@@ -12,6 +12,14 @@ try:
 except ImportError:
     pdfplumber = None
 
+try:
+    import pytesseract
+    from pdf2image import convert_from_path
+except ImportError:
+    pytesseract = None
+    convert_from_path = None
+
+
 
 # ── Pydantic schemas ───────────────────────────────────────
 class RevisionEntry(BaseModel):
@@ -261,7 +269,7 @@ def normalize_fields(fields: dict) -> dict:
     return fields
 
 
-def extract_locally(pdf_path: str) -> dict:
+def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict:
     fields = {
         "drawingNumber": "",
         "drawingTitle": "",
@@ -283,7 +291,58 @@ def extract_locally(pdf_path: str) -> dict:
     try:
         with pdfplumber.open(pdf_path) as pdf:
             page = pdf.pages[0]
-            text = page.extract_text(layout=True, x_tolerance=2.0)
+            
+            # Stage 1-5 Mode Handling
+            if extraction_mode == "ocr":
+                if pytesseract and convert_from_path:
+                    try:
+                        images = convert_from_path(pdf_path, first_page=1, last_page=1, dpi=300)
+                        if images:
+                            text = pytesseract.image_to_string(images[0])
+                        else:
+                            text = ""
+                    except Exception:
+                        text = ""
+                else:
+                    text = ""
+            elif extraction_mode == "geometric":
+                words = page.extract_words(x_tolerance=1, y_tolerance=1)
+                if not words:
+                    text = ""
+                else:
+                    words.sort(key=lambda w: w['top'])
+                    lines = []
+                    curr = [words[0]]
+                    ctop, cbot = words[0]['top'], words[0]['bottom']
+                    for w in words[1:]:
+                        cy = (w['top'] + w['bottom']) / 2
+                        if ctop - 4 <= cy <= cbot + 4:
+                            curr.append(w)
+                            ctop = min(ctop, w['top'])
+                            cbot = max(cbot, w['bottom'])
+                        else:
+                            lines.append(curr)
+                            curr = [w]
+                            ctop, cbot = w['top'], w['bottom']
+                    if curr:
+                        lines.append(curr)
+                    final_text = []
+                    for l in lines:
+                        l.sort(key=lambda x: x['x0'])
+                        line_str = ''
+                        prev_x1 = -999
+                        for w in l:
+                            if prev_x1 != -999 and w['x0'] - prev_x1 > 5.0:
+                                line_str += ' '
+                            line_str += w['text']
+                            prev_x1 = w['x1']
+                        final_text.append(line_str.strip())
+                    text = '\n'.join(final_text)
+            elif extraction_mode == "raw":
+                text = page.extract_text(layout=False) or ""
+            else: # "layout"
+                text = page.extract_text(layout=True, x_tolerance=2.0) or ""
+
             if not text:
                 return fields
 
@@ -627,6 +686,53 @@ def extract_locally(pdf_path: str) -> dict:
                     for r in rev_date_first:
                         _add_rev(r[1], r[0], r[2])
 
+            # FLEXIBLE FIELD DETECTION (Keywords & Multi-Region & Destination Mapping)
+            if not fields["revisionHistory"]:
+                # Try table-like row: # of Copies | Revision | Destination | Date
+                # Example: ... GRADE: A36  1 0 FOR FABRICATION 09-22-2025
+                row_pattern = re.findall(
+                    r'\b(\d+)[ \t]+([A-Z]|\d{1,2})[ \t]+([A-Za-z][A-Za-z\s]*?)[ \t]+(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})\b',
+                    clean_text, re.I
+                )
+                for r in row_pattern:
+                    val_dest = r[2].strip()
+                    val_dest_up = val_dest.upper()
+                    if val_dest_up == "FORFABRICATION": val_dest = "FOR FABRICATION"
+                    elif val_dest_up == "FORAPPROVAL": val_dest = "FOR APPROVAL"
+                    elif val_dest_up == "FORCONSTRUCTION": val_dest = "FOR CONSTRUCTION"
+
+                    if val_dest.upper() in ["FOR FABRICATION", "FOR APPROVAL", "FOR CONSTRUCTION", "ISSUED FOR APPROVAL", "ISSUED FOR FABRICATION"]:
+                        _add_rev(r[1], r[3], val_dest)
+                    else:
+                        _add_rev(r[1], r[3], val_dest)
+
+            if not fields["revisionHistory"]:
+                # Broad text regex fallback for scattered tables without lines
+                # Group 1: Mark, Group 3: Dest/Remarks, Group 4: Date
+                scattered_pattern = re.findall(
+                    r'\bREV(?:ISION)?\s*([A-Z0-9]{1,2})\b.*?(?:REMARKS|DESTINATION|STATUS)\s*([A-Za-z\s]{3,25}?).*?(?:DATE)\s*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})',
+                    clean_text, re.I | re.DOTALL
+                )
+                for r in scattered_pattern:
+                    _add_rev(r[0], r[2], r[1].strip())
+
+            if not fields["revisionHistory"]:
+                # Individual keyword extraction across entire page
+                # Date detection keywords
+                date_kw = re.search(r'\b(?:DATE|ISSUE\s+DATE|DRAWING\s+DATE)\s*[:.\-\|]?\s*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2})', clean_text, re.I)
+                # Remarks detection keywords
+                rem_kw = re.search(r'\b(?:REMARKS|DESTINATION|STATUS)\s*[:.\-\|]?\s*([A-Za-z\s]+?)(?=\s\s+|\n|$)', clean_text, re.I)
+                # Revision detection keywords
+                rev_kw = re.search(r'\b(?:REV|REVISION|REVISION/ISSUE)\s*[:.\-\|]?\s*([A-Z]|\d{1,2})\b', clean_text, re.I)
+                
+                if rev_kw or date_kw or rem_kw:
+                    r_mark = rev_kw.group(1) if rev_kw else ("0" if date_kw else "0")
+                    r_date = date_kw.group(1) if date_kw else ""
+                    r_rem = rem_kw.group(1).strip() if rem_kw else ""
+                    
+                    if r_mark and r_mark not in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT', 'DATE'):
+                         _add_rev(r_mark, r_date, r_rem)
+
             # Sort chronologically (date ascending) so history is in order
             fields["revisionHistory"].sort(key=get_date_val)
 
@@ -647,6 +753,56 @@ def extract_locally(pdf_path: str) -> dict:
 
     except Exception as e:
         fields["description"] = f"Local error: {str(e)}"
+    return fields
+
+
+def extract_locally(pdf_path: str) -> dict:
+    # ── Stage 1 & 2: Standard Text Extraction & Table Detection ──
+    fields = extract_locally_pass(pdf_path, extraction_mode="layout")
+    
+    def is_missing_required(f):
+        req = ["drawingNumber", "drawingTitle", "revision", "date", "remarks"]
+        # If any is totally empty, return True
+        return not all(str(f.get(k, "")).strip() for k in req)
+
+    # ── Stage 3: Coordinate Region / Geometric Interleaved Text Pass ──
+    if is_missing_required(fields):
+        f_geo = extract_locally_pass(pdf_path, extraction_mode="geometric")
+        for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
+            if not fields.get(k) and f_geo.get(k):
+                fields[k] = f_geo[k]
+                
+    # ── Stage 4: OCR Fallback ──
+    if is_missing_required(fields):
+        try:
+            f_ocr = extract_locally_pass(pdf_path, extraction_mode="ocr")
+            for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
+                if not fields.get(k) and f_ocr.get(k):
+                    fields[k] = f_ocr[k]
+        except Exception:
+            pass
+            
+    # ── Stage 5: Regex Validation Pass (Raw Layout=False) ──
+    if is_missing_required(fields):
+        f_raw = extract_locally_pass(pdf_path, extraction_mode="raw")
+        for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
+            if not fields.get(k) and f_raw.get(k):
+                fields[k] = f_raw[k]
+
+    # Post-process missing spaces
+    if fields.get("remarks"):
+        r_up = fields["remarks"].upper()
+        if r_up == "FORFABRICATION": fields["remarks"] = "FOR FABRICATION"
+        elif r_up == "FORAPPROVAL": fields["remarks"] = "FOR APPROVAL"
+        elif r_up == "FORCONSTRUCTION": fields["remarks"] = "FOR CONSTRUCTION"
+
+    if fields.get("revisionHistory"):
+        for rev_entry in fields["revisionHistory"]:
+            entry_up = rev_entry["remarks"].upper()
+            if entry_up == "FORFABRICATION": rev_entry["remarks"] = "FOR FABRICATION"
+            elif entry_up == "FORAPPROVAL": rev_entry["remarks"] = "FOR APPROVAL"
+            elif entry_up == "FORCONSTRUCTION": rev_entry["remarks"] = "FOR CONSTRUCTION"
+
     return fields
 
 
