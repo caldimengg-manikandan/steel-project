@@ -495,8 +495,6 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 norm_mark = re.sub(r'^REV[\s\-_]*', '', str(mark).strip(), flags=re.I).strip().upper()
                 if not norm_mark or norm_mark in seen_marks:
                     return
-
-                    
                 # Skip obvious noise tokens
                 if norm_mark in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT',
                                  'DATE', 'MARK', 'ISSUE', 'REVISION', 'COPIES', 'DESTINATION',
@@ -808,6 +806,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("pdf_path", help="Path to PDF file")
     parser.add_argument("--api_key", default="", help="Removed - Not Used")
+    parser.add_argument("--original_filename", default="", help="Original filename for logging")
     args = parser.parse_args()
 
     pdf_path = args.pdf_path
