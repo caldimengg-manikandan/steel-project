@@ -74,9 +74,12 @@ def safe_get(lst: Any, idx: Any, default: Any = "") -> Any:
     return default
 
 
-BODY_NOTE_PATTERN = re.compile(r'^\s*(?:PAINT|PREPARATION|SSPC)\b', re.I)
+BODY_NOTE_PATTERN = re.compile(
+    r'^\s*(?:PAINT|PREPARATION|SSPC|FINISH|GALV|COATING|PRIMER|NOTES?|SPECIFICATIONS?|FABRICATION|ERECTION|WELDING|GENERAL)\b',
+    re.I
+)
 HARD_STOP_PATTERN = re.compile(
-    r'^\s*(?:Scale|Ref(?:erence)?|Contract\s*#|Drawing\s*#|Approved|Contractor)\b',
+    r'^\s*(?:Scale|Ref(?:erence)?|Contract\s*#|Drawing\s*#|Approved|Contractor|Date|Rev|Weight|Material|Project|Client)\b',
     re.I
 )
 
@@ -145,7 +148,7 @@ def clean_rem(s):
     patterns = [
         r'DRAWN\s+BY', r'PROJ[.\s]*NO', r'PROJ', r'DATE', r'CONTRACTOR',
         r'CHECKED\s+BY', r'CHECKED', r'NO\b', r'N\s*O\b', r'REV[.\s]*#',
-        r'REV\b', r'MARK\b', r'PAGE\b', r'DWG\b', r'HOLES', r'PAINT'
+        r'REV\b', r'MARK\b', r'PAGE\b', r'DWG\b', r'HOLES', r'PAINT', r'FINISH'
     ]
     regex = r'\s+(?:' + '|'.join(patterns) + r')\b'
     parts = re.split(regex, s, flags=re.I)
@@ -153,6 +156,42 @@ def clean_rem(s):
     res = re.sub(r'\s+', ' ', res)
     res = re.sub(r'[:.\-\s]+$', '', res)
     return res
+
+
+def is_valid_title_candidate(s: str) -> bool:
+    """Check if string is a plausible drawing title (not a note, status, or date)."""
+    if not s or len(s.strip()) < 3:
+        return False
+    # Avoid purely numeric/date strings
+    if re.match(r'^[\d\s\-\./\#]+$', s):
+        return False
+    s_up = s.upper().strip()
+    if BODY_NOTE_PATTERN.match(s_up):
+        return False
+    if any(bad in s_up for bad in BAD_TITLES):
+        return False
+    # Exclude common status phrases
+    if s_up in ("FOR FABRICATION", "FOR APPROVAL", "FOR CONSTRUCTION", "ISSUED FOR APPROVAL"):
+        return False
+    # Exclude standard finish specs that might have been caught
+    if re.match(r'^(?:PAINT|FINISH|GALV|COAT)\b', s_up):
+        return False
+    return True
+
+
+def score_title(s: str) -> int:
+    """Score title quality based on keywords."""
+    if not is_valid_title_candidate(s):
+        return -1
+    score = 10  # base score
+    s_up = s.upper()
+    if any(k in s_up for k in KEYWORDS):
+        score += 50
+    if "DETAIL" in s_up:
+        score += 20
+    if len(s) > 60:
+        score -= 10
+    return score
 
 
 def get_date_val(r):
@@ -422,102 +461,61 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 pl_match = re.search(r'(?:DWG\s+)?(pl\d{3,}|[A-Z\d]{5,})', clean_text, re.I)
                 fields["drawingNumber"] = pl_match.group(1) if pl_match else (fn_hint or os.path.basename(pdf_path).replace(".pdf", ""))
 
-            # --- 2. Drawing Title ---
-            lines = clean_text.splitlines()
+            # --- 2. Drawing Title (Multi-pass extraction) ---
+            all_lines: List[str] = clean_text.splitlines()
+            candidates = []
 
-            if not fields["drawingTitle"]:
-                dt_match = re.search(r'Drawing\s*Title\s*:\s*(\S[^\n]*)', clean_text, re.I)
-                if dt_match:
-                    val = strip_leading_date(dt_match.group(1).strip())
-                    if (len(val) > 1 and not re.match(r'^[\d/\-\.\s]+$', val) and not BODY_NOTE_PATTERN.match(val)):
-                        fields["drawingTitle"] = val
+            # Pass A: Regex for "Drawing Title :" or "DWG DESCRIPTION :"
+            m1 = re.search(r'Drawing\s*Title\s*[:.\s]+(\S[^\n]*)', clean_text, re.I)
+            if m1: candidates.append(m1.group(1).strip())
+            
+            m2 = re.search(r'DWG\s+DESCRIPTION\s*[:.\-\s]*\n?\s*([A-Z0-9\s,&/\-]+?)(?=\s\s+|\n|[A-Z]{3,}:|$)', clean_text, re.I)
+            if m2: candidates.append(m2.group(1).strip())
 
-            if not fields["drawingTitle"]:
-                for i, line in enumerate(lines):
-                    if re.search(r'Drawing\s*Title\s*:\s*$', line.rstrip(), re.I):
-                        title_parts = []
-                        j = i + 1
-                        while j < min(i + 8, len(lines)):
-                            line_j = lines[j] # type: ignore
-                            candidate = str(line_j or "").strip()
-                            j += 1
-                            if not candidate:
-                                continue
-                            if BODY_NOTE_PATTERN.match(candidate):
-                                continue
-                            candidate_no_date = strip_leading_date(candidate)
-                            if re.match(r'^[\d/\-\.\s]+$', candidate_no_date) or not candidate_no_date:
-                                continue
-                            if HARD_STOP_PATTERN.match(candidate_no_date):
-                                break
-                            title_parts.append(candidate_no_date)
-                        if title_parts:
-                            fields["drawingTitle"] = " ".join(title_parts)
-                        break
-
-            if not fields["drawingTitle"]:
-                # Multiline-safe DWG DESCRIPTION regex
-                # Handles "DWG DESCRIPTION :\n HORIZONTAL BRACE DETAIL" or "DWG DESCRIPTION: HARIZONTAL..."
-                dt_match_alt = re.search(r'DWG\s+DESCRIPTION\s*[:.\-\s]*\n?\s*([A-Z0-9\s,&/\-]+?)(?=\s\s+|\n|[A-Z]{3,}:|$)', clean_text, re.I)
-                if dt_match_alt:
-                    val = dt_match_alt.group(1).strip()
-                    if len(val) > 2 and not BODY_NOTE_PATTERN.match(val):
-                        fields["drawingTitle"] = val
-
-            if not fields["drawingTitle"]:
-                for line in reversed(lines):
-                    if re.search(r'DWG\s+DESCRIPTION', line, re.I):
-                        m = re.search(r'DWG\s+DESCRIPTION\s*[:\s]\s*(.+)', line, re.I)
-                        if m:
-                            val = m.group(1).strip()
-                            if len(val) > 1:
-                                fields["drawingTitle"] = val
-                                break
-
-            if not fields["drawingTitle"]:
-                for line in reversed(lines):
-                    if re.search(r'(?<!PROJECT\s)DESCRIPTION', line, re.I) and \
-                       not re.search(r'DWG\s+DESCRIPTION|PROJECT\s+DESCRIPTION', line, re.I):
-                        m = re.search(r'DESCRIPTION\s*[:.\s]+(.*?)(?=\n|[A-Z]{3,}:|MARK|QTY|FT|IN|WEIGHT|DATE|REV|PAGE|DWG|$)', line, re.I)
-                        if m and len(m.group(1).strip()) > 2:
-                            fields["drawingTitle"] = m.group(1).strip()
+            # Pass B: Scan lines for "DWG DESCRIPTION" or similar
+            for i, line in enumerate(all_lines):
+                if re.search(r'(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', line, re.I):
+                    m = re.search(r'DESCRIPTION\s*[:.\s]+(.*?)(?=\s\s+|\n|[A-Z]{3,}:|$)', line, re.I)
+                    if m: candidates.append(m.group(1).strip())
+                
+                # Check lines below a title label if label is alone
+                if re.search(r'Drawing\s*Title\s*:\s*$', line.rstrip(), re.I):
+                    for j in range(i + 1, min(i + 5, len(all_lines))):
+                        line_j = all_lines[j] # type: ignore
+                        candidate = line_j.strip()
+                        if candidate and not HARD_STOP_PATTERN.match(candidate):
+                            candidates.append(candidate)
+                        else:
                             break
 
-            # Fallback
-            if not fields["drawingTitle"]:
-                complex_match = re.search(r'\b(.*?(?:FRAME|STAIR|RAILING|HANDRAIL|BEAM|COLUMN|PLATE|LADDER)\s+DETAIL.*?)(?=\n|$)', clean_text, re.I)
-                if complex_match and len(complex_match.group(1)) < 60:
-                    fields["drawingTitle"] = complex_match.group(1).strip()
-                else:
-                    for line in lines:
-                        line_clean = line.strip()
-                        if 3 < len(line_clean) < 60 and not BODY_NOTE_PATTERN.match(line_clean) and not re.search(r'DWG\s+DESCRIPTION', line_clean, re.I):
-                            if any(w in line_clean.upper() for w in KEYWORDS) and ('DETAIL' in line_clean.upper() or 'FRAME' in line_clean.upper() or 'MISCELLANEOUS' in line_clean.upper()):
-                                if 'SHOP' not in line_clean.upper() and 'WELD' not in line_clean.upper() and 'NOT' not in line_clean.upper() and 'FABRICATOR' not in line_clean.upper():
-                                    fields["drawingTitle"] = line_clean
-                                    break
-                    
-                    if not fields["drawingTitle"]:
-                        for word in KEYWORDS:
-                            if re.search(rf'^\s*{word}\s*$', clean_text, re.M | re.I):
-                                fields["drawingTitle"] = word
-                                break
-                        if not fields["drawingTitle"]:
-                            for word in KEYWORDS:
-                                if re.search(rf'\b{word}\s+DETAIL\b', clean_text, re.I):
-                                    fields["drawingTitle"] = f"{word} DETAIL"
-                                    break
-                if not fields.get("drawingTitle"):
-                    for word in KEYWORDS:
-                        if isinstance(word, str) and word.upper() in clean_text.upper():
-                            fields["drawingTitle"] = word
-                            break
+            # Pass C: Reversed search (common for bottom right title blocks)
+            for line in reversed(all_lines):
+                if re.search(r'DWG\s+DESCRIPTION', line, re.I):
+                    m = re.search(r'DWG\s+DESCRIPTION\s*[:.\s]+\s*(.+)', line, re.I)
+                    if m: candidates.append(m.group(1).strip())
+            
+            # Pass D: FALLBACK - Keyword search
+            complex_match = re.search(r'\b(.*?(?:FRAME|STAIR|RAILING|HANDRAIL|BEAM|COLUMN|PLATE|LADDER)\s+DETAIL.*?)(?=\n|$)', clean_text, re.I)
+            if complex_match: candidates.append(complex_match.group(1).strip())
 
-            if isinstance(fields.get("drawingTitle"), str) and fields["drawingTitle"]:
-                if fields["drawingTitle"].upper() in BAD_TITLES:
-                    fields["drawingTitle"] = ""
-                if fields.get("drawingTitle"):
-                    fields["drawingTitle"] = re.sub(r'^(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', '', fields["drawingTitle"], flags=re.I).strip()
+            for word in KEYWORDS:
+                if re.search(rf'^\s*{word}\s*$', clean_text, re.M | re.I):
+                    candidates.append(word)
+                if re.search(rf'\b{word}\s+DETAIL\b', clean_text, re.I):
+                    candidates.append(f"{word} DETAIL")
+
+            # Final Selection: pick highest score
+            best_title = ""
+            best_score = -1
+            for cand in candidates:
+                cand_clean = re.sub(r'^(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', '', cand, flags=re.I).strip()
+                s = score_title(cand_clean)
+                if s > best_score:
+                    best_score = s
+                    best_title = cand_clean
+            
+            fields["drawingTitle"] = best_title
+            fields["drawingDescription"] = best_title # Also populate description for consistency
 
             # --- 3. Metadata ---
             # Using \s*[:.\-\s]*\n?\s* so if the value is printed on the next line or after much space, we still grab it

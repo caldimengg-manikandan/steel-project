@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { adminListProjects } from '../../services/projectApi';
 import {
     listRfiExtractions,
@@ -45,6 +46,7 @@ const IconPdf = () => (
 
 export default function AdminRfi() {
     const { user } = useAuth();
+    const location = useLocation();
 
     const [projects, setProjects] = useState<any[]>([]);
     const [selectedProject, setSelectedProject] = useState<any | null>(null);
@@ -73,12 +75,26 @@ export default function AdminRfi() {
         (async () => {
             try {
                 const data = await adminListProjects();
-                setProjects(data.projects || []);
-                if (data.projects?.length > 0) setSelectedProject(data.projects[0]);
+                const fetchedProjects = data.projects || [];
+                setProjects(fetchedProjects);
+                
+                if (fetchedProjects.length > 0) {
+                    const stateProjectId = location.state?.projectId;
+                    if (stateProjectId) {
+                        const target = fetchedProjects.find((p: any) => (p._id || p.id) === stateProjectId);
+                        if (target) {
+                            setSelectedProject(target);
+                        } else {
+                            setSelectedProject(fetchedProjects[0]);
+                        }
+                    } else {
+                        setSelectedProject(fetchedProjects[0]);
+                    }
+                }
             } catch (err) { console.error(err); }
             finally { setLoadingProjects(false); }
         })();
-    }, []);
+    }, [location.state]);
 
     const loadExtractions = useCallback(async () => {
         if (!selectedProject) return;

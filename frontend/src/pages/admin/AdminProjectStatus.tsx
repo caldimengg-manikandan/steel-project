@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminListProjects, downloadProjectStatusExcel } from '../../services/projectApi';
 import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
@@ -48,6 +49,7 @@ function IconChevron({ open }: { open: boolean }) {
 }
 
 export default function AdminProjectStatus() {
+    const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -238,29 +240,45 @@ export default function AdminProjectStatus() {
                                     </div>
                                     <div 
                                         className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'OPEN' ? 'active-stat-selection' : ''}`} 
-                                        style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                                        onClick={() => handleToggleRfis(project.id, 'OPEN')}
+                                        style={{ transition: 'all 0.2s' }}
                                     >
-                                        <div className="project-status-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <div 
+                                            className="project-status-stat-label" 
+                                            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                            onClick={(e) => { e.stopPropagation(); handleToggleRfis(project.id, 'OPEN'); }}
+                                        >
                                             Open RFIs <IconChevron open={isSectionExpanded && expandedRfiFilter === 'OPEN'} />
                                         </div>
-                                        <div className="project-status-stat-value" style={{ color: openRfiCount > 0 ? 'var(--color-danger-mid)' : 'inherit' }}>
-                                            {openRfiCount}
+                                        <div 
+                                            onClick={() => navigate('/admin/rfi', { state: { projectId: project.id } })}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <div className="project-status-stat-value" style={{ color: openRfiCount > 0 ? 'var(--color-danger-mid)' : 'inherit' }}>
+                                                {openRfiCount}
+                                            </div>
+                                            <div className="project-status-stat-sub">unresolved questions</div>
                                         </div>
-                                        <div className="project-status-stat-sub">unresolved questions</div>
                                     </div>
                                     <div 
                                         className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'CLOSED' ? 'active-stat-selection' : ''}`}
-                                        style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                                        onClick={() => handleToggleRfis(project.id, 'CLOSED')}
+                                        style={{ transition: 'all 0.2s' }}
                                     >
-                                        <div className="project-status-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <div 
+                                            className="project-status-stat-label" 
+                                            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                            onClick={(e) => { e.stopPropagation(); handleToggleRfis(project.id, 'CLOSED'); }}
+                                        >
                                             Closed RFIs <IconChevron open={isSectionExpanded && expandedRfiFilter === 'CLOSED'} />
                                         </div>
-                                        <div className="project-status-stat-value" style={{ color: closedRfiCount > 0 ? 'var(--color-success-mid)' : 'inherit' }}>
-                                            {closedRfiCount}
+                                        <div 
+                                            onClick={() => navigate('/admin/rfi', { state: { projectId: project.id } })}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <div className="project-status-stat-value" style={{ color: closedRfiCount > 0 ? 'var(--color-success-mid)' : 'inherit' }}>
+                                                {closedRfiCount}
+                                            </div>
+                                            <div className="project-status-stat-sub">resolved items</div>
                                         </div>
-                                        <div className="project-status-stat-sub">resolved items</div>
                                     </div>
 
                                     {/* Change Order Column */}
@@ -338,7 +356,22 @@ export default function AdminProjectStatus() {
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                 {filteredRfis.map((rfi, idx) => (
-                                                    <div key={idx} style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: 8, padding: '12px 14px', position: 'relative', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                                    <div 
+                                                        key={idx} 
+                                                        onClick={() => navigate('/admin/rfi', { state: { projectId: project.id } })}
+                                                        style={{ 
+                                                            background: '#fff', 
+                                                            border: '1px solid var(--color-border-light)', 
+                                                            borderRadius: 8, 
+                                                            padding: '12px 14px', 
+                                                            position: 'relative', 
+                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                                                            cursor: 'pointer',
+                                                            transition: 'transform 0.1s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                                    >
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 6 }}>
                                                             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: 4 }}>
                                                                 #{rfi.rfiNumber || (idx + 1)}

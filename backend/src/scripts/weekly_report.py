@@ -1,17 +1,18 @@
 import os
 import sys
-import smtplib
-import schedule
 import time
-import datetime
+import schedule
+import pymongo
+from datetime import datetime
+import datetime as dt_module
+from dotenv import load_dotenv
+import smtplib
 import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from pymongo import MongoClient
-from dotenv import load_dotenv
-from openpyxl import Workbook
+import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.drawing.image import Image
 
@@ -20,232 +21,252 @@ load_dotenv()
 
 # --- Configuration ---
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/steel_dms")
-DB_NAME = "steel_dms" # Default from .env or override
-REPORT_RECIPIENT = "hariithejj05@gmail.com"
-EMAIL_SENDER = os.getenv("EMAIL_USER", "steel-dms-reports@example.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASS", "") # Needs to be set in .env
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+RECIPIENT_EMAIL = "thejathangavel05@gmail.com"
 
-# Path to logo (relative to backend)
-LOGO_PATH = os.path.join(os.path.dirname(__file__), "../../../frontend/src/assets/excel_im/excel_img.png")
+# Path to logo for Excel branding
+LOGO_PATH = r"c:\Users\Arshad Ibrahim\steel-project\frontend\src\assets\logo\caldim_engineering_logo.jpg"
 
 def get_project_stats():
-    """Fetches project statistics from MongoDB."""
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
+    """Fetch project statistics using aggregation, scoped to the user's admin ID."""
+    from bson import ObjectId
+    client = pymongo.MongoClient(MONGO_URI)
+    db = client.get_database()
     
-    projects_coll = db["projects"]
-    drawings_coll = db["drawings"]
-    rfis_coll = db["rfis"]
+    # Target Admin ID for the live projects (admin1)
+    ADMIN_ID = ObjectId("699d4924d9dfdefb578dce14")
     
-    projects_data = []
-    
-    for proj in projects_coll.find():
-        proj_id = proj["_id"]
+    # 1. Fetch live projects for this admin
+    projects = list(db.projects.find({"createdByAdminId": ADMIN_ID, "status": "active"}))
+    if not projects:
+        client.close()
+        return []
         
-        # Aggregating drawing stats
-        drawing_count = drawings_coll.count_documents({"projectId": proj_id})
+    project_ids = [p['_id'] for p in projects]
+    stats = []
+
+    # 2. Aggregate Drawing Stats (Matching adminProjectsController.js)
+    pipeline_drawings = [
+        {"$match": {"projectId": {"$in": project_ids}}},
+        {"$group": {
+            "_id": "$projectId",
+            "totalCount": {"$sum": 1},
+            "approvalCount": {
+                "$sum": {
+                    "$cond": [
+                        {
+                            "$or": [
+                                {"$regexMatch": {"input": {"$ifNull": ["$extractedFields.revision", ""]}, "regex": r"^(rev\s*)?[a-z]", "options": "i"}},
+                                {"$regexMatch": {"input": {"$ifNull": ["$extractedFields.remarks", ""]}, "regex": r"approved|approval", "options": "i"}},
+                                {"$regexMatch": {"input": {"$ifNull": ["$extractedFields.description", ""]}, "regex": r"approved|approval", "options": "i"}}
+                            ]
+                        }, 1, 0
+                    ]
+                }
+            },
+            "fabricationCount": {
+                "$sum": {
+                    "$cond": [
+                        {"$regexMatch": {"input": {"$ifNull": ["$extractedFields.revision", ""]}, "regex": r"^(rev\s*)?[0-9]", "options": "i"}},
+                        1, 0
+                    ]
+                }
+            }
+        }}
+    ]
+    drawing_stats = {res['_id']: res for res in db.drawing_extractions.aggregate(pipeline_drawings)}
+
+    # 3. Aggregate RFI Stats
+    pipeline_rfis = [
+        {"$match": {"projectId": {"$in": project_ids}}},
+        {"$unwind": "$rfis"},
+        {"$group": {
+            "_id": "$projectId",
+            "openCount": {"$sum": {"$cond": [{"$eq": ["$rfis.status", "OPEN"]}, 1, 0]}},
+            "closedCount": {"$sum": {"$cond": [{"$eq": ["$rfis.status", "CLOSED"]}, 1, 0]}}
+        }}
+    ]
+    rfi_stats = {res['_id']: res for res in db.rfiextractions.aggregate(pipeline_rfis)}
+
+    # 4. Assemble Results
+    for proj in projects:
+        p_id = proj['_id']
+        d_stat = drawing_stats.get(p_id, {})
+        r_stat = rfi_stats.get(p_id, {})
         
-        # Approval vs Fabrication counts (approximation based on revision history)
-        # Note: In a production system, these would be indexed counters
-        approval_count = 0
-        fabrication_count = 0
+        total = d_stat.get("totalCount", 0)
+        approved = d_stat.get("approvalCount", 0)
+        fabricated = d_stat.get("fabricationCount", 0)
+        approx = proj.get("approximateDrawingsCount") or 0
         
-        drawings = drawings_coll.find({"projectId": proj_id})
-        for dwg in drawings:
-            fields = dwg.get("extractedFields", {})
-            rev = str(fields.get("revision", "")).upper()
-            if rev.isdigit():
-                fabrication_count += 1
-            elif rev and rev.isalpha():
-                approval_count += 1
-        
-        # RFI Stats
-        open_rfis = rfis_coll.count_documents({"projectId": proj_id, "status": "open"})
-        closed_rfis = rfis_coll.count_documents({"projectId": proj_id, "status": "closed"})
-        
-        projects_data.append({
-            "name": proj.get("name", "N/A"),
-            "client": proj.get("clientName", "N/A"),
-            "status": proj.get("status", "active"),
-            "approximate": proj.get("approximateDrawingsCount", 0),
-            "actual": drawing_count,
-            "approval": approval_count,
-            "fabrication": fabrication_count,
-            "open_rfis": open_rfis,
-            "closed_rfis": closed_rfis
+        # Calculate percentages based on approximate count as per UI
+        approval_pct = round((approved / approx * 100), 1) if approx > 0 else 0
+        fab_pct = round((fabricated / approx * 100), 1) if approx > 0 else 0
+
+        stats.append({
+            "name": proj.get("name", "Unknown"),
+            "client": proj.get("clientName", "Unknown"),
+            "total_drawings": total,
+            "approved": approved,
+            "fabricated": fabricated,
+            "open_rfis": r_stat.get("openCount", 0),
+            "closed_rfis": r_stat.get("closedCount", 0),
+            "approval_pct": approval_pct,
+            "fab_pct": fab_pct
         })
-    
-    client.close()
-    return projects_data
-
-def generate_report_excel(data):
-    """Generates the Project Status Excel file."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Project Status"
-    
-    # --- Styling ---
-    pink_fill = PatternFill(start_color="FFFF9999", end_color="FFFF9999", fill_type="solid")
-    yellow_fill = PatternFill(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")
-    header_font = Font(bold=True, size=11)
-    brand_font = Font(bold=True, size=14)
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-    
-    # --- Branding ---
-    if os.path.exists(LOGO_PATH):
-        try:
-            img = Image(LOGO_PATH)
-            # Scale if needed, but here we just place it
-            ws.add_image(img, 'A1')
-        except Exception as e:
-            print(f"Error adding logo: {e}")
-
-    # Spacer for logo (rows 1-5)
-    for r in range(1, 7):
-        ws.row_dimensions[r].height = 18
         
-    # Brand Row
-    ws.merge_cells('A7:L7')
-    brand_cell = ws['A7']
-    brand_cell.value = "CALDIM ENGINEERING PVT LTD - PROJECT STATUS REPORT"
-    brand_cell.fill = pink_fill
-    brand_cell.font = brand_font
-    brand_cell.alignment = Alignment(horizontal="center", vertical="middle")
-    ws.row_dimensions[7].height = 30
+    client.close()
+    return stats
+
+def generate_report_excel(stats):
+    """Generate a styled Excel report."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Project Status Report"
     
-    # Date Row
-    ws.merge_cells('I8:L8')
-    date_cell = ws['I8']
-    date_cell.value = f"Generated On: {datetime.date.today().strftime('%d/%m/%Y')}"
-    date_cell.alignment = Alignment(horizontal="right")
+    # 1. Branding Header
+    if os.path.exists(LOGO_PATH):
+        img = Image(LOGO_PATH)
+        img.width = 120
+        img.height = 45
+        ws.add_image(img, 'A1')
     
-    # Headers
+    ws['C2'] = "PROJECT STATUS WEEKLY REPORT"
+    ws['C2'].font = Font(size=18, bold=True, color="1F4E78")
+    ws['C2'].alignment = Alignment(horizontal="center")
+    
+    ws['C3'] = f"Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    ws['C3'].font = Font(italic=True)
+    ws['C3'].alignment = Alignment(horizontal="center")
+    
+    # 2. Table Headers
     headers = [
-        "Project Name", "Client/Fabricator", "Status", 
-        "Approximate Drawings", "Extracted Drawings", 
-        "Approved Count", "Fabrication Count",
-        "Approval %", "Fabrication %",
-        "Open RFIs", "Closed RFIs", "Overall Status"
+        "Project Name", "Client", "Total Drawings", "Approved", "Fabricated", 
+        "Approval %", "Fabrication %", "Open RFIs", "Closed RFIs"
     ]
     
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=10, column=col_num)
-        cell.value = header
-        cell.fill = yellow_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="middle", wrap_text=True)
-        cell.border = thin_border
-
-    ws.row_dimensions[10].height = 30
+    header_row = 6
+    for col, text in enumerate(headers, 1):
+        cell = ws.cell(row=header_row, column=col, value=text)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+    # 3. Data Rows
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'), 
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
     
-    # Data
-    for row_idx, proj in enumerate(data, 11):
-        approx = proj["approximate"] or 1 # Avoid division by zero
-        app_pct = round((proj["approval"] / approx) * 100)
-        fab_pct = round((proj["fabrication"] / approx) * 100)
+    for i, p in enumerate(stats, 1):
+        row = header_row + i
+        ws.cell(row=row, column=1, value=p['name']).border = thin_border
+        ws.cell(row=row, column=2, value=p['client']).border = thin_border
+        ws.cell(row=row, column=3, value=p['total_drawings']).border = thin_border
+        ws.cell(row=row, column=4, value=p['approved']).border = thin_border
+        ws.cell(row=row, column=5, value=p['fabricated']).border = thin_border
         
-        row_data = [
-            proj["name"], proj["client"], proj["status"].capitalize(),
-            proj["approximate"], proj["actual"],
-            proj["approval"], proj["fabrication"],
-            f"{app_pct}%", f"{fab_pct}%",
-            proj["open_rfis"], proj["closed_rfis"], "In Progress" if proj["status"] == "active" else proj["status"].capitalize()
-        ]
+        # Pcts with conditional coloring
+        app_cell = ws.cell(row=row, column=6, value=f"{p['approval_pct']}%")
+        app_cell.border = thin_border
+        if p['approval_pct'] >= 90: app_cell.font = Font(color="00B050", bold=True)
         
-        for col_idx, value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            cell.value = value
-            cell.border = thin_border
-            cell.alignment = Alignment(horizontal="center", vertical="middle")
+        fab_cell = ws.cell(row=row, column=7, value=f"{p['fab_pct']}%")
+        fab_cell.border = thin_border
+        if p['fab_pct'] >= 90: fab_cell.font = Font(color="00B050", bold=True)
+        
+        # RFI coloring
+        open_cell = ws.cell(row=row, column=8, value=p['open_rfis'])
+        open_cell.border = thin_border
+        if p['open_rfis'] > 0: open_cell.font = Font(color="FF0000", bold=True)
+        
+        ws.cell(row=row, column=9, value=p['closed_rfis']).border = thin_border
 
-    # Column Widths
-    ws.column_dimensions['A'].width = 35
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 15
-    ws.column_dimensions['D'].width = 20
-    ws.column_dimensions['E'].width = 20
-    ws.column_dimensions['F'].width = 15
-    ws.column_dimensions['G'].width = 15
-    ws.column_dimensions['H'].width = 12
-    ws.column_dimensions['I'].width = 12
-    ws.column_dimensions['J'].width = 12
-    ws.column_dimensions['K'].width = 12
-    ws.column_dimensions['L'].width = 20
+    # Adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except: pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = adjusted_width
 
-    filename = f"Project_Status_{datetime.date.today().strftime('%Y%m%d')}.xlsx"
-    filepath = os.path.join(os.path.dirname(__file__), "../../uploads/temp_reports", filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    filename = f"Project_Status_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    wb.save(filename)
+    return filename
 
-def send_email(attachment_path):
-    """Sends the report via email."""
-    if not EMAIL_PASSWORD:
-        print("Error: EMAIL_PASS not set in .env. Skipping email.")
+def send_email(filename):
+    """Send email with attachment."""
+    if not EMAIL_USER or not EMAIL_PASS:
+        print("Error: EMAIL_USER or EMAIL_PASS not set in environment.")
         return False
         
     msg = MIMEMultipart()
-    msg['From'] = EMAIL_SENDER
-    msg['To'] = REPORT_RECIPIENT
-    msg['Subject'] = "Weekly Project Status Report"
+    msg['From'] = EMAIL_USER
+    msg['To'] = RECIPIENT_EMAIL
+    msg['Subject'] = f"Weekly Project Status Report - {datetime.now().strftime('%d %b %Y')}"
     
-    body = f"""Hello,
+    body = f"""
+    Dear Detailing Team,
     
-Please find the attached Weekly Project Status Report for all currently active drawings.
-
-Generation Date: {datetime.date.today().strftime('%B %d, %Y')}
-
-Best Regards,
-Steel DMS Automated System
-"""
+    Please find attached the automated Weekly Project Status Report for the steel detailing projects.
+    
+    Summary of Active Projects: {datetime.now().strftime('%Y-%m-%d')}
+    
+    This is an automated report generated by the Steel DMS system.
+    """
     msg.attach(MIMEText(body, 'plain'))
     
-    filename = os.path.basename(attachment_path)
+    with open(filename, "rb") as attachment:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {filename}")
+        msg.attach(part)
+        
     try:
-        with open(attachment_path, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header('Content-Disposition', f"attachment; filename= {filename}")
-            msg.attach(part)
-            
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-            server.starttls()
-            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            text = msg.as_string()
-            server.sendmail(EMAIL_SENDER, REPORT_RECIPIENT, text)
-            server.quit()
-            print(f"Email sent successfully to {REPORT_RECIPIENT}")
-            return True
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.send_message(msg)
+        server.quit()
+        print(f"Successfully sent report to {RECIPIENT_EMAIL}")
+        return True
     except Exception as e:
         print(f"Failed to send email: {e}")
         return False
 
 def job():
-    """The main scheduled job."""
-    print(f"[{datetime.datetime.now()}] Starting weekly report generation...")
+    print(f"Starting scheduled report job at {datetime.now()}")
     try:
-        data = get_project_stats()
-        report_path = generate_report_excel(data)
-        send_email(report_path)
-        print(f"[{datetime.datetime.now()}] Job completed.")
+        stats = get_project_stats()
+        if not stats:
+            print("No active projects found. Skipping report.")
+            return
+        filename = generate_report_excel(stats)
+        success = send_email(filename)
+        if success:
+            os.remove(filename)  # Clean up after sending
     except Exception as e:
-        print(f"Error in scheduled job: {e}")
+        print(f"Error in report job: {e}")
 
-# --- Scheduler ---
 def run_scheduler():
-    # Schedule for Wednesday at 09:00 AM
-    schedule.every().wednesday.at("09:00").do(job)
+    # Schedule the job for TUESDAY at 12:00 PM
+    schedule.every().tuesday.at("12:00").do(job)
     
-    print("Scheduler started. Waiting for next Wednesday...")
+    print(f"Scheduler started. Waiting for Tuesday 12:00 PM... (Current time: {datetime.now().strftime('%A %H:%M')})")
+    
     while True:
         schedule.run_pending()
         time.sleep(60)
 
 if __name__ == "__main__":
-    # If run with --now flag, trigger immediately
     if "--now" in sys.argv:
         job()
     else:
