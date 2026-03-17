@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-        const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const BASE = import.meta.env.VITE_API_URL || '/api';
 
         try {
             // First, try Admin login

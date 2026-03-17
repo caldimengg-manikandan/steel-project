@@ -9,7 +9,7 @@
 
 import type { DrawingExtraction } from '../types';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 // ── Auth token helper ─────────────────────────────────────
 function getToken(): string {
