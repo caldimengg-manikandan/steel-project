@@ -1,6 +1,8 @@
 {
-    "python.defaultInterpreterPath": "C:\\Users\\vibhu\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+    "python.defaultInterpreterPath": "C:\\Program Files\\Python312\\python.exe",
     "python.analysis.extraPaths": [
         "./backend/src/scripts"
-    ]
+    ],
+    "python.analysis.useLibraryCodeForTypes": true,
+    "python.analysis.typeCheckingMode": "basic"
 }

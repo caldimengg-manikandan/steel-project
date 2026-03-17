@@ -4,28 +4,28 @@ import json
 import argparse
 import re
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, cast
 
 # --- Dependency handling ---
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field # type: ignore
 except ImportError:
-    class Field:
-        def __init__(self, default=None, **kwargs): self.default = default
+    from typing import Any
+    def Field(default=None, **kwargs) -> Any: return default
     class BaseModel:
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: Any):
             for k, v in kwargs.items(): setattr(self, k, v)
         @classmethod
-        def parse_obj(cls, obj): return cls(**obj)
+        def parse_obj(cls, obj: dict) -> Any: return cls(**obj)
 
 try:
-    import pdfplumber
+    import pdfplumber # type: ignore
 except ImportError:
     pdfplumber = None
 
 try:
-    import pytesseract
-    from pdf2image import convert_from_path
+    import pytesseract # type: ignore
+    from pdf2image import convert_from_path # type: ignore
 except ImportError:
     pytesseract = None
     convert_from_path = None
@@ -54,6 +54,18 @@ class DrawingFields(BaseModel):
 
 
 # ── Constants & Helpers ─────────────────────────────────────
+def safe_get(lst: Any, idx: Any, default: Any = "") -> Any:
+    """Safely get from a list by index, bypassing strict type checking."""
+    try:
+        if lst is not None and idx is not None:
+            idx_int = int(idx)
+            if idx_int >= 0 and len(list(lst)) > idx_int:
+                return list(lst)[idx_int]
+    except Exception:
+        pass
+    return default
+
+
 BODY_NOTE_PATTERN = re.compile(r'^\s*(?:PAINT|PREPARATION|SSPC)\b', re.I)
 HARD_STOP_PATTERN = re.compile(
     r'^\s*(?:Scale|Ref(?:erence)?|Contract\s*#|Drawing\s*#|Approved|Contractor)\b',
@@ -74,18 +86,30 @@ BAD_TITLES = {"MARK", "QTY", "FT IN", "WEIGHT", "MATERIAL", "DATE", "REV", "CHEC
 def normalize_date_string(date_str):
     if not date_str:
         return ""
+    
+    # Extract only the relevant date part to avoid trailing/leading junk characters
+    m_ext = re.search(r'(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2})|'
+                      r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{4})', date_str, re.I)
+    if m_ext:
+        date_str = m_ext.group(1)
+
     d = date_str.strip().replace("/", "-").replace(".", "-")
+    d = re.sub(r'\s+', '', d)
+
     # Handle "Jul 28 2025" -> "28-07-2025"
-    m = re.search(r'([A-Z]{3,})\s+(\d{1,2})\s+(\d{4})', d, re.I)
+    m = re.search(r'([A-Z]{3,})\s*(\d{1,2})\s*(\d{4})', d, re.I)
     if m:
         month_map = {
             'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
             'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
         }
-        month_abbr = m.group(1)[:3].upper()
-        month = month_map.get(month_abbr)
-        if month:
-            return f"{int(m.group(2)):02d}-{month}-{m.group(3)}"
+        m_g1 = m.group(1)
+        if m_g1:
+            m_g1_str: Any = str(m_g1)
+            month_abbr = m_g1_str[0:3].upper() # type: ignore
+            month = month_map.get(month_abbr)
+            if month:
+                return f"{int(m.group(2)):02d}-{month}-{m.group(3)}" # type: ignore
     return d
 
 
@@ -106,6 +130,10 @@ def fix_doubled(m):
 def clean_rem(s):
     if not s:
         return ""
+    
+    # Strip leading 'x ', 'X ', 'v ', '*', or '-' noise that often comes from PDF checkmarks or artifacts
+    s = re.sub(r'^[xXv\*\-\.\s]+(?=[A-Z0-9])', '', s).strip()
+    
     patterns = [
         r'DRAWN\s+BY', r'PROJ[.\s]*NO', r'PROJ', r'DATE', r'CONTRACTOR',
         r'CHECKED\s+BY', r'CHECKED', r'NO\b', r'N\s*O\b', r'REV[.\s]*#',
@@ -163,9 +191,10 @@ def revision_sort_key(r):
 
     if is_numeric:
         # Fabrication: numeric mark — category 1 (higher priority)
-        try:
-            num_val = int(re.match(r'\d+', mark).group())
-        except Exception:
+        m_val = re.match(r'\d+', mark)
+        if m_val:
+            num_val = int(m_val.group())
+        else:
             num_val = 0
         category = 1          # beats alphabetical
         sub_val  = num_val
@@ -209,7 +238,7 @@ def validate_fields(fields: dict) -> dict:
         warnings.append(f"Revision mark '{rev}' may not follow standard format")
 
     date = fields.get("date", "")
-    date_valid = bool(date and re.search(r'\d{1,4}[-/\.]\d{1,2}[-/\.]\d{2,4}', date))
+    date_valid = bool(date and re.search(r'\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}' + r'|\d{2})\b', date))
     if not date_valid and date:
         warnings.append(f"Date '{date}' format may be non-standard")
 
@@ -271,7 +300,7 @@ def normalize_fields(fields: dict) -> dict:
 
 
 def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict:
-    fields = {
+    fields_dict: Dict[str, Any] = {
         "drawingNumber": "",
         "drawingTitle": "",
         "description": "Locally extracted",
@@ -284,6 +313,8 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
         "remarks": "",
         "revisionHistory": []
     }
+    fields = fields_dict
+
 
     if not pdfplumber:
         fields["description"] = "Error: pdfplumber not installed"
@@ -312,31 +343,38 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                     text = ""
                 else:
                     words.sort(key=lambda w: w['top'])
-                    lines = []
-                    curr = [words[0]]
-                    ctop, cbot = words[0]['top'], words[0]['bottom']
-                    for w in words[1:]:
-                        cy = (w['top'] + w['bottom']) / 2
+                    word_lines: List[List[Any]] = []
+                    words_any: Any = words
+                    curr: List[Any] = [words_any[0]]
+                    ctop = float(words_any[0]['top'])
+                    cbot = float(words_any[0]['bottom'])
+                    for w in words_any[1:]:
+                        w_any: Any = w
+                        cy = (float(w_any['top']) + float(w_any['bottom'])) / 2
                         if ctop - 4 <= cy <= cbot + 4:
-                            curr.append(w)
-                            ctop = min(ctop, w['top'])
-                            cbot = max(cbot, w['bottom'])
+                            curr.append(w_any)
+                            ctop = min(ctop, float(w_any['top']))
+                            cbot = max(cbot, float(w_any['bottom']))
                         else:
-                            lines.append(curr)
-                            curr = [w]
-                            ctop, cbot = w['top'], w['bottom']
+                            word_lines.append(curr)
+                            curr = [w_any]
+                            ctop = float(w_any['top'])
+                            cbot = float(w_any['bottom'])
                     if curr:
-                        lines.append(curr)
-                    final_text = []
-                    for l in lines:
-                        l.sort(key=lambda x: x['x0'])
+                        word_lines.append(curr)
+                    final_text: List[str] = []
+                    for l in word_lines:
+                        l_any: Any = l
+                        l_any.sort(key=lambda x: float(str(x.get('x0', 0))))
                         line_str = ''
-                        prev_x1 = -999
-                        for w in l:
-                            if prev_x1 != -999 and w['x0'] - prev_x1 > 5.0:
+                        prev_x1 = -999.0
+                        for w_in_l in l_any:
+                            w_in_l_any: Any = w_in_l
+                            wx0 = float(str(w_in_l_any.get('x0', 0)))
+                            if prev_x1 != -999.0 and wx0 - prev_x1 > 5.0:
                                 line_str += ' '
-                            line_str += w['text']
-                            prev_x1 = w['x1']
+                            line_str += str(w_in_l_any.get('text', ''))
+                            prev_x1 = float(str(w_in_l_any.get('x1', 0)))
                         final_text.append(line_str.strip())
                     text = '\n'.join(final_text)
             elif extraction_mode == "raw":
@@ -384,7 +422,8 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                         title_parts = []
                         j = i + 1
                         while j < min(i + 8, len(lines)):
-                            candidate = lines[j].strip()
+                            line_j = lines[j] # type: ignore
+                            candidate = str(line_j or "").strip()
                             j += 1
                             if not candidate:
                                 continue
@@ -458,7 +497,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                             fields["drawingTitle"] = word
                             break
 
-            if fields.get("drawingTitle") and isinstance(fields["drawingTitle"], str):
+            if isinstance(fields.get("drawingTitle"), str) and fields["drawingTitle"]:
                 if fields["drawingTitle"].upper() in BAD_TITLES:
                     fields["drawingTitle"] = ""
                 if fields.get("drawingTitle"):
@@ -493,34 +532,40 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             def _add_rev(mark, date, remarks):
                 """Normalise mark and add to history if not already seen."""
                 norm_mark = re.sub(r'^REV[\s\-_]*', '', str(mark).strip(), flags=re.I).strip().upper()
+                # Remove common noise if it's mixed with the mark (e.g. "A." -> "A")
+                norm_mark = re.sub(r'[^A-Z0-9]', '', norm_mark)
+
                 if not norm_mark or norm_mark in seen_marks:
                     return
                 # Skip obvious noise tokens
-                if norm_mark in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT',
+                if norm_mark in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT', 'AM', 'PM',
                                  'DATE', 'MARK', 'ISSUE', 'REVISION', 'COPIES', 'DESTINATION',
-                                 '#'):
+                                 '#', 'DWG', 'SHEET'):
                     return
-                # Skip pure multi-digit numbers that look like counts, not revision marks
-                # (revision marks are typically 1 digit or 1-2 letters)
+                # Skip numeric marks that are clearly not revisions (count of pieces etc)
+                if norm_mark.isdigit() and int(norm_mark) > 99:
+                    return
+                # Revision marks are typically 1-2 chars. Skip longer ones unless they are noise we didn't catch.
                 if len(norm_mark) > 2:
                     return
                 seen_marks.add(norm_mark)
-                fields["revisionHistory"].append({
-                    "mark":    norm_mark,
-                    "date":    normalize_date_string(date),
-                    "remarks": clean_rem(remarks),
-                })
+                if isinstance(fields.get("revisionHistory"), list):
+                    fields["revisionHistory"].append({
+                        "mark":    norm_mark,
+                        "date":    normalize_date_string(date),
+                        "remarks": clean_rem(remarks),
+                    })
 
             # ── Phase 1: Structured table extraction ──────────────────────
             # Keywords that identify a "date" column header
-            DATE_HDR   = re.compile(r'\bdate\b', re.I)
+            DATE_HDR   = re.compile(r'\b(?:date|dt|issued?)\b', re.I)
             # Keywords that identify a "revision/mark" column header
-            REV_HDR    = re.compile(r'\b(?:rev(?:ision)?|issue|mark)\b', re.I)
+            REV_HDR    = re.compile(r'\b(?:rev(?:ision)?|issue|mark|no\.?)\b', re.I)
             # Keywords that identify a "description/remarks/destination" header
-            DESC_HDR   = re.compile(r'\b(?:desc(?:ription)?|remark|destination|purpose|notes?)\b', re.I)
+            DESC_HDR   = re.compile(r'\b(?:desc(?:ription)?|remark|destination|purpose|notes?|status|action)\b', re.I)
             # A cell that looks like a valid date (MM-DD-YYYY, DD-MM-YYYY, YYYY-MM-DD, Mon DD YYYY …)
             DATE_CELL  = re.compile(
-                r'\b(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|'
+                r'\b(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2})|'
                 r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{4})\b',
                 re.I
             )
@@ -537,17 +582,22 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
 
                 Returns True if at least one revision was successfully extracted.
                 """
+                found_any = False
                 tables = pdf_page.extract_tables()
                 for table in tables:
-                    if not table or len(table) < 2:
+                    if not table or len(list(table)) < 2:
                         continue
 
                     # ── Identify header row (check ALL rows, not just first 4) ──
                     header_idx = None
                     col_rev = col_date = col_desc = None
 
-                    for row_i, row in enumerate(table):
-                        row_text = [str(c or '').strip() for c in row]
+                    table_any: Any = table
+                    table_list: List[Any] = [x for x in (table_any or [])]
+                    for row_i, row in enumerate(table_list):
+                        row_any: Any = row
+                        row_list: List[Any] = [x for x in row_any] if row_any is not None else []
+                        row_text = [str(c or '').strip() for c in row_list]
                         # Join multi-line cells (pdfplumber sometimes gives "\nIssue" for "Revision/\nIssue")
                         row_joined = [c.replace('\n', ' ').replace('/', ' ') for c in row_text]
                         has_rev  = any(REV_HDR.search(c) for c in row_joined)
@@ -567,48 +617,66 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                         continue
 
                     # If no description column found, pick the column that is neither rev nor date
-                    all_cols = set(range(len(table[header_idx])))
-                    used_cols = {i for i in [col_rev, col_date] if i is not None}
-                    if col_desc is None:
-                        remaining = sorted(all_cols - used_cols)
-                        if remaining:
-                            col_desc = remaining[0]
+                    if header_idx is not None:
+                        h_idx: Any = header_idx
+                        header_row = [x for x in (table_list[h_idx] if 0 <= h_idx < len(table_list) else [])] # type: ignore
+                        all_cols = set(range(len(header_row)))
+                        used_cols = {i for i in [col_rev, col_date] if i is not None}
+                        if col_desc is None:
+                            remaining = sorted(all_cols - used_cols)
+                            if remaining:
+                                col_desc = remaining[0]
 
                     # ── Determine data row range ───────────────────────────────
                     # Header at top  → data rows come AFTER it
                     # Header at bottom → data rows come BEFORE it (common in this PDF format)
                     if header_idx == 0:
-                        data_rows = table[1:]
-                    elif header_idx == len(table) - 1:
+                        data_rows = [table_list[i] for i in range(1, len(table_list))]
+                    elif header_idx == len(table_list) - 1:
                         # Header is the last row — data rows are everything before it
-                        data_rows = table[:header_idx]
+                        h_idx_val: Any = header_idx
+                        data_rows = [table_list[i] for i in range(h_idx_val)] # type: ignore
                     else:
                         # Header is somewhere in the middle.
                         # Check if more data-like rows exist before or after it.
-                        rows_after  = table[header_idx + 1:]
-                        rows_before = table[:header_idx]
-                        after_has_data  = any(
-                            DATE_CELL.search(str(r[col_date] or '')) and MARK_CELL.match(str(r[col_rev] or '').strip())
-                            for r in rows_after if len(r) > max(col_rev, col_date)
-                        )
-                        before_has_data = any(
-                            DATE_CELL.search(str(r[col_date] or '')) and MARK_CELL.match(str(r[col_rev] or '').strip())
-                            for r in rows_before if len(r) > max(col_rev, col_date)
-                        )
-                        if before_has_data and not after_has_data:
-                            data_rows = rows_before
+                        if header_idx is not None:
+                            h_idx_mid: Any = header_idx
+                            rows_after_any: Any  = [table_list[i] for i in range(h_idx_mid + 1, len(table_list))] # type: ignore
+                            rows_before_any: Any = [table_list[i] for i in range(h_idx_mid)] # type: ignore
+                            
+                            rows_after: List[Any] = [x for x in rows_after_any] if rows_after_any else []
+                            rows_before: List[Any] = [x for x in rows_before_any] if rows_before_any else []
+                            
+                            after_has_data  = any(
+                                col_date is not None and col_rev is not None and
+                                DATE_CELL.search(str(safe_get(r, col_date) or '')) and MARK_CELL.match(str(safe_get(r, col_rev) or '').strip())
+                                for r in rows_after if r
+                            )
+                            before_has_data = any(
+                                col_date is not None and col_rev is not None and
+                                DATE_CELL.search(str(safe_get(r, col_date) or '')) and MARK_CELL.match(str(safe_get(r, col_rev) or '').strip())
+                                for r in rows_before if r
+                            )
+                            if before_has_data and not after_has_data:
+                                data_rows = rows_before
+                            else:
+                                data_rows = rows_after
                         else:
-                            data_rows = rows_after
+                            data_rows = []
 
                     # ── Parse data rows ───────────────────────────────────────
-                    found_any = False
                     min_col = max(c for c in [col_rev, col_date, col_desc or 0] if c is not None)
                     for row in data_rows:
-                        if len(row) <= min_col:
+                        row_data = list(row) if row else []
+                        if len(row_data) <= min_col:
                             continue
-                        mark    = str(row[col_rev]  or '').strip()
-                        date    = str(row[col_date] or '').strip()
-                        remarks = str(row[col_desc] or '').strip() if col_desc is not None else ''
+                        
+                        if col_rev is not None and col_date is not None:
+                            mark    = str(safe_get(row_data, col_rev) or '').strip()
+                            date    = str(safe_get(row_data, col_date) or '').strip()
+                            remarks = str(safe_get(row_data, col_desc) or '').strip() if col_desc is not None else ''
+                        else:
+                            continue
 
                         # Validate: mark must look like a revision mark (1-2 alnum chars)
                         if not mark or not MARK_CELL.match(mark):
@@ -631,9 +699,8 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             # ── Phase 2: Text regex patterns (fallback) ───────────────────
             if not table_success:
                 # Pattern 1: leading row-number  e.g. "1  A  Issued for Approval  28-01-2026"
-                # Handles both MM-DD-YYYY and DD-MM-YYYY formats
                 rev_rows_new = re.findall(
-                    r'^[ \t]*(\d+)[ \t]+([A-Z0-9]{1,2})[ \t]+(.*?)[ \t]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})[ \t]*$',
+                    r'^[ \t]*(\d+)[ \t]+([A-Z0-9]{1,2})[ \t]+(.*?)[ \t]+(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))[ \t]*$',
                     clean_text, re.I | re.M
                 )
                 for r in rev_rows_new:
@@ -658,7 +725,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 4 (fallback): mark  initials  DD-MM-YYYY or YYYY-MM-DD  description
                 if not fields["revisionHistory"]:
                     rev_num = re.findall(
-                        r'\b([A-Z0-9]{1,2})\b[ \t]+(?:[A-Z]{2,4}[ \t]+)?(?:.*?)[ \t]*\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b[ \t]+(.*)',
+                        r'\b([A-Z0-9]{1,2})\b[ \t]+(?:[A-Z]{2,4}[ \t]+)?(?:.*?)[ \t]*\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))\b[ \t]+(.*)',
                         clean_text, re.I
                     )
                     for r in rev_num:
@@ -667,7 +734,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 5 (broad fallback): "A  Issued for Approval  28/01/2026"
                 if not fields["revisionHistory"]:
                     rev_broad = re.findall(
-                        r'\b([A-Z0-9]{1,2})[ \t]+(Issued[ \t]+for[ \t]+\w+(?:[ \t]+\w+)?)[ \t]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})',
+                        r'\b([A-Z0-9]{1,2})[ \t]+(Issued[ \t]+for[ \t]+\w+(?:[ \t]+\w+)?)[ \t]+(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}' + r'|\d{2}))\b',
                         clean_text, re.I
                     )
                     for r in rev_broad:
@@ -676,11 +743,40 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 6: DD-MM-YYYY mark description
                 if not fields["revisionHistory"]:
                     rev_date_first = re.findall(
-                        r'\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b[ \t]+\b([A-Z0-9]{1,2}|REV[ \t][A-Z0-9]{1,2})\b[ \t]+(.*)',
+                        r'\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))\b[ \t]+\b([A-Z0-9]{1,2}|REV[ \t][A-Z0-9]{1,2})\b[ \t]+(.*)',
                         clean_text, re.I
                     )
                     for r in rev_date_first:
                         _add_rev(r[1], r[0], r[2])
+
+                # Pattern 7: Very broad line-based search for Alnum Mark + Date
+                if not fields["revisionHistory"]:
+                    for line in clean_text.splitlines():
+                        m_date = DATE_CELL.search(line)
+                        if m_date:
+                            date_str = m_date.group(0)
+                            # Remove date from line to find mark
+                            line_no_date = line.replace(date_str, " DATE ")
+                            # Look for a mark (1-2 alnum chars) surrounded by word boundaries or at start
+                            m_rev = re.search(r'(?:^|\s)([A-Z0-9]{1,2})(?:\s|$)', line_no_date)
+                            if m_rev:
+                                mark_val = m_rev.group(1).strip()
+                                if mark_val not in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT'):
+                                    rem = line_no_date.replace(mark_val, "").replace(" DATE ", "").strip()
+                                    # Skip if it looks like a quantity or BOM line
+                                    if re.search(r'\b(?:REQ\'D|QTY|PIECES?|LBS|WT|MARK|SIZE)\b', rem, re.I):
+                                        continue
+                                    _add_rev(mark_val, m_date.group(0), rem)
+
+                # Pattern 8: Explicit search for DATE : or similar if still empty
+                if not fields["revisionHistory"]:
+                    m_date_explicit = re.search(r'\b(?:DATE|ISSUE|ISSUED|DT)\s*[:.\s]+\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', clean_text, re.I)
+                    if m_date_explicit:
+                        r_date = m_date_explicit.group(1)
+                        # Find a nearby revision mark
+                        m_rev_nearby = re.search(r'\b(?:REV|REVISION|MARK)\s*[:.\s]*([A-Z0-9]{1,2})\b', clean_text, re.I)
+                        r_mark = m_rev_nearby.group(1) if m_rev_nearby else "0"
+                        _add_rev(r_mark, r_date, "")
 
             # FLEXIBLE FIELD DETECTION (Keywords & Multi-Region & Destination Mapping)
             if not fields["revisionHistory"]:
@@ -715,7 +811,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             if not fields["revisionHistory"]:
                 # Individual keyword extraction across entire page
                 # Date detection keywords
-                date_kw = re.search(r'\b(?:DATE|ISSUE\s+DATE|DRAWING\s+DATE)\s*[:.\-\|]?\s*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2})', clean_text, re.I)
+                date_kw = re.search(r'\b(?:DATE|ISSUE\s+DATE|DRAWING\s+DATE|DT)\s*[:.\-\|]?\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', clean_text, re.I)
                 # Remarks detection keywords
                 rem_kw = re.search(r'\b(?:REMARKS|DESTINATION|STATUS)\s*[:.\-\|]?\s*([A-Za-z\s]+?)(?=\s\s+|\n|$)', clean_text, re.I)
                 # Revision detection keywords
@@ -730,7 +826,9 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                          _add_rev(r_mark, r_date, r_rem)
 
             # Sort chronologically (date ascending) so history is in order
-            fields["revisionHistory"].sort(key=get_date_val)
+            rev_history = fields.get("revisionHistory")
+            if isinstance(rev_history, list):
+                rev_history.sort(key=get_date_val)
 
             if fields["revisionHistory"]:
                 # ── Pick latest using fabrication-priority rule ──
