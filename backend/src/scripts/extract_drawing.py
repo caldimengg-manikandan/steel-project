@@ -54,6 +54,14 @@ class DrawingFields(BaseModel):
 
 
 # ── Constants & Helpers ─────────────────────────────────────
+def get_bottom_right_region(page):
+    """Returns the coordinates for the bottom-right 30% of the page."""
+    width = float(page.width)
+    height = float(page.height)
+    # x0, y0, x1, y1 (y0 is 50% down, x0 is 60% across)
+    return (width * 0.6, height * 0.5, width, height)
+
+
 def safe_get(lst: Any, idx: Any, default: Any = "") -> Any:
     """Safely get from a list by index, bypassing strict type checking."""
     try:
@@ -363,6 +371,11 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
         with pdfplumber.open(pdf_path) as pdf:
             page = pdf.pages[0]
             
+            # --- Region-Based Optimization ---
+            # Revisions are almost always in the bottom-right.
+            rev_region = page.within_bbox(get_bottom_right_region(page))
+            rev_region_text = rev_region.extract_text() or ""
+            
             # Stage 1-5 Mode Handling
             if extraction_mode == "ocr":
                 if pytesseract and convert_from_path:
@@ -426,6 +439,9 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
 
             clean_text = re.sub(r'(([A-Z])\2){3,}', fix_doubled, text)
             clean_text = re.sub(r'\bN\s+O(?=\.|\s|:)', 'NO', clean_text, flags=re.I)
+            
+            # Combine full text with targeted region text for better coverage
+            augmented_text = clean_text + "\n" + rev_region_text
 
             # --- 1. Drawing Number ---
             fn_base = os.path.basename(pdf_path).split('_')
@@ -699,7 +715,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 1: leading row-number  e.g. "1  A  Issued for Approval  28-01-2026"
                 rev_rows_new = re.findall(
                     r'^[ \t]*(\d+)[ \t]+([A-Z0-9]{1,2})[ \t]+(.*?)[ \t]+(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))[ \t]*$',
-                    clean_text, re.I | re.M
+                    augmented_text, re.I | re.M
                 )
                 for r in rev_rows_new:
                     _add_rev(r[1], r[3], r[2])
@@ -707,7 +723,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 2: mark  initials  "Mon DD YYYY"  description
                 rev_rows_date_first = re.findall(
                     r'\b([A-Z0-9]{1,2}|REV[ \t][A-Z0-9]{1,2})\b[ \t]+(?:[A-Z]{2,4}[ \t]+)?\b([A-Z]{3,}[ \t]+\d{1,2}[ \t]*,?[ \t]*\d{4})\b[ \t]+(.*)',
-                    clean_text, re.I
+                    augmented_text, re.I
                 )
                 for r in rev_rows_date_first:
                     _add_rev(r[0], r[1], r[2])
@@ -715,7 +731,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Pattern 3: mark  initials  description  "Mon DD YYYY"
                 rev_rows_desc_first = re.findall(
                     r'\b([A-Z0-9]{1,2}|REV[ \t][A-Z0-9]{1,2})\b[ \t]+(?:[A-Z]{2,4}[ \t]+)?(.*?)[ \t]+\b([A-Z]{3,}[ \t]+\d{1,2}[ \t]*,?[ \t]*\d{4})\b(.*)',
-                    clean_text, re.I
+                    augmented_text, re.I
                 )
                 for r in rev_rows_desc_first:
                     _add_rev(r[0], r[2], r[1])
@@ -724,7 +740,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 if not fields["revisionHistory"]:
                     rev_num = re.findall(
                         r'\b([A-Z0-9]{1,2})\b[ \t]+(?:[A-Z]{2,4}[ \t]+)?(?:.*?)[ \t]*\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))\b[ \t]+(.*)',
-                        clean_text, re.I
+                        augmented_text, re.I
                     )
                     for r in rev_num:
                         _add_rev(r[0], r[1], r[2])
@@ -733,7 +749,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 if not fields["revisionHistory"]:
                     rev_broad = re.findall(
                         r'\b([A-Z0-9]{1,2})[ \t]+(Issued[ \t]+for[ \t]+\w+(?:[ \t]+\w+)?)[ \t]+(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}' + r'|\d{2}))\b',
-                        clean_text, re.I
+                        augmented_text, re.I
                     )
                     for r in rev_broad:
                         _add_rev(r[0], r[2], r[1])
@@ -742,14 +758,14 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 if not fields["revisionHistory"]:
                     rev_date_first = re.findall(
                         r'\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:20\d{2}|19\d{2}|\d{2}))\b[ \t]+\b([A-Z0-9]{1,2}|REV[ \t][A-Z0-9]{1,2})\b[ \t]+(.*)',
-                        clean_text, re.I
+                        augmented_text, re.I
                     )
                     for r in rev_date_first:
                         _add_rev(r[1], r[0], r[2])
 
                 # Pattern 7: Very broad line-based search for Alnum Mark + Date
                 if not fields["revisionHistory"]:
-                    for line in clean_text.splitlines():
+                    for line in augmented_text.splitlines():
                         m_date = DATE_CELL.search(line)
                         if m_date:
                             date_str = m_date.group(0)
@@ -768,11 +784,11 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
 
                 # Pattern 8: Explicit search for DATE : or similar if still empty
                 if not fields["revisionHistory"]:
-                    m_date_explicit = re.search(r'\b(?:DATE|ISSUE|ISSUED|DT)\s*[:.\s]+\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', clean_text, re.I)
+                    m_date_explicit = re.search(r'\b(?:DATE|ISSUE|ISSUED|DT)\s*[:.\s]+\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', augmented_text, re.I)
                     if m_date_explicit:
                         r_date = m_date_explicit.group(1)
                         # Find a nearby revision mark
-                        m_rev_nearby = re.search(r'\b(?:REV|REVISION|MARK)\s*[:.\s]*([A-Z0-9]{1,2})\b', clean_text, re.I)
+                        m_rev_nearby = re.search(r'\b(?:REV|REVISION|MARK)\s*[:.\s]*([A-Z0-9]{1,2})\b', augmented_text, re.I)
                         r_mark = m_rev_nearby.group(1) if m_rev_nearby else "0"
                         _add_rev(r_mark, r_date, "")
 
@@ -782,7 +798,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Example: ... GRADE: A36  1 0 FOR FABRICATION 09-22-2025
                 row_pattern = re.findall(
                     r'\b(\d+)[ \t]+([A-Z]|\d{1,2})[ \t]+([A-Za-z][A-Za-z\s]*?)[ \t]+(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})\b',
-                    clean_text, re.I
+                    augmented_text, re.I
                 )
                 for r in row_pattern:
                     val_dest = r[2].strip()
@@ -801,7 +817,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 # Group 1: Mark, Group 3: Dest/Remarks, Group 4: Date
                 scattered_pattern = re.findall(
                     r'\bREV(?:ISION)?\s*([A-Z0-9]{1,2})\b.*?(?:REMARKS|DESTINATION|STATUS)\s*([A-Za-z\s]{3,25}?).*?(?:DATE)\s*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})',
-                    clean_text, re.I | re.DOTALL
+                    augmented_text, re.I | re.DOTALL
                 )
                 for r in scattered_pattern:
                     _add_rev(r[0], r[2], r[1].strip())
@@ -809,11 +825,11 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             if not fields["revisionHistory"]:
                 # Individual keyword extraction across entire page
                 # Date detection keywords
-                date_kw = re.search(r'\b(?:DATE|ISSUE\s+DATE|DRAWING\s+DATE|DT)\s*[:.\-\|]?\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', clean_text, re.I)
+                date_kw = re.search(r'\b(?:DATE|ISSUE\s+DATE|DRAWING\s+DATE|DT)\s*[:.\-\|]?\s*(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b', augmented_text, re.I)
                 # Remarks detection keywords
-                rem_kw = re.search(r'\b(?:REMARKS|DESTINATION|STATUS)\s*[:.\-\|]?\s*([A-Za-z\s]+?)(?=\s\s+|\n|$)', clean_text, re.I)
+                rem_kw = re.search(r'\b(?:REMARKS|DESTINATION|STATUS)\s*[:.\-\|]?\s*([A-Za-z\s]+?)(?=\s\s+|\n|$)', augmented_text, re.I)
                 # Revision detection keywords
-                rev_kw = re.search(r'\b(?:REV|REVISION|REVISION/ISSUE)\s*[:.\-\|]?\s*([A-Z]|\d{1,2})\b', clean_text, re.I)
+                rev_kw = re.search(r'\b(?:REV|REVISION|REVISION/ISSUE)\s*[:.\-\|]?\s*([A-Z]|\d{1,2})\b', augmented_text, re.I)
                 
                 if rev_kw or date_kw or rem_kw:
                     r_mark = rev_kw.group(1) if rev_kw else ("0" if date_kw else "0")
@@ -849,51 +865,63 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
 
 
 def extract_locally(pdf_path: str) -> dict:
-    # ── Stage 1 & 2: Standard Text Extraction & Table Detection ──
+    """
+    Production-level multi-stage extraction pipeline.
+    Stage 1: Layout text extraction (pdfplumber layout=True)
+    Stage 2: Geometric reconstruction (custom word-to-line logic)
+    Stage 3: Table detection (via pdfplumber table extraction)
+    Stage 4: OCR fallback (Tesseract)
+    Stage 5: Regex validation (layout=False / raw scan)
+    """
+    
+    # helper to check if critical fields are still missing
+    def is_incomplete(f):
+        # We consider it incomplete if any of the core metadata is missing
+        req_keys = ["drawingNumber", "drawingTitle", "revision", "date"]
+        return not all(str(f.get(k, "")).strip() for k in req_keys)
+
+    # --- Stage 1: Layout ---
     fields = extract_locally_pass(pdf_path, extraction_mode="layout")
     
-    def is_missing_required(f):
-        req = ["drawingNumber", "drawingTitle", "revision", "date", "remarks"]
-        # If any is totally empty, return True
-        return not all(str(f.get(k, "")).strip() for k in req)
-
-    # ── Stage 3: Coordinate Region / Geometric Interleaved Text Pass ──
-    if is_missing_required(fields):
+    # --- Stage 2 & 3: Geometric & Table (Interleaved in pass logic) ---
+    if is_incomplete(fields):
         f_geo = extract_locally_pass(pdf_path, extraction_mode="geometric")
+        # Merge results - only overwrite if current is empty
         for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
-            if not fields.get(k) and f_geo.get(k):
+            if not str(fields.get(k, "")).strip() and str(f_geo.get(k, "")).strip():
                 fields[k] = f_geo[k]
                 
-    # ── Stage 4: OCR Fallback ──
-    if is_missing_required(fields):
+    # --- Stage 4: OCR Fallback ---
+    if is_incomplete(fields):
         try:
             f_ocr = extract_locally_pass(pdf_path, extraction_mode="ocr")
             for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
-                if not fields.get(k) and f_ocr.get(k):
+                if not str(fields.get(k, "")).strip() and str(f_ocr.get(k, "")).strip():
                     fields[k] = f_ocr[k]
         except Exception:
             pass
             
-    # ── Stage 5: Regex Validation Pass (Raw Layout=False) ──
-    if is_missing_required(fields):
+    # --- Stage 5: Regex Validation (Raw Scan) ---
+    if is_incomplete(fields):
         f_raw = extract_locally_pass(pdf_path, extraction_mode="raw")
         for k in ["drawingNumber", "drawingTitle", "revision", "date", "remarks", "revisionHistory"]:
-            if not fields.get(k) and f_raw.get(k):
+            if not str(fields.get(k, "")).strip() and str(f_raw.get(k, "")).strip():
                 fields[k] = f_raw[k]
 
-    # Post-process missing spaces
+    # Post-process missing spaces for common phrases
     if fields.get("remarks"):
         r_up = fields["remarks"].upper()
-        if r_up == "FORFABRICATION": fields["remarks"] = "FOR FABRICATION"
-        elif r_up == "FORAPPROVAL": fields["remarks"] = "FOR APPROVAL"
-        elif r_up == "FORCONSTRUCTION": fields["remarks"] = "FOR CONSTRUCTION"
+        if "FORFABRICATION" in r_up: fields["remarks"] = fields["remarks"].replace("FORFABRICATION", "FOR FABRICATION")
+        if "FORAPPROVAL" in r_up: fields["remarks"] = fields["remarks"].replace("FORAPPROVAL", "FOR APPROVAL")
+        if "FORCONSTRUCTION" in r_up: fields["remarks"] = fields["remarks"].replace("FORCONSTRUCTION", "FOR CONSTRUCTION")
 
     if fields.get("revisionHistory"):
         for rev_entry in fields["revisionHistory"]:
-            entry_up = rev_entry["remarks"].upper()
-            if entry_up == "FORFABRICATION": rev_entry["remarks"] = "FOR FABRICATION"
-            elif entry_up == "FORAPPROVAL": rev_entry["remarks"] = "FOR APPROVAL"
-            elif entry_up == "FORCONSTRUCTION": rev_entry["remarks"] = "FOR CONSTRUCTION"
+            rem = rev_entry.get("remarks", "")
+            rem_up = rem.upper()
+            if "FORFABRICATION" in rem_up: rev_entry["remarks"] = rem.replace("FORFABRICATION", "FOR FABRICATION")
+            if "FORAPPROVAL" in rem_up: rev_entry["remarks"] = rem.replace("FORAPPROVAL", "FOR APPROVAL")
+            if "FORCONSTRUCTION" in rem_up: rev_entry["remarks"] = rem.replace("FORCONSTRUCTION", "FOR CONSTRUCTION")
 
     return fields
 

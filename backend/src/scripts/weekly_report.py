@@ -4,8 +4,10 @@ import time
 import schedule
 import pymongo
 from datetime import datetime
+import datetime as dt_module
 from dotenv import load_dotenv
 import smtplib
+import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -17,6 +19,7 @@ from openpyxl.drawing.image import Image
 # Load environment variables
 load_dotenv()
 
+# --- Configuration ---
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/steel_dms")
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
@@ -264,7 +267,7 @@ def run_scheduler():
         time.sleep(60)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--now":
+    if "--now" in sys.argv:
         job()
     else:
         run_scheduler()
