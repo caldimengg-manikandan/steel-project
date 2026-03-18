@@ -10,11 +10,13 @@ import { IconUpload, IconTrash } from './Icons';
 
 interface RfiExtractionPanelProps {
     projectId: string;
+    projectName?: string;
     canUpload: boolean;
 }
 
 export default function RfiExtractionPanel({
     projectId,
+    projectName = '',
     canUpload,
 }: RfiExtractionPanelProps) {
 
@@ -28,6 +30,7 @@ export default function RfiExtractionPanel({
     const [expanded, setExpanded] = useState<string | null>(null);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [localSavePath, setLocalSavePath] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollRef = useRef<any>(null);
@@ -68,6 +71,19 @@ export default function RfiExtractionPanel({
         if (fileArray.length === 0) {
             setUploadError('No valid PDF files found.');
             return;
+        }
+
+        // Project Name Validation: Filename must contain project name
+        if (projectName) {
+            const invalidFiles = fileArray.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
+            if (invalidFiles.length > 0) {
+                const msg = `Validation Error: The following files do not contain the project name "${projectName}":\n\n` + 
+                            invalidFiles.map(f => `• ${f.name}`).join('\n') + 
+                            `\n\nPlease ensure your drawing filenames include the project name.`;
+                alert(msg);
+                setUploadError(`Drawing filenames must include the project name "${projectName}".`);
+                return;
+            }
         }
 
         setUploadError('');
@@ -128,6 +144,7 @@ export default function RfiExtractionPanel({
                 )}
             </div>
 
+
             {canUpload && (
                 <div style={{ marginBottom: 20, padding: 16, background: '#fafbfc', border: '1px dashed var(--color-border)', borderRadius: 8 }}>
                     <h4 style={{ margin: '0 0 10px 0', fontSize: 14 }}>Upload RFI Drawing (PDF)</h4>
@@ -169,6 +186,24 @@ export default function RfiExtractionPanel({
                 </div>
             )}
 
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, background: '#f8f9fa', border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 14px', maxWidth: 400 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-muted)' }}>
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input 
+                    type="text" 
+                    placeholder="Search RFI questions or drawings..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: '100%', color: 'var(--color-text-primary)' }}
+                />
+                {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} style={{ border: 'none', background: 'none', padding: 0.5, cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                )}
+            </div>
+
             {loading ? (
                 <div style={{ textAlign: 'center', padding: 40 }}>Loading RFIs...</div>
             ) : extractions.length === 0 ? (
@@ -189,8 +224,24 @@ export default function RfiExtractionPanel({
                             </tr>
                         </thead>
                         <tbody>
-                            {extractions.map(ext => {
-                                const isExp = expanded === ext._id;
+                            {extractions.filter(ext => {
+                                if (!searchTerm) return true;
+                                const s = searchTerm.toLowerCase();
+                                return (ext.originalFileName || '').toLowerCase().includes(s) || 
+                                       (ext.rfis || []).some((rfi: any) => 
+                                           (rfi.description || '').toLowerCase().includes(s) || 
+                                           (rfi.rfiNumber || '').toLowerCase().includes(s) ||
+                                           (rfi.response || '').toLowerCase().includes(s)
+                                       );
+                            }).map((ext, _) => {
+                                const rfiMatches = searchTerm ? (ext.rfis || []).filter((rfi: any) => {
+                                    const s = searchTerm.toLowerCase();
+                                    return (rfi.description || '').toLowerCase().includes(s) || 
+                                           (rfi.rfiNumber || '').toLowerCase().includes(s) ||
+                                           (rfi.response || '').toLowerCase().includes(s);
+                                }) : (ext.rfis || []);
+
+                                const isExp = expanded === ext._id || (searchTerm !== '' && rfiMatches.length > 0);
                                 return (
                                     <React.Fragment key={ext._id}>
                                         <tr
@@ -217,18 +268,32 @@ export default function RfiExtractionPanel({
                                                         <table style={{ margin: 0, background: 'white', border: '1px solid #e1e4e8', borderRadius: 4 }}>
                                                             <thead style={{ background: '#f6f8fa' }}>
                                                                 <tr>
-                                                                    <th>RFI #</th>
+                                                                    <th>RFI # {searchTerm && <span style={{ color: 'var(--color-primary)', fontWeight: 'normal', fontSize: 11 }}>({rfiMatches.length} matches)</span>}</th>
                                                                     <th>Description</th>
                                                                     <th>Response</th>
                                                                     <th>Status</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {ext.rfis.map((rfi: any, idx: number) => (
+                                                                {rfiMatches.map((rfi: any, idx: number) => (
                                                                     <tr key={idx}>
                                                                         <td style={{ width: 80, fontWeight: 'bold' }}>{rfi.rfiNumber}</td>
                                                                         <td style={{ whiteSpace: 'pre-wrap' }}>{rfi.description}</td>
-                                                                        <td style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-secondary)' }}>{rfi.response || '-'}</td>
+                                                                        <td style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-secondary)' }}>
+                                                                            {rfi.response || '-'}
+                                                                            {rfi.responseAttachmentUrl && (
+                                                                                <div style={{ marginTop: 4 }}>
+                                                                                    <a 
+                                                                                        href={rfi.responseAttachmentUrl} 
+                                                                                        target="_blank" 
+                                                                                        rel="noreferrer"
+                                                                                        style={{ fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
+                                                                                    >
+                                                                                        📎 {rfi.responseAttachmentName || 'View Attachment'}
+                                                                                    </a>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
                                                                         <td>
                                                                             <span className={`badge ${rfi.status === 'CLOSED' ? 'badge-success' : 'badge-warning'}`}>
                                                                                 {rfi.status}

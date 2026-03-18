@@ -10,6 +10,8 @@ const rfiItemSchema = new mongoose.Schema({
     skNumber: { type: String, default: '' },
     sentOn: { type: Date, default: Date.now },
     closedOn: Date,
+    responseAttachmentUrl: String,
+    responseAttachmentName: String,
 });
 
 const rfiExtractionSchema = new mongoose.Schema(

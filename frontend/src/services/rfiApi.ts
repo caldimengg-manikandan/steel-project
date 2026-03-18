@@ -108,3 +108,24 @@ export const updateRfiStatus = async (
     }
     return res.json();
 };
+
+export const uploadRfiResponseAttachment = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number,
+    file: File
+) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}/response/${rfiIndex}/attachment`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+        body: formData,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload response attachment');
+    }
+    return res.json();
+};

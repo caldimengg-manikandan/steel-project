@@ -195,6 +195,7 @@ exports.updateRfiStatus = async (req, res) => {
     }
 };
 
+
 // Delete single RFI extraction
 exports.deleteRfiExtraction = async (req, res) => {
     const { id } = req.params;
@@ -213,5 +214,52 @@ exports.deleteRfiExtraction = async (req, res) => {
     } catch (error) {
         console.error('[RfiController] Delete failed:', error);
         res.status(500).json({ error: 'Failed to delete.' });
+    }
+};
+
+// Upload attachment for an RFI response
+exports.uploadRfiResponseAttachment = async (req, res) => {
+    const { projectId, id, rfiIndex } = req.params;
+    const adminId = req.principal.adminId;
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No attachment uploaded.' });
+    }
+
+    const idx = parseInt(rfiIndex, 10);
+    if (isNaN(idx) || idx < 0) {
+        return res.status(400).json({ error: 'Invalid rfiIndex.' });
+    }
+
+    try {
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
+
+        if (!extraction.rfis[idx]) {
+            return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
+        }
+
+        // store the relative URL for the response attachment
+        const relativeUrl = `/uploads/rfis/${projectId}/${req.file.filename}`;
+        
+        extraction.rfis[idx].responseAttachmentUrl = relativeUrl;
+        extraction.rfis[idx].responseAttachmentName = req.file.originalname;
+        extraction.rfis[idx].status = 'CLOSED';
+        extraction.rfis[idx].closedOn = new Date();
+
+        // Optional: also store "Attached: file_name" in the text response if it's empty
+        if (!extraction.rfis[idx].response || extraction.rfis[idx].response.trim() === '') {
+            extraction.rfis[idx].response = `[Attached]: ${req.file.originalname}`;
+        }
+
+        await extraction.save();
+
+        res.json({ 
+            message: 'Attachment uploaded and RFI closed.', 
+            rfi: extraction.rfis[idx] 
+        });
+    } catch (err) {
+        console.error('[RfiController] uploadRfiResponseAttachment error:', err);
+        res.status(500).json({ error: 'Failed to upload response attachment.' });
     }
 };

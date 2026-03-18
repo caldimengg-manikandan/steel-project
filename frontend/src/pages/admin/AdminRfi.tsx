@@ -6,7 +6,8 @@ import {
     uploadRfiDrawing,
     getRfiExcelDownloadUrl,
     deleteRfiExtraction,
-    updateRfiResponse
+    updateRfiResponse,
+    uploadRfiResponseAttachment
 } from '../../services/rfiApi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -43,6 +44,11 @@ const IconPdf = () => (
         <line x1="9" y1="13" x2="15" y2="13" /><line x1="9" y1="17" x2="12" y2="17" />
     </svg>
 );
+const IconClip = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+    </svg>
+);
 
 export default function AdminRfi() {
     const { user } = useAuth();
@@ -59,6 +65,7 @@ export default function AdminRfi() {
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isAdmin = user?.role === 'admin';
     const [folderUrl, setFolderUrl] = useState('');  // base URL for 'Link to Source' in Excel
@@ -119,6 +126,18 @@ export default function AdminRfi() {
     const doUpload = async (files: File[]) => {
         if (!selectedProject || files.length === 0) return;
         const projectId = selectedProject._id || selectedProject.id;
+        const projectName = selectedProject.name;
+
+        // Validation: Filename must contain project name
+        const invalidFiles = files.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
+        if (invalidFiles.length > 0) {
+            const msg = `Validation Error: The following files do not contain the project name "${projectName}":\n\n` + 
+                        invalidFiles.map(f => `• ${f.name}`).join('\n') + 
+                        `\n\nPlease ensure your drawing filenames include the project name.`;
+            alert(msg);
+            setUploadError(`Drawing filenames must include the project name "${projectName}".`);
+            return;
+        }
 
         // Check for duplicate filenames
         const duplicates = extractions.filter(ext => 
@@ -195,6 +214,33 @@ export default function AdminRfi() {
             setTimeout(() => setSavedResponse(prev => ({ ...prev, [key]: false })), 2000);
         } catch (err: any) {
             alert(`Failed to save response: ${err.message}`);
+        } finally {
+            setSavingResponse(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleAttachmentUpload = async (extractionId: string, rfiIndex: number, file: File) => {
+        const key = `${extractionId}_${rfiIndex}`;
+        setSavingResponse(prev => ({ ...prev, [key]: true }));
+        try {
+            const resData = await uploadRfiResponseAttachment(
+                selectedProject._id || selectedProject.id,
+                extractionId,
+                rfiIndex,
+                file
+            );
+            // Update local extractions state
+            setExtractions(prev => prev.map(ext => {
+                if (ext._id !== extractionId) return ext;
+                const updatedRfis = ext.rfis.map((rfi: any, i: number) =>
+                    i === rfiIndex ? resData.rfi : rfi
+                );
+                return { ...ext, rfis: updatedRfis };
+            }));
+            setSavedResponse(prev => ({ ...prev, [key]: true }));
+            setTimeout(() => setSavedResponse(prev => ({ ...prev, [key]: false })), 2000);
+        } catch (err: any) {
+            alert(`Failed to upload attachment: ${err.message}`);
         } finally {
             setSavingResponse(prev => ({ ...prev, [key]: false }));
         }
@@ -441,6 +487,28 @@ export default function AdminRfi() {
                                 </div>
                             </div>
 
+                            {/* Search bar below upload */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border-light)', borderRadius: 12, padding: '10px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-muted)' }}>
+                                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by description, RFI #, or file name..." 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: '100%', color: 'var(--color-text-primary)', fontWeight: 500 }}
+                                />
+                                {searchTerm && (
+                                    <button 
+                                        onClick={() => setSearchTerm('')}
+                                        style={{ border: 'none', background: 'none', padding: 0.5, cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                )}
+                            </div>
+
                             {/* Results */}
                             {loadingExtractions ? (
                                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>Loading extractions...</div>
@@ -460,9 +528,28 @@ export default function AdminRfi() {
                                         <span />
                                     </div>
 
-                                    {extractions.map((ext, idx) => {
-                                        const isExp = expanded === ext._id;
-                                        const isLast = idx === extractions.length - 1;
+                                    {extractions.filter(ext => {
+                                        if (!searchTerm) return true;
+                                        const s = searchTerm.toLowerCase();
+                                        const fileMatch = (ext.originalFileName || '').toLowerCase().includes(s);
+                                        const rfisMatch = (ext.rfis || []).some((rfi: any) => 
+                                            (rfi.description || '').toLowerCase().includes(s) || 
+                                            (rfi.rfiNumber || '').toLowerCase().includes(s) ||
+                                            (rfi.response || '').toLowerCase().includes(s) ||
+                                            (rfi.remarks || '').toLowerCase().includes(s)
+                                        );
+                                        return fileMatch || rfisMatch;
+                                    }).map((ext, idx, arr) => {
+                                        const rfiMatches = searchTerm ? (ext.rfis || []).filter((rfi: any) => {
+                                            const s = searchTerm.toLowerCase();
+                                            return (rfi.description || '').toLowerCase().includes(s) || 
+                                                   (rfi.rfiNumber || '').toLowerCase().includes(s) ||
+                                                   (rfi.response || '').toLowerCase().includes(s) ||
+                                                   (rfi.remarks || '').toLowerCase().includes(s);
+                                        }) : (ext.rfis || []);
+
+                                        const isExp = expanded === ext._id || (searchTerm !== '' && rfiMatches.length > 0);
+                                        const isLast = idx === arr.length - 1;
                                         return (
                                             <div key={ext._id} style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border-light)' }}>
                                                 {/* Row */}
@@ -502,7 +589,7 @@ export default function AdminRfi() {
                                                 {isExp && ext.rfis && ext.rfis.length > 0 && (
                                                     <div style={{ background: 'var(--color-background)', borderTop: '1px solid var(--color-border-light)', padding: '12px 20px 16px 46px' }}>
                                                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <span>Extracted RFI Items</span>
+                                                            <span>Extracted RFI Items {searchTerm && <span style={{ color: '#2563eb', textTransform: 'none' }}>({rfiMatches.length} matching search)</span>}</span>
                                                             {ext.status === 'completed' && projectId && (
                                                                 <a
                                                                     href={getRfiExcelDownloadUrl(projectId, ext._id, folderUrl)}
@@ -519,8 +606,9 @@ export default function AdminRfi() {
                                                             )}
                                                         </div>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                            {ext.rfis.map((rfi: any, i: number) => {
-                                                                const key = `${ext._id}_${i}`;
+                                                            {rfiMatches.map((rfi: any, i: number) => {
+                                                                const rfiIndexInOriginal = ext.rfis.findIndex((r: any) => r === rfi);
+                                                                const key = `${ext._id}_${rfiIndexInOriginal}`;
                                                                 const draftText = responseEdits[key] ?? rfi.response ?? '';
                                                                 const draftRemarks = remarksEdits[key] ?? rfi.remarks ?? '';
                                                                 const isSaving = savingResponse[key] || false;
@@ -563,29 +651,76 @@ export default function AdminRfi() {
                                                                                     outline: 'none',
                                                                                 }}
                                                                             />
-                                                                            <button
-                                                                                onClick={() => handleSaveResponse(ext._id, i, draftText, draftRemarks)}
-                                                                                disabled={isSaving}
-                                                                                style={{
-                                                                                    marginTop: 6,
-                                                                                    padding: '4px 12px',
-                                                                                    fontSize: 11,
-                                                                                    fontWeight: 600,
-                                                                                    borderRadius: 6,
-                                                                                    border: 'none',
-                                                                                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                                                                                    background: justSaved
-                                                                                        ? 'rgba(34,197,94,0.15)'
-                                                                                        : 'linear-gradient(135deg,#2563eb,#7c3aed)',
-                                                                                    color: justSaved ? '#22c55e' : 'white',
-                                                                                    transition: 'all 0.2s',
-                                                                                    display: 'inline-flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: 4,
-                                                                                }}
-                                                                            >
-                                                                                {isSaving ? 'Saving…' : justSaved ? '✓ Saved' : 'Save Response / Remarks'}
-                                                                            </button>
+                                                                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                                                <button
+                                                                                    onClick={() => handleSaveResponse(ext._id, rfiIndexInOriginal, draftText, draftRemarks)}
+                                                                                    disabled={isSaving}
+                                                                                    style={{
+                                                                                        padding: '6px 14px',
+                                                                                        fontSize: 11,
+                                                                                        fontWeight: 600,
+                                                                                        borderRadius: 6,
+                                                                                        border: 'none',
+                                                                                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                                                                                        background: justSaved
+                                                                                            ? 'rgba(34,197,94,0.15)'
+                                                                                            : 'linear-gradient(135deg,#2563eb,#7c3aed)',
+                                                                                        color: justSaved ? '#22c55e' : 'white',
+                                                                                        transition: 'all 0.2s',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: 4,
+                                                                                    }}
+                                                                                >
+                                                                                    {isSaving ? 'Saving…' : justSaved ? '✓ Saved' : 'Save Response / Remarks'}
+                                                                                </button>
+
+                                                                                {/* Attachment Upload */}
+                                                                                <div style={{ position: 'relative' }}>
+                                                                                    <input 
+                                                                                        type="file" 
+                                                                                        id={`attach-${key}`}
+                                                                                        style={{ display: 'none' }} 
+                                                                                        onChange={(e) => {
+                                                                                            const f = e.target.files?.[0];
+                                                                                            if (f) handleAttachmentUpload(ext._id, rfiIndexInOriginal, f);
+                                                                                        }}
+                                                                                    />
+                                                                                    <button
+                                                                                        onClick={() => document.getElementById(`attach-${key}`)?.click()}
+                                                                                        disabled={isSaving}
+                                                                                        title="Upload response attachment"
+                                                                                        style={{
+                                                                                            padding: '6px 10px',
+                                                                                            fontSize: 11,
+                                                                                            fontWeight: 600,
+                                                                                            borderRadius: 6,
+                                                                                            background: '#f3f4f6',
+                                                                                            border: '1px solid #d1d5db',
+                                                                                            color: '#374151',
+                                                                                            cursor: isSaving ? 'not-allowed' : 'pointer',
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: 6
+                                                                                        }}
+                                                                                    >
+                                                                                        <IconClip /> Upload Response Attachment
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                            {rfi.responseAttachmentUrl && (
+                                                                                <div style={{ marginTop: 10, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                                    <span style={{ color: 'var(--color-text-muted)' }}>Attachment:</span>
+                                                                                    <a 
+                                                                                        href={rfi.responseAttachmentUrl} 
+                                                                                        target="_blank" 
+                                                                                        rel="noreferrer"
+                                                                                        style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
+                                                                                    >
+                                                                                        {rfi.responseAttachmentName || 'View Attachment'}
+                                                                                    </a>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                         <div>
                                                                             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Remarks</div>

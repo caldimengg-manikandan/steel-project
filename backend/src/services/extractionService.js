@@ -156,7 +156,34 @@ async function _executePipeline(extractionId, pdfPath, projectId, targetTransmit
             { new: true }
         );
 
-        // ── Step 5b: Buffer for Excel batch write ───────────────────────
+        // ── Step 5b: Dynamic "Total Expected Drawings" Increment ──────
+        // If a drawing goes straight to fabrication (numeric rev) without any
+        // approval revisions (A, B, C...), it increases the total project count.
+        try {
+            const history = fields.revisionHistory || [];
+            const hasApproval = history.some(r => /^[a-zA-Z]/.test(r.mark)) || /^[a-zA-Z]/.test(fields.revision);
+            const hasFabrication = history.some(r => /^[0-9]/.test(r.mark)) || /^[0-9]/.test(fields.revision);
+
+            if (hasFabrication && !hasApproval) {
+                // Check if this is the first time we see this drawing number in this project
+                const existing = await DrawingExtraction.findOne({
+                    projectId,
+                    'extractedFields.drawingNumber': fields.drawingNumber,
+                    _id: { $ne: extractionId },
+                    status: 'completed'
+                });
+
+                if (!existing) {
+                    console.log(`[Extraction] New fabrication-only drawing ${fields.drawingNumber} found. Incrementing project count.`);
+                    const Project = require('../models/Project');
+                    await Project.findByIdAndUpdate(projectId, { $inc: { approximateDrawingsCount: 1 } });
+                }
+            }
+        } catch (err) {
+            console.error('[Extraction] Failed to increment expected count:', err.message);
+        }
+
+        // ── Step 5c: Buffer for Excel batch write ───────────────────────
         try {
             const projectIdStr = projectId.toString();
             if (!excelBatchBuffer.has(projectIdStr)) {

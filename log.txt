@@ -1,7 +1,0 @@
-53771dd Merge pull request #1 from thejathangavel/Theja
-9cb0c14 fix: improve drawing extraction remarks cleaning and date robustness
-0d7f788 Fix: add --original_filename arg, fix stray indent in _add_rev
----  
-b741a40 project status
-5eac509 feat: Add Remarks field, auto-status logic, Excel formatting improvements, Link to Source column with folder URL support
-2dc7acd Initial commit

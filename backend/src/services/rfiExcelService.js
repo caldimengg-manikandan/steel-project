@@ -329,6 +329,11 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         // Response — special styling if "CONFIRMED"
         const respCell = dataRow.getCell(6);
         const isConfirmed = responseVal && responseVal.trim().toUpperCase() === 'CONFIRMED';
+        
+        let responseHref = '';
+        if (item.responseAttachmentUrl && resolvedBase) {
+            responseHref = isExternal ? '' : `${resolvedBase}${item.responseAttachmentUrl}`;
+        }
 
         if (isConfirmed) {
             respCell.value = 'CONFIRMED';
@@ -337,6 +342,14 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
                 alignment: { vertical: 'middle', horizontal: 'center', wrapText: true },
                 border: commonBorder,
+            };
+        } else if (responseHref) {
+            respCell.value = { text: responseVal || 'View Attachment', hyperlink: responseHref };
+            respCell.style = { 
+                font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, 
+                fill: rowFill, 
+                alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, 
+                border: commonBorder 
             };
         } else {
             respCell.value = responseVal;

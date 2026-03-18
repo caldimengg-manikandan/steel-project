@@ -631,6 +631,12 @@ async function generateProjectExcel(rows, projectDetails, type) {
 
             const rDataL = logSheet.addRow(rowData);
             rDataL.height = 22;
+
+            // Highlight in grey if it ONLY went for fabrication (numeric revs only, no letters)
+            const hasAlphaRev = alphaRevs.some(revMark => revMap[revMark]);
+            const hasNumRev = numRevs.some(revMark => revMap[revMark]);
+            const isOnlyFabLog = hasNumRev && !hasAlphaRev;
+
             rDataL.eachCell((cell, colNum) => {
                 cell.border = commonBorderStyle;
                 cell.alignment = {
@@ -638,6 +644,19 @@ async function generateProjectExcel(rows, projectDetails, type) {
                     horizontal: (colNum === 3 || colNum === sIdx) ? 'left' : 'center',
                     wrapText: true
                 };
+
+                // Highlight ONLY the specific revision cell if it went only for fabrication
+                const numStart = 4 + alphaRevs.length;
+                const numEnd = 3 + alphaRevs.length + numRevs.length;
+                const isNumCol = colNum >= numStart && colNum <= numEnd;
+
+                if (isOnlyFabLog && isNumCol && cell.value) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFECECEC' } // Light Grey
+                    };
+                }
             });
         });
     }

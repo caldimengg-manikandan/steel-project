@@ -50,16 +50,41 @@ export default function ProjectView() {
             // Sync with Extractions
             const extData = await listExtractions(id);
 
+            // Step 1: Pre-scan to group all revisions per drawing to determine "Only Fab" status
+            const drawingMarksMap: Record<string, Set<string>> = {};
+            const completed = extData.extractions.filter((ex: any) => ex.status === 'completed');
+
+            completed.forEach((ex: any) => {
+                const sNo = ex.extractedFields.drawingNumber || 'Extracted';
+                if (!drawingMarksMap[sNo]) drawingMarksMap[sNo] = new Set();
+                
+                const hist = Array.isArray(ex.extractedFields.revisionHistory) && ex.extractedFields.revisionHistory.length > 0
+                    ? ex.extractedFields.revisionHistory
+                    : [{ mark: ex.extractedFields.revision }];
+                
+                hist.forEach((h: any) => {
+                    if (h.mark != null && h.mark !== '') {
+                        drawingMarksMap[sNo].add(String(h.mark).trim().toUpperCase());
+                    }
+                });
+            });
+
+            // Step 2: Populate revision rows with the "isOnlyFab" flag
             const revs: any[] = [];
-            extData.extractions.filter(ex => ex.status === 'completed').forEach(ex => {
+            completed.forEach((ex: any) => {
                 const sheetNo = ex.extractedFields.drawingNumber || 'Extracted';
                 const uploadedBy = ex.uploadedBy;
+
+                // "Only Fabrication" = No alphabetic revision marks exist for this sheet number
+                const marks = Array.from(drawingMarksMap[sheetNo] || []);
+                const hasApproval = marks.some(m => /^[A-Z]/.test(m));
+                const isOnlyFab = marks.length > 0 && !hasApproval;
 
                 const history = Array.isArray(ex.extractedFields.revisionHistory) && ex.extractedFields.revisionHistory.length > 0
                     ? ex.extractedFields.revisionHistory
                     : [{ mark: ex.extractedFields.revision, date: ex.extractedFields.date, remarks: ex.extractedFields.remarks }];
 
-                history.forEach((h, i) => {
+                history.forEach((h: any, i: number) => {
                     if (h.mark !== undefined && h.mark !== null && h.mark !== '') {
                         revs.push({
                             id: `${ex._id}-${i}`,
@@ -67,7 +92,8 @@ export default function ProjectView() {
                             revMark: h.mark,
                             date: h.date || '-',
                             description: ex.extractedFields.drawingTitle || ex.extractedFields.drawingDescription || `[No Title] ${ex.originalFileName}`,
-                            revisedBy: uploadedBy
+                            revisedBy: uploadedBy,
+                            isOnlyFab
                         });
                     }
                 });
@@ -242,6 +268,7 @@ export default function ProjectView() {
                 <div className="card" style={{ padding: 'var(--space-lg)' }}>
                     <RfiExtractionPanel
                         projectId={project.id}
+                        projectName={project.name}
                         canUpload={canUpload}
                     />
                 </div>
@@ -274,7 +301,11 @@ export default function ProjectView() {
                                 allRevisions.map((r) => (
                                     <tr key={r.id}>
                                         <td className="font-mono" style={{ fontWeight: 600 }}>{r.sheetNo}</td>
-                                        <td><span className="role-chip viewer">{r.revMark}</span></td>
+                                        <td style={r.isOnlyFab ? { background: '#f1f1f9', fontWeight: 700 } : {}}>
+                                            <span className={`role-chip ${r.isOnlyFab ? 'archived' : 'viewer'}`}>
+                                                {r.revMark}
+                                            </span>
+                                        </td>
                                         <td className="text-muted">{r.date}</td>
                                         <td>{r.description}</td>
                                         <td className="text-muted">{r.revisedBy}</td>

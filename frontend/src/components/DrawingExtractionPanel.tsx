@@ -1031,13 +1031,19 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
     const v = ex.validationResult;
     const ok = ex.status === 'completed';
 
+    // Highlight in grey if "Only Fabrication" (no approval revisions)
+    const history = (f && Array.isArray(f.revisionHistory)) ? f.revisionHistory : [];
+    const hasApproval = history.some((r: any) => /^[a-zA-Z]/.test(r.mark)) || (f && /^[a-zA-Z]/.test(f.revision));
+    const hasFabrication = history.some((r: any) => /^[0-9]/.test(r.mark)) || (f && /^[0-9]/.test(f.revision));
+    const isOnlyFab = hasFabrication && !hasApproval;
+
     return (
         <div style={{
             border: '1px solid',
-            borderColor: ok ? '#e2e8f0' : ex.status === 'failed' ? '#fecaca' : '#bfdbfe',
+            borderColor: ok ? (isOnlyFab ? '#cbd5e1' : '#e2e8f0') : ex.status === 'failed' ? '#fecaca' : '#bfdbfe',
             borderRadius: 10,
             overflow: 'hidden',
-            background: 'white',
+            background: isOnlyFab ? '#f1f5f9' : 'white',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             transition: 'box-shadow 0.2s',
         }}>
@@ -1048,7 +1054,7 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '11px 14px',
                     cursor: ok ? 'pointer' : 'default',
-                    background: ok ? 'white' : ex.status === 'failed' ? '#fef2f2' : '#eff6ff',
+                    background: ok ? (isOnlyFab ? '#f8fafc' : 'white') : ex.status === 'failed' ? '#fef2f2' : '#eff6ff',
                     borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
                 }}
             >

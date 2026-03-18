@@ -13,7 +13,8 @@ const {
     downloadRfiExcel,
     deleteRfiExtraction,
     updateRfiResponse,
-    updateRfiStatus
+    updateRfiStatus,
+    uploadRfiResponseAttachment,
 } = require('../controllers/rfiController');
 
 // Multer storage for RFI
@@ -37,6 +38,16 @@ const upload = multer({
     }
 });
 
+const uploadResponse = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        // More permissive for response attachments
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('File type not allowed'), false);
+    }
+});
+
 // All routes here are scoped under /api/rfis/:projectId
 router.use(verifyToken);
 // Binds req.principal and ensures user belongs to this project
@@ -56,6 +67,9 @@ router.patch('/:id/response/:rfiIndex', requirePermission('editor'), updateRfiRe
 
 // Update status (OPEN / CLOSED) for a specific RFI item (editor + admin)
 router.patch('/:id/status/:rfiIndex', requirePermission('editor'), updateRfiStatus);
+
+// Upload attachment for an RFI response (editor + admin)
+router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), uploadResponse.single('file'), uploadRfiResponseAttachment);
 
 // Delete single Extraction (admin only)
 router.delete('/:id', requirePermission('admin'), deleteRfiExtraction);
