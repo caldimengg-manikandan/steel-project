@@ -58,6 +58,21 @@ export default function TransmittalPanel({ projectId, canEdit }: { projectId: st
         }
     };
 
+    const handleDeleteTransmittal = async (transmittalId: string, transmittalNo: number) => {
+        if (!confirm(`Are you sure you want to delete Transmittal TR-${String(transmittalNo).padStart(3, '0')}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const { deleteTransmittal } = await import('../services/transmittalApi');
+            const res = await deleteTransmittal(projectId, transmittalId);
+            alert(res.message);
+            fetchTransmittals();
+        } catch (err: any) {
+            alert(`Failed to delete: ${err.message}`);
+        }
+    };
+
     return (
         <div className="card" style={{ padding: 'var(--space-lg)' }}>
             <div className="panel-status-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -103,9 +118,20 @@ export default function TransmittalPanel({ projectId, canEdit }: { projectId: st
                                     <td><span className="badge badge-success">{t.newCount}</span></td>
                                     <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                     <td>
-                                        <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm">
-                                            📥 Download
-                                        </a>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm">
+                                                📥 Download
+                                            </a>
+                                            {canEdit && (
+                                                <button 
+                                                    className="btn btn-ghost btn-sm" 
+                                                    style={{ color: '#dc2626' }}
+                                                    onClick={() => handleDeleteTransmittal(t._id, t.transmittalNumber)}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

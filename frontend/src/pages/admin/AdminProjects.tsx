@@ -391,22 +391,22 @@ export default function AdminProjects() {
                                         const val = e.target.value;
                                         setSeqInput(val);
                                         const count = Math.max(0, parseInt(val) || 0);
-                                        const prevCount = sequenceNames.length;
                                         
                                         // Update the form string for submission
                                         setForm(f => ({ ...f, sequenceCount: val }));
 
-                                        // Only update boxes if NOT decreasing from what we started with
-                                        // (In create, started with 0)
-                                        if (count >= prevCount) {
-                                            setSequenceNames(prev => {
+                                        // Sync boxes with the new count
+                                        setSequenceNames(prev => {
+                                            if (count > prev.length) {
                                                 const next = [...prev];
                                                 for (let i = prev.length; i < count; i++) {
                                                     next.push('');
                                                 }
                                                 return next;
-                                            });
-                                        }
+                                            } else {
+                                                return prev.slice(0, count);
+                                            }
+                                        });
                                     }} 
                                 />
                             </div>
@@ -500,13 +500,14 @@ export default function AdminProjects() {
                                         const count = Math.max(0, parseInt(val) || 0);
                                         const current = editTarget.sequences || [];
                                         
-                                        // Only add sequences if increasing
                                         if (count > current.length) {
                                             const newSeqs = [...current];
                                             for (let i = current.length; i < count; i++) {
                                                 newSeqs.push({ name: '', status: 'Not Completed' });
                                             }
                                             setEditTarget({ ...editTarget, sequences: newSeqs });
+                                        } else if (count < current.length) {
+                                            setEditTarget({ ...editTarget, sequences: current.slice(0, count) });
                                         }
                                     }} 
                                 />

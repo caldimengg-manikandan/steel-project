@@ -35,7 +35,20 @@ exports.uploadAndExtract = async (req, res) => {
     const pathArray = Array.isArray(paths) ? paths : [paths];
     // null → auto-assign next transmittal number; integer → append to that existing transmittal
     const rawTN = req.body.targetTransmittalNumber;
-    const targetTransmittalNumber = rawTN != null && rawTN !== '' ? parseInt(rawTN, 10) : null;
+    let targetTransmittalNumber = rawTN != null && rawTN !== '' ? parseInt(rawTN, 10) : null;
+
+    if (targetTransmittalNumber === null) {
+        // Pre-reserve a new transmittal number for this batch upload
+        // This ensures all drawings in this upload batch go into ONE new transmittal
+        const updatedProject = await Project.findByIdAndUpdate(
+            projectId,
+            { $inc: { transmittalCount: 1 } },
+            { new: true }
+        ).lean();
+        if (updatedProject) {
+            targetTransmittalNumber = updatedProject.transmittalCount;
+        }
+    }
 
     // Filter and determine folder name
     const validFiles = [];

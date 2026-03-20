@@ -203,6 +203,8 @@ function detectChanges(extractions, drawingLog) {
     return { newDrawings, revisedDrawings, unchangedDrawings };
 }
 
+const extractionLocks = new Map(); // projectId -> Promise (lock)
+
 /**
  * generateTransmittal
  * ────────────────────────────────────────────────────────────
@@ -233,6 +235,28 @@ function detectChanges(extractions, drawingLog) {
  * }>}
  */
 async function generateTransmittal(projectId, adminId, targetExtractionIds = null, targetTransmittalNumber = null) {
+    // ── Project Lock ──
+    const projectIdStr = projectId.toString();
+    while (extractionLocks.has(projectIdStr)) {
+        await extractionLocks.get(projectIdStr);
+    }
+
+    let releaseLock;
+    const lockPromise = new Promise(resolve => releaseLock = resolve);
+    extractionLocks.set(projectIdStr, lockPromise);
+
+    try {
+        console.log(`[Transmittal] Processing for project ${projectIdStr}` + 
+            (targetTransmittalNumber ? ` → targeting #${targetTransmittalNumber}` : '...'));
+        const result = await _internalGenerateTransmittal(projectId, adminId, targetExtractionIds, targetTransmittalNumber);
+        return result;
+    } finally {
+        extractionLocks.delete(projectIdStr);
+        releaseLock();
+    }
+}
+
+async function _internalGenerateTransmittal(projectId, adminId, targetExtractionIds = null, targetTransmittalNumber = null) {
     // ── Step 1: Load relevant completed extractions ───────────
     const extractionFilter = {
         projectId,

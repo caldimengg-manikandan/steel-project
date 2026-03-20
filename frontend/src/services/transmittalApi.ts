@@ -60,3 +60,12 @@ export function getDrawingLogExcelUrl(projectId: string): string {
     const t = getToken();
     return `${BASE}/transmittals/${projectId}/drawing-log/excel?token=${encodeURIComponent(t)}`;
 }
+
+export async function deleteTransmittal(projectId: string, transmittalId: string) {
+    const token = getToken();
+    const res = await fetch(`${BASE}/transmittals/${projectId}/${transmittalId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return handleResponse<any>(res);
+}

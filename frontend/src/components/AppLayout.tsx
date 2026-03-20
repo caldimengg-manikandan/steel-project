@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useState, useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
 
 const PAGE_TITLES: Record<string, string> = {
     '/admin': 'Dashboard Overview',
@@ -10,8 +11,12 @@ const PAGE_TITLES: Record<string, string> = {
     '/admin/users': 'User Management',
     '/admin/permissions': 'Permission Assignment',
     '/admin/status': 'Project Status',
+    '/admin/settings': 'System Settings',
+    '/admin/reports': 'Reports & Analytics',
     '/dashboard': 'My Dashboard',
     '/dashboard/projects': 'My Projects',
+    '/dashboard/rfi': 'My RFIs',
+    '/dashboard/settings': 'Account Settings',
 };
 
 function LiveClock() {
@@ -22,21 +27,38 @@ function LiveClock() {
         return () => clearInterval(timer);
     }, []);
 
-    const timeStr = now.toLocaleTimeString('en-IN', {
+    const { settings } = useSettings();
+
+    const timeStr = now.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         hour12: true,
-        timeZone: 'Asia/Kolkata',
+        timeZone: settings.timezone,
     });
 
-    const dateStr = now.toLocaleDateString('en-IN', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'Asia/Kolkata',
-    });
+    // Handle dynamic date format
+    const formatDate = (date: Date, fmt: string, tz: string) => {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            weekday: 'short',
+            timeZone: tz
+        }).formatToParts(date);
+
+        const d = parts.find(p => p.type === 'day')?.value || '';
+        const m = parts.find(p => p.type === 'month')?.value || '';
+        const y = parts.find(p => p.type === 'year')?.value || '';
+        const wd = parts.find(p => p.type === 'weekday')?.value || '';
+
+        if (fmt === 'DD/MM/YYYY') return `${wd}, ${d}/${m}/${y}`;
+        if (fmt === 'MM/DD/YYYY') return `${wd}, ${m}/${d}/${y}`;
+        if (fmt === 'YYYY-MM-DD') return `${wd}, ${y}-${m}-${d}`;
+        return `${wd}, ${m} ${d}, ${y}`; // Fallback
+    };
+
+    const dateStr = formatDate(now, settings.dateFormat, settings.timezone);
 
     return (
         <div className="topbar-clock">

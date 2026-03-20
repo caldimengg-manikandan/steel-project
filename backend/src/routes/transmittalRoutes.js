@@ -49,4 +49,7 @@ router.get('/:transmittalId/excel', requirePermission('viewer'), ctrl.downloadTr
 // Get a single transmittal by ID
 router.get('/:transmittalId', requirePermission('viewer'), ctrl.getTransmittal);
 
+// Delete a transmittal (admin only)
+router.delete('/:transmittalId', requirePermission('admin'), ctrl.deleteTransmittal);
+
 module.exports = router;

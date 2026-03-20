@@ -192,29 +192,19 @@ exports.downloadTransmittalExcel = async (req, res) => {
 
 /**
  * GET /api/transmittals/:projectId/preview-changes
- * Dry-run: detect what would be in the next transmittal
- * WITHOUT actually generating one. Good for a confirmation popup.
- *
- * Body (optional):
- *   { extractionIds: string[] }
  */
 exports.previewChanges = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
     const { extractionIds } = req.body;
 
-    const filter = {
-        projectId,
-        createdByAdminId: adminId,
-        status: 'completed',
-    };
-    if (extractionIds && extractionIds.length > 0) {
-        filter._id = { $in: extractionIds };
-    }
+    const { getDrawingLog, detectChanges } = require('../services/transmittalService');
+
+    const filter = { projectId, createdByAdminId: adminId, status: 'completed' };
+    if (extractionIds?.length > 0) filter._id = { $in: extractionIds };
 
     const extractions = await DrawingExtraction.find(filter).lean();
     const log = await getDrawingLog(projectId, adminId);
-
     const { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, log);
 
     res.json({
@@ -233,4 +223,25 @@ exports.previewChanges = async (req, res) => {
             title: e.extractedFields?.drawingTitle || e.originalFileName,
         })),
     });
+};
+
+/**
+ * DELETE /api/transmittals/:projectId/:transmittalId
+ * Delete a transmittal record.
+ */
+exports.deleteTransmittal = async (req, res) => {
+    const { projectId, transmittalId } = req.params;
+    const adminId = req.principal.adminId;
+
+    const doc = await Transmittal.findOneAndDelete({
+        _id: transmittalId,
+        projectId,
+        createdByAdminId: adminId,
+    });
+
+    if (!doc) {
+        return res.status(404).json({ error: 'Transmittal not found.' });
+    }
+
+    res.json({ message: `Transmittal TR-${String(doc.transmittalNumber).padStart(3, '0')} deleted.` });
 };

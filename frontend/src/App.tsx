@@ -12,15 +12,22 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminPermissions from './pages/admin/AdminPermissions';
 import AdminProjectStatus from './pages/admin/AdminProjectStatus';
 import AdminRfi from './pages/admin/AdminRfi';
+import AdminSettings from './pages/admin/AdminSettings';
+import AdminReports from './pages/admin/AdminReports';
 import UserDashboard from './pages/user/UserDashboard';
 import UserProjects from './pages/user/UserProjects';
+import UserRfi from './pages/user/UserRfi';
+import UserSettings from './pages/user/UserSettings';
 import ProjectView from './pages/shared/ProjectView';
+
+import { SettingsProvider } from './context/SettingsContext';
 
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
+      <SettingsProvider>
+        <AuthProvider>
+          <BrowserRouter>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
@@ -40,6 +47,8 @@ export default function App() {
               <Route path="users" element={<AdminUsers />} />
               <Route path="permissions" element={<AdminPermissions />} />
               <Route path="rfi" element={<AdminRfi />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="reports" element={<AdminReports />} />
               <Route path="project/:id" element={<ProjectView />} />
             </Route>
 
@@ -54,6 +63,8 @@ export default function App() {
             >
               <Route index element={<UserDashboard />} />
               <Route path="projects" element={<UserProjects />} />
+              <Route path="rfi" element={<UserRfi />} />
+              <Route path="settings" element={<UserSettings />} />
               <Route path="project/:id" element={<ProjectView />} />
             </Route>
 
@@ -63,6 +74,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import logoImg from '../assets/logo/caldim_engineering_logo.jpg';
 import {
     IconDashboard, IconFolder, IconUsers,
-    IconPermissions, IconLogout, IconShield,
+    IconPermissions, IconLogout, IconShield, IconSettings, IconChart
 } from './Icons';
 
 interface NavItem {
@@ -37,11 +37,15 @@ const adminNav: NavItem[] = [
     { label: 'Users', to: '/admin/users', icon: <IconUsers /> },
     { label: 'Permissions', to: '/admin/permissions', icon: <IconPermissions /> },
     { label: 'RFI', to: '/admin/rfi', icon: <IconRfi /> },
+    { label: 'Reports', to: '/admin/reports', icon: <IconChart /> },
+    { label: 'Settings', to: '/admin/settings', icon: <IconSettings /> },
 ];
 
 const userNav: NavItem[] = [
     { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
     { label: 'My Projects', to: '/dashboard/projects', icon: <IconFolder /> },
+    { label: 'RFI', to: '/dashboard/rfi', icon: <IconRfi /> },
+    { label: 'Settings', to: '/dashboard/settings', icon: <IconSettings /> },
 ];
 
 export default function Sidebar() {

@@ -130,13 +130,35 @@ def is_date_pattern(s):
                           r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{4}', s, re.I))
 
 
-def strip_leading_date(s):
-    """Remove a date at the start of a string, return remaining text."""
-    cleaned = re.sub(
-        r'^[\d]{1,4}\s*[/\-\.]\s*[\d]{1,2}\s*[/\-\.]\s*[\d]{2,4}\s*',
-        '', s
-    ).strip()
-    return cleaned if cleaned else s
+def strip_all_dates(s: str) -> str:
+    """
+    Remove any date patterns found anywhere in the string.
+    Targeting common patterns like '01/23/2025', '23/2/26', 'Jan 20, 2025'.
+    """
+    if not s: return ""
+    
+    # 1. Broad numeric dates: MM/DD/YYYY, DD/MM/YYYY, YY/MM/DD, etc.
+    # Handles 2 or 4 digit years, short months, and lots of space around separators.
+    numeric_date = r'\b(?:\d{1,4}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))\b'
+    
+    # 2. Year-first or unusual separators
+    year_first = r'\b(?:(?:20\d{2}|19\d{2})\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*\d{1,2})\b'
+    
+    # 3. Alpha dates: Jan 23 2025
+    alpha_date = r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{4})\b'
+    
+    # Apply removals
+    for pat in [numeric_date, year_first, alpha_date]:
+        s = re.sub(pat, ' ', s, flags=re.I)
+    
+    # 4. Handle cases like '23/2/26base plate' where no word boundary exists on one side
+    # Specifically catch the digits/slashes combo at the very start or very end
+    s = re.sub(r'^\s*[\d\s\-/]{6,}\b', ' ', s) 
+    s = re.sub(r'\b[\d\s\-/]{6,}\s*$', ' ', s)
+    
+    # Clean up excess whitespace
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
 
 
 def fix_doubled(m):
@@ -186,18 +208,46 @@ def is_valid_title_candidate(s: str) -> bool:
 
 
 def score_title(s: str) -> int:
-    """Score title quality based on keywords."""
+    """
+    Score title quality based on length, keywords, and noise.
+    Aiming for: 'COLUMN/BEAM DETAIL' instead of 'C COLUMN PER PLAN L OF COLUMN/BEAM DETAIL-2'
+    """
     if not is_valid_title_candidate(s):
         return -1
-    score = 10  # base score
-    s_up = s.upper()
-    if any(k in s_up for k in KEYWORDS):
-        score += 50
+    
+    s_up = s.upper().strip()
+    score = 100  # Base logic: shorter is better, provided it's valid
+    
+    # Reward keywords (Strong signal)
+    keyword_matches = [k for k in KEYWORDS if k in s_up]
+    if keyword_matches:
+        score += 500
+        score += len(keyword_matches) * 20
+        # Extra reward if the title STARTS with or IS exactly a keyword
+        if any(s_up.startswith(k) for k in keyword_matches):
+            score += 100
+            
     if "DETAIL" in s_up:
-        score += 20
-    if len(s) > 60:
-        score -= 10
-    return score
+        score += 100
+        
+    # Heuristic: shorter, concise titles are much more likely to be correct
+    score -= len(s) * 3
+    
+    # Penalize metadata noise commonly found in long accidental extractions
+    noise_words = [' PER ', ' OF ', ' FOR ', ' PLAN ', ' BY ', ' NO.', ' REF ', ' DWG ', ' SHEET ']
+    for noise in noise_words:
+        if noise in s_up:
+            score -= 80
+            
+    # Penalize excessive punctuation/numeric junk in title
+    junk_chars = sum(1 for c in s if not c.isalnum() and not c.isspace())
+    score -= junk_chars * 15
+    
+    # If the title contains characters that look like a drawing number (dots/dashes/digits), penalize it
+    if re.search(r'\b[A-Z]?\d+[-.]\d+\b', s_up):
+        score -= 200
+
+    return max(0, score)
 
 
 def get_date_val(r):
@@ -515,6 +565,9 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             best_score = -1
             for cand in candidates:
                 cand_clean = re.sub(r'^(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', '', cand, flags=re.I).strip()
+                # New: Strip any accidental dates caught from nearby fields
+                cand_clean = strip_all_dates(cand_clean)
+                
                 s = score_title(cand_clean)
                 if s > best_score:
                     best_score = s

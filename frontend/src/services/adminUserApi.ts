@@ -79,3 +79,12 @@ export async function adminGetDashboardStats(): Promise<any> {
     });
     return handleResponse(res);
 }
+/**
+ * Get aggregated reports data
+ */
+export async function adminGetReportsData(days: number = 30): Promise<any> {
+    const res = await fetch(`${BASE}/admin/reports?days=${days}`, {
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
