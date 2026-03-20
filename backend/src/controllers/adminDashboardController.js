@@ -81,15 +81,31 @@ async function getAdminStats(req, res) {
         };
     });
 
+    const totalUsers = users.length;
+    const activeUsers = users.filter(u => u.status === 'active').length;
+
+    // Aggregated Sequence Stats
+    let totalSequences = 0;
+    let completedSequences = 0;
+
+    projects.forEach(p => {
+        if (p.sequences && Array.isArray(p.sequences)) {
+            totalSequences += p.sequences.length;
+            completedSequences += p.sequences.filter(s => s.status === 'Completed').length;
+        }
+    });
+
     res.json({
         totalProjects: projects.length,
         activeProjects: projects.filter(p => p.status === 'active').length,
         onHoldProjects: projects.filter(p => p.status === 'on_hold').length,
-        totalUsers: users.length,
-        activeUsers: users.filter(u => u.status === 'active').length,
+        totalUsers,
+        activeUsers,
         totalDrawings,
         recentProjects,
         recentUsers: users.slice(0, 5),
+        totalSequences,
+        completedSequences
     });
 }
 

@@ -13,11 +13,19 @@ function authHeaders(): Record<string, string> {
 }
 
 async function handleResponse(res: Response) {
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'API Request failed');
+    const text = await res.text();
+    let data;
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch (e) {
+        if (!res.ok) throw new Error(`API Error ${res.status}: ${text || res.statusText}`);
+        throw new Error('Malformed JSON response from server');
     }
-    return res.json();
+
+    if (!res.ok) {
+        throw new Error(data.error || data.message || `API Request failed (${res.status})`);
+    }
+    return data;
 }
 
 /**
@@ -44,6 +52,7 @@ export async function adminCreateProject(data: {
     status?: ProjectStatus;
     approximateDrawingsCount?: number;
     location?: string;
+    sequences?: Array<{ name: string; status: 'Completed' | 'Not Completed' }>;
 }): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects`, {
         method: 'POST',
@@ -136,6 +145,7 @@ interface CreateProjectForm {
     status: ProjectStatus;
     approximateDrawingsCount: number;
     location: string;
+    sequences?: Array<{ name: string; status: 'Completed' | 'Not Completed' }>;
 }
 
 /**

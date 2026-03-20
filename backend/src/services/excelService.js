@@ -451,24 +451,32 @@ async function generateProjectExcel(rows, projectDetails, type) {
             const f = r.extractedFields || {};
             const revHist = f.revisionHistory && Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
                 ? f.revisionHistory
-                : [{ mark: f.revision }];
+                : [{ mark: f.revision, remarks: f.remarks }]; 
+
             revHist.forEach(hist => {
-                if (hist.mark !== undefined && hist.mark !== null && hist.mark !== '') {
-                    allRevsSet.add(String(hist.mark).toUpperCase().trim());
+                const mark = String(hist.mark || '').toUpperCase().trim();
+                const rem = String(hist.remarks || '').toLowerCase();
+                
+                // Rule: Revision 0 should only be shown if it has been fabricated (remark check)
+                if (mark === '0' && !rem.includes('fabrication')) {
+                    return; // Skip
+                }
+                
+                if (mark !== '') {
+                    allRevsSet.add(mark);
                 }
             });
         });
 
         const allRevsArr = Array.from(allRevsSet);
-        const alphaRevs = allRevsArr.filter(r => /^[A-Za-z]/.test(r));
-        let numRevs = allRevsArr.filter(r => !/^[A-Za-z]/.test(r));
+        const alphaRevs = allRevsArr.filter(r => /^[A-Z]$/.test(r)); // Strictly single letters A, B, C...
+        let numRevs = allRevsArr.filter(r => /^[0-9]+$/.test(r)); // Strictly numeric for fabrication
 
-        // Ensure at least Rev A exists for Approval
+        // Ensure at least Rev A exists for Approval (per "ensuring Revision A is displayed")
         ['A'].forEach(r => { if (!alphaRevs.includes(r)) alphaRevs.push(r); });
         alphaRevs.sort();
 
-        // Ensure at least Rev 0 exists for Fabrication
-        ['0'].forEach(n => { if (!numRevs.includes(n)) numRevs.push(n); });
+        // NOTE: No longer forcing '0' here – it only appears if it had a fabrication remark above.
         numRevs.sort((a, b) => {
             const numA = parseInt(a, 10);
             const numB = parseInt(b, 10);
@@ -632,10 +640,17 @@ async function generateProjectExcel(rows, projectDetails, type) {
             const rDataL = logSheet.addRow(rowData);
             rDataL.height = 22;
 
-            // Highlight in grey if it ONLY went for fabrication (numeric revs only, no letters)
-            const hasAlphaRev = alphaRevs.some(revMark => revMap[revMark]);
+            // Highlight logic updated for "Skipped Approval" cases:
+            // 1. If drawing has gone to Fabrication (numRevs) but skipped Approval (alphaRevs cells are blank)
+            // 2. Or if 'Rev A' was used directly for fabrication (irregular case)
             const hasNumRev = numRevs.some(revMark => revMap[revMark]);
-            const isOnlyFabLog = hasNumRev && !hasAlphaRev;
+            const alphaStart = 4;
+            const alphaEnd = 3 + alphaRevs.length;
+
+            const latestRevObj = d.revisions && d.revisions.length > 0 ? pickLatestRevision(d.revisions) : {};
+            const latestRevMark = (latestRevObj.mark || '').replace(/^Rev\s*/i, '').trim().toUpperCase();
+            const hasFabricationRemark = d.revisions.some(r => /fabrication/i.test(r.remarks || ''));
+            const isOnlyFabLog = (latestRevMark === 'A') && hasFabricationRemark;
 
             rDataL.eachCell((cell, colNum) => {
                 cell.border = commonBorderStyle;
@@ -645,17 +660,18 @@ async function generateProjectExcel(rows, projectDetails, type) {
                     wrapText: true
                 };
 
-                // Highlight ONLY the specific revision cell if it went only for fabrication
-                const numStart = 4 + alphaRevs.length;
-                const numEnd = 3 + alphaRevs.length + numRevs.length;
-                const isNumCol = colNum >= numStart && colNum <= numEnd;
+                const isAlphaCol = colNum >= alphaStart && colNum <= alphaEnd;
+                const isRevACol = colNum === alphaStart; // Revision A is the first alpha column
+                const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } };
 
-                if (isOnlyFabLog && isNumCol && cell.value) {
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: 'FFECECEC' } // Light Grey
-                    };
+                // Highlight blank Approval cell ONLY for Rev A if drawing already has some Fabrication date (Skipped Approval)
+                if (isRevACol && !cell.value && hasNumRev) {
+                    cell.fill = greyFill;
+                }
+                
+                // Also highlight Rev A cell if it exists but is actually for Fabrication (Irregular case)
+                if (isRevACol && cell.value && isOnlyFabLog) {
+                    cell.fill = greyFill;
                 }
             });
         });

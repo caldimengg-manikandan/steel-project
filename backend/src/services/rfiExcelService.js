@@ -90,20 +90,45 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     const today = new Date();
     const updatedOn = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
-    // ── Column widths (10 columns) ─────────────────────────────
-    // S.NO | Sent On | SK # | Ref. Drawing | Description | Response | Status | Closed on | Remarks | Link to Source
+    // ── Flatten all RFIs & Check for Client RFI Numbers ───────
+    let allRfis = [];
+    rfiExtractions.forEach(doc => {
+        const docSkNumber = extractSkFromFilename(doc.originalFileName);
+        doc.rfis.forEach(rfi => {
+            const computedSk = (rfi.skNumber && rfi.skNumber.trim()) ? rfi.skNumber : docSkNumber;
+            allRfis.push({
+                ...rfi,
+                refDrawing: rfi.refDrawing || doc.originalFileName,
+                skNumber: computedSk,
+                sentOn: rfi.sentOn || doc.sentOn || '',
+                fileUrl: doc.fileUrl,
+            });
+        });
+    });
+
+    const hasClientRfiNo = allRfis.some(r => r.clientRfiNumber && r.clientRfiNumber.trim().length > 0);
+    const TOTAL_COLS = hasClientRfiNo ? 11 : 10;
+
+    // ── Column widths ─────────────────────────────────────────
     sheet.getColumn(1).width = 8;    // S.NO
     sheet.getColumn(2).width = 14;   // Sent On
     sheet.getColumn(3).width = 12;   // SK #
     sheet.getColumn(4).width = 22;   // Ref. Drawing
     sheet.getColumn(5).width = 60;   // Description
-    sheet.getColumn(6).width = 38;   // Response
-    sheet.getColumn(7).width = 12;   // Status
-    sheet.getColumn(8).width = 14;   // Closed on
-    sheet.getColumn(9).width = 30;   // Remarks
-    sheet.getColumn(10).width = 20;  // Link to Source
-
-    const TOTAL_COLS = 10;
+    if (hasClientRfiNo) {
+        sheet.getColumn(6).width = 20;   // CLIENT RFI NUMBER
+        sheet.getColumn(7).width = 38;   // Response
+        sheet.getColumn(8).width = 12;   // Status
+        sheet.getColumn(9).width = 14;   // Closed on
+        sheet.getColumn(10).width = 30;  // Remarks
+        sheet.getColumn(11).width = 20;  // Link to Source
+    } else {
+        sheet.getColumn(6).width = 38;   // Response
+        sheet.getColumn(7).width = 12;   // Status
+        sheet.getColumn(8).width = 14;   // Closed on
+        sheet.getColumn(9).width = 30;   // Remarks
+        sheet.getColumn(10).width = 20;  // Link to Source
+    }
 
     const commonBorder = {
         top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -188,7 +213,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
 
     infoRow.getCell(6).value = `Updated on: ${updatedOn}`;
     infoRow.getCell(6).style = infoCellStyle;
-    sheet.mergeCells(3, 6, 3, 10);
+    sheet.mergeCells(3, 6, 3, TOTAL_COLS);
 
     // ensure all merged cells in row 3 have border
     for (let c = 1; c <= TOTAL_COLS; c++) {
@@ -199,9 +224,9 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
 
     // ════════════════════════════════════════════════════════
     // ROW 4 — Column headers
-    // S.NO | Sent On | SK # | Ref. Drawing | Description | Response | Status | Closed on | Remarks
-    // ════════════════════════════════════════════════════════
-    const COL_HEADERS = ['S.NO', 'Sent On', 'SK #', 'Ref. Drawing', 'Description', 'Response', 'Status', 'Closed on', 'Remarks', 'Link to Source'];
+    const COL_HEADERS = ['S.NO', 'Sent On', 'SK #', 'Ref. Drawing', 'Description'];
+    if (hasClientRfiNo) COL_HEADERS.push('CLIENT RFI NUMBER');
+    COL_HEADERS.push('Response', 'Status', 'Closed on', 'Remarks', 'Link to Source');
 
     const colHeaderStyle = {
         font: { bold: true, size: 10, color: { argb: 'FF000000' } },
@@ -221,213 +246,117 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     // Freeze top 4 rows (logo + title + info banner + column headers)
     sheet.views = [{ state: 'frozen', ySplit: 4 }];
 
-    // ════════════════════════════════════════════════════════
-    // Collect & flatten all RFIs across extraction documents
-    // ════════════════════════════════════════════════════════
-    let allRfis = [];
-    rfiExtractions.forEach(doc => {
-        // SK# fallback: try extracting from the original filename if extractor didn't find one
-        const docSkNumber = extractSkFromFilename(doc.originalFileName);
-
-        doc.rfis.forEach(rfi => {
-            // Always derive SK# from the doc filename (per business rule).
-            // Only use the stored rfi.skNumber if it is a non-empty value from a
-            // fresh extraction (old records may have '' stored).
-            const computedSk = (rfi.skNumber && rfi.skNumber.trim())
-                ? rfi.skNumber
-                : docSkNumber; // docSkNumber is always "SK#N" or "SK# - Unknown"
-            allRfis.push({
-                ...rfi,
-                refDrawing: rfi.refDrawing || doc.originalFileName,
-                skNumber: computedSk,
-                sentOn: rfi.sentOn || doc.sentOn || '',
-                fileUrl: doc.fileUrl,
-            });
-        });
-    });
-
-    // Group rows so that shared Sent On / SK # cells are merged (like the image)
+    // ── Row rendering ─────────────────────────────────────────
     let prevSentOn = null;
     let prevSkNum = null;
-    let groupStartRow = 5; // excel data starts at row 5 now (logo shifted everything down 1)
-
-    const WHITE_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-    const GREY_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-
-    // Track group boundaries for merging Sent On and SK # columns
-    const groupBoundaries = []; // { start, end, sentOn, skNum }
+    const groupBoundaries = [];
 
     allRfis.forEach((item, index) => {
-        const excelRowNum = index + 5; // data starts at row 5 (rows 1-4 are logo/title/info/headers)
-        const isEvenGroup = index % 2 === 1; // alternate every row
+        const excelRowNum = index + 5;
+        const isEvenGroup = index % 2 === 1;
+        const rowFill = isEvenGroup ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } } : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        const sentOnStr = item.sentOn
-            ? (() => {
-                const d = new Date(item.sentOn);
-                return isNaN(d) ? item.sentOn : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            })()
-            : '';
+        const sentOnStr = item.sentOn ? (() => {
+            const d = new Date(item.sentOn);
+            return isNaN(d) ? item.sentOn : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+        })() : '';
 
         const skNum = item.skNumber || '';
-        const refDrawing = item.refDrawing || '';
-        const description = item.description || '';
-        const responseVal = item.response || '';
-
-        const rowFill = isEvenGroup ? GREY_FILL : WHITE_FILL;
-
         const dataRow = sheet.getRow(excelRowNum);
-        dataRow.height = 80; // taller rows to accommodate formatted multi-line descriptions
+        dataRow.height = 80;
 
-        // S.NO
-        const sNoCell = dataRow.getCell(1);
-        sNoCell.value = index + 1;
-        sNoCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
-
-        // Sent On
-        const sentOnCell = dataRow.getCell(2);
-        sentOnCell.value = sentOnStr;
-        sentOnCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
-
-        // SK # — with hyperlink to the original PDF per user request
+        // Populate standard columns
+        dataRow.getCell(1).value = index + 1;
+        dataRow.getCell(1).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        dataRow.getCell(2).value = sentOnStr;
+        dataRow.getCell(2).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        
+        // SK #
         const skCell = dataRow.getCell(3);
         const resolvedBase = (baseUrl || '').toString().replace(/\/$/, '');
-        
-        let href = '';
-        if (resolvedBase) {
-            if (isExternal) {
-                const fileName = item.refDrawing || '';
-                href = `${resolvedBase}/${encodeURIComponent(fileName)}`;
-            } else {
-                // item.fileUrl usually starts with "/uploads/..."
-                href = (item.fileUrl) ? `${resolvedBase}${item.fileUrl}` : '';
-            }
-        }
-
+        let href = (item.fileUrl) ? `${resolvedBase}${item.fileUrl}` : '';
+        if (isExternal) href = `${resolvedBase}/${encodeURIComponent(item.refDrawing || '')}`;
         if (href) {
             skCell.value = { text: skNum, hyperlink: href };
-            skCell.style = {
-                font: { size: 10, color: { argb: 'FF2563EB' }, underline: true },
-                fill: rowFill,
-                alignment: { vertical: 'middle', horizontal: 'center' },
-                border: commonBorder
-            };
+            skCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
         } else {
             skCell.value = skNum;
             skCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
         }
 
-        // Ref. Drawing
-        const refCell = dataRow.getCell(4);
-        refCell.value = refDrawing;
-        refCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: commonBorder };
-
-        // Description
-        const descCell = dataRow.getCell(5);
-        descCell.value = formatDescription(description);
-        descCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'top', horizontal: 'left', wrapText: true }, border: commonBorder };
-
-        // Response — special styling if "CONFIRMED"
-        const respCell = dataRow.getCell(6);
-        const isConfirmed = responseVal && responseVal.trim().toUpperCase() === 'CONFIRMED';
+        dataRow.getCell(4).value = item.refDrawing || '';
+        dataRow.getCell(4).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: commonBorder };
         
-        let responseHref = '';
-        if (item.responseAttachmentUrl && resolvedBase) {
-            responseHref = isExternal ? '' : `${resolvedBase}${item.responseAttachmentUrl}`;
+        dataRow.getCell(5).value = formatDescription(item.description || '');
+        dataRow.getCell(5).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'top', horizontal: 'left', wrapText: true }, border: commonBorder };
+
+        // Handle dynamic column indexing
+        let cursor = 6;
+        if (hasClientRfiNo) {
+            dataRow.getCell(cursor).value = item.clientRfiNumber || '';
+            dataRow.getCell(cursor).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+            cursor++;
         }
+
+        // Response
+        const respCell = dataRow.getCell(cursor);
+        const responseVal = item.response || '';
+        const isConfirmed = responseVal && responseVal.trim().toUpperCase() === 'CONFIRMED';
+        let responseHref = (item.responseAttachmentUrl && !isExternal) ? `${resolvedBase}${item.responseAttachmentUrl}` : '';
 
         if (isConfirmed) {
             respCell.value = 'CONFIRMED';
-            respCell.style = {
-                font: { bold: true, size: 10, color: { argb: 'FFFF0000' } },
-                fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
-                alignment: { vertical: 'middle', horizontal: 'center', wrapText: true },
-                border: commonBorder,
-            };
+            respCell.style = { font: { bold: true, size: 10, color: { argb: 'FFFF0000' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: commonBorder };
         } else if (responseHref) {
             respCell.value = { text: responseVal || 'View Attachment', hyperlink: responseHref };
-            respCell.style = { 
-                font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, 
-                fill: rowFill, 
-                alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, 
-                border: commonBorder 
-            };
+            respCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
         } else {
             respCell.value = responseVal;
             respCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
         }
+        cursor++;
 
-        // Status — Green for CLOSED, Red for OPEN
+        // Status
         const statusVal = (item.status || 'OPEN').toUpperCase();
-        const statusCell = dataRow.getCell(7);
-        const isClosed = statusVal === 'CLOSE' || statusVal === 'CLOSED';
+        const statusCell = dataRow.getCell(cursor);
+        const isClosed = statusVal === 'CLOSED' || statusVal === 'CLOSE';
         const isOpen = statusVal === 'OPEN';
-        
-        const GREEN_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
-        const RED_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
-        
-        let statusFill = rowFill;
-        if (isClosed) statusFill = GREEN_FILL;
-        else if (isOpen) statusFill = RED_FILL;
-        
+        let statusFill = isClosed ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } } : (isOpen ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } } : rowFill);
         statusCell.value = isClosed ? 'CLOSED' : (isOpen ? 'OPEN' : statusVal);
-        statusCell.style = {
-            font: { bold: true, size: 10, color: { argb: (isClosed || isOpen) ? 'FFFFFFFF' : 'FF000000' } },
-            fill: statusFill,
-            alignment: { vertical: 'middle', horizontal: 'center' },
-            border: commonBorder,
-        };
+        statusCell.style = { font: { bold: true, size: 10, color: { argb: (isClosed || isOpen) ? 'FFFFFFFF' : 'FF000000' } }, fill: statusFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        cursor++;
 
-        // Closed on
-        const closedOnCell = dataRow.getCell(8);
-        const closedOnStr = item.closedOn
-            ? (() => {
-                const d = new Date(item.closedOn);
-                return isNaN(d) ? item.closedOn : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-            })()
-            : '';
-        closedOnCell.value = closedOnStr;
-        closedOnCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        // Closed On
+        const closedOnStr = item.closedOn ? (() => { const d = new Date(item.closedOn); return isNaN(d) ? item.closedOn : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; })() : '';
+        dataRow.getCell(cursor).value = closedOnStr;
+        dataRow.getCell(cursor).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        cursor++;
 
         // Remarks
-        const remarksCell = dataRow.getCell(9);
-        remarksCell.value = item.remarks || '';
-        remarksCell.style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
+        dataRow.getCell(cursor).value = item.remarks || '';
+        dataRow.getCell(cursor).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
+        cursor++;
 
-        // Link to Source — hyperlink to the original PDF
-        const linkCell = dataRow.getCell(10);
-        
-        // Use the same href logic as SK # column
+        // Link to Source
+        const linkCell = dataRow.getCell(cursor);
         if (href) {
             linkCell.value = { text: 'View PDF', hyperlink: href };
-            linkCell.style = {
-                font: { size: 10, color: { argb: 'FF2563EB' }, underline: true },
-                fill: rowFill,
-                alignment: { vertical: 'middle', horizontal: 'center' },
-                border: commonBorder,
-            };
+            linkCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
         } else {
             linkCell.value = 'View PDF';
-            linkCell.style = {
-                font: { size: 10, color: { argb: 'FF9CA3AF' }, italic: true },
-                fill: rowFill,
-                alignment: { vertical: 'middle', horizontal: 'center' },
-                border: commonBorder,
-            };
+            linkCell.style = { font: { size: 10, color: { argb: 'FF9CA3AF' }, italic: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
         }
 
+        // Grouping
         const isSameGroup = (sentOnStr === prevSentOn && skNum === prevSkNum);
         if (!isSameGroup) {
-            // Close previous group
-            if (groupBoundaries.length > 0) {
-                groupBoundaries[groupBoundaries.length - 1].end = excelRowNum - 1;
-            }
+            if (groupBoundaries.length > 0) groupBoundaries[groupBoundaries.length - 1].end = excelRowNum - 1;
             groupBoundaries.push({ start: excelRowNum, end: excelRowNum, sentOn: sentOnStr, skNum });
             prevSentOn = sentOnStr;
             prevSkNum = skNum;
         }
     });
 
-    // Close the last group
     if (groupBoundaries.length > 0) {
         groupBoundaries[groupBoundaries.length - 1].end = allRfis.length + 4;
     }

@@ -25,9 +25,6 @@ const rfiRoutes = require('./routes/rfiRoutes');
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
 
-// ── Connect to MongoDB ─────────────────────────────────────
-connectDB();
-
 // ── App setup ─────────────────────────────────────────────
 const app = express();
 
@@ -72,9 +69,17 @@ app.use(errorHandler);
 
 // ── Start server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
-    console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
+
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
+        console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
+    });
+}).catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
 });
 
 module.exports = app;
+
+// Backend server trigger restart (port freed)

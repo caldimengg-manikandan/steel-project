@@ -1033,9 +1033,20 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
 
     // Highlight in grey if "Only Fabrication" (no approval revisions)
     const history = (f && Array.isArray(f.revisionHistory)) ? f.revisionHistory : [];
-    const hasApproval = history.some((r: any) => /^[a-zA-Z]/.test(r.mark)) || (f && /^[a-zA-Z]/.test(f.revision));
-    const hasFabrication = history.some((r: any) => /^[0-9]/.test(r.mark)) || (f && /^[0-9]/.test(f.revision));
-    const isOnlyFab = hasFabrication && !hasApproval;
+    
+    // Logic updated per user request:
+    // Highlight in grey if "Only Fabrication"
+    // 1. It skipped approval (numeric revisions exist, but no alphabetic ones)
+    // 2. Or it used an approval revision (like 'A') for fabrication specifically
+    
+    const revMark = (f && f.revision) ? f.revision.replace(/Rev\s*/i, '').trim().toUpperCase() : '';
+    const hasFabRemark = history.some((r: any) => /fabrication/i.test(r.remarks || '')) || 
+                         (f && /fabrication/i.test(f.remarks || ''));
+                         
+    const hasAlphaRev = history.some((r: any) => /^[a-zA-Z]/.test(r.mark || '')) || (revMark && /^[a-zA-Z]/.test(revMark));
+    const hasNumRev = history.some((r: any) => /^[0-9]/.test(r.mark || '')) || (revMark && /^[0-9]/.test(revMark));
+
+    const isOnlyFab = (revMark === 'A' && hasFabRemark) || (hasNumRev && !hasAlphaRev);
 
     return (
         <div style={{
@@ -1207,13 +1218,21 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {f.revisionHistory.map((r, i) => (
-                                            <tr key={i}>
-                                                <td><span className="role-chip viewer" style={{ fontFamily: 'monospace' }}>{r.mark}</span></td>
-                                                <td className="text-muted">{r.date}</td>
-                                                <td>{r.remarks}</td>
-                                            </tr>
-                                        ))}
+                                        {(f.revisionHistory || [])
+                                            .filter((r: any) => {
+                                                const mark = (r.mark || '').trim().toUpperCase();
+                                                const remarks = (r.remarks || '').toLowerCase();
+                                                // Only show Revision 0 if it has fabrication remarks
+                                                if (mark === '0' && !remarks.includes('fabrication')) return false;
+                                                return true;
+                                            })
+                                            .map((r: any, i: number) => (
+                                                <tr key={i}>
+                                                    <td><span className="role-chip viewer" style={{ fontFamily: 'monospace' }}>{r.mark}</span></td>
+                                                    <td className="text-muted">{r.date}</td>
+                                                    <td>{r.remarks}</td>
+                                                </tr>
+                                            ))}
                                     </tbody>
                                 </table>
                             </div>

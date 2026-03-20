@@ -108,6 +108,14 @@ const projectSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        // ── Sequence Progress ─────────────────────────────────
+        sequences: {
+            type: [{
+                name: { type: String, required: true },
+                status: { type: String, enum: ['Completed', 'Not Completed'], default: 'Not Completed' }
+            }],
+            default: []
+        },
     },
     {
         timestamps: true,
