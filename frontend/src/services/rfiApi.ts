@@ -20,10 +20,13 @@ function authHeaders(): Record<string, string> {
     return tok ? { Authorization: `Bearer ${tok}` } : {};
 }
 
-export const uploadRfiDrawing = async (projectId: string, files: File[], localSavePath?: string) => {
+export const uploadRfiDrawing = async (projectId: string, files: File[], localSavePath?: string, sequences?: string[]) => {
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
     if (localSavePath) formData.append('localSavePath', localSavePath);
+    if (sequences && sequences.length > 0) {
+        sequences.forEach(s => formData.append('sequences', s));
+    }
 
     const res = await fetch(`${BASE}/rfis/${projectId}/upload`, {
         method: 'POST',
@@ -77,12 +80,13 @@ export const updateRfiResponse = async (
     extractionId: string,
     rfiIndex: number,
     response: string,
-    remarks: string
+    remarks: string,
+    clientRfiNumber?: string
 ) => {
     const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}/response/${rfiIndex}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ response, remarks }),
+        body: JSON.stringify({ response, remarks, clientRfiNumber }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));

@@ -58,7 +58,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* ── Stat Cards ── */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 <div className="stat-card accent-blue">
                     <div className="stat-card-label">My Projects</div>
                     <div className="stat-card-value">{stats.totalProjects}</div>
@@ -72,6 +72,13 @@ export default function AdminDashboard() {
                 <div className="stat-card accent-slate">
                     <div className="stat-card-label">On Hold</div>
                     <div className="stat-card-value">{stats.onHoldProjects}</div>
+                </div>
+
+                <div className="stat-card accent-amber">
+                    <div className="stat-card-label">Sequence Progress</div>
+                    <div className="stat-card-value">
+                        {stats.completedSequences || 0}<span style={{ fontSize: 13, color: 'var(--color-text-muted)', marginLeft: 4 }}>/ {stats.totalSequences || 0}</span>
+                    </div>
                 </div>
             </div>
 

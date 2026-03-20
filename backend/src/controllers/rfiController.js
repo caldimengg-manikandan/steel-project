@@ -9,7 +9,7 @@ exports.uploadRfiDrawing = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
     const uploadedBy = req.principal.username;
-    const { localSavePath } = req.body;
+    const { localSavePath, sequences } = req.body;
 
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: 'No PDF files uploaded.' });
@@ -33,6 +33,7 @@ exports.uploadRfiDrawing = async (req, res) => {
             folderName: localSavePath || '',
             fileUrl: `/uploads/rfis/${projectId}/${file.filename}`,
             status: 'queued',
+            sequences: sequences || [],
         });
         createdExtractions.push(doc);
 
@@ -120,8 +121,10 @@ exports.updateRfiResponse = async (req, res) => {
             return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
         }
 
+        const { response, remarks, clientRfiNumber } = req.body;
         const reqResponse = response !== undefined ? response : extraction.rfis[idx].response;
         const reqRemarks = remarks !== undefined ? remarks : extraction.rfis[idx].remarks;
+        const reqClientRfiNumber = clientRfiNumber !== undefined ? clientRfiNumber : extraction.rfis[idx].clientRfiNumber;
 
         const hasResponse = reqResponse && reqResponse.trim() !== '';
         const hasRemarks = reqRemarks && reqRemarks.trim() !== '';
@@ -139,6 +142,7 @@ exports.updateRfiResponse = async (req, res) => {
 
         extraction.rfis[idx].response = reqResponse || '';
         extraction.rfis[idx].remarks = reqRemarks || '';
+        extraction.rfis[idx].clientRfiNumber = reqClientRfiNumber || '';
         extraction.rfis[idx].status = newStatus;
 
         if (newStatus === 'CLOSED' && oldStatus !== 'CLOSED') {

@@ -174,7 +174,7 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, description, status, approximateDrawingsCount, location } = req.body;
+    const { name, clientName, description, status, approximateDrawingsCount, location, sequences } = req.body;
 
     if (!name || !clientName) {
         return res.status(400).json({ error: 'name and clientName are required.' });
@@ -187,6 +187,7 @@ async function createProject(req, res) {
         status: status || 'active',
         location: location || '',
         approximateDrawingsCount: Number(approximateDrawingsCount) || 0,
+        sequences: sequences || [],
         createdByAdminId: adminId,
         assignments: [
             {
@@ -216,13 +217,14 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, description, status, approximateDrawingsCount, location } = req.body;
+    const { name, clientName, description, status, approximateDrawingsCount, location, sequences } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
     if (description !== undefined) project.description = description;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
     if (location !== undefined) project.location = location;
+    if (sequences !== undefined) project.sequences = sequences;
     if (status !== undefined) {
         if (!['active', 'on_hold', 'completed', 'archived'].includes(status)) {
             return res.status(400).json({ error: 'Invalid status value.' });

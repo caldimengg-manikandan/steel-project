@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getProjectById } from '../../services/projectApi';
+import { getProjectById, adminUpdateProject } from '../../services/projectApi';
 import type { Project, ProjectPermission } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates } from '../../services/extractionApi';
@@ -270,6 +270,7 @@ export default function ProjectView() {
                         projectId={project.id}
                         projectName={project.name}
                         canUpload={canUpload}
+                        sequences={project.sequences}
                     />
                 </div>
             )}
@@ -383,6 +384,72 @@ export default function ProjectView() {
                                             <span className={`role-chip ${a.permission}`}>
                                                 {a.permission.charAt(0).toUpperCase() + a.permission.slice(1)}
                                             </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Sequence Progress Section ── */}
+                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                                Sequence Progress
+                            </h3>
+                            
+                            {!project.sequences || project.sequences.length === 0 ? (
+                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                                    {project.sequences.map((seq, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'space-between',
+                                                padding: '12px 16px',
+                                                background: '#fff',
+                                                border: '1px solid var(--color-border-light)',
+                                                borderRadius: 8,
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                            }}
+                                        >
+                                            <span style={{ fontWeight: 600, fontSize: 14 }}>{seq.name}</span>
+                                            <select
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: 6,
+                                                    fontSize: 12,
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer',
+                                                    border: '1px solid transparent',
+                                                    color: 'white',
+                                                    backgroundColor: seq.status === 'Completed' ? '#16a34a' : '#dc2626', // Green : Red
+                                                    appearance: 'none',
+                                                    WebkitAppearance: 'none',
+                                                    textAlign: 'center',
+                                                    minWidth: 110,
+                                                    outline: 'none'
+                                                }}
+                                                value={seq.status}
+                                                onChange={async (e) => {
+                                                    const newStatus = e.target.value as 'Completed' | 'Not Completed';
+                                                    if (!id) return;
+                                                    try {
+                                                        const newSeqs = [...project.sequences];
+                                                        newSeqs[idx] = { ...newSeqs[idx], status: newStatus };
+                                                        
+                                                        await adminUpdateProject(id, { sequences: newSeqs });
+                                                        fetchData(); // Refresh page
+                                                    } catch (err: any) {
+                                                        alert(`Failed to update sequence: ${err.message}`);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="Not Completed">Not Completed</option>
+                                                <option value="Completed">Completed</option>
+                                            </select>
                                         </div>
                                     ))}
                                 </div>

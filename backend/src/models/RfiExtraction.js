@@ -12,6 +12,7 @@ const rfiItemSchema = new mongoose.Schema({
     closedOn: Date,
     responseAttachmentUrl: String,
     responseAttachmentName: String,
+    clientRfiNumber: { type: String, default: '' },
 });
 
 const rfiExtractionSchema = new mongoose.Schema(
@@ -54,6 +55,10 @@ const rfiExtractionSchema = new mongoose.Schema(
         },
         rfis: {
             type: [rfiItemSchema],
+            default: [],
+        },
+        sequences: {
+            type: [String],
             default: [],
         },
     },
