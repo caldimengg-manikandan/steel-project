@@ -214,11 +214,13 @@ function ValidDot({ valid }: { valid: boolean | null }) {
 interface DrawingExtractionPanelProps {
     projectId: string;
     canUpload: boolean;
+    sequences?: any[];
 }
 
 export default function DrawingExtractionPanel({
     projectId,
     canUpload,
+    sequences = [],
 }: DrawingExtractionPanelProps) {
 
     const [extractions, setExtractions] = useState<DrawingExtraction[]>([]);
@@ -245,6 +247,9 @@ export default function DrawingExtractionPanel({
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
     // Files waiting for the user to pick a transmittal
     const [pendingTransmittalFiles, setPendingTransmittalFiles] = useState<File[]>([]);
+    
+    // Target sequences state
+    const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollRef = useRef<any>(null);
@@ -468,7 +473,7 @@ export default function DrawingExtractionPanel({
                 const executing = new Set<Promise<any>>();
 
                 for (const chunk of chunks) {
-                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse).then(() => fetchExtractions(true));
+                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse, selectedSequences).then(() => fetchExtractions(true));
                     results.push(p);
                     executing.add(p);
                     p.finally(() => executing.delete(p));
@@ -488,6 +493,7 @@ export default function DrawingExtractionPanel({
             setExtractions((prev) => prev.filter(e => !optimisticEntries.find(o => o._id === e._id)));
         } finally {
             setUploading(false);
+            setSelectedSequences([]);
             fetchExtractions(true);
         }
     }
@@ -999,12 +1005,35 @@ export default function DrawingExtractionPanel({
                                 </label>
                             </div>
 
+                            {sequences && sequences.length > 0 && (
+                                <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                                        {sequences.map((seq: any, idx: number) => (
+                                            <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedSequences.includes(seq.name)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
+                                                        else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
+                                                    }}
+                                                    style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                />
+                                                {seq.name}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="form-actions">
                                 <button
                                     className="btn btn-secondary"
                                     onClick={() => {
                                         setTransmittalModal(false);
                                         setPendingTransmittalFiles([]);
+                                        setSelectedSequences([]);
                                     }}
                                 >
                                     Cancel

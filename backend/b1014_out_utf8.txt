@@ -1,0 +1,176 @@
+﻿=== RAW TEXT ===
+  1: '                                                                                                                                                                         '
+  2: '                                                                                                                                                                         '
+  3: '                                                                                                                                                                         '
+  4: '                                                                                                                                                                         '
+  5: '                                                                                                                                                                         '
+  6: '                                                                                                                                                                         '
+  7: '                                                                                                                                                                         '
+  8: '                                                                                                                                                                         '
+  9: '                                                                                                                                                                         '
+ 10: '                                                                                                                                                                         '
+ 11: '                                                                                                                                                                         '
+ 12: '                                                                                                                                                                         '
+ 13: '                                                                                                                                                                         '
+ 14: '                                                                                                                                                                         '
+ 15: '                                                                                                                                                                         '
+ 16: '                                                                                                                                                                         '
+ 17: '                                                                                                                                                                         '
+ 18: '                                                                                                                                                                         '
+ 19: '                                                                                                                                                                         '
+ 20: '                                                                                                                                                                         '
+ 21: '                                                                                                                                                                         '
+ 22: '                                                                                                                                                                         '
+ 23: '                                                                                                                                                                         '
+ 24: '                                                                                                                                                                         '
+ 25: '                                                                                                                                                                         '
+ 26: '                                                                                                                                                                         '
+ 27: '                                                                                                                                                                         '
+ 28: '                                                                                                                                                                         '
+ 29: '                                                                                                                                                                         '
+ 30: '                                                                                                                                                                         '
+ 31: '                                                                                                                                                                         '
+ 32: '                                                                                                                                                                         '
+ 33: '                                                                                                                                                                         '
+ 34: '                                                                                                                                                                         '
+ 35: '                                                                                                                                                                         '
+ 36: '                                                                                                                               FOR SHOP USE :         QUALITY CONTROL    '
+ 37: '                                                                                                                                   INITIAL HOURS DATE    CHECK           '
+ 38: '                                                                                                                               CUT                                       '
+ 39: '                                                                                                                                                            DIMENSIONAL  '
+ 40: '                                                                                                                               VISUAL                                    '
+ 41: '                                                                                                                                                            VISUAL       '
+ 42: '                                                                                                                               DATE                                      '
+ 43: '                                                                                                                                                            DATE         '
+ 44: '                                                                                                                               DATE                                      '
+ 45: '                                                                                                                                   THE INFORMATION NOTED HEREON THIS DRAWING IS THE'
+ 46: '                                                                                                                                   PROPERTY OF STEEL FAB ENTERPRISES, INC. AND SHALL'
+ 47: '                                                                                                                                   NOTED BE USED WITHOUT WRITTEN CONSENT.'
+ 48: '                                                                                                                                       STEEL FAB                         '
+ 49: '                                                                                                                                       ENTERPRISES, LLC                  '
+ 50: '                                                                                                                                       MISCELLANEOUS METALS FABRICATOR AND ERECTORS'
+ 51: '                                                                                                                                       623 BAUMGARDNER ROAD, LANCASTER, PA 17603'
+ 52: '                                                                                                                                       TEL. (717)464-0330 FAX (717)464-9464'
+ 53: '                                                                                                                                       WWW.STEELFABENTERPRISES.COM       '
+ 54: '                                                                                                                               PROJECT OWNER : CK CAPITAL, LLC           '
+ 55: '                                                                                                                               PROJECT DESCRIPTION : CLEVELAND BROTHERS-MILESBURG'
+ 56: '                                                                                  ALL RE-ENTRANT CUT      REVISIONS            PROJECT ADDRESS : 1025N. EAGLE VALLY ROAD, HOWARD, PA 16841'
+ 57: '                                                                                  TO BE 1/2" RADIUSED (U.N.O)                                                            '
+ 58: '                                                                                                                               CONTRACTOR : KINSLEY CONSTRUCTION, INC.   '
+ 59: '                                                                                  WELDS : E70XX                                                                          '
+ 60: '                                                                                  HOLES : 13/16" DIA (U.N.O)                   DRAWN BY : BAS DATE : 06-07-2025 N PR O O . : J . 2 5012 REV #'
+ 61: "                                                                                  MAT'L : A36 (U.N.O)                                               DWG 06B1014  0       "
+ 62: '                                                                                                                               CHECKED BY : GSV DATE : 06-09-2025        '
+ 63: '                                                                                                                                                    NO. : CLEAN :        '
+ 64: '                                                                                                                               DWG DESCRIPTION : BEAM DETAIL             '
+ 65: '                                                                                  PAINT :                                                                                '
+ 66: '    24:23:30                                                                                                                                                             '
+ 67: '    5202                                                                                                                                                                 '
+ 68: '    92                                                                                                                                                                   '
+ 69: '    luJ                                                                                                                                                                  '
+ 70: '    NO                                                                                                                                                                   '
+ 71: '    DETNIRP                                                                                                                                                              '
+ 72: '                                                                                                                              BILL OF MATERIAL                           '
+ 73: '                                                                                                           ASSEMBLY TOTAL SUB-PIECE UNIT MATERIAL LENGTH REMARKS UNIT TOTAL'
+ 74: '                                                                                                            MARK QTY MARK QTY    DESCRIPTION FT IN          WEIGHT WEIGHT'
+ 75: '                                                                                                          06B1014 ONE        BEAM                PNT         196 196     '
+ 76: '                                                                                                                  1 06B1014 1 C8x11.5      17 1  A36         196 196     '
+ 77: '                                                                                                                             FIELD BOLTS                                 '
+ 78: '                                                                                                                  8          3/4 Dia F1852N 0 13/4                       '
+ 79: '                                                                                                                                                          Total weight : '
+ 80: '                                               2                                                                                                                         '
+ 81: '      SHOP NOTES:                                                                              REV# DWN BY   DESCRIPTION   DATE                                          '
+ 82: '      1. ALL PLATES AND ANGLES ATTACHED SHALL BE CENTERED TO MAIN MEMBER U.N.O.                A   GSV  ISSUED FOR APPROVAL Jun 11 2025                                  '
+ 83: '      2. ALL RUNNING DIMENSIONS ARE MEASURED FROM LEFT END OF BEAM INDICATED THUS              0   GSV  ISSUED FOR FABRICATION Jul 28 2025                               '
+ 84: '      3. INDICATES FRAMING SIDE OF BEAM. PAINT STRIPE SHEAR TAB AS REQUIRED.          SSPC-SP3                                                                           '
+ 85: '                                                                                      SHOP PRIMER                                                                        '
+ 86: '                                        / 12                                                                                                                             '
+ 87: '                                        3                                                                                                                                '
+ 88: '                                         2                                                                                                                               '
+ 89: '                                                              3                                                                                                          '
+ 90: '                                                                           11-61                                                                                         '
+ 91: '                                                                                         / 12                                                                            '
+ 92: '                                                                                         3                                                                               '
+ 93: '                                                                                         2                                                                               '
+ 94: '                                                    (1-C8x11.5x17-1) 17-1 (P/P 17-2)                                                                                     '
+ 95: '                                   8-2                                                                                                                                   '
+ 96: '                                   LE                                                                                                                                    '
+ 97: '                                   pW                                                                                                                                    '
+ 98: '                                           (-1/4)                               (-3/4)                                                                                   '
+ 99: '                                                    ONE  BEAM   06B1014                                                                                                  '
+100: '                                                         W 8x1/4                                                                                                         '
+101: '                                                         F 21/4 x3/8                                                                                                     '
+102: '                                                         K 15/16 x11/16                                                                                                  '
+103: '                                               SHOP NOTE:                                                                                                                '
+104: '                                               TOE DIRECTION FAR SIDE                                                                                                    '
+105: '                                                       / 11x                                                                                                             '
+106: '                                                       / 9                                                                                                               '
+107: '                                                       61                                                                                                                '
+108: '                                                       61                                                                                                                '
+109: '                                                   7-93/4    7-21/2 3    1-93/4                                                                                          '
+110: '                                                                                 2                                                                                       '
+111: '                                                                                  1                                                                                      '
+112: '                                                                                     EPOC                                                                                '
+113: '                                                                           2                                                                                             '
+114: '                                                                         COPE                                                                                            '
+115: '                                                                                  1  EPOC                                                                                '
+116: '                                                                                 2                                                                                       '
+117: '                                                                                COPE                                                                                     '
+118: '                                                  / 15                                                                                                                   '
+119: '                                                   2                                                                                                                     '
+120: '                                                              / 92                                                                                                       '
+121: '                                                               61                                                                                                        '
+122: '                                                                                                                                                                 196     '
+
+=== REVISION TABLE (pdfplumber) ===
+
+  Table 0: 27 rows
+    ['BILL OF MATERIAL\nASSEMBLY TOTAL SUB-PIECE UNIT MATERIAL LENGTH REMARKS UNIT TOTAL\nMARK QTY MARK QTY DESCRIPTION FT IN WEIGHT WEIGHT\n06B1014 ONE BEAM PNT 196 196\n1 06B1014 1 C8x11.5 17 1 A36 196 196\nFIELD BOLTS\n8 3/4 Dia F1852N 0 13/4\n(1-C8x11.5x17-1) 17-1 (P/P 17-2) (-1/4) (-3/4)\n7-93/4 7-21/2 3 1-93/4\nTotal weight : 196\n11-61\n2\n61/11x\n2 2\n8-2\n61/9 COPE\nLE EPOC\n61/92\n2/12 2/12 pW\n1\n2/15\n3 3 3\n1 EPOC\n2\nCOPE\nONE BEAM 06B1014\nFOR SHOP USE : QUALITY CONTROL\nINITIAL HOURS DATE CHECK W 8x1/4\nCUT\nDIMENSIONAL\nVISUAL F 21/4 x3/8\nVISUAL\nDATE\nDATE K 15/16 x11/16\nDATE\nTHE INFORMATION NOTED HEREON THIS DRAWING IS THE\nPROPERTY OF STEEL FAB ENTERPRISES, INC. AND SHALL\nNOTED BE USED WITHOUT WRITTEN CONSENT. SHOP NOTE:\nSTEEL FAB TOE DIRECTION FAR SIDE\nENTERPRISES, LLC\nMISCELLANEOUS METALS FABRICATOR AND ERECTORS\n623 BAUMGARDNER ROAD, LANCASTER, PA 17603\nTEL. (717)464-0330 FAX (717)464-9464\nWWW.STEELFABENTERPRISES.COM\nPROJECT OWNER : CK CAPITAL, LLC\nPROJECT DESCRIPTION : CLEVELAND BROTHERS-MILESBURG\nALL RE-ENTRANT CUT REVISIONS PROJECT ADDRESS : 1025N. EAGLE VALLY ROAD, HOWARD, PA 16841\nTO BE 1/2" RADIUSED (U.N.O)\nSHOP NOTES: REV# DWN BY DESCRIPTION DATE CONTRACTOR :KINSLEY CONSTRUCTION, INC.\nWELDS :E70XX\n1. ALL PLATES AND ANGLES ATTACHED SHALL BE CENTERED TO MAIN MEMBER U.N.O. HOLES : 13/16" DIA (U.N.O) A GSV ISSUED FOR APPROVAL Jun 11 2025 DRAWN BY : BAS DATE :06-07-2025 N PR O O . : J . 2 5012 REV #\n2. ALL RUNNING DIMENSIONS ARE MEASURED FROM LEFT END OF BEAM INDICATED THUS MAT\'L : A36 (U.N.O) 0 GSV ISSUED FOR FABRICATION Jul 28 2025 D W G 06B1014 0\nCHECKED BY : GSV DATE :06-09-2025\n3. INDICATES FRAMING SIDE OF BEAM. PAINT STRIPE SHEAR TAB AS REQUIRED. CLEAN : SSPC-SP3 N O . :\nDWG DESCRIPTION : BEAM DETAIL\nPAINT : SHOP PRIMER', None, None, None, None, 'BILL OF MATERIAL', None, None, None, None, None, None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, 'ASSEMBLY', 'TOTAL', 'SUB-PIECE', 'UNIT', 'MATERIAL', None, 'LENGTH', None, 'REMARKS', None, None, 'UNIT', None, 'TOTAL']
+    [None, None, None, None, None, 'MARK', 'QTY', 'MARK', 'QTY', 'DESCRIPTION', None, 'FT IN', None, '', None, None, 'WEIGHT', None, 'WEIGHT']
+    [None, None, None, None, None, '06B1014', 'ONE', '', '', 'BEAM', None, '', '', 'PNT', None, None, '196', None, '196']
+    [None, None, None, None, None, '', '1', '06B1014', '1', 'C8x11.5', None, '17', '1', 'A36', None, None, '196', None, '196']
+    [None, None, None, None, None, '', '', '', '', '', None, '', '', '', None, None, '', None, '']
+    [None, None, None, None, None, '', '', '', '', 'FIELD BOLTS', None, '', '', '', None, None, '', None, '']
+    [None, None, None, None, None, '', '8', '', '', '3/4 Dia F1852N', None, '0', '13/4', '', None, None, '', None, '']
+    [None, None, None, None, None, '', '', '', '', '', None, '', '', '', None, None, '', None, '']
+    [None, None, None, None, None, '', '', '', '', '', None, '', '', '', None, None, '', None, '']
+    [None, None, None, None, None, '', '', '', '', '', None, '', '', '', None, None, '', None, '']
+    [None, None, None, None, None, None, None, None, None, None, 'FOR SHOP USE :\nINITIAL HOURS DATE\nCUT\nVISUAL\nDATE\nDATE', None, None, None, 'QUALITY CONTROL\nCHECK\nDIMENSIONAL\nVISUAL\nDATE', None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'THE INFORMATION NOTED HEREON THIS DRAWING IS THE\nPROPERTY OF STEEL FAB ENTERPRISES, INC. AND SHALL\nNOTED BE USED WITHOUT WRITTEN CONSENT.', None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'STEEL FAB\nENTERPRISES, LLC\nMISCELLANEOUS METALS FABRICATOR AND ERECTORS\n623 BAUMGARDNER ROAD, LANCASTER, PA 17603\nTEL. (717)464-0330 FAX (717)464-9464\nWWW.STEELFABENTERPRISES.COM', None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'PROJECT OWNER : CK CAPITAL, LLC', None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'PROJECT DESCRIPTION : CLEVELAND BROTHERS-MILESBURG', None, None, None, None, None, None, None, None]
+    [None, 'ALL RE-ENTRANT CUT\nTO BE 1/2" RADIUSED (U.N.O)', 'REVISIONS', None, None, None, None, None, None, None, 'PROJECT ADDRESS : 1025N. EAGLE VALLY ROAD, HOWARD, PA 16841', None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'CONTRACTOR :KINSLEY CONSTRUCTION, INC.', None, None, None, None, None, None, None, None]
+    [None, None, 'REV#', 'DWN BY', 'DESCRIPTION', None, None, None, 'DATE', None, None, None, None, None, None, None, None, None, None]
+    [None, 'WELDS :E70XX', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    [None, None, 'A', 'GSV', 'ISSUED FOR APPROVAL', None, None, None, 'Jun 11 2025', None, 'DRAWN BY : BAS', None, 'DATE :06-07-2025', None, None, 'PROJ. 25012\nNO. :', None, 'REV #\n0', None]
+    [None, 'HOLES : 13/16" DIA (U.N.O)', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    [None, None, '0', 'GSV', 'ISSUED FOR FABRICATION', None, None, None, 'Jul 28 2025', None, None, None, None, None, None, None, None, None, None]
+    [None, "MAT'L : A36 (U.N.O)", '', '', '', None, None, None, '', None, 'CHECKED BY : GSV', None, 'DATE :06-09-2025', None, None, 'DWG 06B1014\nNO. :', None, None, None]
+    [None, 'CLEAN : SSPC-SP3\nPAINT : SHOP PRIMER', '', '', '', None, None, None, '', None, None, None, None, None, None, None, None, None, None]
+    [None, None, None, None, None, None, None, None, None, None, 'DWG DESCRIPTION : BEAM DETAIL', None, None, None, None, None, None, None, None]
+    [None, None, '', '', '', None, None, None, '', None, None, None, None, None, None, None, None, None, None]
+
+  Table 1: 7 rows
+    [None, '7-93/4 7-21/2 3 1-93/4', None, None, None, None, None, None, None, None]
+    [None, '61/11x\n2\n61/9', None, None, '61/92', None, '', '11-61', None, None]
+    [None, None, None, None, None, None, None, None, '', None]
+    [None, '', None, None, None, None, None, None, '', None]
+    ['', '', '', '', None, '', '', None, '', '']
+    [None, None, None, None, None, None, None, None, '', None]
+    ['', '', None, None, None, '', '', None, '', '3']
+
+  Table 2: 2 rows
+    ['', '']
+    ['', None]
+
+=== REGEX REVISION PATTERNS ===
+  Pattern1 (row# mark desc date): []
+  Pattern2 (mark date desc): []
+
+=== LINES AROUND 'BE' MARK ===
+  L47: '                                                                                                                                   NOTED BE USED WITHOUT WRITTEN CONSENT.'
+  L57: '                                                                                  TO BE 1/2" RADIUSED (U.N.O)                                                            '
+  L82: '      1. ALL PLATES AND ANGLES ATTACHED SHALL BE CENTERED TO MAIN MEMBER U.N.O.                A   GSV  ISSUED FOR APPROVAL Jun 11 2025                                  '

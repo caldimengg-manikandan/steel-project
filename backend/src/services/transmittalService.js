@@ -260,7 +260,6 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
     // ── Step 1: Load relevant completed extractions ───────────
     const extractionFilter = {
         projectId,
-        createdByAdminId: adminId,
         status: 'completed',
     };
 
@@ -277,7 +276,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
     }
 
     // ── Step 2: Load existing Drawing Log ────────────────────
-    const drawingLog = await DrawingLog.findOne({ projectId, createdByAdminId: adminId }).lean();
+    const drawingLog = await DrawingLog.findOne({ projectId }).lean();
 
     // ── Step 3: Determine transmittal number ─────────────────
     //
@@ -295,7 +294,6 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         // Validate: the transmittal must already exist for this project
         const existing = await Transmittal.findOne({
             projectId,
-            createdByAdminId: adminId,
             transmittalNumber: targetTransmittalNumber,
         }).lean();
 
@@ -369,17 +367,26 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         };
     });
 
+    const combinedSequences = new Set();
+    changedDrawings.forEach(ext => {
+        if (Array.isArray(ext.sequences)) {
+            ext.sequences.forEach(s => combinedSequences.add(s));
+        }
+    });
+    const uniqueSequences = Array.from(combinedSequences);
+
     let newTransmittal;
     if (appendToExisting) {
         // Append drawings to the existing transmittal record
         newTransmittal = await Transmittal.findOneAndUpdate(
-            { projectId, createdByAdminId: adminId, transmittalNumber },
+            { projectId, transmittalNumber },
             {
                 $push: { drawings: { $each: transmittalDrawings } },
                 $inc: {
                     newCount: newDrawings.length,
                     revisedCount: revisedDrawings.length,
                 },
+                $addToSet: { sequences: { $each: uniqueSequences } },
             },
             { new: true }
         );
@@ -391,6 +398,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
             drawings: transmittalDrawings,
             newCount: newDrawings.length,
             revisedCount: revisedDrawings.length,
+            sequences: uniqueSequences,
         });
     }
 
@@ -469,22 +477,20 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
             };
         });
 
-        const log = await DrawingLog.create({
-            projectId,
-            createdByAdminId: adminId,
-            drawings: allEntries,
-            lastTransmittalNo: transmittalNumber,
-        });
+        const log = await DrawingLog.findOneAndUpdate(
+            { projectId },
+            {
+                $setOnInsert: { projectId, createdByAdminId: adminId },
+                $set: { lastTransmittalNo: transmittalNumber },
+                $push: { drawings: { $each: allEntries } },
+            },
+            { upsert: true, new: true }
+        );
 
         return log.toObject();
     }
 
     // ── Subsequent transmittals: Incremental update ───────────
-
-    // Build a set of existing drawing numbers for quick lookup
-    const existingNumbers = new Set(
-        (existingLog.drawings || []).map(d => (d.drawingNumber || '').trim().toUpperCase())
-    );
 
     // Prepare bulk update operations using MongoDB arrayFilters
     const bulkOps = [];
@@ -520,7 +526,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
 
         bulkOps.push({
             updateOne: {
-                filter: { projectId, createdByAdminId: adminId },
+                filter: { projectId },
                 update: { $push: { drawings: newEntry } },
             },
         });
@@ -554,7 +560,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
         // The guard is kept for defence-in-depth.
         bulkOps.push({
             updateOne: {
-                filter: { projectId, createdByAdminId: adminId },
+                filter: { projectId },
                 update: {
                     $set: {
                         'drawings.$[elem].currentRevision': newRevision,
@@ -578,7 +584,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
     // Always update the lastTransmittalNo
     bulkOps.push({
         updateOne: {
-            filter: { projectId, createdByAdminId: adminId },
+            filter: { projectId },
             update: {
                 $set: { lastTransmittalNo: transmittalNumber, updatedAt: today },
             },
@@ -590,7 +596,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
     }
 
     // Return fresh updated log
-    const updated = await DrawingLog.findOne({ projectId, createdByAdminId: adminId }).lean();
+    const updated = await DrawingLog.findOne({ projectId }).lean();
     return updated;
 }
 
@@ -603,8 +609,8 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
  * @param {string} adminId
  * @returns {Promise<Array<object>>}
  */
-async function getTransmittals(projectId, adminId) {
-    return Transmittal.find({ projectId, createdByAdminId: adminId })
+async function getTransmittals(projectId) {
+    return Transmittal.find({ projectId })
         .sort({ transmittalNumber: -1 })
         .lean();
 }
@@ -618,8 +624,8 @@ async function getTransmittals(projectId, adminId) {
  * @param {string} adminId
  * @returns {Promise<object|null>}
  */
-async function getDrawingLog(projectId, adminId) {
-    return DrawingLog.findOne({ projectId, createdByAdminId: adminId }).lean();
+async function getDrawingLog(projectId) {
+    return DrawingLog.findOne({ projectId }).lean();
 }
 
 module.exports = {

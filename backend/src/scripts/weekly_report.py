@@ -1,20 +1,20 @@
 import os
 import sys
 import time
-import schedule
-import pymongo
+import schedule # type: ignore
+import pymongo # type: ignore
 from datetime import datetime
 import datetime as dt_module
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 import smtplib
 import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.drawing.image import Image
+import openpyxl # type: ignore
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side # type: ignore
+from openpyxl.drawing.image import Image # type: ignore
 
 # Load environment variables
 load_dotenv()
@@ -32,7 +32,7 @@ LOGO_PATH = r"c:\Users\Arshad Ibrahim\steel-project\frontend\src\assets\logo\cal
 
 def get_project_stats():
     """Fetch project statistics using aggregation, scoped to the user's admin ID."""
-    from bson import ObjectId
+    from bson import ObjectId # type: ignore
     client = pymongo.MongoClient(MONGO_URI)
     db = client.get_database()
     
@@ -187,14 +187,14 @@ def generate_report_excel(stats):
 
     # Adjust column widths
     for col in ws.columns:
-        max_length = 0
+        max_length: int = 0
         column = col[0].column_letter
         for cell in col:
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except: pass
-        adjusted_width = (max_length + 2)
+        adjusted_width = int(max_length) + 2
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"Project_Status_{datetime.now().strftime('%Y%m%d')}.xlsx"
@@ -208,7 +208,7 @@ def send_email(filename):
         return False
         
     msg = MIMEMultipart()
-    msg['From'] = EMAIL_USER
+    msg['From'] = str(EMAIL_USER)
     msg['To'] = RECIPIENT_EMAIL
     msg['Subject'] = f"Weekly Project Status Report - {datetime.now().strftime('%d %b %Y')}"
     
@@ -233,7 +233,8 @@ def send_email(filename):
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
+        if EMAIL_USER and EMAIL_PASS:
+            server.login(str(EMAIL_USER), str(EMAIL_PASS))
         server.send_message(msg)
         server.quit()
         print(f"Successfully sent report to {RECIPIENT_EMAIL}")

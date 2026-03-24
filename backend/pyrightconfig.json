@@ -1,0 +1,14 @@
+{
+    "reportMissingImports": false,
+    "pythonVersion": "3.12",
+    "typeCheckingMode": "basic",
+    "executionEnvironments": [
+        {
+            "root": "backend",
+            "extraPaths": [
+                "backend",
+                "backend/src"
+            ]
+        }
+    ]
+}

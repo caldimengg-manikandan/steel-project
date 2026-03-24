@@ -1,7 +1,9 @@
 {
     "python.defaultInterpreterPath": "C:\\Program Files\\Python312\\python.exe",
     "python.analysis.extraPaths": [
-        "./backend/src/scripts"
+        "./backend/src/scripts",
+        "./backend",
+        "./backend/src"
     ],
     "python.analysis.useLibraryCodeForTypes": true,
     "python.analysis.typeCheckingMode": "basic"

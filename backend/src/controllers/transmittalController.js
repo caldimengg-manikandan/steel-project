@@ -24,6 +24,7 @@
  *
  * Security: all routes enforce admin-scope via middleware.
  */
+const mongoose = require('mongoose');
 const {
     generateTransmittal,
     getTransmittals,
@@ -54,30 +55,66 @@ const { generateTransmittalExcel, generateDrawingLogExcel } = require('../servic
 exports.generateTransmittal = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
-    const { extractionIds } = req.body;
+    const { extractionIds, targetTransmittalNumber: bodyTargetNum } = req.body;
 
-    const result = await generateTransmittal(
-        projectId,
-        adminId,
-        extractionIds && extractionIds.length > 0 ? extractionIds : null
-    );
+    // ── Determine which transmittal numbers to process ──────
+    // If a specific number is requested, only process that one.
+    // Otherwise, find all pending groups (extractions with targetTransmittalNumber set).
+    let targetNumbers = [];
 
-    if (!result.transmittal) {
-        // Nothing changed — no transmittal created
+    if (bodyTargetNum != null) {
+        targetNumbers = [parseInt(bodyTargetNum, 10)];
+    } else if (extractionIds && extractionIds.length > 0) {
+        // Specific extractions provided → get their unique target numbers
+        const exts = await DrawingExtraction.find({ _id: { $in: extractionIds }, projectId }).select('targetTransmittalNumber').lean();
+        const nums = [...new Set(exts.map(e => e.targetTransmittalNumber).filter(n => n != null))];
+        targetNumbers = nums.length > 0 ? nums : [null]; // null = auto-increment
+    } else {
+        // No filter: find ALL pending transmittal number groups for this project
+        const pending = await DrawingExtraction.aggregate([
+            { $match: { projectId: new mongoose.Types.ObjectId(projectId), status: 'completed', targetTransmittalNumber: { $ne: null } } },
+            { $group: { _id: '$targetTransmittalNumber' } },
+            { $sort: { _id: 1 } }
+        ]);
+        targetNumbers = pending.map(p => p._id);
+        // If no pending extractions with target numbers, fall back to auto-increment
+        if (targetNumbers.length === 0) targetNumbers = [null];
+    }
+
+    const results = [];
+    let lastResult = null;
+
+    for (const targetNum of targetNumbers) {
+        const result = await generateTransmittal(
+            projectId,
+            adminId,
+            extractionIds && extractionIds.length > 0 ? extractionIds : null,
+            targetNum
+        );
+        lastResult = result;
+        if (result.transmittal) {
+            results.push(result);
+        }
+    }
+
+    if (results.length === 0) {
         return res.status(200).json({
-            message: result.summary.message,
+            message: lastResult?.summary?.message || 'No new or revised drawings detected. Transmittal not generated.',
             transmittal: null,
-            summary: result.summary,
+            summary: lastResult?.summary,
         });
     }
 
+    const transmittalNums = results.map(r => `TR-${String(r.summary.transmittalNumber).padStart(3, '0')}`).join(', ');
     res.status(201).json({
-        message: `Transmittal TR-${String(result.summary.transmittalNumber).padStart(3, '0')} generated successfully.`,
-        transmittal: result.transmittal,
-        drawingLog: result.drawingLog,
-        summary: result.summary,
+        message: `${transmittalNums} generated successfully.`,
+        transmittal: results[results.length - 1].transmittal,
+        drawingLog: results[results.length - 1].drawingLog,
+        summary: results[results.length - 1].summary,
+        allResults: results.map(r => r.summary),
     });
 };
+
 
 /**
  * GET /api/transmittals/:projectId
@@ -88,39 +125,42 @@ exports.listTransmittals = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
-    let transmittals = await getTransmittals(projectId, adminId);
+    let transmittals = await getTransmittals(projectId);
 
     // ── Include In-Flight Transmittals ────────────────────
-    // If the project counter is ahead or equivalent but no Transmittal 
-    // record exists yet, we show a "pending" entry so users can append more.
+    // Find all targeted transmittal numbers in extractions that haven't been generated yet.
     try {
-        const project = await Project.findById(projectId).lean();
-        if (project && project.transmittalCount > 0) {
-            const currentCount = project.transmittalCount;
-            const exists = transmittals.find(t => t.transmittalNumber === currentCount);
+        const pendingTargets = await DrawingExtraction.aggregate([
+            { $match: { projectId: new mongoose.Types.ObjectId(projectId), targetTransmittalNumber: { $ne: null } } },
+            { $group: { _id: '$targetTransmittalNumber', count: { $sum: 1 }, sequences: { $push: '$sequences' } } }
+        ]);
 
-            if (!exists) {
-                // See if anyone is actually targeting this number
-                const count = await DrawingExtraction.countDocuments({
-                    projectId,
-                    createdByAdminId: adminId,
-                    targetTransmittalNumber: currentCount,
+        const existingNumbers = new Set(transmittals.map(t => t.transmittalNumber));
+
+        for (const target of pendingTargets) {
+            const currentCount = target._id;
+            if (!existingNumbers.has(currentCount)) {
+                
+                const pendingSeqs = new Set();
+                target.sequences.forEach(seqArray => {
+                    if (seqArray && Array.isArray(seqArray)) {
+                        seqArray.forEach(s => pendingSeqs.add(s));
+                    }
                 });
 
-                if (count > 0) {
-                    // Add virtual placeholder to the top
-                    transmittals.unshift({
-                        _id: `pending-${currentCount}`,
-                        transmittalNumber: currentCount,
-                        newCount: count,
-                        revisedCount: 0,
-                        createdAt: new Date(),
-                        isPending: true,
-                    });
-                }
+                // Add virtual placeholder
+                transmittals.unshift({
+                    _id: `pending-${currentCount}`,
+                    transmittalNumber: currentCount,
+                    newCount: target.count,
+                    revisedCount: 0,
+                    createdAt: new Date(),
+                    isPending: true,
+                    sequences: Array.from(pendingSeqs),
+                });
             }
         }
-    } catch (e) { /* non-fatal */ }
+    } catch (e) { console.error('[ListTransmittals] Failed to load pending targets:', e); }
 
     // Sort by transmittalNumber descending
     transmittals.sort((a, b) => b.transmittalNumber - a.transmittalNumber);
@@ -139,7 +179,6 @@ exports.getTransmittal = async (req, res) => {
     const transmittal = await Transmittal.findOne({
         _id: transmittalId,
         projectId,
-        createdByAdminId: adminId,
     }).lean();
 
     if (!transmittal) {
@@ -157,7 +196,7 @@ exports.getDrawingLog = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
-    const log = await getDrawingLog(projectId, adminId);
+    const log = await getDrawingLog(projectId);
 
     if (!log) {
         return res.status(404).json({
@@ -176,7 +215,7 @@ exports.downloadDrawingLogExcel = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
-    const log = await getDrawingLog(projectId, adminId);
+    const log = await getDrawingLog(projectId);
 
     if (!log || !log.drawings || log.drawings.length === 0) {
         return res.status(404).json({ error: 'Drawing Log is empty or not found.' });
@@ -206,7 +245,6 @@ exports.downloadTransmittalExcel = async (req, res) => {
     const transmittal = await Transmittal.findOne({
         _id: transmittalId,
         projectId,
-        createdByAdminId: adminId,
     }).lean();
 
     if (!transmittal) {
@@ -237,11 +275,11 @@ exports.previewChanges = async (req, res) => {
 
     const { getDrawingLog, detectChanges } = require('../services/transmittalService');
 
-    const filter = { projectId, createdByAdminId: adminId, status: 'completed' };
+    const filter = { projectId, status: 'completed' };
     if (extractionIds?.length > 0) filter._id = { $in: extractionIds };
 
     const extractions = await DrawingExtraction.find(filter).lean();
-    const log = await getDrawingLog(projectId, adminId);
+    const log = await getDrawingLog(projectId);
     const { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, log);
 
     res.json({
@@ -273,7 +311,6 @@ exports.deleteTransmittal = async (req, res) => {
     const doc = await Transmittal.findOneAndDelete({
         _id: transmittalId,
         projectId,
-        createdByAdminId: adminId,
     });
 
     if (!doc) {

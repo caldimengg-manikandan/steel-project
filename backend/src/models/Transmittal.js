@@ -72,6 +72,8 @@ const transmittalSchema = new mongoose.Schema(
         newCount: { type: Number, default: 0 },
         revisedCount: { type: Number, default: 0 },
 
+        sequences: { type: [String], default: [] },
+
         // ── Link to generated Excel file ─────────────────────────
         excelPath: { type: String, default: '' },
         excelUrl: { type: String, default: '' },

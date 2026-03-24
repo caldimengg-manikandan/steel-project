@@ -86,12 +86,13 @@ HARD_STOP_PATTERN = re.compile(
 KEYWORDS = [
     "HORIZONTAL BRACE", "VERTICAL BRACE", "BEAM DETAIL", "FRAME DETAIL",
     "PLATE", "ANGLE", "BEAM", "COLUMN", "CHANNEL", "HSS", "LINTEL", "CLIP",
-    "STIFFENER", "BASE PLATE", "CAP PLATE", "BENT PLATE", "WELDMENT", "FRAME", 
-    "DETAIL", "RAILING", "STAIR", "HANDRAIL", "KICKPLATE",
-    "LADDER", "BRACING", "GIRT", "PURLIN", "MISCELLANEOUS", "EMBED PLATE"
+    "STIFFENER", "BASE PLATE", "CAP PLATE", "BENT PLATE", "WELDMENT", "FRAME",
+    "DETAIL", "RAILING", "STAIR", "HANDRAIL", "HANDRAIL DETAIL", "KICKPLATE",
+    "GUARDRAIL", "GUARDRAIL DETAIL", "LADDER", "BRACING", "GIRT", "PURLIN",
+    "MISCELLANEOUS", "EMBED PLATE", "STEEL"
 ]
 
-BAD_TITLES = {"MARK", "QTY", "FT IN", "WEIGHT", "MATERIAL", "DATE", "REV", "CHECKED", "DRAWN", "PROJ", "CONTRACTOR"}
+BAD_TITLES = {"MARK", "QTY", "FT IN", "WEIGHT", "MATERIAL", "DATE", "REV", "CHECKED", "DRAWN", "PROJ", "CONTRACTOR", "PROJECT", "OWNER", "DESCRIPTION", "CLIENT"}
 
 
 def normalize_date_string(date_str):
@@ -172,6 +173,29 @@ def clean_rem(s):
     
     # Strip leading 'x ', 'X ', 'v ', '*', or '-' noise that often comes from PDF checkmarks or artifacts
     s = re.sub(r'^[xXv\*\-\.\s]+(?=[A-Z0-9])', '', s).strip()
+
+    # Strip shop/general notes that bleed into the remarks column due to PDF layout.
+    # These are numbered list items like "1. ALL PLATES AND ANGLES ATTACHED SHALL BE..."
+    # that appear on the same line as the actual revision remark.
+    # Strategy: if the string starts with a shop note pattern, find the last numbered note
+    # and take only what follows it.
+    #
+    # Example: "1. ALL PLATES ... U.N.O. A GSV ISSUED FOR APPROVAL"
+    #   → we want just "ISSUED FOR APPROVAL"
+    #
+    # We look for "ISSUED FOR ..." or known revision phrases after a note boundary.
+    rev_phrase_match = re.search(
+        r'\b(ISSUED\s+FOR\s+(?:APPROVAL|FABRICATION|CONSTRUCTION|INFORMATION|BID|TENDER)|'
+        r'FOR\s+(?:APPROVAL|FABRICATION|CONSTRUCTION|INFORMATION)|'
+        r'APPROVED\b|PRELIMINARY\b|FINAL\b)',
+        s, re.I
+    )
+    if rev_phrase_match and rev_phrase_match.start() > 0:
+        # Check if there's shop note noise before it
+        prefix = s[:rev_phrase_match.start()].strip()
+        # If the prefix looks like shop note content (contains a numbered list item), strip it
+        if re.search(r'\b\d+\.\s+[A-Z]', prefix, re.I) or re.search(r'\bU\.N\.O\b', prefix, re.I):
+            s = s[rev_phrase_match.start():].strip()
     
     patterns = [
         r'DRAWN\s+BY', r'PROJ[.\s]*NO', r'PROJ', r'DATE', r'CONTRACTOR',
@@ -216,38 +240,40 @@ def score_title(s: str) -> int:
         return -1
     
     s_up = s.upper().strip()
-    score: int = 100  # Base logic: shorter is better, provided it's valid
+    current_score: int = 100  # Base logic: shorter is better, provided it's valid
     
     # Reward keywords (Strong signal)
     keyword_matches = [k for k in KEYWORDS if k in s_up]
     if keyword_matches:
-        score += 500
-        score += len(keyword_matches) * 20
+        current_score += 1000  # Increased reward
+        current_score += len(keyword_matches) * 50
         # Extra reward if the title STARTS with or IS exactly a keyword
         if any(s_up.startswith(k) for k in keyword_matches):
-            score += 100
+            current_score += 200
             
     if "DETAIL" in s_up:
-        score += 100
+        current_score += 300
         
     # Heuristic: shorter, concise titles are much more likely to be correct
-    score = score - (len(s) * 3)  # type: ignore
+    current_score -= len(s) * 3
     
     # Penalize metadata noise commonly found in long accidental extractions
     noise_words = [' PER ', ' OF ', ' FOR ', ' PLAN ', ' BY ', ' NO.', ' REF ', ' DWG ', ' SHEET ']
-    for noise in noise_words:
-        if noise in s_up:
-            score = score - 80  # type: ignore
+    current_score -= sum(80 for noise in noise_words if noise in s_up)
             
     # Penalize excessive punctuation/numeric junk in title
-    junk_chars = int(sum(1 for c in s if not c.isalnum() and not c.isspace()))
-    score = score - (junk_chars * 15)  # type: ignore
+    junk_chars: int = sum(1 for c in s if not c.isalnum() and not c.isspace())
+    current_score -= junk_chars * 15
     
     # If the title contains characters that look like a drawing number (dots/dashes/digits), penalize it
     if re.search(r'\b[A-Z]?\d+[-.]\d+\b', s_up):
-        score = score - 200  # type: ignore
+        current_score -= 500
+        
+    # Penalize suspicious hyphenated project names if no keywords found
+    if "-" in s_up and not keyword_matches:
+        current_score -= 300
 
-    return max(0, int(score))
+    return max(0, current_score)
 
 
 def get_date_val(r):
@@ -519,62 +545,106 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
 
             # --- 2. Drawing Title (Multi-pass extraction) ---
             all_lines: List[str] = clean_text.splitlines()
-            candidates = []
 
-            # Pass A: Regex for "Drawing Title :" or "DWG DESCRIPTION :"
-            m1 = re.search(r'Drawing\s*Title\s*[:.\s]+(\S[^\n]*)', clean_text, re.I)
-            if m1: candidates.append(m1.group(1).strip())
-            
-            m2 = re.search(r'DWG\s+DESCRIPTION\s*[:.\-\s]*\n?\s*([A-Z0-9\s,&/\-]+?)(?=\s\s+|\n|[A-Z]{3,}:|$)', clean_text, re.I)
-            if m2: candidates.append(m2.group(1).strip())
+            # ── Priority 1: Explicit DWG DESCRIPTION / Drawing Title labels ──
+            # These are definitive — if found, use immediately without scoring
+            explicit_title = ""
 
-            # Pass B: Scan lines for "DWG DESCRIPTION" or similar
-            for i, line in enumerate(all_lines):
-                if re.search(r'(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', line, re.I):
-                    m = re.search(r'DESCRIPTION\s*[:.\s]+(.*?)(?=\s\s+|\n|[A-Z]{3,}:|$)', line, re.I)
-                    if m: candidates.append(m.group(1).strip())
-                
-                # Check lines below a title label if label is alone
-                if re.search(r'Drawing\s*Title\s*:\s*$', line.rstrip(), re.I):
-                    for j in range(i + 1, min(i + 5, len(all_lines))):
-                        line_j = all_lines[j] # type: ignore
-                        candidate = line_j.strip()
-                        if candidate and not HARD_STOP_PATTERN.match(candidate):
-                            candidates.append(candidate)
-                        else:
+            # Check for inline "DWG DESCRIPTION: <title>" anywhere in text (passes A, B, C)
+            for line in all_lines:
+                is_dwg_desc = re.search(r'\bDWG\s+DESCRIPTION\s*[:.]\s*', line, re.I)
+                if is_dwg_desc:
+                    m = re.search(r'DWG\s+DESCRIPTION\s*[:.]\s*(.+)', line, re.I)
+                    if m:
+                        val = strip_all_dates(m.group(1).strip())
+                        if val and is_valid_title_candidate(val):
+                            explicit_title = val
                             break
 
-            # Pass C: Reversed search (common for bottom right title blocks)
-            for line in reversed(all_lines):
-                if re.search(r'DWG\s+DESCRIPTION', line, re.I):
-                    m = re.search(r'DWG\s+DESCRIPTION\s*[:.\s]+\s*(.+)', line, re.I)
-                    if m: candidates.append(m.group(1).strip())
-            
-            # Pass D: FALLBACK - Keyword search
-            complex_match = re.search(r'\b(.*?(?:FRAME|STAIR|RAILING|HANDRAIL|BEAM|COLUMN|PLATE|LADDER)\s+DETAIL.*?)(?=\n|$)', clean_text, re.I)
-            if complex_match: candidates.append(complex_match.group(1).strip())
+            # Multi-line: label alone on a line, value on next
+            if not explicit_title:
+                m2 = re.search(
+                    r'DWG\s+DESCRIPTION\s*[:.\-\s]*\n?\s*([A-Z0-9\s,&/\-]+?)(?=\s\s+|\n|[A-Z]{3,}:|$)',
+                    clean_text, re.I
+                )
+                if m2:
+                    val = strip_all_dates(m2.group(1).strip())
+                    if val and is_valid_title_candidate(val):
+                        explicit_title = val
 
-            for word in KEYWORDS:
-                if re.search(rf'^\s*{word}\s*$', clean_text, re.M | re.I):
-                    candidates.append(word)
-                if re.search(rf'\b{word}\s+DETAIL\b', clean_text, re.I):
-                    candidates.append(f"{word} DETAIL")
+            # Reversed scan (bottom-right title blocks have label at end)
+            if not explicit_title:
+                for line in reversed(all_lines):
+                    if re.search(r'DWG\s+DESCRIPTION', line, re.I):
+                        m = re.search(r'DWG\s+DESCRIPTION\s*[:.]\s*(.+)', line, re.I)
+                        if m:
+                            val = strip_all_dates(m.group(1).strip())
+                            if val and is_valid_title_candidate(val):
+                                explicit_title = val
+                                break
 
-            # Final Selection: pick highest score
-            best_title = ""
-            best_score = -1
-            for cand in candidates:
-                cand_clean = re.sub(r'^(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', '', cand, flags=re.I).strip()
-                # New: Strip any accidental dates caught from nearby fields
-                cand_clean = strip_all_dates(cand_clean)
-                
-                s = score_title(cand_clean)
-                if s > best_score:
-                    best_score = s
-                    best_title = cand_clean
-            
-            fields["drawingTitle"] = best_title
-            fields["drawingDescription"] = best_title # Also populate description for consistency
+            # Drawing Title label
+            if not explicit_title:
+                m1 = re.search(r'Drawing\s*Title\s*[:.\s]+(\S[^\n]*)', clean_text, re.I)
+                if m1:
+                    val = strip_all_dates(m1.group(1).strip())
+                    if val and is_valid_title_candidate(val):
+                        explicit_title = val
+
+            # Drawing Title label spanning next line
+            if not explicit_title:
+                for i, line in enumerate(all_lines):
+                    if re.search(r'Drawing\s*Title\s*:\s*$', line.rstrip(), re.I):
+                        for j in range(i + 1, min(i + 5, len(all_lines))):
+                            line_j = all_lines[j] # type: ignore
+                            candidate = line_j.strip()
+                            if candidate and not HARD_STOP_PATTERN.match(candidate):
+                                val = strip_all_dates(candidate)
+                                if val and is_valid_title_candidate(val):
+                                    explicit_title = val
+                                break
+
+            # ── If explicit label found → use it directly ──
+            if explicit_title:
+                fields["drawingTitle"] = explicit_title
+                fields["drawingDescription"] = explicit_title
+            else:
+                # ── Priority 2: Scored keyword candidates (fallback only) ──
+                candidates: List[str] = []
+
+                # Scan for any DESCRIPTION label not preceded by PROJECT
+                for line in all_lines:
+                    is_just_desc = re.search(r'\bDESCRIPTION\s*[:.]\s*', line, re.I) and not re.search(r'PROJECT', line, re.I)
+                    if is_just_desc:
+                        m = re.search(r'DESCRIPTION\s*[:.\s]+(.*?)(?=\s\s+|\n|[A-Z]{3,}:|$)', line, re.I)
+                        if m: candidates.append(m.group(1).strip())
+
+                # Pass D: Keyword + DETAIL synthesis
+                complex_match = re.search(
+                    r'\b(.*?(?:FRAME|STAIR|RAILING|HANDRAIL|GUARDRAIL|BEAM|COLUMN|PLATE|LADDER|STEEL|MISCELLANEOUS|ANGLE|BRACE)\s+DETAIL.*?)(?=\n|$)',
+                    clean_text, re.I
+                )
+                if complex_match: candidates.append(complex_match.group(1).strip())
+
+                for word in KEYWORDS:
+                    if re.search(rf'^\s*{word}\s*$', clean_text, re.M | re.I):
+                        candidates.append(word)
+                    if re.search(rf'\b{word}\s+DETAIL\b', clean_text, re.I):
+                        candidates.append(f"{word} DETAIL")
+
+                # Pick the highest scored candidate
+                best_title = ""
+                best_score = -1
+                for cand in candidates:
+                    cand_clean = re.sub(r'^(?:DWG\s+)?DESCRIPTION\s*[:.\s]+', '', cand, flags=re.I).strip()
+                    cand_clean = strip_all_dates(cand_clean)
+                    s = score_title(cand_clean)
+                    if s > best_score:
+                        best_score = s
+                        best_title = cand_clean
+
+                fields["drawingTitle"] = best_title
+                fields["drawingDescription"] = best_title
 
             # --- 3. Metadata ---
             # Using \s*[:.\-\s]*\n?\s* so if the value is printed on the next line or after much space, we still grab it
@@ -619,6 +689,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                     return
                 # Skip obvious noise tokens
                 if norm_mark in ('NO', 'BY', 'OK', 'TO', 'OF', 'IN', 'IS', 'IT', 'AM', 'PM',
+                                 'BE', 'AS', 'AN', 'AT', 'DO', 'GO', 'IF', 'OR', 'SO', 'UP',
                                  'DATE', 'MARK', 'ISSUE', 'REVISION', 'COPIES', 'DESTINATION',
                                  '#', 'DWG', 'SHEET'):
                     return
@@ -680,8 +751,12 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                         row_text = [str(c or '').strip() for c in row_list]
                         # Join multi-line cells (pdfplumber sometimes gives "\nIssue" for "Revision/\nIssue")
                         row_joined = [c.replace('\n', ' ').replace('/', ' ') for c in row_text]
-                        has_rev  = any(REV_HDR.search(c) for c in row_joined)
-                        has_date = any(DATE_HDR.search(c) for c in row_joined)
+                        # Only look at short cells for header keyword detection.
+                        # Huge merged cells (>60 chars) contain entire drawing content and
+                        # would give false positives (e.g. row 0 of BOM tables).
+                        short_cells = [c for c in row_joined if len(c) <= 60]
+                        has_rev  = any(REV_HDR.search(c) for c in short_cells)
+                        has_date = any(DATE_HDR.search(c) for c in short_cells)
                         if has_rev and has_date:
                             header_idx = row_i
                             # Pick best columns for this header row

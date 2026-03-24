@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getProjectById, adminUpdateProject } from '../../services/projectApi';
 import type { Project, ProjectPermission } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
-import { uploadDrawing, listExtractions, checkDuplicates } from '../../services/extractionApi';
+import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
 import { listTransmittals } from '../../services/transmittalApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
 import TransmittalPanel from '../../components/TransmittalPanel';
@@ -35,6 +35,7 @@ export default function ProjectView() {
     const [loadingTransmittals, setLoadingTransmittals] = useState(false);
     // null = "Create New Transmittal"; number = existing transmittal number
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
+    const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
     const fetchData = useCallback(async () => {
         if (!id) return;
@@ -116,12 +117,18 @@ export default function ProjectView() {
         if (!project?._id) return;
         setUploading(true);
         try {
-            const res = await uploadDrawing(project._id, filesToUpload, localSavePath, selectedTransmittalNumber);
+            let numToUse = selectedTransmittalNumber;
+            if (numToUse === null) {
+                const res = await reserveTransmittalNumber(project._id);
+                numToUse = res.transmittalNumber;
+            }
+            const res = await uploadDrawing(project._id, filesToUpload, localSavePath, numToUse, selectedSequences);
             alert(res.message);
             setUploadModal(false);
             setDupModal(false);
             setDupList([]);
             setPendingFiles([]);
+            setSelectedSequences([]);
             fetchData();
             setActiveTab('extraction');
         } catch (err: any) {
@@ -259,6 +266,7 @@ export default function ProjectView() {
                     <DrawingExtractionPanel
                         projectId={project.id}
                         canUpload={canUpload}
+                        sequences={project.sequences}
                     />
                 </div>
             )}
@@ -277,7 +285,7 @@ export default function ProjectView() {
 
             {/* ── Transmittals Tab ── */}
             {activeTab === 'transmittals' && (
-                <TransmittalPanel projectId={project.id} canEdit={canUpload} />
+                <TransmittalPanel projectId={project.id} canEdit={canUpload} sequences={project.sequences} />
             )}
 
             {/* ── Revision History Tab ── */}
@@ -548,6 +556,28 @@ export default function ProjectView() {
                                     )}
                                 </label>
                             </div>
+
+                            {project.sequences && project.sequences.length > 0 && (
+                                <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                                        {project.sequences.map((seq: any, idx: number) => (
+                                            <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedSequences.includes(seq.name)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
+                                                        else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
+                                                    }}
+                                                    style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                />
+                                                {seq.name}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="form-actions">
                                 <button

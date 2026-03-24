@@ -34,9 +34,13 @@ exports.uploadAndExtract = async (req, res) => {
     const localSavePath = req.body.localSavePath || '';
     const pathArray = Array.isArray(paths) ? paths : [paths];
     // The frontend MUST call /reserve-transmittal first and pass the reserved number here.
-    // If not provided, drawings will be stored without a transmittal number (can be assigned later).
     const rawTN = req.body.targetTransmittalNumber;
     let targetTransmittalNumber = rawTN != null && rawTN !== '' ? parseInt(rawTN, 10) : null;
+
+    let sequences = [];
+    if (req.body.sequences) {
+        sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
+    }
 
     // Filter and determine folder name
     const validFiles = [];
@@ -87,6 +91,7 @@ exports.uploadAndExtract = async (req, res) => {
         uploadedBy,
         localSavePath,
         targetTransmittalNumber,
+        sequences,
         status: 'queued',
     }));
 
@@ -133,7 +138,6 @@ exports.checkDuplicates = async (req, res) => {
     // Pull all completed extractions for this project
     const existing = await DrawingExtraction.find({
         projectId,
-        createdByAdminId: adminId,
         status: 'completed',
     }).select('originalFileName extractedFields').lean();
 
@@ -169,11 +173,9 @@ exports.checkDuplicates = async (req, res) => {
 // ── List Extractions for a Project ───────────────────────
 exports.listExtractions = async (req, res) => {
     const { projectId } = req.params;
-    const adminId = req.principal.adminId;
 
     const extractions = await DrawingExtraction.find({
         projectId,
-        createdByAdminId: adminId,          // ← tenant isolation
     })
         .sort({ createdAt: -1 })
         .lean();

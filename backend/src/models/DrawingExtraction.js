@@ -75,6 +75,9 @@ const drawingExtractionSchema = new mongoose.Schema(
         // integer = append to that existing transmittal slot
         targetTransmittalNumber: { type: Number, default: null },
 
+        // Target sequences for the transmittal mapping
+        sequences: { type: [String], default: [] },
+
         // ── Extraction metadata ──
         status: {
             type: String,
@@ -119,5 +122,6 @@ drawingExtractionSchema.index({
     'extractedFields.drawingNumber': 1,
     'extractedFields.revision': 1,
 });
+drawingExtractionSchema.index({ projectId: 1, targetTransmittalNumber: 1 });
 
 module.exports = mongoose.model('DrawingExtraction', drawingExtractionSchema);
