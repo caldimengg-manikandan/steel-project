@@ -12,6 +12,7 @@
  *   DELETE /api/admin/projects/:projectId                — delete project
  *   POST   /api/admin/projects/:projectId/assignments    — assign user
  *   DELETE /api/admin/projects/:projectId/assignments/:userId — remove assignment
+ *   POST   /api/admin/projects/:projectId/reserve-transmittal — reserve transmittal number
  */
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
@@ -561,6 +562,20 @@ async function uploadCOR(req, res) {
     }
 }
 
+/**
+ * POST /api/admin/projects/:projectId/reserve-transmittal
+ */
+async function reserveTransmittalNumber(req, res) {
+    const project = req.scopedProject;
+    const updated = await Project.findByIdAndUpdate(
+        project._id,
+        { $inc: { transmittalCount: 1 } },
+        { new: true }
+    ).lean();
+    if (!updated) return res.status(404).json({ error: 'Project not found.' });
+    res.json({ transmittalNumber: updated.transmittalCount });
+}
+
 module.exports = {
     listProjects,
     createProject,
@@ -571,4 +586,5 @@ module.exports = {
     removeAssignment,
     downloadAllProjectsStatusExcel,
     uploadCOR,
+    reserveTransmittalNumber,
 };

@@ -216,7 +216,7 @@ def score_title(s: str) -> int:
         return -1
     
     s_up = s.upper().strip()
-    score = 100  # Base logic: shorter is better, provided it's valid
+    score: int = 100  # Base logic: shorter is better, provided it's valid
     
     # Reward keywords (Strong signal)
     keyword_matches = [k for k in KEYWORDS if k in s_up]
@@ -231,23 +231,23 @@ def score_title(s: str) -> int:
         score += 100
         
     # Heuristic: shorter, concise titles are much more likely to be correct
-    score -= len(s) * 3
+    score = score - (len(s) * 3)  # type: ignore
     
     # Penalize metadata noise commonly found in long accidental extractions
     noise_words = [' PER ', ' OF ', ' FOR ', ' PLAN ', ' BY ', ' NO.', ' REF ', ' DWG ', ' SHEET ']
     for noise in noise_words:
         if noise in s_up:
-            score -= 80
+            score = score - 80  # type: ignore
             
     # Penalize excessive punctuation/numeric junk in title
-    junk_chars = sum(1 for c in s if not c.isalnum() and not c.isspace())
-    score -= junk_chars * 15
+    junk_chars = int(sum(1 for c in s if not c.isalnum() and not c.isspace()))
+    score = score - (junk_chars * 15)  # type: ignore
     
     # If the title contains characters that look like a drawing number (dots/dashes/digits), penalize it
     if re.search(r'\b[A-Z]?\d+[-.]\d+\b', s_up):
-        score -= 200
+        score = score - 200  # type: ignore
 
-    return max(0, score)
+    return max(0, int(score))
 
 
 def get_date_val(r):

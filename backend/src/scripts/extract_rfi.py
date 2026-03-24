@@ -1,7 +1,7 @@
 import sys
 import json
 import re
-import fitz
+import fitz  # type: ignore
 
 def extract_sk_number(original_filename):
     """
@@ -31,18 +31,20 @@ def extract_rfi(pdf_path, original_filename):
             valid_annots = []
             
             # 1. Grab PDF Annotations (comments, text boxes, markups)
-            for annot in page.annots():
-                info = annot.info
-                content = info.get('content', '')
-                if content and content.strip():
-                    valid_annots.append({
-                        'text': content.strip(),
-                        'x0': annot.rect.x0,
-                        'y0': annot.rect.y0,
-                        'x1': annot.rect.x1,
-                        'y1': annot.rect.y1,
-                        'rect': annot.rect
-                    })
+            page_annots = page.annots() # type: ignore
+            if page_annots:
+                for annot in page_annots:
+                    info = annot.info
+                    content = info.get('content', '')
+                    if content and content.strip():
+                        valid_annots.append({
+                            'text': content.strip(),
+                            'x0': annot.rect.x0,
+                            'y0': annot.rect.y0,
+                            'x1': annot.rect.x1,
+                            'y1': annot.rect.y1,
+                            'rect': annot.rect
+                        })
                     
             # Remove duplicated annotation boxes placed exactly on top of each other
             unique_annots = []
@@ -63,7 +65,7 @@ def extract_rfi(pdf_path, original_filename):
                     rfi_num = f"Q{standalone_match.group(1)}"
                     
                     # Find the nearest separate text box to be the description
-                    best_annot = None
+                    best_annot = {}
                     min_dist = float('inf')
                     
                     for sibling in valid_annots:
@@ -91,7 +93,7 @@ def extract_rfi(pdf_path, original_filename):
                                 min_dist = dist
                                 best_annot = sibling
                                 
-                    desc = best_annot['text'] if best_annot else ""
+                    desc = str(best_annot.get('text', ''))
                     page_rfis.append({
                         'rfiNumber': rfi_num,
                         'refDrawing': original_filename,
@@ -100,7 +102,7 @@ def extract_rfi(pdf_path, original_filename):
                         'status': 'OPEN',
                         'remarks': '',
                         'skNumber': sk_number,
-                        '_rect': best_annot['rect'] if best_annot else a['rect']
+                        '_rect': best_annot.get('rect', a['rect'])
                     })
                     continue
 
@@ -125,10 +127,13 @@ def extract_rfi(pdf_path, original_filename):
             
             for rfi in page_rfis:
                 # Embedded inline response (e.g., "Response: Confirmed" inside the main description box)
-                resp_match = re.search(r'\b(response|ans|answer)\s*:', rfi['description'], re.IGNORECASE)
+                desc_text = str(rfi.get('description', ''))
+                resp_match = re.search(r'\b(response|ans|answer)\s*:', desc_text, re.IGNORECASE)
                 if resp_match:
-                    rfi['response'] = rfi['description'][resp_match.end():].strip()
-                    rfi['description'] = rfi['description'][:resp_match.start()].strip()
+                    start_idx = int(resp_match.start())
+                    end_idx = int(resp_match.end())
+                    rfi['response'] = desc_text[end_idx:].strip()  # type: ignore
+                    rfi['description'] = desc_text[:start_idx].strip()  # type: ignore
                     
                 # Search nearby valid annots that might act as response labels
                 desc_rect = rfi['_rect']

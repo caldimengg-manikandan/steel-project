@@ -82,12 +82,49 @@ exports.generateTransmittal = async (req, res) => {
 /**
  * GET /api/transmittals/:projectId
  * List all transmittals for a project (newest first).
+ * Now includes "In-Flight" transmittals that are processing but not yet finalized.
  */
 exports.listTransmittals = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
-    const transmittals = await getTransmittals(projectId, adminId);
+    let transmittals = await getTransmittals(projectId, adminId);
+
+    // ── Include In-Flight Transmittals ────────────────────
+    // If the project counter is ahead or equivalent but no Transmittal 
+    // record exists yet, we show a "pending" entry so users can append more.
+    try {
+        const project = await Project.findById(projectId).lean();
+        if (project && project.transmittalCount > 0) {
+            const currentCount = project.transmittalCount;
+            const exists = transmittals.find(t => t.transmittalNumber === currentCount);
+
+            if (!exists) {
+                // See if anyone is actually targeting this number
+                const count = await DrawingExtraction.countDocuments({
+                    projectId,
+                    createdByAdminId: adminId,
+                    targetTransmittalNumber: currentCount,
+                });
+
+                if (count > 0) {
+                    // Add virtual placeholder to the top
+                    transmittals.unshift({
+                        _id: `pending-${currentCount}`,
+                        transmittalNumber: currentCount,
+                        newCount: count,
+                        revisedCount: 0,
+                        createdAt: new Date(),
+                        isPending: true,
+                    });
+                }
+            }
+        }
+    } catch (e) { /* non-fatal */ }
+
+    // Sort by transmittalNumber descending
+    transmittals.sort((a, b) => b.transmittalNumber - a.transmittalNumber);
+
     res.json({ count: transmittals.length, transmittals });
 };
 

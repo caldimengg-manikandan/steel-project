@@ -149,4 +149,14 @@ export async function checkDuplicates(
     });
     return handleResponse(res);
 }
-
+// ── Reserve Transmittal Number ────────────────────────────
+export async function reserveTransmittalNumber(
+    projectId: string
+): Promise<{ transmittalNumber: number }> {
+    const token = getToken();
+    const res = await fetch(`${BASE}/admin/projects/${projectId}/reserve-transmittal`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    return handleResponse(res);
+}

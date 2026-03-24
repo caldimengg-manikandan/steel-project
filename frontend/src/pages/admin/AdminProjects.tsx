@@ -390,21 +390,21 @@ export default function AdminProjects() {
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setSeqInput(val);
-                                        const count = Math.max(0, parseInt(val) || 0);
+                                        const count = parseInt(val);
+                                        if (isNaN(count)) return;
                                         
-                                        // Update the form string for submission
+                                        const effectiveCount = Math.max(0, count);
                                         setForm(f => ({ ...f, sequenceCount: val }));
 
-                                        // Sync boxes with the new count
                                         setSequenceNames(prev => {
-                                            if (count > prev.length) {
+                                            if (effectiveCount > prev.length) {
                                                 const next = [...prev];
-                                                for (let i = prev.length; i < count; i++) {
+                                                for (let i = prev.length; i < effectiveCount; i++) {
                                                     next.push('');
                                                 }
                                                 return next;
                                             } else {
-                                                return prev.slice(0, count);
+                                                return prev.slice(0, effectiveCount);
                                             }
                                         });
                                     }} 
@@ -497,17 +497,25 @@ export default function AdminProjects() {
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setSeqInput(val);
-                                        const count = Math.max(0, parseInt(val) || 0);
-                                        const current = editTarget.sequences || [];
+                                        if (val === '') return; 
                                         
-                                        if (count > current.length) {
+                                        const count = parseInt(val);
+                                        if (isNaN(count)) return;
+
+                                        const current = editTarget.sequences || [];
+                                        const originalCount = projects.find(p => p.id === editTarget.id)?.sequences?.length || 0;
+                                        
+                                        // Lock the original sequences while allowing growth and corrections above them.
+                                        const effectiveCount = Math.max(count, originalCount);
+                                        
+                                        if (effectiveCount > current.length) {
                                             const newSeqs = [...current];
-                                            for (let i = current.length; i < count; i++) {
+                                            for (let i = current.length; i < effectiveCount; i++) {
                                                 newSeqs.push({ name: '', status: 'Not Completed' });
                                             }
                                             setEditTarget({ ...editTarget, sequences: newSeqs });
-                                        } else if (count < current.length) {
-                                            setEditTarget({ ...editTarget, sequences: current.slice(0, count) });
+                                        } else if (effectiveCount < current.length) {
+                                            setEditTarget({ ...editTarget, sequences: current.slice(0, effectiveCount) });
                                         }
                                     }} 
                                 />

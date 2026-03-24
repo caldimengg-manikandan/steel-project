@@ -21,6 +21,7 @@ import {
     checkDuplicates,
     reprocessExtraction,
     getExcelDownloadUrl,
+    reserveTransmittalNumber,
 } from '../services/extractionApi';
 import { listTransmittals } from '../services/transmittalApi';
 import { IconClose } from './Icons';
@@ -436,6 +437,21 @@ export default function DrawingExtractionPanel({
 
         setExtractions((prev) => [...optimisticEntries, ...prev]);
 
+        let transmittalNumberToUse = selectedTransmittalNumber;
+        
+        // If we are creating a new transmittal, reserve the number ONCE for this entire session
+        if (transmittalNumberToUse === null) {
+            try {
+                const res = await reserveTransmittalNumber(projectId);
+                transmittalNumberToUse = res.transmittalNumber;
+                console.log(`[Upload] Reserved Transmittal #${transmittalNumberToUse} for this session.`);
+            } catch (err) {
+                console.error('[Upload] Failed to reserve transmittal number:', err);
+                // Fallback: the server will still auto-assign, but might fragment. 
+                // We proceed anyway to ensure the files move.
+            }
+        }
+
         try {
             // Upload in parallel batches of 10
             const CHUNK_SIZE = 10;
@@ -452,7 +468,7 @@ export default function DrawingExtractionPanel({
                 const executing = new Set<Promise<any>>();
 
                 for (const chunk of chunks) {
-                    const p = uploadDrawing(projectId, chunk, localSavePath, selectedTransmittalNumber).then(() => fetchExtractions(true));
+                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse).then(() => fetchExtractions(true));
                     results.push(p);
                     executing.add(p);
                     p.finally(() => executing.delete(p));

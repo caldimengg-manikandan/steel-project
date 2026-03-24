@@ -33,22 +33,10 @@ exports.uploadAndExtract = async (req, res) => {
     const paths = req.body.paths || [];
     const localSavePath = req.body.localSavePath || '';
     const pathArray = Array.isArray(paths) ? paths : [paths];
-    // null → auto-assign next transmittal number; integer → append to that existing transmittal
+    // The frontend MUST call /reserve-transmittal first and pass the reserved number here.
+    // If not provided, drawings will be stored without a transmittal number (can be assigned later).
     const rawTN = req.body.targetTransmittalNumber;
     let targetTransmittalNumber = rawTN != null && rawTN !== '' ? parseInt(rawTN, 10) : null;
-
-    if (targetTransmittalNumber === null) {
-        // Pre-reserve a new transmittal number for this batch upload
-        // This ensures all drawings in this upload batch go into ONE new transmittal
-        const updatedProject = await Project.findByIdAndUpdate(
-            projectId,
-            { $inc: { transmittalCount: 1 } },
-            { new: true }
-        ).lean();
-        if (updatedProject) {
-            targetTransmittalNumber = updatedProject.transmittalCount;
-        }
-    }
 
     // Filter and determine folder name
     const validFiles = [];
@@ -271,7 +259,7 @@ exports.downloadExcel = async (req, res) => {
         return res.status(404).json({ error: 'No completed extractions found for this project.' });
     }
 
-    // Fetch project details — increment transmittal counter if this is a transmittal download
+    // Fetch project details
     let projectDetails = {
         projectName: 'Project',
         clientName: 'UNKNOWN CLIENT',
@@ -280,16 +268,9 @@ exports.downloadExcel = async (req, res) => {
     const type = req.query.type || null;
     try {
         let proj;
-        if (!type || type === 'transmittal') {
-            // Atomically increment transmittalCount and get the new value
-            proj = await Project.findByIdAndUpdate(
-                projectId,
-                { $inc: { transmittalCount: 1 } },
-                { new: true }
-            ).lean();
-        } else {
-            proj = await Project.findById(projectId).lean();
-        }
+        // Never increment the transmittal version on a simple download.
+        // It only increments when a new transmittal is EXPLICITLY generated.
+        proj = await Project.findById(projectId).lean();
         if (proj) {
             projectDetails.projectName = proj.name || projectDetails.projectName;
             projectDetails.clientName = proj.clientName || projectDetails.clientName;

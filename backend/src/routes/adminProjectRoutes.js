@@ -18,6 +18,7 @@ const {
     listProjects, createProject, getProject,
     updateProject, deleteProject, assignUser, removeAssignment,
     downloadAllProjectsStatusExcel, uploadCOR,
+    reserveTransmittalNumber,
 } = require('../controllers/adminProjectsController');
 const multer = require('multer');
 const path = require('path');
@@ -45,14 +46,17 @@ router.get('/status/excel', downloadAllProjectsStatusExcel);
 // Project CRUD
 router.get('/', listProjects);
 router.post('/', createProject);
-router.get('/:projectId', scopeProjectToAdmin, getProject);
-router.patch('/:projectId', scopeProjectToAdmin, updateProject);
-router.delete('/:projectId', scopeProjectToAdmin, deleteProject);
 
-// Projects
+// Project Operations
+router.post('/:projectId/reserve-transmittal', scopeProjectToAdmin, reserveTransmittalNumber);
 router.post('/:projectId/cor', scopeProjectToAdmin, upload.single('file'), uploadCOR);
 router.post('/:projectId/assignments', scopeProjectToAdmin, validateCrossAdminAssignment, assignUser);
 router.delete('/:projectId/assignments/:userId', scopeProjectToAdmin, removeAssignment);
+
+// Project CRUD
+router.get('/:projectId', scopeProjectToAdmin, getProject);
+router.patch('/:projectId', scopeProjectToAdmin, updateProject);
+router.delete('/:projectId', scopeProjectToAdmin, deleteProject);
 
 module.exports = router;
 

@@ -157,15 +157,21 @@ async function _executePipeline(extractionId, pdfPath, projectId, targetTransmit
         );
 
         // ── Step 5b: Dynamic "Total Expected Drawings" Increment ──────
-        // If a drawing goes straight to fabrication (numeric rev) without any
-        // approval revisions (A, B, C...), it increases the total project count.
+        // Logic: if a sheet only has numeric revisions (0, 1, 2...) it's for fabrication.
+        // If it's a new sheet that starts this way, we increase the project's expected total.
         try {
+            const cleanMark = (m) => (m || "").toString().replace(/^(rev|revision|mark)\s*:?\s*/i, "").trim();
             const history = fields.revisionHistory || [];
-            const hasApproval = history.some(r => /^[a-zA-Z]/.test(r.mark)) || /^[a-zA-Z]/.test(fields.revision);
-            const hasFabrication = history.some(r => /^[0-9]/.test(r.mark)) || /^[0-9]/.test(fields.revision);
+            const marks = history.map(r => cleanMark(r.mark));
+            const latestMark = cleanMark(fields.revision);
+            
+            const allMarks = [...marks];
+            if (latestMark) allMarks.push(latestMark);
+
+            const hasApproval = allMarks.some(m => m && /^[a-zA-Z]/.test(m));
+            const hasFabrication = allMarks.some(m => m && /^[0-9]/.test(m));
 
             if (hasFabrication && !hasApproval) {
-                // Check if this is the first time we see this drawing number in this project
                 const existing = await DrawingExtraction.findOne({
                     projectId,
                     'extractedFields.drawingNumber': fields.drawingNumber,
@@ -173,17 +179,41 @@ async function _executePipeline(extractionId, pdfPath, projectId, targetTransmit
                     status: 'completed'
                 });
 
-                if (!existing) {
-                    console.log(`[Extraction] New fabrication-only drawing ${fields.drawingNumber} found. Incrementing project count.`);
+                if (!existing && fields.drawingNumber) {
+                    console.log(`[Extraction] FABRICATION-ONLY drawing ${fields.drawingNumber} is new. Incrementing project count.`);
                     const Project = require('../models/Project');
                     await Project.findByIdAndUpdate(projectId, { $inc: { approximateDrawingsCount: 1 } });
                 }
             }
         } catch (err) {
-            console.error('[Extraction] Failed to increment expected count:', err.message);
+            console.error('[Extraction] Error in fabrication-only count:', err.message);
         }
 
-        // ── Step 5c: Buffer for Excel batch write ───────────────────────
+        // ── Step 5c: Ensure approx count matches local reality ──────
+        try {
+            const Project = require('../models/Project');
+            const uniqueSheets = await DrawingExtraction.distinct('extractedFields.drawingNumber', { 
+                projectId, 
+                status: 'completed',
+                'extractedFields.drawingNumber': { $ne: null, $ne: "" }
+            });
+            const totalFiles = await DrawingExtraction.countDocuments({ projectId, status: 'completed' });
+            
+            const targetCount = Math.max(uniqueSheets.length, totalFiles);
+
+            const updateResult = await Project.updateOne(
+                { _id: projectId, approximateDrawingsCount: { $lt: targetCount } },
+                { $set: { approximateDrawingsCount: targetCount } }
+            );
+
+            if (updateResult.modifiedCount > 0) {
+                console.log(`[Extraction] Synced approx count for ${projectId} to ${targetCount} (sheets: ${uniqueSheets.length}, files: ${totalFiles})`);
+            }
+        } catch (err) {
+            console.error('[Extraction] Error syncing count:', err.message);
+        }
+
+        // ── Step 5d: Buffer for Excel batch write ───────────────────────
         try {
             const projectIdStr = projectId.toString();
             if (!excelBatchBuffer.has(projectIdStr)) {
@@ -337,27 +367,9 @@ async function _flushExcelQueue(projectId) {
             _flushExcelQueue(projectId);
         } else {
             // Buffer is empty, processing for this batch is done.
-            // Automatically generate a Transmittal for the newly completed extractions!
-            try {
-                // Determine adminId from the extractions we just processed
-                if (rowsToWrite.length > 0) {
-                    const extRecord = await DrawingExtraction.findById(rowsToWrite[0].extractionId).lean();
-                    if (extRecord && extRecord.createdByAdminId) {
-                        // Pick up the target transmittal number carried by the batch
-                        // All rows in a batch share the same targetTransmittalNumber since
-                        // they were uploaded together.
-                        const batchTargetTN = rowsToWrite[0].targetTransmittalNumber ?? null;
-                        console.log(`[ExcelService] Auto-generating transmittal for project ${projectId}` +
-                            (batchTargetTN ? ` → targeting transmittal #${batchTargetTN}` : '') + '...');
-                        await generateTransmittal(projectId, extRecord.createdByAdminId, null, batchTargetTN);
-                        console.log(`[ExcelService] ✓ Auto-transmittal complete for project ${projectId}`);
-                    }
-                }
-            } catch (trErr) {
-                // If there are no new/revised drawings, transmittalService safely skips generation.
-                // We log errors just in case.
-                console.log(`[ExcelService] Auto-transmittal info: ${trErr.message}`);
-            }
+            // Transmittals are now only created when the user explicitly triggers it
+            // from the Transmittal Generator page. Auto-generation from extraction
+            // is disabled to avoid fragmenting batches.
         }
     }
 }
