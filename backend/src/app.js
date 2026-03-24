@@ -12,6 +12,10 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const connectDB = require('./config/db');
 
+// Models (for auto-seeding)
+const Admin = require('./models/Admin');
+const User = require('./models/User');
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
@@ -69,10 +73,38 @@ app.use((_req, res) => {
 // ── Global error handler ───────────────────────────────────
 app.use(errorHandler);
 
+// ── Auto-seeding logic ──────────────────────────────────────
+async function ensureDefaultAdmin() {
+    try {
+        const adminCount = await Admin.countDocuments();
+        if (adminCount === 0) {
+            console.log('[DB] Seeding default admin account...');
+            const admin = await Admin.create({
+                username: 'admin1',
+                email: 'admin1@steeldetailing.com',
+                password_hash: 'Admin1@2026',
+                displayName: 'Default Admin',
+            });
+            console.log(`[DB] Created: admin1 / Admin1@2026`);
+            
+            await User.create({
+                username: 'theja',
+                email: 'theja@firm1.com',
+                password_hash: 'pass@1234',
+                adminId: admin._id,
+            });
+            console.log(`[DB] Created: theja / pass@1234`);
+        }
+    } catch (err) {
+        console.warn('[DB] Skip auto-seed check.');
+    }
+}
+
 // ── Start server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
+connectDB().then(async () => {
+    await ensureDefaultAdmin();
     app.listen(PORT, () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
@@ -83,5 +115,3 @@ connectDB().then(() => {
 });
 
 module.exports = app;
-
-// Backend server trigger restart (port freed)
