@@ -7,8 +7,8 @@ import {
     AreaChart, Area
 } from 'recharts';
 import {
-    IconChart, IconFilter, IconDownload, IconTrendingUp,
-    IconTrendingDown, IconFolder
+    IconChart, IconFilter, IconDownload,
+    IconFolder, IconTrendingUp
 } from '../../components/Icons';
 import { adminGetReportsData } from '../../services/adminUserApi';
 
@@ -40,7 +40,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-const StatCard = ({ label, value, change, trending, icon }: any) => (
+const StatCard = ({ label, value, icon, variant }: any) => (
     <div className="card" style={{ 
         padding: '24px', 
         border: '1px solid var(--color-border-light)',
@@ -55,7 +55,7 @@ const StatCard = ({ label, value, change, trending, icon }: any) => (
             right: -10, 
             width: 80, 
             height: 80, 
-            background: trending === 'up' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)', 
+            background: variant === 'danger' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(var(--color-primary-rgb, 30, 79, 216), 0.05)', 
             borderRadius: '50%', 
             zIndex: 0
         }} />
@@ -64,22 +64,15 @@ const StatCard = ({ label, value, change, trending, icon }: any) => (
                 <div style={{ 
                     width: 40, height: 40, 
                     borderRadius: '10px', 
-                    background: trending === 'up' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                    color: trending === 'up' ? '#10b981' : '#ef4444',
+                    background: variant === 'danger' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(var(--color-primary-rgb, 30, 79, 216), 0.15)',
+                    color: variant === 'danger' ? '#ef4444' : 'var(--color-primary)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                     {icon}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>{label}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-text-secondary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</div>
             </div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 8 }}>{value}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: trending === 'up' ? '#10b981' : '#ef4444' }}>
-                <div style={{ display: 'flex', alignItems: 'center', background: trending === 'up' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '20px' }}>
-                    {trending === 'up' ? <IconTrendingUp /> : <IconTrendingDown />}
-                    <span style={{ marginLeft: 4 }}>{change}</span>
-                </div>
-                <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>vs last period</span>
-            </div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 0 }}>{value}</div>
         </div>
     </div>
 );
@@ -110,7 +103,10 @@ export default function AdminReports() {
     const [loading, setLoading] = useState(true);
     const [exportLoading, setExportLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
     const reportRef = useRef<HTMLDivElement>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback(async (d: number) => {
         try {
@@ -154,6 +150,17 @@ export default function AdminReports() {
         fetchData(days);
     }, [days, fetchData]);
 
+    // Close filters when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setShowFilters(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     if (loading && !data) return (
         <div style={{ padding: '100px 0', textAlign: 'center' }}>
             <div className="spinner mb-sm"></div>
@@ -170,13 +177,35 @@ export default function AdminReports() {
 
     if (!data) return null;
 
-    const { overview, projectProgress, drawingSplit, userPerformance, trendData } = data;
+    const { projectProgress, drawingSplit, userPerformance, trendData, projects } = data;
+
+    // Local filtering and stat recalculation
+    const filteredProjects = selectedProjectIds.length > 0 
+        ? projects.filter((p: any) => selectedProjectIds.includes(String(p.id)))
+        : projects;
+
+    const filteredProgress = selectedProjectIds.length > 0 
+        ? projectProgress.filter((p: any) => selectedProjectIds.includes(String(p.id)))
+        : projectProgress;
+
+    // Recalculate overview based on filtered selection
+    const currentStats = {
+        totalProjects: filteredProjects.length,
+        activeRfis: filteredProjects.reduce((acc: number, p: any) => acc + (p.openRfiCount || 0), 0),
+        totalDrawings: filteredProjects.reduce((acc: number, p: any) => acc + (p.drawingCount || 0), 0),
+        delayedTasks: filteredProjects.reduce((acc: number, p: any) => {
+            const delayed = (p.sequences || []).filter((s: any) => 
+                s.status !== 'Completed' && s.deadline && new Date(s.deadline) < new Date()
+            ).length;
+            return acc + delayed;
+        }, 0)
+    };
 
     const OVERVIEW_STATS = [
-        { label: 'Total Projects', value: overview.totalProjects, change: '+1', trending: 'up', icon: <IconFolder /> },
-        { label: 'Active RFIs', value: overview.activeRfis, change: 'avg', trending: 'up', icon: <IconChart /> },
-        { label: 'Completed Drawings', value: overview.completedDrawings.toLocaleString(), change: '+12%', trending: 'up', icon: <IconChart /> },
-        { label: 'Delayed Tasks', value: overview.delayedTasks, change: overview.delayedTasks > 0 ? 'CRITICAL' : '0%', trending: 'down', icon: <IconTrendingUp /> },
+        { label: 'TOTAL PROJECTS', value: currentStats.totalProjects, icon: <IconFolder /> },
+        { label: 'ACTIVE RFIS', value: currentStats.activeRfis, icon: <IconChart /> },
+        { label: 'TOTAL DRAWINGS', value: (currentStats.totalDrawings || 0).toLocaleString(), icon: <IconChart /> },
+        { label: 'DELAYED TASKS', value: currentStats.delayedTasks, icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
     return (
@@ -186,13 +215,54 @@ export default function AdminReports() {
                     <h2 className="page-title">Reports & Analytics</h2>
                     <p className="page-subtitle">Real-time insights from live project data</p>
                 </div>
-                <div className="page-header-right" style={{ display: 'flex', gap: 12 }}>
+                <div className="page-header-right" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <div className="btn-group">
                         <button className={`btn ${days === 7 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(7)}>Last 7 Days</button>
                         <button className={`btn ${days === 30 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(30)}>Last 30 Days</button>
                         <button className={`btn ${days === 90 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(90)}>Last 90 Days</button>
                     </div>
-                    <button className="btn btn-secondary btn-sm"><IconFilter /> Filters</button>
+                    
+                    <div style={{ position: 'relative' }} ref={filterRef}>
+                        <button 
+                            className={`btn ${selectedProjectIds.length > 0 ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <IconFilter /> Filters {selectedProjectIds.length > 0 && `(${selectedProjectIds.length})`}
+                        </button>
+
+                        {showFilters && (
+                            <div style={{ 
+                                position: 'absolute', top: '100%', right: 0, marginTop: 8,
+                                background: '#fff', border: '1px solid var(--color-border)',
+                                borderRadius: 12, boxShadow: 'var(--shadow-lg)', zIndex: 100,
+                                minWidth: 240, padding: 12
+                            }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>FILTER BY PROJECT</span>
+                                    <span style={{ cursor: 'pointer', color: 'var(--color-primary)' }} onClick={() => setSelectedProjectIds([])}>Clear</span>
+                                </div>
+                                <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {projects.map((p: any) => (
+                                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }} className="hover-bg">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedProjectIds.includes(p.id)}
+                                                onChange={() => {
+                                                    if (selectedProjectIds.includes(p.id)) {
+                                                        setSelectedProjectIds(selectedProjectIds.filter(id => id !== p.id));
+                                                    } else {
+                                                        setSelectedProjectIds([...selectedProjectIds, p.id]);
+                                                    }
+                                                }}
+                                            />
+                                            {p.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <button 
                         className="btn btn-primary btn-sm" 
                         onClick={handleExportPDF} 
@@ -226,7 +296,7 @@ export default function AdminReports() {
                         <div className="table-empty">No project data available for charts.</div>
                     ) : (
                         <ResponsiveContainer width="100%" height={360}>
-                            <BarChart data={projectProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                            <BarChart data={filteredProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="barGradientPrimary" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={1} />

@@ -1,12 +1,47 @@
-=== ALL PROJECTS ===
- "Industrial Shed – Phase II" | _id: 699d1f2b4d7710a3ad23596c | count: 2
- "Warehouse Complex – WH7" | _id: 699d1f2b4d7710a3ad23596f | count: undefined
- "maryland" | _id: 69ba3ad5b0939795cf6046e7 | count: 8
- "cleve" | _id: 69bb9f35cb7055937287ba0e | count: 16
- "sds" | _id: 69bd358ee076089d2d34a4ca | count: 2
+=== COLLECTIONS ===
+ - projects
+ - transmittals
+ - drawing_extractions
+ - drawing_logs
+ - drawings
+ - drawingextractions
+ - drawinglogs
+ - users
+ - change_orders
+ - admins
+ - rfiextractions
+
+=== DB STATS ===
+Total Projects in Coll: 5
+Total Transmittals: 872
+Unique ProjectIds in Transmittals: 111
+Total 'drawings': 0
+Total 'drawingextractions': 0
+Total 'drawing_extractions': 1109
+Total 'drawing_logs': 107
+Total 'drawinglogs': 0
+Unique ProjectIds in 'drawing_extractions': 3
+ - Drawing Project: maryland (69ba3ad5b0939795cf6046e7)
+ - Drawing Project: cleve (69bb9f35cb7055937287ba0e)
+ - Drawing Project: sds (69c21c8181738ce86b95a372)
+Drawings with NULL projectId: 0
+
+=== PROJECTS IN COLL ===
+ - Industrial Shed – Phase II (699d1f2b4d7710a3ad23596c) | Admin: 699d1f294d7710a3ad235951
+ - Warehouse Complex – WH7 (699d1f2b4d7710a3ad23596f) | Admin: 699d1f294d7710a3ad235951
+ - maryland (69ba3ad5b0939795cf6046e7) | Admin: 699d1f294d7710a3ad235945
+ - cleve (69bb9f35cb7055937287ba0e) | Admin: 699d1f294d7710a3ad235945
+ - sds (69c21c8181738ce86b95a372) | Admin: 699d1f294d7710a3ad235945
+
+=== ADMINS ===
+ - admin1 (699d1f294d7710a3ad235945) | Role: admin
+ - admin2 (699d1f294d7710a3ad235951) | Role: admin
+
+=== SAMPLE TR PROJECTS ===
+Sample IDs: 699d1f2b4d7710a3ad23596c, 69ae4fb9de999bdba790570b, 69ae517423a789f1ac7f5b33, 69ae530623a789f1ac7f62a5, 69ae546e23a789f1ac7f6aa1
 
 === ALL TRANSMITTALS ===
-Total: 871
+Total: 872
  TR-1 | projectId: 69ae4fb9de999bdba790570b | new: 10
  TR-2 | projectId: 69ae4fb9de999bdba790570b | new: 2
  TR-3 | projectId: 69ae4fb9de999bdba790570b | new: 1
@@ -102,7 +137,6 @@ Total: 871
  TR-14 | projectId: 69ae5faa359c7394b9c565f2 | new: 0
  TR-1 | projectId: 69ae639a192a930be90792a8 | new: 337
  TR-1 | projectId: 69ae8470bece11575fc18e36 | new: 337
- TR-1 | projectId: 69ae8833bece11575fc199bd | new: 306
  TR-1 | projectId: 69ae8ec827bf4cc9a9475d2b | new: 305
  TR-1 | projectId: 69ae93175f477642c2b9058a | new: 306
  TR-1 | projectId: 69ae9931ca47dbe40f402d19 | new: 406
@@ -878,3 +912,5 @@ Total: 871
  TR-1 | projectId: 69c1026ffdcc0e0877796fab | new: 2
  TR-5 | projectId: 69c1026ffdcc0e0877796fab | new: 0
  TR-1 | projectId: 699d1f2b4d7710a3ad23596c | new: 2
+ TR-1 | projectId: 69bd358ee076089d2d34a4ca | new: 100
+ TR-2 | projectId: 69bd358ee076089d2d34a4ca | new: 306

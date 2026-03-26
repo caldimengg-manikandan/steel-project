@@ -2,6 +2,7 @@ const Project = require('../models/Project');
 const RfiExtraction = require('../models/RfiExtraction');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const User = require('../models/User');
+const { attachProjectStats } = require('../services/projectStatsService');
 
 /**
  * GET /api/admin/reports
@@ -15,129 +16,75 @@ async function getReportsData(req, res) {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Fetch all projects for this admin
-        const projects = await Project.find({ createdByAdminId: adminId }).lean();
+        // Fetch all projects for this admin, sorted by most recent activity
+        const rawProjects = await Project.find({ createdByAdminId: adminId }).sort({ updatedAt: -1 }).lean();
+        
+        // Attach dynamic stats (drawingCount, openRfiCount, etc.)
+        const projects = await attachProjectStats(rawProjects);
         const projectIds = projects.map(p => p._id);
 
-        // 1. Overview Component
-        // Count active/open RFIs globally
-        const rfiCounts = await RfiExtraction.aggregate([
-            { $match: { projectId: { $in: projectIds }, status: 'completed' } },
-            { $unwind: '$rfis' },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: 1 },
-                    open: { $sum: { $cond: [{ $eq: ['$rfis.status', 'OPEN'] }, 1, 0] } },
-                    closed: { $sum: { $cond: [{ $eq: ['$rfis.status', 'CLOSED'] }, 1, 0] } }
-                }
+        // 1. Calculate Overview Totals by summing cached Project fields
+        let totalDrw = 0;
+        let totalOpenRfi = 0;
+        let totalClosedRfi = 0;
+        let totalDel = 0;
+
+        projects.forEach(p => {
+            totalDrw += (p.drawingCount || 0);
+            totalOpenRfi += (p.openRfiCount || 0);
+            totalClosedRfi += (p.closedRfiCount || 0);
+            
+            // Delayed tasks = current sequences that have missed their deadline
+            if (p.sequences && Array.isArray(p.sequences)) {
+                totalDel += p.sequences.filter(s => 
+                    s.status !== 'Completed' && s.deadline && new Date(s.deadline) < new Date()
+                ).length;
             }
-        ]);
-
-        const totalRfis = rfiCounts[0] || { total: 0, open: 0, closed: 0 };
-
-        // Count completed drawing extractions
-        const totalDrawings = await DrawingExtraction.countDocuments({ 
-            projectId: { $in: projectIds }, 
-            status: 'completed'
         });
 
-        // 2. Project Progress Data (recent 5 for charts)
-        const drawingAgg = await DrawingExtraction.aggregate([
-            { $match: { projectId: { $in: projectIds }, status: 'completed' } },
-            {
-                $group: {
-                    _id: '$projectId',
-                    total: { $sum: 1 },
-                    approvalCount: {
-                        $sum: {
-                            $cond: [
-                                {
-                                    $or: [
-                                        { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } },
-                                        { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[a-z]", options: "i" } }
-                                    ]
-                                },
-                                1, 0
-                            ]
-                        }
-                    },
-                    fabricationCount: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } },
-                                1, 0
-                            ]
-                        }
-                    }
-                }
-            }
-        ]);
-
-        const progMap = {};
-        drawingAgg.forEach(d => {
-            progMap[d._id.toString()] = d;
-        });
-
-        const chartProjects = projects.slice(0, 7).map(p => {
-            const stats = progMap[p._id.toString()] || { total: 0, approvalCount: 0, fabricationCount: 0 };
-            const approx = p.approximateDrawingsCount || 100;
+        // 2. Project Progress Data (for Bar Chart)
+        // Return up to 15 projects for the chart
+        const chartProjects = projects.slice(0, 15).map(p => {
             return {
+                id: p._id.toString(),
                 name: p.name,
-                approval: Math.round((stats.approvalCount / (approx || 1)) * 100),
-                fabrication: Math.round((stats.fabricationCount / (approx || 1)) * 100),
-                rfi: totalRfis.open
+                approval: p.approvalPercentage || 0,
+                fabrication: p.fabricationPercentage || 0,
+                rfi: p.openRfiCount || 0
             };
         });
 
-        // 3. Drawing Status Split (LIVE)
+        // 3. Drawing Status Split (Category wise - still needs aggregate as this isn't in Project model)
         const dwgSplit = await DrawingExtraction.aggregate([
             { $match: { projectId: { $in: projectIds }, status: 'completed' } },
             {
                 $group: {
                     _id: { $toLower: { $ifNull: ["$extractedFields.category", "others"] } },
                     approved: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved", options: "i" } },
-                                1, 0
-                            ]
-                        }
+                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved", options: "i" } }, 1, 0] }
                     },
                     pending: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "pending|review", options: "i" } },
-                                1, 0
-                            ]
-                        }
+                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "pending|review", options: "i" } }, 1, 0] }
                     },
                     rejected: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "rejected|revise", options: "i" } },
-                                1, 0
-                            ]
-                        }
+                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "rejected|revise", options: "i" } }, 1, 0] }
                     }
                 }
             }
         ]);
 
-        // 4. User Performance (Real users)
-        const users = await User.find({ adminId: req.principal.userId }).lean();
+        // 4. User Performance (Live Sample)
+        const users = await User.find({ adminId: adminId }).lean();
         const userPerformance = users.slice(0, 5).map(u => {
             const efficiency = Math.floor(Math.random() * 20) + 80;
             return {
                 user: u.username,
                 tasks: Math.floor(Math.random() * 50) + 10,
-                rfi: 0,
-                time: 'N/A',
                 efficiency: `${efficiency}%`
             };
         });
 
-        // 5. Monthly Trend History (Live)
+        // 5. Monthly Trend History
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
         sixMonthsAgo.setDate(1);
@@ -152,45 +99,25 @@ async function getReportsData(req, res) {
             {
                 $group: {
                     _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
-                    approval: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } },
-                                1, 0
-                            ]
-                        }
-                    },
-                    fabrication: {
-                        $sum: {
-                            $cond: [
-                                { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } },
-                                1, 0
-                            ]
-                        }
-                    }
+                    approval: { $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } }, 1, 0] } },
+                    fabrication: { $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } }, 1, 0] } }
                 }
             },
             { $sort: { "_id.year": 1, "_id.month": 1 } }
         ]);
 
         const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const trendMap = {};
-        monthlyRaw.forEach(t => {
-            trendMap[`${t._id.year}-${t._id.month}`] = t;
-        });
-
         const trendData = [];
         let curr = new Date(sixMonthsAgo);
         const currentNow = new Date();
         while (curr <= currentNow) {
             const m = curr.getMonth() + 1;
             const y = curr.getFullYear();
-            const key = `${y}-${m}`;
-            const stats = trendMap[key] || { approval: 0, fabrication: 0 };
+            const match = monthlyRaw.find(t => t._id.month === m && t._id.year === y);
             trendData.push({
                 month: monthsArr[m - 1],
-                approval: stats.approval,
-                fabrication: stats.fabrication
+                approval: match ? match.approval : 0,
+                fabrication: match ? match.fabrication : 0
             });
             curr.setMonth(curr.getMonth() + 1);
         }
@@ -198,25 +125,11 @@ async function getReportsData(req, res) {
         res.json({
             overview: {
                 totalProjects: projects.length,
-                activeRfis: totalRfis.open,
-                completedDrawings: totalDrawings,
-                delayedTasks: projects.reduce((acc, p) => {
-                    if (p.sequences && Array.isArray(p.sequences)) {
-                        const delayedCount = p.sequences.filter(s => 
-                            s.status === 'Not Completed' && 
-                            s.deadline && 
-                            new Date(s.deadline) < new Date()
-                        ).length;
-                        return acc + delayedCount;
-                    }
-                    return acc + (p.status === 'on_hold' ? 1 : 0); // Fallback to on_hold if no sequences
-                }, 0)
+                activeRfis: totalOpenRfi,
+                totalDrawings: totalDrw,
+                delayedTasks: totalDel
             },
             projectProgress: chartProjects,
-            rfiSplit: [
-                { name: 'Open', value: totalRfis.open, color: '#f59e0b' },
-                { name: 'Closed', value: totalRfis.closed, color: '#10b981' }
-            ],
             drawingSplit: dwgSplit.map(d => ({
                 category: d._id.charAt(0).toUpperCase() + d._id.slice(1),
                 approved: d.approved,
@@ -224,7 +137,14 @@ async function getReportsData(req, res) {
                 rejected: d.rejected
             })),
             userPerformance,
-            trendData
+            trendData,
+            projects: projects.map(p => ({ 
+                id: p._id.toString(), 
+                name: p.name,
+                drawingCount: p.drawingCount || 0,
+                openRfiCount: p.openRfiCount || 0,
+                sequences: p.sequences || []
+            }))
         });
     } catch (err) {
         console.error('[AdminReportsController] error:', err);
