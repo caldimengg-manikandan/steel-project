@@ -472,8 +472,8 @@ export default function AdminProjects() {
                                                 for (let i = prev.length; i < effectiveCount; i++) {
                                                     next.push({ 
                                                         name: '', 
-                                                        deadline: '',
-                                                        approvalDate: today,
+                                                        deadline: today,
+                                                        approvalDate: '',
                                                         fabricationDate: ''
                                                     });
                                                 }
@@ -502,20 +502,7 @@ export default function AdminProjects() {
                                                     }}
                                                 />
                                             </div>
-                                            <div style={{ width: 110 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                <input 
-                                                    className="form-control form-control-sm" 
-                                                    type="date"
-                                                    value={s.approvalDate ? s.approvalDate.split('T')[0] : ''}
-                                                    onChange={(e) => {
-                                                        const newNames = [...sequenceNames];
-                                                        newNames[idx] = { ...newNames[idx], approvalDate: e.target.value };
-                                                        setSequenceNames(newNames);
-                                                    }}
-                                                />
-                                            </div>
-                                            <div style={{ width: 110 }}>
+                                            <div style={{ width: 140 }}>
                                                 <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                 <input 
                                                     className="form-control form-control-sm" 
@@ -528,8 +515,8 @@ export default function AdminProjects() {
                                                     }}
                                                 />
                                             </div>
-                                            <div style={{ width: 110 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Deadline (Opt)</label>
+                                            <div style={{ width: 140 }}>
+                                                <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
                                                 <input 
                                                     className="form-control form-control-sm" 
                                                     type="date"
@@ -637,7 +624,8 @@ export default function AdminProjects() {
                                                 newSeqs.push({ 
                                                     name: '', 
                                                     status: 'Not Completed',
-                                                    approvalDate: today,
+                                                    deadline: today,
+                                                    approvalDate: '',
                                                     fabricationDate: ''
                                                 });
                                             }
@@ -669,20 +657,7 @@ export default function AdminProjects() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div style={{ width: 110 }}>
-                                                    <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                    <input 
-                                                        className="form-control form-control-sm" 
-                                                        type="date"
-                                                        value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
-                                                        onChange={(e) => {
-                                                            const newSeqs = [...editTarget.sequences];
-                                                            newSeqs[idx] = { ...newSeqs[idx], approvalDate: e.target.value };
-                                                            setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div style={{ width: 110 }}>
+                                                <div style={{ width: 140 }}>
                                                     <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                     <input 
                                                         className="form-control form-control-sm" 
@@ -695,8 +670,8 @@ export default function AdminProjects() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div style={{ width: 110 }}>
-                                                    <label className="form-label" style={{ fontSize: 10 }}>Deadline Date</label>
+                                                <div style={{ width: 140 }}>
+                                                    <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
                                                     <input 
                                                         className="form-control form-control-sm" 
                                                         type="date"

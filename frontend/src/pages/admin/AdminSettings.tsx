@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    IconUsers, IconShieldTick, IconNotification, IconLayout,
-    IconDatabase, IconLock, IconActivity, IconSettings,
-    IconPlus, IconEdit, IconSearch, IconDownload
+    IconUsers, IconShieldTick, IconNotification,
+    IconLock, IconActivity, IconSettings,
+    IconPlus, IconEdit, IconSearch
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'project' | 'notifications' | 'ui' | 'data' | 'security' | 'audit' | 'admin';
+type TabId = 'access' | 'notifications' | 'ui' | 'security' | 'audit' | 'admin';
 
 interface TabItem {
     id: TabId;
@@ -18,10 +18,8 @@ interface TabItem {
 
 const TABS: TabItem[] = [
     { id: 'access', label: 'User & Access', icon: <IconUsers />, desc: 'Roles, permissions and user management' },
-    { id: 'project', label: 'Project Config', icon: <IconLayout />, desc: 'Templates, workflows and numbering' },
     { id: 'notifications', label: 'Notifications', icon: <IconNotification />, desc: 'Email alerts and reminder schedules' },
     { id: 'ui', label: 'System Prefs', icon: <IconSettings />, desc: 'Theme, timezone and language' },
-    { id: 'data', label: 'Data & Sync', icon: <IconDatabase />, desc: 'Exports, API and backups' },
     { id: 'security', label: 'Security', icon: <IconLock />, desc: '2FA, password policy and sessions' },
     { id: 'audit', label: 'Logs & Audit', icon: <IconActivity />, desc: 'System activity and change history' },
     { id: 'admin', label: 'Admin Controls', icon: <IconShieldTick />, desc: 'License and global module toggles' },
@@ -218,15 +216,6 @@ export default function AdminSettings() {
                         </>
                     )}
 
-                    {activeTab === 'project' && (
-                        <>
-                            <Card title="Workflow Configuration">
-                                <SettingRow title="RFI Auto-Numbering" desc="Generate RFI IDs automatically (e.g., RFI-001)">
-                                    <Toggle enabled={settings.rfiAutoNumber} onChange={(v) => handleSettingChange('rfiAutoNumber', v)} />
-                                </SettingRow>
-                            </Card>
-                        </>
-                    )}
 
                     {activeTab === 'notifications' && (
                         <Card title="Email & System Alerts">
@@ -324,19 +313,6 @@ export default function AdminSettings() {
                                     </tbody>
                                 </table>
                             </div>
-                        </Card>
-                    )}
-                    {activeTab === 'data' && (
-                        <Card title="Data Management & Integrations">
-                            <SettingRow title="Export System Database" desc="Download a full JSON backup of all projects, RFIs and drawings">
-                                <button className="btn btn-secondary btn-sm"><IconDownload /> Export Backup</button>
-                            </SettingRow>
-                            <SettingRow title="API Access Token" desc="Retrieve your unique token for third-party integrations">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <code style={{ background: 'var(--color-bg-page)', padding: '4px 8px', borderRadius: 4, fontStyle: 'normal' }}>sk_live_••••••••••••</code>
-                                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px' }}>Copy</button>
-                                </div>
-                            </SettingRow>
                         </Card>
                     )}
 
