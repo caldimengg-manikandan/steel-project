@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User, Project } from '../../types';
-import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser } from '../../services/adminUserApi';
+import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, adminBulkCreateUsers } from '../../services/adminUserApi';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
-import { IconTrash, IconClose, IconAssign, IconPlus } from '../../components/Icons';
+import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload } from '../../components/Icons';
 
 interface CreateUserForm {
     username: string; email: string; password: string; displayName: string;
@@ -21,8 +21,12 @@ export default function AdminUsers() {
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
 
     const [showCreate, setShowCreate] = useState(false);
+    const [showBulk, setShowBulk] = useState(false);
     const [form, setForm] = useState<CreateUserForm>(DEFAULT_FORM);
     const [creating, setCreating] = useState(false);
+    const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [bulkResult, setBulkResult] = useState<any>(null);
+    const [bulkError, setBulkError] = useState('');
 
     const fetchData = useCallback(async () => {
         try {
@@ -102,6 +106,21 @@ export default function AdminUsers() {
         }
     }
 
+    async function handleBulkUpload() {
+        if (!bulkFile) return;
+        try {
+            setBulkError('');
+            setCreating(true);
+            const result = await adminBulkCreateUsers(bulkFile);
+            setBulkResult(result);
+            await fetchData();
+        } catch (err: any) {
+            setBulkError(err.message || 'Unknown error occurred during upload.');
+        } finally {
+            setCreating(false);
+        }
+    }
+
     // Count project assignments within this admin's scope only
     function countRoles(userId: string) {
         return projects.reduce((n, p) => n + p.assignments.filter((a) => a.userId === userId).length, 0);
@@ -125,7 +144,10 @@ export default function AdminUsers() {
                     <h2 className="page-title">User Management</h2>
                     <p className="page-subtitle">Manage portal users, their accounts, and project access</p>
                 </div>
-                <div className="page-header-right">
+                <div className="page-header-right" style={{ display: 'flex', gap: '12px' }}>
+                    <button className="btn btn-secondary" onClick={() => { setShowBulk(true); setBulkResult(null); setBulkFile(null); setBulkError(''); }}>
+                        <IconUpload /> Bulk Upload
+                    </button>
                     <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
                         <IconPlus /> New User
                     </button>
@@ -369,6 +391,102 @@ export default function AdminUsers() {
                                     Save Assignment
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* ── Bulk Upload Modal ── */}
+            {showBulk && (
+                <div className="modal-overlay" onClick={() => setShowBulk(false)}>
+                    <div className="modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Bulk User Upload</span>
+                            <button className="modal-close" onClick={() => setShowBulk(false)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body">
+                            {bulkError && (
+                                <div className="info-box danger mb-md" style={{ padding: '8px 12px', fontSize: 13 }}>
+                                    <strong>Error:</strong> {bulkError}
+                                </div>
+                            )}
+                            {!bulkResult ? (
+                                <>
+                                    <div className="info-box info mb-md">
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: 14 }}>Required Excel Format</h4>
+                                        <p style={{ margin: '0 0 12px 0', fontSize: 13, opacity: 0.9 }}>
+                                            Please upload an Excel file (<code>.xlsx</code>) with the following headers in the first row:
+                                        </p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                                            <div>
+                                                <strong>Required Columns:</strong>
+                                                <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+                                                    <li><code>username</code></li>
+                                                    <li><code>email</code></li>
+                                                    <li><code>password</code></li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <strong>Optional Columns:</strong>
+                                                <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+                                                    <li><code>displayName</code></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Select Excel File</label>
+                                        <input 
+                                            type="file" 
+                                            accept=".xlsx"
+                                            className="form-control" 
+                                            onChange={e => setBulkFile(e.target.files?.[0] || null)}
+                                            style={{ padding: '8px' }}
+                                        />
+                                    </div>
+
+                                    <div className="form-actions mt-lg">
+                                        <button className="btn btn-secondary" onClick={() => setShowBulk(false)} disabled={creating}>Cancel</button>
+                                        <button 
+                                            className="btn btn-primary" 
+                                            onClick={handleBulkUpload} 
+                                            disabled={creating || !bulkFile}
+                                        >
+                                            {creating ? 'Uploading & Processing...' : 'Upload & Create Users'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <div className={`info-box ${bulkResult.results.created > 0 ? 'success' : 'warning'} mb-md`}>
+                                        <p style={{ fontWeight: 600, margin: 0 }}>{bulkResult.message}</p>
+                                    </div>
+                                    
+                                    {bulkResult.results.failedRows.length > 0 && (
+                                        <div className="form-group">
+                                            <label className="form-label">Issues / Errors:</label>
+                                            <div style={{ 
+                                                maxHeight: 200, 
+                                                overflowY: 'auto', 
+                                                background: '#f8fafc', 
+                                                padding: '12px', 
+                                                borderRadius: 6,
+                                                fontSize: 12,
+                                                border: '1px solid #e2e8f0',
+                                                color: 'var(--color-danger)'
+                                            }}>
+                                                {bulkResult.results.failedRows.map((err: string, idx: number) => (
+                                                    <div key={idx} style={{ marginBottom: 4 }}>• {err}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="form-actions mt-lg">
+                                        <button className="btn btn-primary" onClick={() => setShowBulk(false)}>Close</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

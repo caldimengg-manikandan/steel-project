@@ -71,6 +71,33 @@ export async function adminDeleteUser(userId: string): Promise<{ message: string
 }
 
 /**
+ * Get headers for multipart/form-data (exclude Content-Type)
+ */
+function authMultipartHeaders(): Record<string, string> {
+    const stored = sessionStorage.getItem('sdms_user');
+    if (!stored) return {};
+    const user: AuthUser = JSON.parse(stored);
+    return {
+        'Authorization': `Bearer ${user.token || ''}`,
+    };
+}
+
+/**
+ * Bulk create users via Excel
+ */
+export async function adminBulkCreateUsers(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${BASE}/admin/users/bulk`, {
+        method: 'POST',
+        headers: authMultipartHeaders(),
+        body: formData,
+    });
+    return handleResponse(res);
+}
+
+/**
  * Get dashboard stats
  */
 export async function adminGetDashboardStats(): Promise<any> {

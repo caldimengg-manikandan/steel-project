@@ -114,4 +114,142 @@ async function deleteUser(req, res) {
     res.json({ message: `User "${user.username}" deleted. All project assignments removed.` });
 }
 
-module.exports = { listUsers, createUser, getUser, updateUser, deleteUser };
+/**
+ * POST /api/admin/users/bulk
+ * Processes an Excel file to create multiple users.
+ * Required columns: username, email, password
+ * Optional columns: displayName
+ */
+async function bulkCreateUsers(req, res) {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No Excel file uploaded.' });
+    }
+
+    const adminId = req.principal.adminId;
+    const fs = require('fs');
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+
+    try {
+        console.log(`[BULK UPLOAD] Processing file at: ${req.file.path}`);
+        const buffer = fs.readFileSync(req.file.path);
+        await workbook.xlsx.load(buffer);
+        
+        // Get the first worksheet
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+            return res.status(400).json({ error: 'The Excel file contains no worksheets.' });
+        }
+
+        const usersToCreate = [];
+        const errors = [];
+
+        // Identify columns based on header row (row 1)
+        const headerRow = worksheet.getRow(1);
+        if (!headerRow || !headerRow.values || (Array.isArray(headerRow.values) && headerRow.values.length === 0)) {
+            return res.status(400).json({ error: 'The first row of the Excel sheet is empty. Header row required.' });
+        }
+
+        const colMap = {};
+        headerRow.eachCell((cell, colNumber) => {
+            const header = cell.value?.toString().toLowerCase().trim();
+            if (header) colMap[header] = colNumber;
+        });
+
+        console.log(`[BULK UPLOAD] Admin ${adminId} | Sheet: "${worksheet.name}" | Headers:`, Object.keys(colMap));
+
+        // Validate headers
+        const required = ['username', 'email', 'password'];
+        const missing = required.filter(h => !colMap[h]);
+        if (missing.length > 0) {
+            return res.status(400).json({ 
+                error: `Missing required columns: ${missing.join(', ')}. Found: ${Object.keys(colMap).join(', ') || 'None'}` 
+            });
+        }
+
+        // Parse rows starting from row 2
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return; // skip header
+            if (!row.values || (Array.isArray(row.values) && row.values.length === 0)) return; // skip truly empty rows
+
+            const usernameCell = colMap['username'] ? row.getCell(colMap['username']) : null;
+            const emailCell = colMap['email'] ? row.getCell(colMap['email']) : null;
+            const passwordCell = colMap['password'] ? row.getCell(colMap['password']) : null;
+            const displayCell = colMap['displayname'] ? row.getCell(colMap['displayname']) : null;
+
+            const username = usernameCell?.value?.toString().trim();
+            const email = emailCell?.value?.toString().trim();
+            const password = passwordCell?.value?.toString().trim();
+            const displayName = displayCell?.value?.toString().trim() || username;
+
+            if (!username || !email || !password) {
+                // Only error if it's not a completely empty row (sometimes row.values has data but cells are blank)
+                if (username || email || password) {
+                    errors.push(`Row ${rowNumber}: Incomplete data (username, email, and password required).`);
+                }
+                return;
+            }
+
+            usersToCreate.push({
+                username,
+                email,
+                password_hash: password,
+                displayName,
+                adminId,
+                role: 'user',
+                status: 'active'
+            });
+        });
+
+        if (usersToCreate.length === 0) {
+            return res.status(400).json({ error: 'The Excel file contains no valid user data.' });
+        }
+
+        // Create users one by one to handle duplicates or validation errors
+        const results = {
+            created: 0,
+            skipped: 0,
+            failedRows: errors
+        };
+
+        for (const userData of usersToCreate) {
+            try {
+                // Check if user already exists for this admin
+                const exists = await User.findOne({ 
+                    adminId, 
+                    $or: [{ username: userData.username }, { email: userData.email }] 
+                });
+
+                if (exists) {
+                    results.skipped++;
+                    results.failedRows.push(`User "${userData.username}" or "${userData.email}" already exists.`);
+                    continue;
+                }
+
+                await User.create(userData);
+                results.created++;
+            } catch (err) {
+                results.skipped++;
+                results.failedRows.push(`Error creating "${userData.username}": ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Processed ${usersToCreate.length} rows. Created ${results.created} users, skipped ${results.skipped}.`,
+            results
+        });
+
+    } catch (error) {
+        console.error('Excel processing error:', error);
+        res.status(500).json({ error: `Excel processing failed: ${error.message}. Ensure it is a valid .xlsx file.` });
+    } finally {
+        // Clean up temp file
+        const fs = require('fs');
+        if (req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+    }
+}
+
+module.exports = { listUsers, createUser, getUser, updateUser, deleteUser, bulkCreateUsers };
+
