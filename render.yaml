@@ -26,7 +26,7 @@ services:
         sync: false
 
   # Frontend Static Site
-  - type: static
+  - type: web
     name: steel-dms-frontend
     env: static
     buildCommand: npm install && npm run build
