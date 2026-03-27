@@ -4,7 +4,7 @@ services:
     name: steel-dms-backend
     env: docker
     dockerContext: backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: backend/Dockerfile
     plan: free # or starter for more resources
     healthCheckPath: /api/health
     envVars:
