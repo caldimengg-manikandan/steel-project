@@ -6,6 +6,7 @@ services:
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     plan: free # or starter for more resources
+    port: 5000
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
