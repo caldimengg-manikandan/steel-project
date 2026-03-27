@@ -3,7 +3,7 @@
  * Wraps all backend RFI endpoints.
  */
 
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://steel-dms-backend.onrender.com/api';
 
 // ── Auth token helper — matches extractionApi.ts exactly ──
 function getToken(): string {

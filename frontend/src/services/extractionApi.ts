@@ -9,7 +9,7 @@
 
 import type { DrawingExtraction } from '../types';
 
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://steel-dms-backend.onrender.com/api';
 
 // ── Auth token helper ─────────────────────────────────────
 function getToken(): string {

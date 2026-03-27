@@ -1,6 +1,6 @@
 import type { AuthUser, Project, ProjectStatus } from '../types';
 
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://steel-dms-backend.onrender.com/api';
 
 function authHeaders(): Record<string, string> {
     const stored = sessionStorage.getItem('sdms_user');
