@@ -17,7 +17,7 @@ async function getReportsData(req, res) {
         startDate.setDate(startDate.getDate() - days);
 
         // Fetch all projects for this admin, sorted by most recent activity
-        const rawProjects = await Project.find({ createdByAdminId: adminId }).sort({ updatedAt: -1 }).lean();
+        const rawProjects = await Project.find({ createdByAdminId: adminId }).populate('clientId').sort({ updatedAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)
         const projects = await attachProjectStats(rawProjects);
@@ -36,9 +36,10 @@ async function getReportsData(req, res) {
             
             // Delayed tasks = current sequences that have missed their deadline
             if (p.sequences && Array.isArray(p.sequences)) {
-                totalDel += p.sequences.filter(s => 
-                    s.status !== 'Completed' && s.deadline && new Date(s.deadline) < new Date()
-                ).length;
+                totalDel += p.sequences.filter(s => {
+                    const targetDate = s.approvalDate || s.deadline;
+                    return s.status !== 'Completed' && targetDate && new Date(targetDate) < new Date();
+                }).length;
             }
         });
 
@@ -54,74 +55,6 @@ async function getReportsData(req, res) {
             };
         });
 
-        // 3. Drawing Status Split (Category wise - still needs aggregate as this isn't in Project model)
-        const dwgSplit = await DrawingExtraction.aggregate([
-            { $match: { projectId: { $in: projectIds }, status: 'completed' } },
-            {
-                $group: {
-                    _id: { $toLower: { $ifNull: ["$extractedFields.category", "others"] } },
-                    approved: {
-                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved", options: "i" } }, 1, 0] }
-                    },
-                    pending: {
-                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "pending|review", options: "i" } }, 1, 0] }
-                    },
-                    rejected: {
-                        $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "rejected|revise", options: "i" } }, 1, 0] }
-                    }
-                }
-            }
-        ]);
-
-        // 4. User Performance (Live Sample)
-        const users = await User.find({ adminId: adminId }).lean();
-        const userPerformance = users.slice(0, 5).map(u => {
-            const efficiency = Math.floor(Math.random() * 20) + 80;
-            return {
-                user: u.username,
-                tasks: Math.floor(Math.random() * 50) + 10,
-                efficiency: `${efficiency}%`
-            };
-        });
-
-        // 5. Monthly Trend History
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-        sixMonthsAgo.setDate(1);
-        sixMonthsAgo.setHours(0,0,0,0);
-
-        const monthlyRaw = await DrawingExtraction.aggregate([
-            { $match: { 
-                projectId: { $in: projectIds }, 
-                status: 'completed',
-                createdAt: { $gte: sixMonthsAgo }
-            } },
-            {
-                $group: {
-                    _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
-                    approval: { $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } }, 1, 0] } },
-                    fabrication: { $sum: { $cond: [{ $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } }, 1, 0] } }
-                }
-            },
-            { $sort: { "_id.year": 1, "_id.month": 1 } }
-        ]);
-
-        const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const trendData = [];
-        let curr = new Date(sixMonthsAgo);
-        const currentNow = new Date();
-        while (curr <= currentNow) {
-            const m = curr.getMonth() + 1;
-            const y = curr.getFullYear();
-            const match = monthlyRaw.find(t => t._id.month === m && t._id.year === y);
-            trendData.push({
-                month: monthsArr[m - 1],
-                approval: match ? match.approval : 0,
-                fabrication: match ? match.fabrication : 0
-            });
-            curr.setMonth(curr.getMonth() + 1);
-        }
-
         res.json({
             overview: {
                 totalProjects: projects.length,
@@ -130,17 +63,13 @@ async function getReportsData(req, res) {
                 delayedTasks: totalDel
             },
             projectProgress: chartProjects,
-            drawingSplit: dwgSplit.map(d => ({
-                category: d._id.charAt(0).toUpperCase() + d._id.slice(1),
-                approved: d.approved,
-                pending: d.pending,
-                rejected: d.rejected
-            })),
-            userPerformance,
-            trendData,
             projects: projects.map(p => ({ 
                 id: p._id.toString(), 
                 name: p.name,
+                clientName: p.clientId ? p.clientId.name : 'Unknown',
+                status: p.status || 'active',
+                approvalPercentage: p.approvalPercentage || 0,
+                fabricationPercentage: p.fabricationPercentage || 0,
                 drawingCount: p.drawingCount || 0,
                 openRfiCount: p.openRfiCount || 0,
                 sequences: p.sequences || []

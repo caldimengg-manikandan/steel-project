@@ -93,6 +93,8 @@ export interface Project {
         approvalDate?: string;
         fabricationDate?: string;
     }>;
+    connectionDesignVendor?: string;
+    connectionDesignContact?: string;
     /** Multi-tenant key: the admin who created this project */
     createdByAdminId: string;
     /** User-specific permission (injected for user dashboard) */

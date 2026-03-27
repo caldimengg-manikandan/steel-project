@@ -4,7 +4,7 @@ services:
     name: steel-dms-backend
     env: docker
     dockerContext: backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     plan: free # or starter for more resources
     healthCheckPath: /api/health
     envVars:
@@ -32,6 +32,10 @@ services:
     buildCommand: npm install && npm run build
     publishDir: frontend/dist
     rootDir: frontend
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://steel-dms-backend.onrender.com/api

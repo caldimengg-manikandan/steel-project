@@ -51,3 +51,22 @@ export async function adminDeleteClient(clientId: string): Promise<{ message: st
     });
     return handleResponse(res);
 }
+
+export async function adminBulkCreateClients(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // For FormData, we must NOT set Content-Type: application/json. 
+    // fetch will automatically set Content-Type: multipart/form-data with proper boundaries.
+    const stored = sessionStorage.getItem('sdms_user');
+    const user = stored ? JSON.parse(stored) : null;
+    
+    const res = await fetch(`${BASE}/admin/clients/bulk`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${user?.token || ''}`
+        },
+        body: formData,
+    });
+    return handleResponse(res);
+}

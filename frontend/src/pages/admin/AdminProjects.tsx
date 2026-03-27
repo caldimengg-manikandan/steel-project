@@ -25,6 +25,8 @@ interface CreateProjectForm {
     approximateDrawingsCount: string;
     location: string;
     sequenceCount: string;
+    connectionDesignVendor: string;
+    connectionDesignContact: string;
 }
 const DEFAULT_FORM: CreateProjectForm = { 
     name: '', 
@@ -35,7 +37,9 @@ const DEFAULT_FORM: CreateProjectForm = {
     status: 'active', 
     approximateDrawingsCount: '0', 
     location: '', 
-    sequenceCount: '0' 
+    sequenceCount: '0',
+    connectionDesignVendor: '',
+    connectionDesignContact: ''
 };
 
 export default function AdminProjects() {
@@ -98,6 +102,14 @@ export default function AdminProjects() {
             p.clientName.toLowerCase().includes(search.toLowerCase())
     );
 
+    const distinctVendors = Array.from(
+        new Set(
+            projects
+                .map(p => p.connectionDesignVendor)
+                .filter(v => typeof v === 'string' && v.trim() !== '')
+        )
+    );
+
     async function handleCreate() {
         if (!form.name.trim() || !form.clientId || !form.location) return;
         
@@ -122,7 +134,9 @@ export default function AdminProjects() {
                     deadline: s.deadline,
                     approvalDate: s.approvalDate,
                     fabricationDate: s.fabricationDate
-                }))
+                })),
+                connectionDesignVendor: form.connectionDesignVendor,
+                connectionDesignContact: form.connectionDesignContact
             });
 
             const newProject = {
@@ -168,7 +182,9 @@ export default function AdminProjects() {
                 status: editTarget.status,
                 approximateDrawingsCount: editTarget.approximateDrawingsCount,
                 location: editTarget.location,
-                sequences: editTarget.sequences
+                sequences: editTarget.sequences,
+                connectionDesignVendor: editTarget.connectionDesignVendor,
+                connectionDesignContact: editTarget.connectionDesignContact
             });
 
             // Re-map with consistent ID
@@ -384,11 +400,6 @@ export default function AdminProjects() {
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label className="form-label required">Project Name</label>
-                                <input className="form-control" placeholder="e.g. SteelFrame Tower B"
-                                    value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                            </div>
-                            <div className="form-group">
                                 <label className="form-label required">Client / Organization</label>
                                 <select 
                                     className="form-control"
@@ -408,21 +419,42 @@ export default function AdminProjects() {
                             {form.clientId && (
                                 <div className="form-group">
                                     <label className="form-label required">Contact Person</label>
-                                    <select 
-                                        className="form-control"
-                                        value={form.contactPerson ? JSON.stringify(form.contactPerson) : ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setForm({ ...form, contactPerson: val ? JSON.parse(val) : null });
-                                        }}
-                                    >
-                                        <option value="">Select Contact Person</option>
-                                        {clients.find(c => (c.id || c._id) === form.clientId)?.contacts.map((con, idx) => (
-                                            <option key={idx} value={JSON.stringify(con)}>{con.name} ({con.email})</option>
-                                        ))}
-                                    </select>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                                        {clients.find(c => (c.id || c._id) === form.clientId)?.contacts.map((con, idx) => {
+                                            const isSelected = form.contactPerson?.email === con.email;
+                                            return (
+                                                <label 
+                                                    key={idx} 
+                                                    style={{ 
+                                                        display: 'flex', alignItems: 'flex-start', gap: 10, 
+                                                        padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, 
+                                                        borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                        transition: 'all 0.2s', margin: 0
+                                                    }}
+                                                >
+                                                    <input 
+                                                        type="radio" 
+                                                        name="contactPersonRadio"
+                                                        checked={isSelected}
+                                                        onChange={() => setForm({ ...form, contactPerson: con })}
+                                                        style={{ marginTop: 2, cursor: 'pointer' }}
+                                                    />
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{con.name}</span>
+                                                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{con.email}</span>
+                                                    </div>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             )}
+
+                            <div className="form-group">
+                                <label className="form-label required">Project Name</label>
+                                <input className="form-control" placeholder="e.g. SteelFrame Tower B"
+                                    value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                            </div>
                              <div className="form-group">
                                 <label className="form-label">Description</label>
                                 <textarea className="form-control" placeholder="Brief project description…" rows={3}
@@ -472,8 +504,7 @@ export default function AdminProjects() {
                                                 for (let i = prev.length; i < effectiveCount; i++) {
                                                     next.push({ 
                                                         name: '', 
-                                                        deadline: today,
-                                                        approvalDate: '',
+                                                        approvalDate: today,
                                                         fabricationDate: ''
                                                     });
                                                 }
@@ -503,6 +534,19 @@ export default function AdminProjects() {
                                                 />
                                             </div>
                                             <div style={{ width: 140 }}>
+                                                <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
+                                                <input 
+                                                    className="form-control form-control-sm" 
+                                                    type="date"
+                                                    value={s.approvalDate ? s.approvalDate.split('T')[0] : ''}
+                                                    onChange={(e) => {
+                                                        const newNames = [...sequenceNames];
+                                                        newNames[idx] = { ...newNames[idx], approvalDate: e.target.value };
+                                                        setSequenceNames(newNames);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div style={{ width: 140 }}>
                                                 <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                 <input 
                                                     className="form-control form-control-sm" 
@@ -515,23 +559,39 @@ export default function AdminProjects() {
                                                     }}
                                                 />
                                             </div>
-                                            <div style={{ width: 140 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                <input 
-                                                    className="form-control form-control-sm" 
-                                                    type="date"
-                                                    value={s.deadline ? s.deadline.split('T')[0] : ''}
-                                                    onChange={(e) => {
-                                                        const newNames = [...sequenceNames];
-                                                        newNames[idx] = { ...newNames[idx], deadline: e.target.value };
-                                                        setSequenceNames(newNames);
-                                                    }}
-                                                />
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
+
+                            <div style={{ marginTop: 24, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+                                    Connection Design
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Vendor / Client Name</label>
+                                    <input 
+                                        className="form-control" 
+                                        placeholder="Enter vendor details" 
+                                        list="client-list-create"
+                                        value={form.connectionDesignVendor}
+                                        onChange={(e) => setForm({ ...form, connectionDesignVendor: e.target.value })} 
+                                    />
+                                    <datalist id="client-list-create">
+                                        {distinctVendors.map((v, i) => <option key={`vendor-${i}`} value={v} />)}
+                                    </datalist>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Contact Number</label>
+                                    <input 
+                                        className="form-control" 
+                                        placeholder="Phone number" 
+                                        value={form.connectionDesignContact}
+                                        onChange={(e) => setForm({ ...form, connectionDesignContact: e.target.value })} 
+                                    />
+                                </div>
+                            </div>
+
                             <div className="form-actions">
                                 <button className="btn btn-secondary"
                                     onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); }}>Cancel</button>
@@ -592,6 +652,33 @@ export default function AdminProjects() {
                                             onChange={(e) => setEditTarget({ ...editTarget, status: e.target.value as ProjectStatus })}>
                                             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                                         </select>
+                                    </div>
+                                    <div style={{ marginTop: 20, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+                                            Connection Design
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Vendor / Client Name</label>
+                                            <input 
+                                                className="form-control" 
+                                                placeholder="Enter vendor details" 
+                                                list="client-list-edit"
+                                                value={editTarget.connectionDesignVendor || ''}
+                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignVendor: e.target.value })} 
+                                            />
+                                            <datalist id="client-list-edit">
+                                                {distinctVendors.map((v, i) => <option key={`edit-vendor-${i}`} value={v} />)}
+                                            </datalist>
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label className="form-label">Contact Number</label>
+                                            <input 
+                                                className="form-control" 
+                                                placeholder="Phone number" 
+                                                value={editTarget.connectionDesignContact || ''}
+                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignContact: e.target.value })} 
+                                            />
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -658,6 +745,19 @@ export default function AdminProjects() {
                                                     />
                                                 </div>
                                                 <div style={{ width: 140 }}>
+                                                    <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
+                                                    <input 
+                                                        className="form-control form-control-sm" 
+                                                        type="date"
+                                                        value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
+                                                        onChange={(e) => {
+                                                            const newSeqs = [...editTarget.sequences];
+                                                            newSeqs[idx] = { ...newSeqs[idx], approvalDate: e.target.value };
+                                                            setEditTarget({ ...editTarget, sequences: newSeqs });
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div style={{ width: 140 }}>
                                                     <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                     <input 
                                                         className="form-control form-control-sm" 
@@ -666,19 +766,6 @@ export default function AdminProjects() {
                                                         onChange={(e) => {
                                                             const newSeqs = [...editTarget.sequences];
                                                             newSeqs[idx] = { ...newSeqs[idx], fabricationDate: e.target.value };
-                                                            setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div style={{ width: 140 }}>
-                                                    <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                    <input 
-                                                        className="form-control form-control-sm" 
-                                                        type="date"
-                                                        value={seq.deadline ? seq.deadline.split('T')[0] : ''}
-                                                        onChange={(e) => {
-                                                            const newSeqs = [...editTarget.sequences];
-                                                            newSeqs[idx] = { ...newSeqs[idx], deadline: e.target.value };
                                                             setEditTarget({ ...editTarget, sequences: newSeqs });
                                                         }}
                                                     />

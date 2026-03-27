@@ -34,6 +34,10 @@ const { errorHandler } = require('./middleware/errorHandler');
 // ── App setup ─────────────────────────────────────────────
 const app = express();
 
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
+
 app.use(helmet());
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',

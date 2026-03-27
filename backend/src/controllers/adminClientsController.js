@@ -91,5 +91,121 @@ module.exports = {
     listClients,
     createClient,
     updateClient,
-    deleteClient
+    deleteClient,
+    bulkCreateClients
 };
+
+const ExcelJS = require('exceljs');
+const fs = require('fs');
+
+/**
+ * POST /api/admin/clients/bulk
+ * Create clients from an Excel/CSV file uploaded via multer.
+ * Required columns: "Client Name", "Client Email"
+ */
+async function bulkCreateClients(req, res) {
+    const adminId = req.principal.adminId;
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    try {
+        console.log(`[BULK UPLOAD CLIENTS] Processing file at: ${req.file.path}`);
+        
+        const workbook = new ExcelJS.Workbook();
+        const extension = req.file.originalname.split('.').pop().toLowerCase();
+        
+        if (extension === 'csv') {
+            await workbook.csv.readFile(req.file.path);
+        } else {
+            await workbook.xlsx.readFile(req.file.path);
+        }
+
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+            throw new Error('Could not find a worksheet in the provided file.');
+        }
+
+        const headerRow = worksheet.getRow(1);
+        const colMap = {};
+        
+        headerRow.eachCell((cell, colNumber) => {
+            const header = String(cell.value).trim().toLowerCase();
+            // Map common header naming variations
+            if (header.includes('client name') || header === 'name' || header === 'company' || header === 'company name') colMap['clientName'] = colNumber;
+            else if (header.includes('email') || header.includes('mail id')) colMap['email'] = colNumber;
+            else if (header.includes('contact name') || header === 'contact') colMap['contactName'] = colNumber;
+            else if (header.includes('phone') || header.includes('mobile')) colMap['phone'] = colNumber;
+        });
+
+        if (!colMap.clientName) {
+            throw new Error('Could not find mandatory "Client Name" column in the header row.');
+        }
+        if (!colMap.email) {
+            throw new Error('Could not find mandatory "Client Email" or "Mail ID" column in the header row.');
+        }
+
+        let createdCount = 0;
+        let skippedCount = 0;
+        let errorList = [];
+
+        for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+            const row = worksheet.getRow(rowNumber);
+            if (!row.hasValues) continue;
+
+            const clientName = row.getCell(colMap.clientName).value;
+            let emailValue = row.getCell(colMap.email).value;
+            const contactNameValue = colMap.contactName ? row.getCell(colMap.contactName).value : null;
+            const phoneValue = colMap.phone ? row.getCell(colMap.phone).value : null;
+
+            if (!clientName || !emailValue) {
+                errorList.push(`Row ${rowNumber}: Missing Client Name or Email.`);
+                skippedCount++;
+                continue;
+            }
+            
+            // Clean values
+            const name = String(clientName).trim();
+            const email = (emailValue && typeof emailValue === 'object') ? emailValue.text || emailValue.hyperlink : String(emailValue).trim();
+            const contactName = contactNameValue ? String(contactNameValue).trim() : name; 
+            const phone = phoneValue ? String(phoneValue).trim() : '';
+
+            // Check duplicate client name
+            const exists = await Client.findOne({ name: name, createdByAdminId: adminId });
+            if (exists) {
+                errorList.push(`Row ${rowNumber}: Client "${name}" already exists.`);
+                skippedCount++;
+                continue;
+            }
+
+            try {
+                await Client.create({
+                    name: name,
+                    contacts: [{ name: contactName, email: email, phone: phone }],
+                    status: 'active',
+                    createdByAdminId: adminId
+                });
+                createdCount++;
+            } catch (err) {
+                errorList.push(`Row ${rowNumber}: ${err.message}`);
+                skippedCount++;
+            }
+        }
+
+        // Cleanup temp file
+        try { fs.unlinkSync(req.file.path); } catch(e) {}
+
+        res.json({
+            message: `Bulk upload completed. Created: ${createdCount}, Skipped: ${skippedCount}.`,
+            createdCount,
+            skippedCount,
+            errors: errorList
+        });
+
+    } catch (err) {
+        console.error('[BULK UPLOAD CLIENTS] Error:', err);
+        try { fs.unlinkSync(req.file.path); } catch(e) {}
+        res.status(500).json({ error: err.message || 'Failed to process bulk upload.' });
+    }
+}

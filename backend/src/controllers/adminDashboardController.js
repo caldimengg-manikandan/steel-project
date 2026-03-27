@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const User = require('../models/User');
+const Client = require('../models/Client');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { attachProjectStats } = require('../services/projectStatsService');
 
@@ -10,9 +11,10 @@ const { attachProjectStats } = require('../services/projectStatsService');
 async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
 
-    const [projects, users] = await Promise.all([
+    const [projects, users, totalClients] = await Promise.all([
         Project.find({ createdByAdminId: adminId }).sort({ updatedAt: -1 }),
-        User.find({ adminId }).sort({ createdAt: -1 })
+        User.find({ adminId }).sort({ createdAt: -1 }),
+        Client.countDocuments({ createdByAdminId: adminId })
     ]);
 
     const projectIds = projects.map(p => p._id);
@@ -41,12 +43,13 @@ async function getAdminStats(req, res) {
     projects.forEach(p => {
         if (p.sequences && Array.isArray(p.sequences)) {
             p.sequences.forEach(s => {
-                if (s.status !== 'Completed' && s.deadline && new Date(s.deadline) < new Date()) {
+                const targetDate = s.approvalDate || s.deadline;
+                if (s.status !== 'Completed' && targetDate && new Date(targetDate) < new Date()) {
                     delayedTasks.push({
                         projId: p._id,
                         projName: p.name,
                         seqName: s.name,
-                        deadline: s.deadline,
+                        deadline: targetDate,
                         status: s.status
                     });
                 }
@@ -55,6 +58,7 @@ async function getAdminStats(req, res) {
     });
 
     res.json({
+        totalClients,
         totalProjects: projects.length,
         activeProjects: projects.filter(p => p.status === 'active').length,
         onHoldProjects: projects.filter(p => p.status === 'on_hold').length,

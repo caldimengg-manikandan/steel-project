@@ -135,6 +135,16 @@ const projectSchema = new mongoose.Schema(
             }],
             default: []
         },
+
+        // ── Connection Design ─────────────────────────────────
+        connectionDesignVendor: {
+            type: String,
+            default: '',
+        },
+        connectionDesignContact: {
+            type: String,
+            default: '',
+        },
     },
     {
         timestamps: true,

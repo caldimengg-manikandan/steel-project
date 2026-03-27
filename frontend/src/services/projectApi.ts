@@ -61,6 +61,8 @@ export async function adminCreateProject(data: {
         fabricationDate?: string;
         deadline?: string;
     }>;
+    connectionDesignVendor?: string;
+    connectionDesignContact?: string;
 }): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects`, {
         method: 'POST',
@@ -192,6 +194,8 @@ interface CreateProjectForm {
         fabricationDate?: string;
         deadline?: string;
     }>;
+    connectionDesignVendor?: string;
+    connectionDesignContact?: string;
 }
 
 /**

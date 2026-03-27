@@ -63,17 +63,29 @@ export default function AdminDashboard() {
             </div>
 
             {/* ── Stat Cards ── */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 <div className="stat-card accent-blue">
-                    <div className="stat-card-label">My Projects</div>
-                    <div className="stat-card-value text-primary">{stats.totalProjects}</div>
-                    <div className="stat-card-meta">Active & Pending projects</div>
+                    <div className="stat-card-label">Total Clients</div>
+                    <div className="stat-card-value text-primary">{stats.totalClients || 0}</div>
+                    <div className="stat-card-meta">Registered organizations</div>
                 </div>
 
                 <div className="stat-card accent-green">
-                    <div className="stat-card-label">My Users</div>
-                    <div className="stat-card-value">{stats.totalUsers}</div>
+                    <div className="stat-card-label">Total Projects</div>
+                    <div className="stat-card-value text-success">{stats.totalProjects || 0}</div>
+                    <div className="stat-card-meta">Active & Pending projects</div>
+                </div>
+
+                <div className="stat-card accent-amber">
+                    <div className="stat-card-label">Total Users</div>
+                    <div className="stat-card-value">{stats.totalUsers || 0}</div>
                     <div className="stat-card-meta">Registered platform users</div>
+                </div>
+
+                <div className="stat-card accent-violet">
+                    <div className="stat-card-label">Total Drawings</div>
+                    <div className="stat-card-value" style={{ color: 'var(--accent-violet)' }}>{stats.totalDrawings || 0}</div>
+                    <div className="stat-card-meta">Processed & approved DWGs</div>
                 </div>
 
                 {(() => {
@@ -92,7 +104,7 @@ export default function AdminDashboard() {
                             style={{ overflow: showDelayedList ? 'visible' : 'hidden', cursor: 'default' }}
                             onMouseLeave={() => setShowDelayedList(false)}
                         >
-                            <div className="stat-card-label">Delayed Projects</div>
+                            <div className="stat-card-label">Delayed Drawings / Tasks</div>
                             <div className="stat-card-value text-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 {delayedCount}
                                 {delayedCount > 0 && (
@@ -108,7 +120,7 @@ export default function AdminDashboard() {
                                     </button>
                                 )}
                             </div>
-                            <div className="stat-card-meta">Projects with past-due sequences</div>
+                            <div className="stat-card-meta">Projects with past-due drawing sequences</div>
 
                             {/* Dropdown List */}
                             {showDelayedList && delayedCount > 0 && (
@@ -116,24 +128,47 @@ export default function AdminDashboard() {
                                     <div className="dropdown-arrow"></div>
                                     <div className="dropdown-header">Overdue Projects</div>
                                     <div className="dropdown-items">
-                                        {uniqueDelayedProjects.map((p: any) => (
-                                            <div 
-                                                key={p.id} 
-                                                className="dropdown-item"
-                                                onClick={() => {
-                                                    navigate(`/admin/project/${p.id}`);
-                                                    setShowDelayedList(false);
-                                                }}
-                                            >
-                                                <div className="item-dot"></div>
-                                                <span className="item-name">{p.name}</span>
-                                                <span className="item-count">
-                                                    {delayedTasks.filter((t: any) => t.projId === p.id).length} tasks
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {uniqueDelayedProjects.map((p: any) => {
+                                            const projectTasks = delayedTasks.filter((t: any) => t.projId === p.id);
+                                            return (
+                                                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                    <div 
+                                                        className="dropdown-item"
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate(`/admin/project/${p.id}`);
+                                                        }}
+                                                        style={{ borderBottom: 'none', paddingBottom: 6 }}
+                                                    >
+                                                        <div className="item-dot"></div>
+                                                        <span className="item-name">{p.name}</span>
+                                                        <span className="item-count">
+                                                            {projectTasks.length} tasks
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ padding: '0 16px 10px 32px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                        {projectTasks.map((t: any, idx: number) => (
+                                                            <div 
+                                                                key={idx}
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/admin/project/${p.id}`);
+                                                                }}
+                                                                style={{ fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                                                                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)' }}
+                                                                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+                                                            >
+                                                                <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-danger)' }} />
+                                                                {t.seqName} <span style={{ fontSize: 9, opacity: 0.7 }}>({new Date(t.deadline).toLocaleDateString()})</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                    <div className="dropdown-footer" onClick={() => {
+                                    <div className="dropdown-footer" onMouseDown={(e) => {
+                                        e.preventDefault();
                                         const el = document.getElementById('delayed-tasks-module');
                                         if (el) el.scrollIntoView({ behavior: 'smooth' });
                                         setShowDelayedList(false);
@@ -180,7 +215,10 @@ export default function AdminDashboard() {
                                     </tr>
                                 ) : (
                                     stats.recentProjects.map((p: any) => {
-                                        const hasDelayed = (p.sequences || []).some((s: any) => s.status !== 'Completed' && s.deadline && s.deadline < today);
+                                        const hasDelayed = (p.sequences || []).some((s: any) => {
+                                            const targetDate = s.approvalDate || s.deadline;
+                                            return s.status !== 'Completed' && targetDate && targetDate < today;
+                                        });
                                         return (
                                             <tr key={p._id || p.id}>
                                                 <td 
@@ -266,11 +304,14 @@ export default function AdminDashboard() {
                                     }
 
                                     return delayedTasks.map((t: any, i: number) => (
-                                        <tr key={i}>
-                                            <td 
-                                                style={{ fontWeight: 600, cursor: 'pointer', color: 'var(--color-primary)' }}
-                                                onClick={() => navigate(`/admin/project/${t.projId}`)}
-                                            >
+                                        <tr 
+                                            key={i} 
+                                            onClick={() => navigate(`/admin/project/${t.projId}`)}
+                                            style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                                        >
+                                            <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
                                                 {t.projName}
                                             </td>
                                             <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{t.seqName}</td>
@@ -282,7 +323,10 @@ export default function AdminDashboard() {
                                                 <button 
                                                     className="btn btn-ghost btn-sm" 
                                                     style={{ color: 'var(--color-primary)' }}
-                                                    onClick={() => navigate(`/admin/project/${t.projId}`)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigate(`/admin/project/${t.projId}`);
+                                                    }}
                                                 >
                                                     View Project →
                                                 </button>
