@@ -28,7 +28,7 @@ services:
   # Frontend Static Site
   - type: web
     name: steel-dms-frontend
-    env: static
+    runtime: static
     buildCommand: npm install && npm run build
     publishDir: frontend/dist
     rootDir: frontend
