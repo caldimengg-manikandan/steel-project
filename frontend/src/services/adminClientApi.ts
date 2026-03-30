@@ -36,7 +36,7 @@ export async function adminCreateClient(data: { name: string; contacts: any[] })
 }
 
 export async function adminUpdateClient(clientId: string, data: any): Promise<{ client: Client }> {
-    const res = await fetch(`${BASE}/admin/clients/${clientId}`, {
+    const res = await fetch(`${BASE}/admin/clients/${String(clientId)}`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(data),
@@ -45,7 +45,7 @@ export async function adminUpdateClient(clientId: string, data: any): Promise<{ 
 }
 
 export async function adminDeleteClient(clientId: string): Promise<{ message: string }> {
-    const res = await fetch(`${BASE}/admin/clients/${clientId}`, {
+    const res = await fetch(`${BASE}/admin/clients/${String(clientId)}`, {
         method: 'DELETE',
         headers: authHeaders(),
     });

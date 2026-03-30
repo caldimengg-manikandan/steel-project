@@ -79,7 +79,7 @@ export async function adminAssignUser(projectId: string, data: {
     userId: string;
     permission: 'viewer' | 'editor' | 'admin';
 }): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${projectId}/assignments`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(data),
@@ -101,12 +101,12 @@ export async function userListProjects(): Promise<{ projects: Project[] }> {
  * Get a single project by ID (scoped check on backend)
  */
 export async function getProjectById(id: string): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${id}`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(id)}`, {
         headers: authHeaders(),
     });
     // Fallback try user route if admin fails (or just simplify backend)
     if (!res.ok && res.status === 403) {
-        const resUser = await fetch(`${BASE}/user/projects/${id}`, {
+        const resUser = await fetch(`${BASE}/user/projects/${String(id)}`, {
             headers: authHeaders(),
         });
         return handleResponse(resUser);
@@ -118,7 +118,7 @@ export async function getProjectById(id: string): Promise<{ project: Project }> 
  * Remove a user from a project
  */
 export async function adminRemoveUserAssignment(projectId: string, userId: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${BASE}/admin/projects/${projectId}/assignments/${userId}`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments/${String(userId)}`, {
         method: 'DELETE',
         headers: authHeaders(),
     });
@@ -129,7 +129,7 @@ export async function adminRemoveUserAssignment(projectId: string, userId: strin
  * Delete a project (Admin)
  */
 export async function adminDeleteProject(projectId: string): Promise<{ message: string }> {
-    const res = await fetch(`${BASE}/admin/projects/${projectId}`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'DELETE',
         headers: authHeaders(),
     });
@@ -140,7 +140,7 @@ export async function adminDeleteProject(projectId: string): Promise<{ message: 
  * Update a project (Admin)
  */
 export async function adminUpdateProject(projectId: string, data: Partial<CreateProjectForm>): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${projectId}`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(data),
@@ -159,7 +159,7 @@ export async function updateProjectSequences(projectId: string, sequences: Array
     deadline?: string;
 }>): Promise<{ project: Project }> {
     // Try Admin endpoint first
-    const res = await fetch(`${BASE}/admin/projects/${projectId}`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify({ sequences }),
@@ -167,7 +167,7 @@ export async function updateProjectSequences(projectId: string, sequences: Array
 
     if (res.status === 403) {
         // Try User endpoint specifically for sequences
-        const resUser = await fetch(`${BASE}/user/projects/${projectId}/sequences`, {
+        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
             method: 'PATCH',
             headers: authHeaders(),
             body: JSON.stringify({ sequences }),
@@ -208,7 +208,7 @@ export async function adminUploadCOR(projectId: string, file: File): Promise<{ m
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${BASE}/admin/projects/${projectId}/cor`, {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/cor`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`
