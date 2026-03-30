@@ -156,7 +156,7 @@ export default function UserProjects() {
                                         <td>
                                             <button
                                                 className="btn btn-secondary btn-sm"
-                                                onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                                onClick={() => navigate(`/dashboard/project/${p.id}`)}
                                             >
                                                 <IconOpen /> Open
                                             </button>
