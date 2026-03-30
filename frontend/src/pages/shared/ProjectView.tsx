@@ -46,15 +46,12 @@ export default function ProjectView() {
 
         try {
             setLoading(true);
-            const data = await getProjectById(id);
-            const proj = {
-                ...data.project,
-                id: data.project._id || data.project.id
-            };
-            setProject(proj);
+            const [projData, extData] = await Promise.all([
+                getProjectById(id),
+                listExtractions(id)
+            ]);
 
-            // Sync with Extractions
-            const extData = await listExtractions(id);
+            setProject(projData.project);
 
             // Step 1: Pre-scan to group all revisions per drawing to determine "Only Fab" status
             const drawingMarksMap: Record<string, Set<string>> = {};
