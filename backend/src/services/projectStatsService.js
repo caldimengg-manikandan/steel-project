@@ -110,7 +110,7 @@ async function attachProjectStats(projects) {
 
     // ── 4. Merge Stats with Projects ─────────────────────────
     const results = projectsArray.map((p) => {
-        const pObj = typeof p.toObject === 'function' ? p.toObject() : p;
+        const pObj = typeof p.toObject === 'function' ? p.toObject({ virtuals: true }) : p;
         const stats = drawingMap[p._id.toString()] || { total: 0, completed: 0, approvalCount: 0, fabricationCount: 0 };
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
         const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
@@ -124,8 +124,13 @@ async function attachProjectStats(projects) {
             fabricationPercentage = Math.round((stats.fabricationCount / approx) * 100);
         }
 
+        // Explicitly add id as a string so frontend always has a reliable ID field
+        const idStr = pObj._id ? pObj._id.toString() : (pObj.id ? pObj.id.toString() : '');
+
         return {
             ...pObj,
+            _id: idStr,
+            id: idStr,
             drawingCount: stats.total,
             approvalCount: stats.approvalCount,
             fabricationCount: stats.fabricationCount,
