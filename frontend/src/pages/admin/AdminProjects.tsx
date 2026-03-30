@@ -357,8 +357,9 @@ export default function AdminProjects() {
                                             <div className="btn-group">
                                                 <button
                                                     className="btn btn-secondary btn-sm"
-                                                    onClick={() => navigate(`/admin/projects/${p.id}`)}
+                                                    onClick={() => p.id && p.id !== 'undefined' && navigate(`/admin/projects/${p.id}`)}
                                                     title="Open Project"
+                                                    disabled={!p.id || p.id === 'undefined'}
                                                 >
                                                     <IconOpen /> Open
                                                 </button>

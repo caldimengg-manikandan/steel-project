@@ -93,10 +93,12 @@ export default function AdminDashboard() {
                     
                     // Get unique projects that are delayed
                     const uniqueDelayedProjects = Array.from(new Map(
-                        delayedTasks.map((t: any) => {
-                            const stringId = String(t.projId);
-                            return [stringId, { id: stringId, name: t.projName }];
-                        })
+                        delayedTasks
+                            .filter((t: any) => t.projId && String(t.projId) !== 'undefined')
+                            .map((t: any) => {
+                                const stringId = String(t.projId);
+                                return [stringId, { id: stringId, name: t.projName }];
+                            })
                     ).values());
 
                     const delayedCount = uniqueDelayedProjects.length;
@@ -170,7 +172,7 @@ export default function AdminDashboard() {
                                             );
                                         })}
                                     </div>
-                                    <div className="dropdown-footer" onMouseDown={(e) => {
+                                    <div className="dropdown-header" style={{ borderTop: '1px solid var(--color-border-light)', cursor: 'pointer', textAlign: 'center', padding: '10px 0' }} onMouseDown={(e) => {
                                         e.preventDefault();
                                         const el = document.getElementById('delayed-tasks-module');
                                         if (el) el.scrollIntoView({ behavior: 'smooth' });
