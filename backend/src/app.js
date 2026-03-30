@@ -32,6 +32,22 @@ const rfiRoutes = require('./routes/rfiRoutes');
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
 
+const allowedOrigins = [
+    'https://steel-dms-frontend.onrender.com',
+    'https://steel-project-iota.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
+
+if (process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN.split(',').forEach(origin => {
+        const o = origin.trim();
+        if (o && !allowedOrigins.includes(o)) {
+            allowedOrigins.push(o);
+        }
+    });
+}
+
 // ── App setup ─────────────────────────────────────────────
 const app = express();
 
@@ -39,23 +55,36 @@ if (process.env.NODE_ENV === 'production') {
     app.set('trust proxy', 1);
 }
 
-const allowedOrigins = [
-    'https://steel-dms-frontend.onrender.com',
-    // 'https://steel-dms-frontend.onrender.com/',
-    'http://localhost:5173'
-];
-
-app.use(helmet());
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        if (!origin) return callback(null, true);
+        
+        const isAllowed = allowedOrigins.some(o => {
+            // Exact match
+            if (o === origin) return true;
+            // Match without trailing slash
+            if (o.replace(/\/$/, '') === origin.replace(/\/$/, '')) return true;
+            // Match vercel subdomains
+            if (origin.endsWith('.vercel.app') && o === 'https://steel-project-iota.vercel.app') return true;
+            return false;
+        });
+
+        if (isAllowed) {
             callback(null, true);
         } else {
+            console.warn(`[CORS] Blocked origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
 app.use(morgan('dev'));
 app.use(express.json());
