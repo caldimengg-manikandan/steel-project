@@ -114,7 +114,7 @@ export default function AppLayout() {
 
     const pageTitle =
         PAGE_TITLES[pathname] ??
-        (pathname.includes('/project/') ? 'Project View' : 'Steel Detailing DMS');
+        (pathname.includes('/projects/') ? 'Project View' : 'Steel Detailing DMS');
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
     const isAdmin = user?.role === 'admin';

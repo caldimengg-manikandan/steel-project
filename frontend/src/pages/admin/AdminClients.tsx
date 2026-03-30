@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { adminListClients, adminCreateClient, adminDeleteClient, adminUpdateClient } from '../../services/adminClientApi';
+import { adminListClients, adminCreateClient, adminDeleteClient, adminUpdateClient, adminBulkCreateClients } from '../../services/adminClientApi';
 import type { Client, ClientContact } from '../../types';
 import { 
     IconPlus, IconTrash, IconUsers, IconBuilding, IconSearch, 
-    IconEdit, IconFilter, IconClose, IconOpen
+    IconEdit, IconFilter, IconClose, IconOpen, IconUpload
 } from '../../components/Icons';
 
 export default function AdminClients() {
@@ -14,6 +14,13 @@ export default function AdminClients() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
     
+    // Bulk Upload state
+    const [showBulk, setShowBulk] = useState(false);
+    const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [bulkResult, setBulkResult] = useState<any>(null);
+    const [bulkError, setBulkError] = useState('');
+    const [uploading, setUploading] = useState(false);
+
     // Form state
     const [name, setName] = useState('');
     const [status, setStatus] = useState<'active' | 'pending' | 'inactive'>('active');
@@ -32,6 +39,21 @@ export default function AdminClients() {
             console.error('Error fetching clients:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleBulkUpload = async () => {
+        if (!bulkFile) return;
+        try {
+            setBulkError('');
+            setUploading(true);
+            const result = await adminBulkCreateClients(bulkFile);
+            setBulkResult(result);
+            await fetchClients();
+        } catch (err: any) {
+            setBulkError(err.message || 'Unknown error occurred during upload.');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -115,9 +137,14 @@ export default function AdminClients() {
                     <h2 className="page-title">Clients</h2>
                     <p className="page-subtitle">Manage client organizations and their key contact personnel</p>
                 </div>
-                <button className="btn btn-primary btn-lg" onClick={() => handleOpenModal()}>
-                    <IconPlus /> Add New Client
-                </button>
+                <div className="page-header-right" style={{ display: 'flex', gap: '12px' }}>
+                    <button className="btn btn-secondary btn-lg" onClick={() => { setShowBulk(true); setBulkResult(null); setBulkFile(null); setBulkError(''); }}>
+                        <IconUpload /> Import Bulk
+                    </button>
+                    <button className="btn btn-primary btn-lg" onClick={() => handleOpenModal()}>
+                        <IconPlus /> Add New Client
+                    </button>
+                </div>
             </div>
 
             {/* Toolbar */}
@@ -279,7 +306,7 @@ export default function AdminClients() {
                                         )}
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                                             <div className="form-group" style={{ marginBottom: 0 }}>
-                                                <label className="form-label">Full Name</label>
+                                                <label className="form-label required">Full Name</label>
                                                 <input 
                                                     type="text" 
                                                     className="form-control" 
@@ -289,7 +316,7 @@ export default function AdminClients() {
                                                 />
                                             </div>
                                             <div className="form-group" style={{ marginBottom: 0 }}>
-                                                <label className="form-label">Email</label>
+                                                <label className="form-label required">Email</label>
                                                 <input 
                                                     type="email" 
                                                     className="form-control" 
@@ -329,6 +356,103 @@ export default function AdminClients() {
                                     {editingClient ? 'Update Client' : 'Create Client'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Bulk Upload Modal ── */}
+            {showBulk && (
+                <div className="modal-overlay" onClick={() => setShowBulk(false)}>
+                    <div className="modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Bulk Client Upload</span>
+                            <button className="modal-close" onClick={() => setShowBulk(false)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body">
+                            {bulkError && (
+                                <div className="info-box danger mb-md" style={{ padding: '8px 12px', fontSize: 13 }}>
+                                    <strong>Error:</strong> {bulkError}
+                                </div>
+                            )}
+                            {!bulkResult ? (
+                                <>
+                                    <div className="info-box info mb-md">
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: 14 }}>Required Excel Format</h4>
+                                        <p style={{ margin: '0 0 12px 0', fontSize: 13, opacity: 0.9 }}>
+                                            Please upload an Excel file (<code>.xlsx</code> or <code>.csv</code>) with headers in the first row:
+                                        </p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                                            <div>
+                                                <strong>Required Columns:</strong>
+                                                <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+                                                    <li><code>Client Name</code></li>
+                                                    <li><code>Client Email</code></li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <strong>Optional Columns:</strong>
+                                                <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+                                                    <li><code>Contact Name</code></li>
+                                                    <li><code>Phone</code></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Select Excel File</label>
+                                        <input 
+                                            type="file" 
+                                            accept=".xlsx,.csv"
+                                            className="form-control" 
+                                            onChange={e => setBulkFile(e.target.files?.[0] || null)}
+                                            style={{ padding: '8px' }}
+                                        />
+                                    </div>
+
+                                    <div className="form-actions mt-lg">
+                                        <button className="btn btn-secondary" onClick={() => setShowBulk(false)} disabled={uploading}>Cancel</button>
+                                        <button 
+                                            className="btn btn-primary" 
+                                            onClick={handleBulkUpload} 
+                                            disabled={uploading || !bulkFile}
+                                        >
+                                            {uploading ? 'Processing...' : 'Upload Clients'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <div className={`info-box ${bulkResult.createdCount > 0 ? 'success' : 'warning'} mb-md`}>
+                                        <p style={{ fontWeight: 600, margin: 0 }}>{bulkResult.message}</p>
+                                    </div>
+                                    
+                                    {bulkResult.errors && bulkResult.errors.length > 0 && (
+                                        <div className="form-group">
+                                            <label className="form-label">Issues / Errors:</label>
+                                            <div style={{ 
+                                                maxHeight: 200, 
+                                                overflowY: 'auto', 
+                                                background: '#f8fafc', 
+                                                padding: '12px', 
+                                                borderRadius: 6,
+                                                fontSize: 12,
+                                                border: '1px solid #e2e8f0',
+                                                color: 'var(--color-danger)'
+                                            }}>
+                                                {bulkResult.errors.map((err: string, idx: number) => (
+                                                    <div key={idx} style={{ marginBottom: 4 }}>• {err}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="form-actions mt-lg">
+                                        <button className="btn btn-primary" onClick={() => setShowBulk(false)}>Close</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -48,7 +48,11 @@ const rfiExtractionSchema = new mongoose.Schema(
         },
         fileUrl: {
             type: String,
-            required: true, // we store the PDF to re-download if needed
+            default: '',
+        },
+        gridFsFileId: {
+            type: mongoose.Schema.Types.ObjectId,
+            index: true,
         },
         errorDetails: {
             type: String,

@@ -1,6 +1,6 @@
 import type { AuthUser, User } from '../types';
 
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://steel-dms-backend.onrender.com/api';
 
 function authHeaders(): Record<string, string> {
     const stored = sessionStorage.getItem('sdms_user');
@@ -51,7 +51,7 @@ export async function adminCreateUser(data: {
  * Update user status or details
  */
 export async function adminUpdateUser(userId: string, data: Partial<User> & { password?: string }): Promise<{ user: User }> {
-    const res = await fetch(`${BASE}/admin/users/${userId}`, {
+    const res = await fetch(`${BASE}/admin/users/${String(userId)}`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(data),
@@ -63,7 +63,7 @@ export async function adminUpdateUser(userId: string, data: Partial<User> & { pa
  * Delete a user
  */
 export async function adminDeleteUser(userId: string): Promise<{ message: string }> {
-    const res = await fetch(`${BASE}/admin/users/${userId}`, {
+    const res = await fetch(`${BASE}/admin/users/${String(userId)}`, {
         method: 'DELETE',
         headers: authHeaders(),
     });

@@ -85,8 +85,9 @@ exports.uploadAndExtract = async (req, res) => {
         projectId,
         createdByAdminId: adminId,
         originalFileName: file.originalname,
+        fileUrl: '', // GridFS mode — no local path
+        gridFsFileId: file.id, // THE ATLAS FILE ID
         folderName,
-        fileUrl: file.path,
         fileSize: file.size,
         uploadedBy,
         localSavePath,
@@ -102,7 +103,7 @@ exports.uploadAndExtract = async (req, res) => {
     for (const doc of savedDocs) {
         runExtractionPipeline(
             doc._id.toString(),
-            doc.fileUrl,
+            doc.gridFsFileId.toString(), // Start with cloud ID
             projectId,
             targetTransmittalNumber
         ).catch((err) => {
@@ -243,6 +244,50 @@ exports.reprocess = async (req, res) => {
     });
 };
 
+// ── View PDF (Stream from GridFS/Disk) ─────────────────────
+exports.viewPdf = async (req, res) => {
+    const { projectId, id } = req.params;
+    const adminId = req.principal.adminId;
+
+    const doc = await DrawingExtraction.findOne({
+        _id: id,
+        projectId,
+        createdByAdminId: adminId,
+    }).lean();
+
+    if (!doc) {
+        return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    // 1. GridFS Mode
+    if (doc.gridFsFileId) {
+        try {
+            const { getBucket } = require('../utils/gridfs');
+            const bucket = getBucket();
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            // Suggest inline viewing
+            res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+
+            const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(doc.gridFsFileId));
+            downloadStream.pipe(res);
+            return;
+        } catch (err) {
+            console.error('[ViewPdf] GridFS stream failed:', err.message);
+            return res.status(500).json({ error: 'Failed to stream file from Atlas.' });
+        }
+    }
+
+    // 2. Legacy Disk Mode
+    if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+        return fs.createReadStream(doc.fileUrl).pipe(res);
+    }
+
+    return res.status(404).json({ error: 'Physical PDF file not found.' });
+};
+
 // ── Download Excel ────────────────────────────────────────
 exports.downloadExcel = async (req, res) => {
     const { projectId } = req.params;
@@ -331,9 +376,21 @@ exports.deleteExtraction = async (req, res) => {
         return res.status(404).json({ error: 'Extraction not found.' });
     }
 
-    // Delete uploaded PDF if present
+    // Delete uploaded PDF from GridFS if present
+    if (doc.gridFsFileId) {
+        try {
+            const { getBucket } = require('../utils/gridfs');
+            const bucket = getBucket();
+            await bucket.delete(new mongoose.Types.ObjectId(doc.gridFsFileId));
+            console.log(`[Delete] GridFS file ${doc.gridFsFileId} deleted.`);
+        } catch (err) {
+            console.error('[Delete] Failed to remove GridFS file:', err.message);
+        }
+    }
+
+    // Legacy: Delete local file if present
     if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
-        fs.unlinkSync(doc.fileUrl);
+        try { fs.unlinkSync(doc.fileUrl); } catch (_) {}
     }
 
     res.json({ message: 'Extraction deleted.' });

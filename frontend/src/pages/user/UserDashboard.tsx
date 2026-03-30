@@ -17,7 +17,7 @@ export default function UserDashboard() {
             const data = await userListProjects();
             const mapped = data.projects.map((p: any) => ({
                 ...p,
-                id: p._id || p.id,
+                id: String(p._id || p.id),
                 permission: (p.myPermission ?? 'viewer') as ProjectPermission,
             }));
             setProjects(mapped);

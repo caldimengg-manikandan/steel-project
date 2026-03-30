@@ -90,7 +90,7 @@ export default function AdminRfi() {
                 if (fetchedProjects.length > 0) {
                     const stateProjectId = location.state?.projectId;
                     if (stateProjectId) {
-                        const target = fetchedProjects.find((p: any) => (p._id || p.id) === stateProjectId);
+                        const target = fetchedProjects.find((p: any) => String(p._id || p.id) === String(stateProjectId));
                         if (target) {
                             setSelectedProject(target);
                         } else {
@@ -109,7 +109,7 @@ export default function AdminRfi() {
         if (!selectedProject) return;
         setLoadingExtractions(true);
         try {
-            const data = await listRfiExtractions(selectedProject._id || selectedProject.id);
+            const data = await listRfiExtractions(String(selectedProject._id || selectedProject.id));
             setExtractions(data.extractions || []);
         } catch { }
         finally { setLoadingExtractions(false); }
@@ -127,7 +127,7 @@ export default function AdminRfi() {
 
     const doUpload = async (files: File[]) => {
         if (!selectedProject || files.length === 0) return;
-        const projectId = selectedProject._id || selectedProject.id;
+        const projectId = String(selectedProject._id || selectedProject.id);
         const projectName = selectedProject.name;
 
         // Validation: Filename must contain project name
@@ -189,7 +189,7 @@ export default function AdminRfi() {
         e.stopPropagation();
         if (!window.confirm('Delete this RFI extraction?')) return;
         try {
-            await deleteRfiExtraction(selectedProject._id || selectedProject.id, extractionId);
+            await deleteRfiExtraction(String(selectedProject._id || selectedProject.id), extractionId);
             setExtractions(prev => prev.filter(x => x._id !== extractionId));
         } catch { alert('Failed to delete.'); }
     };
@@ -199,7 +199,7 @@ export default function AdminRfi() {
         setSavingResponse(prev => ({ ...prev, [key]: true }));
         try {
             const resData = await updateRfiResponse(
-                selectedProject._id || selectedProject.id,
+                String(selectedProject._id || selectedProject.id),
                 extractionId,
                 rfiIndex,
                 responseText,
@@ -228,7 +228,7 @@ export default function AdminRfi() {
         setSavingResponse(prev => ({ ...prev, [key]: true }));
         try {
             const resData = await uploadRfiResponseAttachment(
-                selectedProject._id || selectedProject.id,
+                String(selectedProject._id || selectedProject.id),
                 extractionId,
                 rfiIndex,
                 file
@@ -253,7 +253,7 @@ export default function AdminRfi() {
     // handleStatusChange removed since status is now auto-computed
 
     const completedCount = extractions.filter(e => e.status === 'completed').length;
-    const projectId = selectedProject?._id || selectedProject?.id;
+    const projectId = selectedProject ? String(selectedProject._id || selectedProject.id) : null;
 
     const statusConfig: Record<string, { label: string; color: string; bg: string; dot: string }> = {
         completed: { label: 'Completed', color: '#166534', bg: '#dcfce7', dot: '#22c55e' },
@@ -348,7 +348,7 @@ export default function AdminRfi() {
                     ) : (
                         <div style={{ maxHeight: 460, overflowY: 'auto' }}>
                             {projects.map((p: any) => {
-                                const pid = p._id || p.id;
+                                const pid = String(p._id || p.id);
                                 const active = pid === projectId;
                                 return (
                                     <button

@@ -16,6 +16,11 @@ export default function ProjectView() {
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
 
+    // DEBUG (Step 5): Log ID for troubleshooting
+    useEffect(() => {
+        console.log(`[ProjectView] URL Parameter 'id' is:`, id);
+    }, [id]);
+
     const [project, setProject] = useState<Project | null>(null);
     const [allRevisions, setAllRevisions] = useState<any[]>([]); // Populated from Extractions
     const [loading, setLoading] = useState(true);
@@ -38,18 +43,21 @@ export default function ProjectView() {
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
     const fetchData = useCallback(async () => {
-        if (!id) return;
+        if (!id || id === 'undefined' || id.length < 5) {
+            console.error(`[ProjectView] Bailing fetch due to invalid ID:`, id);
+            setError(`Project ID is invalid or missing (Received: "${id}").`);
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
-            const data = await getProjectById(id);
-            const proj = {
-                ...data.project,
-                id: data.project._id || data.project.id
-            };
-            setProject(proj);
+            const [projData, extData] = await Promise.all([
+                getProjectById(id),
+                listExtractions(id)
+            ]);
 
-            // Sync with Extractions
-            const extData = await listExtractions(id);
+            setProject(projData.project);
 
             // Step 1: Pre-scan to group all revisions per drawing to determine "Only Fab" status
             const drawingMarksMap: Record<string, Set<string>> = {};
@@ -114,15 +122,19 @@ export default function ProjectView() {
 
     // ── Reusable upload helper ────────────────────────────────
     const doUpload = async (filesToUpload: File[]) => {
-        if (!project?._id) return;
+        const pId = project?._id || project?.id;
+        if (!pId) {
+            console.error("[ProjectView] Cannot upload: No valid project ID found in state.", project);
+            return;
+        }
         setUploading(true);
         try {
             let numToUse = selectedTransmittalNumber;
             if (numToUse === null) {
-                const res = await reserveTransmittalNumber(project._id);
+                const res = await reserveTransmittalNumber(pId);
                 numToUse = res.transmittalNumber;
             }
-            const res = await uploadDrawing(project._id, filesToUpload, localSavePath, numToUse, selectedSequences);
+            const res = await uploadDrawing(pId, filesToUpload, localSavePath, numToUse, selectedSequences);
             alert(res.message);
             setUploadModal(false);
             setDupModal(false);
@@ -140,10 +152,11 @@ export default function ProjectView() {
 
     // ── Open transmittal selector before showing the upload modal ──
     const handleUploadButtonClick = async () => {
-        if (!project?._id) return;
+        const pId = project?._id || project?.id;
+        if (!pId) return;
         setLoadingTransmittals(true);
         try {
-            const data = await listTransmittals(project._id || project.id);
+            const data = await listTransmittals(pId);
             setExistingTransmittals(data.transmittals || []);
         } catch {
             setExistingTransmittals([]);
@@ -433,7 +446,7 @@ export default function ProjectView() {
             {activeTab === 'extraction' && (
                 <div className="card" style={{ padding: 'var(--space-lg)' }}>
                     <DrawingExtractionPanel
-                        projectId={project.id}
+                        projectId={(project?._id || project?.id) as string}
                         canUpload={canUpload}
                         sequences={project.sequences}
                     />
@@ -444,7 +457,7 @@ export default function ProjectView() {
             {activeTab === 'rfi' && (
                 <div className="card" style={{ padding: 'var(--space-lg)' }}>
                     <RfiExtractionPanel
-                        projectId={project.id}
+                        projectId={(project?._id || project?.id) as string}
                         projectName={project.name}
                         canUpload={canUpload}
                         sequences={project.sequences}
@@ -454,7 +467,7 @@ export default function ProjectView() {
 
             {/* ── Transmittals Tab ── */}
             {activeTab === 'transmittals' && (
-                <TransmittalPanel projectId={project.id} canEdit={canUpload} sequences={project.sequences} />
+                <TransmittalPanel projectId={(project?._id || project?.id) as string} canEdit={canUpload} sequences={project.sequences} />
             )}
 
             {/* ── Revision History Tab ── */}

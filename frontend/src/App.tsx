@@ -51,7 +51,7 @@ export default function App() {
               <Route path="rfi" element={<AdminRfi />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="reports" element={<AdminReports />} />
-              <Route path="project/:id" element={<ProjectView />} />
+              <Route path="projects/:id" element={<ProjectView />} />
             </Route>
 
             {/* User routes */}
@@ -67,7 +67,7 @@ export default function App() {
               <Route path="projects" element={<UserProjects />} />
               <Route path="rfi" element={<UserRfi />} />
               <Route path="settings" element={<UserSettings />} />
-              <Route path="project/:id" element={<ProjectView />} />
+              <Route path="projects/:id" element={<ProjectView />} />
             </Route>
 
             {/* Default redirect */}

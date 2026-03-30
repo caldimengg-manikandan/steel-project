@@ -16,12 +16,32 @@
  */
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const mongoose = require('mongoose');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { appendToProjectExcel } = require('./excelService');
 const { generateTransmittal } = require('./transmittalService');
+const { getBucket } = require('../utils/gridfs');
 
 const PYTHON_SCRIPT = path.join(__dirname, '../scripts/extract_drawing.py');
-const PYTHON_BIN = process.env.PYTHON_BIN || 'python';  // or 'python3'
+const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';  
+
+/**
+ * _downloadFromGridFS
+ * Downloads a file from Atlas to a local path (temp)
+ */
+function _downloadFromGridFS(fileId, destPath) {
+    return new Promise((resolve, reject) => {
+        const bucket = getBucket();
+        const objId = new mongoose.Types.ObjectId(fileId);
+        const downloadStream = bucket.openDownloadStream(objId);
+        const writeStream = fs.createWriteStream(destPath);
+
+        downloadStream.pipe(writeStream)
+            .on('finish', () => resolve(destPath))
+            .on('error', (err) => reject(new Error(`GridFS Download Error: ${err.message}`)));
+    });
+}
 
 /**
  * runExtractionPipeline
@@ -113,8 +133,10 @@ async function _processQueue() {
     }
 }
 
-async function _executePipeline(extractionId, pdfPath, projectId, targetTransmittalNumber = null) {
+async function _executePipeline(extractionId, fileRef, projectId, targetTransmittalNumber = null) {
     const start = Date.now();
+    let localPath = fileRef;
+    let isTemp = false;
 
     // 1. Mark as processing AND clear previous errors
     await DrawingExtraction.findByIdAndUpdate(extractionId, {
@@ -122,17 +144,42 @@ async function _executePipeline(extractionId, pdfPath, projectId, targetTransmit
         errorMessage: ''
     });
 
+    // 2. Fetch the doc early so we have originalFileName for hints
+    const doc = await DrawingExtraction.findById(extractionId).lean();
+
     try {
         let result;
 
-        // Fetch the doc to get originalFileName
-        const doc = await DrawingExtraction.findById(extractionId).lean();
+        // ── GridFS Check ──────────────────────────────────────
+        // If fileRef is a 24-char hex string, it's likely a GridFS ID
+        if (mongoose.Types.ObjectId.isValid(fileRef)) {
+            const tempDir = path.join(__dirname, '../../uploads/temp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+            
+            const originalBase = doc ? doc.originalFileName.replace(/\.[^/.]+$/, "") : 'temp';
+            const sanitizedBase = originalBase.replace(/[^a-z0-9_\-]/gi, '_');
+            const tempFileName = `${sanitizedBase}_${extractionId}_${Date.now()}.pdf`;
+            localPath = path.join(tempDir, tempFileName);
+            
+            console.log(`[Extraction] Downloading GridFS file ${fileRef} for hint "${originalBase}" to ${localPath}`);
+            await _downloadFromGridFS(fileRef, localPath);
+            isTemp = true;
+        }
+
+        if (!fs.existsSync(localPath)) {
+            throw new Error(`PDF file not found at ${localPath}. It may have been deleted.`);
+        }
+
         const originalFileName = doc ? doc.originalFileName : '';
 
         // ── Step 1+2: Call Python extraction bridge ────────────
-        // We always call the bridge. It performs local PDF parsing 
-        // using pdfplumber as the default engine.
-        result = await _callPythonBridge(pdfPath, originalFileName);
+        result = await _callPythonBridge(localPath, originalFileName);
+
+        // Cleanup temporary file immediately if we downloaded from GridFS
+        if (isTemp && fs.existsSync(localPath)) {
+            fs.unlinkSync(localPath);
+            isTemp = false;
+        }
 
         if (!result.success) {
             throw new Error(result.error || 'Extraction returned failure');
@@ -257,6 +304,11 @@ async function _executePipeline(extractionId, pdfPath, projectId, targetTransmit
     } catch (err) {
         const processingTimeMs = Date.now() - start;
         console.error(`[Extraction] ✗ ${extractionId}:`, err.message);
+
+        // Cleanup temporary file on error too
+        if (isTemp && fs.existsSync(localPath)) {
+            try { fs.unlinkSync(localPath); } catch (_) {}
+        }
 
         try {
             await DrawingExtraction.findByIdAndUpdate(extractionId, {

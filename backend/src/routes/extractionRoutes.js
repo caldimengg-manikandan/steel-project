@@ -14,25 +14,12 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const router = express.Router({ mergeParams: true }); // mergeParams for projectId
+const router = express.Router({ mergeParams: true }); 
 
 const { verifyToken } = require('../middleware/auth');
 const { scopeProjectAccess, requirePermission } = require('../middleware/adminScope');
 const ctrl = require('../controllers/extractionController');
-
-// ── Multer configuration ──────────────────────────────────
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dir = path.join(__dirname, `../../uploads/drawings/${req.params.projectId}`);
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        const timestamp = Date.now();
-        const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-        cb(null, `${timestamp}_${safe}`);
-    },
-});
+const { storage } = require('../utils/gridfs');
 
 const fileFilter = (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
@@ -49,17 +36,16 @@ const upload = multer({
 });
 
 // ── Apply unified scope to all extraction routes ──────────
-router.use(verifyToken, scopeProjectAccess);
+router.use(verifyToken);
 
 // ── Routes ────────────────────────────────────────────────
 
-// Pre-flight duplicate check (Requires Viewer+)
-// Must be BEFORE the :id parameter route to avoid conflicts
-router.post('/check-duplicates', requirePermission('viewer'), ctrl.checkDuplicates);
+router.post('/check-duplicates', scopeProjectAccess, requirePermission('viewer'), ctrl.checkDuplicates);
 
 // Upload + trigger extraction (Requires Editor or Admin)
 router.post(
     '/upload',
+    scopeProjectAccess,
     requirePermission('editor'),
     upload.array('drawings'),
     (err, req, res, next) => {
@@ -70,20 +56,22 @@ router.post(
     ctrl.uploadAndExtract
 );
 
-// List all extractions for a project (Requires Viewer)
-router.get('/', requirePermission('viewer'), ctrl.listExtractions);
+router.get('/', scopeProjectAccess, requirePermission('viewer'), ctrl.listExtractions);
 
 // ── Download Excel ────────────────────────────────────────
-router.get('/excel/download', requirePermission('viewer'), ctrl.downloadExcel);
+router.get('/excel/download', scopeProjectAccess, requirePermission('viewer'), ctrl.downloadExcel);
+
+// View PDF stream (Requires Viewer)
+router.get('/:id/view', scopeProjectAccess, requirePermission('viewer'), ctrl.viewPdf);
 
 // Get a single extraction (Requires Viewer)
-router.get('/:id', requirePermission('viewer'), ctrl.getExtraction);
+router.get('/:id', scopeProjectAccess, requirePermission('viewer'), ctrl.getExtraction);
 
 // Reprocess a failed extraction (Requires Editor)
-router.post('/:id/reprocess', requirePermission('editor'), ctrl.reprocess);
+router.post('/:id/reprocess', scopeProjectAccess, requirePermission('editor'), ctrl.reprocess);
 
 // Delete an extraction (Requires Admin only)
-router.delete('/:id', requirePermission('admin'), ctrl.deleteExtraction);
+router.delete('/:id', scopeProjectAccess, requirePermission('admin'), ctrl.deleteExtraction);
 
 module.exports = router;
 

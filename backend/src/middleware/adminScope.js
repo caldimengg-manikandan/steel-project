@@ -52,11 +52,14 @@ async function scopeUserToAdmin(req, res, next) {
  * Use on routes like:  GET /api/admin/projects/:projectId
  */
 async function scopeProjectToAdmin(req, res, next) {
-    const { projectId } = req.params;
+    let { projectId } = req.params;
     const adminId = req.principal.adminId;
 
+    if (typeof projectId === 'string') projectId = projectId.trim().replace(/\/$/, "");
+
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        return res.status(400).json({ error: 'Invalid projectId.' });
+        console.error(`[Admin Guard] Blocked invalid projectId: "${projectId}"`);
+        return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
     }
 
     const project = await Project.findOne({ _id: projectId, createdByAdminId: adminId });
@@ -152,11 +155,34 @@ async function scopeProjectToUser(req, res, next) {
  * Sets: req.scopedProject and req.userPermission.
  */
 async function scopeProjectAccess(req, res, next) {
-    const { projectId } = req.params;
     const { id, role, adminId } = req.principal;
 
+    // Capture projectId from any possible source (Params, Body, or Query)
+    let projectId = req.params.projectId || req.body.projectId || req.query.projectId;
+
+    // DEBUG (Step 5): Log request details
+    console.log(`[Guard] scopeProjectAccess: ${req.method} ${req.originalUrl}`);
+    console.log(`[Guard] Detected projectId:`, projectId, `(Type: ${typeof projectId})`);
+
+    // Standardize and validate projectId
+    if (typeof projectId === 'string') {
+        projectId = projectId.trim().replace(/\/$/, "");
+    } else if (projectId && typeof projectId.toString === 'function') {
+        projectId = projectId.toString();
+    }
+
+    if (!projectId || typeof projectId !== 'string') {
+        console.error(`[Guard] Blocked invalid projectId type:`, typeof projectId, "for URL:", req.originalUrl);
+        return res.status(400).json({
+            error: 'Invalid projectId format (expecting string).',
+            receivedType: typeof projectId,
+            hint: 'Ensure your frontend sends the project ID in the URL structure.'
+        });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        return res.status(400).json({ error: 'Invalid projectId.' });
+        console.error(`[Guard] Blocked invalid MongoDB ID: "${projectId}"`);
+        return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
     }
 
     let project;

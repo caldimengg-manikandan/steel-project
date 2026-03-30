@@ -24,35 +24,33 @@ function signToken(payload) {
  */
 async function adminLogin(req, res) {
     const { username, password } = req.body;
-    console.log(`[AUTH] Admin login attempt: ${username}`);
+    console.log(`[AUTH] Admin login attempt for: "${username}"`);
     
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required.' });
     }
 
-    // Load admin WITH password_hash (select: false by default)
     const admin = await Admin.findOne({ username: username.trim().toLowerCase() })
         .select('+password_hash');
 
     if (!admin) {
+        console.warn(`[AUTH] No admin found with username: ${username}`);
         return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    if (admin.status !== 'active') {
-        return res.status(403).json({ error: 'Admin account is deactivated.' });
     }
 
     const valid = await admin.matchPassword(password);
     if (!valid) {
+        console.warn(`[AUTH] Invalid password for admin: ${username}`);
         return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
+    console.log(`[AUTH] Admin ${username} logged in successfully!`);
     const token = signToken({
         id: admin._id,
         username: admin.username,
         email: admin.email,
         role: 'admin',
-        adminId: admin._id,   // admin's own id IS the adminId
+        adminId: admin._id,
     });
 
     res.json({

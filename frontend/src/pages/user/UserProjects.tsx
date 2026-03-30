@@ -17,9 +17,9 @@ export default function UserProjects() {
             const data = await userListProjects();
             const mapped = data.projects.map((p: any) => ({
                 ...p,
-                id: p._id || p.id,
+                id: String(p._id || p.id),
                 permission: (p.myPermission ?? 'viewer') as ProjectPermission,
-            }));
+}));
             setProjects(mapped);
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
@@ -156,7 +156,7 @@ export default function UserProjects() {
                                         <td>
                                             <button
                                                 className="btn btn-secondary btn-sm"
-                                                onClick={() => navigate(`/dashboard/project/${p.id}`)}
+                                                onClick={() => navigate(`/dashboard/projects/${p.id}`)}
                                             >
                                                 <IconOpen /> Open
                                             </button>

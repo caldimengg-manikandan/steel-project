@@ -18,6 +18,7 @@ const User = require('./models/User');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
+const { initGridFS } = require('./utils/gridfs');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const adminProjectRoutes = require('./routes/adminProjectRoutes');
 const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
@@ -31,16 +32,68 @@ const rfiRoutes = require('./routes/rfiRoutes');
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
 
+const allowedOrigins = [
+    'https://steel-dms-frontend.onrender.com',
+    'https://steel-project-iota.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
+
+if (process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN.split(',').forEach(origin => {
+        const o = origin.trim();
+        if (o && !allowedOrigins.includes(o)) {
+            allowedOrigins.push(o);
+        }
+    });
+}
+
 // ── App setup ─────────────────────────────────────────────
 const app = express();
 
-app.use(helmet());
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        
+        const isAllowed = allowedOrigins.some(o => {
+            // Exact match
+            if (o === origin) return true;
+            // Match without trailing slash
+            if (o.replace(/\/$/, '') === origin.replace(/\/$/, '')) return true;
+            // Match vercel subdomains
+            if (origin.endsWith('.vercel.app') && o === 'https://steel-project-iota.vercel.app') return true;
+            return false;
+        });
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            console.warn(`[CORS] Blocked origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Debugging log (Remove after fixing)
+app.use((req, res, next) => {
+    console.log(`[API_DEBUG] ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 const path = require('path');
 
@@ -52,11 +105,9 @@ app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/admin/reports', adminReportsRoutes);
 app.use('/api/admin/clients', adminClientRoutes);
 app.use('/api/user/projects', userProjectRoutes);
-// Nested: /api/extractions/:projectId
+// Nested: /api/extractions/:projectId, /api/transmittals/:projectId, /api/rfis/:projectId
 app.use('/api/extractions/:projectId', extractionRoutes);
-// Nested: /api/transmittals/:projectId
 app.use('/api/transmittals/:projectId', transmittalRoutes);
-// Nested: /api/rfis/:projectId
 app.use('/api/rfis/:projectId', rfiRoutes);
 
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
@@ -78,17 +129,24 @@ app.use(errorHandler);
 // ── Auto-seeding logic ──────────────────────────────────────
 async function ensureDefaultAdmin() {
     try {
-        const adminCount = await Admin.countDocuments();
-        if (adminCount === 0) {
+        let admin = await Admin.findOne({ username: 'admin1' });
+        if (!admin) {
             console.log('[DB] Seeding default admin account...');
-            const admin = await Admin.create({
+            admin = await Admin.create({
                 username: 'admin1',
                 email: 'admin1@steeldetailing.com',
                 password_hash: 'Admin1@2026',
                 displayName: 'Default Admin',
             });
-            console.log(`[DB] Created: admin1 / Admin1@2026`);
-            
+        } else {
+            console.log('[DB] Admin1 exists, resetting password for safety...');
+            admin.password_hash = 'Admin1@2026';
+            await admin.save();
+        }
+        console.log(`[DB] Account READY: admin1 / Admin1@2026`);
+        
+        const userExists = await User.findOne({ username: 'theja' });
+        if (!userExists) {
             await User.create({
                 username: 'theja',
                 email: 'theja@firm1.com',
@@ -98,7 +156,7 @@ async function ensureDefaultAdmin() {
             console.log(`[DB] Created: theja / pass@1234`);
         }
     } catch (err) {
-        console.warn('[DB] Skip auto-seed check.');
+        console.warn('[DB] Skip auto-seed check:', err.message);
     }
 }
 
@@ -106,6 +164,7 @@ async function ensureDefaultAdmin() {
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(async () => {
+    initGridFS();
     await ensureDefaultAdmin();
     app.listen(PORT, () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);

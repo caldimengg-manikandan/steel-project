@@ -65,7 +65,8 @@ const drawingExtractionSchema = new mongoose.Schema(
 
         // ── Upload metadata ──
         originalFileName: { type: String, required: true },
-        fileUrl: { type: String, required: true }, // Stored path on disk
+        fileUrl: { type: String, default: '' }, // Legacy disk path
+        gridFsFileId: { type: mongoose.Schema.Types.ObjectId, index: true }, // Persistent Atlas storage ID
         folderName: { type: String, default: '' },
         fileSize: { type: Number, default: 0 }, // Bytes
         uploadedBy: { type: String, required: true }, // username

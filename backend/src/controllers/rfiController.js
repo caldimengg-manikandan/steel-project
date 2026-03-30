@@ -17,12 +17,6 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     const createdExtractions = [];
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, '../../uploads/rfis');
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     // Process each file
     for (const file of req.files) {
         const doc = await RfiExtraction.create({
@@ -31,14 +25,15 @@ exports.uploadRfiDrawing = async (req, res) => {
             uploadedBy,
             originalFileName: file.originalname,
             folderName: localSavePath || '',
-            fileUrl: `/uploads/rfis/${projectId}/${file.filename}`,
+            fileUrl: '', // GridFS mode — no local path
+            gridFsFileId: file.id, // THE ATLAS FILE ID
             status: 'queued',
             sequences: sequences || [],
         });
         createdExtractions.push(doc);
 
-        // process in background
-        runRfiExtraction(doc._id);
+        // process in background using cloud ID
+        runRfiExtraction(doc._id, doc.gridFsFileId.toString());
     }
 
     res.status(202).json({
@@ -209,9 +204,25 @@ exports.deleteRfiExtraction = async (req, res) => {
         const doc = await RfiExtraction.findOneAndDelete({ _id: id, createdByAdminId: adminId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
-        const p = path.join(__dirname, '../../', doc.fileUrl);
-        if (fs.existsSync(p)) {
-            fs.unlinkSync(p);
+        // Delete from GridFS if present
+        if (doc.gridFsFileId) {
+            try {
+                const { getBucket } = require('../utils/gridfs');
+                const bucket = getBucket();
+                const mongoose = require('mongoose');
+                await bucket.delete(new mongoose.Types.ObjectId(doc.gridFsFileId));
+                console.log(`[DeleteRFI] GridFS file ${doc.gridFsFileId} deleted.`);
+            } catch (err) {
+                console.error('[DeleteRFI] Failed to remove GridFS file:', err.message);
+            }
+        }
+
+        // Legacy/disk or attachment cleanup
+        if (doc.fileUrl) {
+            const p = path.join(__dirname, '../../', doc.fileUrl);
+            if (fs.existsSync(p)) {
+                try { fs.unlinkSync(p); } catch (_) {}
+            }
         }
 
         res.json({ message: 'RFI extraction deleted successfully.' });

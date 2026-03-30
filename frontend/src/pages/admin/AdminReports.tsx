@@ -3,8 +3,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
     BarChart, Bar,
-    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    AreaChart, Area
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
     IconChart, IconFilter, IconDownload,
@@ -177,7 +176,7 @@ export default function AdminReports() {
 
     if (!data) return null;
 
-    const { projectProgress, drawingSplit, userPerformance, trendData, projects } = data;
+    const { projectProgress, projects } = data;
 
     // Local filtering and stat recalculation
     const filteredProjects = selectedProjectIds.length > 0 
@@ -246,16 +245,17 @@ export default function AdminReports() {
                                         <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }} className="hover-bg">
                                             <input 
                                                 type="checkbox" 
-                                                checked={selectedProjectIds.includes(p.id)}
+                                                checked={selectedProjectIds.includes(String(p.id))}
                                                 onChange={() => {
-                                                    if (selectedProjectIds.includes(p.id)) {
-                                                        setSelectedProjectIds(selectedProjectIds.filter(id => id !== p.id));
+                                                    const pid = String(p.id);
+                                                    if (selectedProjectIds.includes(pid)) {
+                                                        setSelectedProjectIds(selectedProjectIds.filter(id => id !== pid));
                                                     } else {
-                                                        setSelectedProjectIds([...selectedProjectIds, p.id]);
+                                                        setSelectedProjectIds([...selectedProjectIds, pid]);
                                                     }
                                                 }}
                                             />
-                                            {p.name}
+                                            <span style={{ fontWeight: 600 }}>{p.clientName}</span> - {p.name}
                                         </label>
                                     ))}
                                 </div>
@@ -320,81 +320,58 @@ export default function AdminReports() {
                 </ChartCard>
             </div>
 
-            {/* Charts Row 2: Monthly Trends & Drawing Status */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 32 }}>
-                <ChartCard title="Monthly Performance Trends">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorApp" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="colorFab" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
-                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 11, fontWeight: 600 }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }} />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
-                            <Area type="monotone" name="Approval" dataKey="approval" stroke="var(--color-primary)" strokeWidth={4} fillOpacity={1} fill="url(#colorApp)" />
-                            <Area type="monotone" name="Fabrication" dataKey="fabrication" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorFab)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </ChartCard>
 
-                <ChartCard title="Drawing Categories Distribution">
-                    {drawingSplit.length === 0 ? (
-                        <div className="table-empty">No drawing split data found.</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={drawingSplit} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border-light)" />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="category" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: 'var(--color-text-primary)' }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
-                                <Bar dataKey="approved" name="Approved" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="pending" name="Pending" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="rejected" name="Rejected" stackId="a" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={24} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </ChartCard>
-            </div>
 
-            {/* Row 3: User Performance Summary */}
-            <ChartCard title="Internal Team Performance (Live Sample)">
+            {/* Row 3: Clients & Projects Table */}
+            <ChartCard title="Clients & Projects Detail">
                 <div className="table-wrapper">
                     <table>
                         <thead>
                             <tr>
-                                <th>User</th>
-                                <th>Tasks Completed</th>
-                                <th>Avg. Efficiency</th>
+                                <th>Client Name</th>
+                                <th>Project Name</th>
                                 <th>Status</th>
+                                <th>Drawings</th>
+                                <th>Open RFIs</th>
+                                <th>Approval %</th>
+                                <th>Fabrication %</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {userPerformance.length === 0 ? (
-                                <tr><td colSpan={4} className="table-empty">No user data available.</td></tr>
+                            {filteredProjects.length === 0 ? (
+                                <tr><td colSpan={7} className="table-empty">No clients/projects match the current filter.</td></tr>
                             ) : (
-                                userPerformance.map((row: any, i: number) => (
+                                filteredProjects.map((p: any, i: number) => (
                                     <tr key={i}>
-                                        <td><span style={{ fontWeight: 600 }}>{row.user}</span></td>
-                                        <td>{row.tasks}</td>
+                                        <td style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{p.clientName || 'Unknown'}</td>
+                                        <td style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{p.name}</td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <span className={`badge ${
+                                                p.status === 'active' ? 'badge-success' : 
+                                                p.status === 'on_hold' ? 'badge-warning' : 
+                                                p.status === 'completed' ? 'badge-info' : 'badge-neutral'
+                                            }`}>
+                                                {p.status || 'Active'}
+                                            </span>
+                                        </td>
+                                        <td className="font-mono">{p.totalDrawings || p.drawingCount || 0}</td>
+                                        <td className="font-mono">{p.openRfiCount || 0}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                 <div style={{ flex: 1, height: 6, background: 'var(--color-bg-page)', borderRadius: 3, overflow: 'hidden' }}>
-                                                    <div style={{ height: '100%', width: row.efficiency, background: 'var(--color-primary)' }} />
+                                                    <div style={{ height: '100%', width: `${p.approvalPercentage || 0}%`, background: 'var(--color-primary)' }} />
                                                 </div>
-                                                <span style={{ fontSize: 12, fontWeight: 700 }}>{row.efficiency}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 700 }}>{p.approvalPercentage || 0}%</span>
                                             </div>
                                         </td>
-                                        <td><span className="badge badge-success">Active</span></td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div style={{ flex: 1, height: 6, background: 'var(--color-bg-page)', borderRadius: 3, overflow: 'hidden' }}>
+                                                    <div style={{ height: '100%', width: `${p.fabricationPercentage || 0}%`, background: '#10b981' }} />
+                                                </div>
+                                                <span style={{ fontSize: 12, fontWeight: 700 }}>{p.fabricationPercentage || 0}%</span>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             )}

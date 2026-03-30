@@ -3,7 +3,7 @@
  * Wraps all backend RFI endpoints.
  */
 
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://steel-dms-backend.onrender.com/api';
 
 // ── Auth token helper — matches extractionApi.ts exactly ──
 function getToken(): string {
@@ -28,7 +28,7 @@ export const uploadRfiDrawing = async (projectId: string, files: File[], localSa
         sequences.forEach(s => formData.append('sequences', s));
     }
 
-    const res = await fetch(`${BASE}/rfis/${projectId}/upload`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/upload`, {
         method: 'POST',
         headers: { ...authHeaders() },
         body: formData,
@@ -41,7 +41,7 @@ export const uploadRfiDrawing = async (projectId: string, files: File[], localSa
 };
 
 export const listRfiExtractions = async (projectId: string) => {
-    const res = await fetch(`${BASE}/rfis/${projectId}`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}`, {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
     });
     if (!res.ok) {
@@ -53,9 +53,9 @@ export const listRfiExtractions = async (projectId: string) => {
 
 export const getRfiExcelDownloadUrl = (projectId: string, extractionId?: string, baseUrl?: string): string => {
     const tok = getToken();
-    let url = `${BASE}/rfis/${projectId}/excel/download?token=${tok}`;
+    let url = `${BASE}/rfis/${String(projectId)}/excel/download?token=${tok}`;
     if (extractionId) {
-        url += `&extractionId=${extractionId}`;
+        url += `&extractionId=${String(extractionId)}`;
     }
     if (baseUrl && baseUrl.trim()) {
         url += `&baseUrl=${encodeURIComponent(baseUrl.trim())}`;
@@ -64,7 +64,7 @@ export const getRfiExcelDownloadUrl = (projectId: string, extractionId?: string,
 };
 
 export const deleteRfiExtraction = async (projectId: string, extractionId: string) => {
-    const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
     });
@@ -83,7 +83,7 @@ export const updateRfiResponse = async (
     remarks: string,
     clientRfiNumber?: string
 ) => {
-    const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}/response/${rfiIndex}`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ response, remarks, clientRfiNumber }),
@@ -101,7 +101,7 @@ export const updateRfiStatus = async (
     rfiIndex: number,
     status: 'OPEN' | 'CLOSED'
 ) => {
-    const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}/status/${rfiIndex}`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/status/${rfiIndex}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status }),
@@ -122,7 +122,7 @@ export const uploadRfiResponseAttachment = async (
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${BASE}/rfis/${projectId}/${extractionId}/response/${rfiIndex}/attachment`, {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}/attachment`, {
         method: 'POST',
         headers: { ...authHeaders() },
         body: formData,

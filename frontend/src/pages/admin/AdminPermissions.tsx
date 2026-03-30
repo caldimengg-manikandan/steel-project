@@ -34,7 +34,7 @@ export default function AdminPermissions() {
 
             const mappedProj = projData.projects.map((p: any) => ({
                 ...p,
-                id: p._id || p.id,
+                id: String(p._id || p.id),
             }));
 
             // Reconstruct assignments list from ALL projects
