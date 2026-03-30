@@ -36,16 +36,16 @@ const upload = multer({
 });
 
 // ── Apply unified scope to all extraction routes ──────────
-router.use(verifyToken, scopeProjectAccess);
+router.use(verifyToken);
 
 // ── Routes ────────────────────────────────────────────────
 
-// Pre-flight duplicate check (Requires Viewer+)
-router.post('/check-duplicates', requirePermission('viewer'), ctrl.checkDuplicates);
+router.post('/check-duplicates', scopeProjectAccess, requirePermission('viewer'), ctrl.checkDuplicates);
 
 // Upload + trigger extraction (Requires Editor or Admin)
 router.post(
     '/upload',
+    scopeProjectAccess,
     requirePermission('editor'),
     upload.array('drawings'),
     (err, req, res, next) => {
@@ -56,23 +56,22 @@ router.post(
     ctrl.uploadAndExtract
 );
 
-// List all extractions for a project (Requires Viewer)
-router.get('/', requirePermission('viewer'), ctrl.listExtractions);
+router.get('/', scopeProjectAccess, requirePermission('viewer'), ctrl.listExtractions);
 
 // ── Download Excel ────────────────────────────────────────
-router.get('/excel/download', requirePermission('viewer'), ctrl.downloadExcel);
+router.get('/excel/download', scopeProjectAccess, requirePermission('viewer'), ctrl.downloadExcel);
 
 // View PDF stream (Requires Viewer)
-router.get('/:id/view', requirePermission('viewer'), ctrl.viewPdf);
+router.get('/:id/view', scopeProjectAccess, requirePermission('viewer'), ctrl.viewPdf);
 
 // Get a single extraction (Requires Viewer)
-router.get('/:id', requirePermission('viewer'), ctrl.getExtraction);
+router.get('/:id', scopeProjectAccess, requirePermission('viewer'), ctrl.getExtraction);
 
 // Reprocess a failed extraction (Requires Editor)
-router.post('/:id/reprocess', requirePermission('editor'), ctrl.reprocess);
+router.post('/:id/reprocess', scopeProjectAccess, requirePermission('editor'), ctrl.reprocess);
 
 // Delete an extraction (Requires Admin only)
-router.delete('/:id', requirePermission('admin'), ctrl.deleteExtraction);
+router.delete('/:id', scopeProjectAccess, requirePermission('admin'), ctrl.deleteExtraction);
 
 module.exports = router;
 
