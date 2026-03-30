@@ -149,6 +149,20 @@ const projectSchema = new mongoose.Schema(
     {
         timestamps: true,
         collection: 'projects',
+        toJSON: {
+            virtuals: true,
+            transform: function(doc, ret) {
+                ret.id = ret._id.toString();
+                return ret;
+            }
+        },
+        toObject: {
+            virtuals: true,
+            transform: function(doc, ret) {
+                ret.id = ret._id.toString();
+                return ret;
+            }
+        }
     }
 );
 
