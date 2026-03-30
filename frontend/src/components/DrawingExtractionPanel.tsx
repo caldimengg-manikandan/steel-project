@@ -22,7 +22,7 @@ import {
     reprocessExtraction,
     getExcelDownloadUrl,
     reserveTransmittalNumber,
-    getDrawingViewUrl,
+
 } from '../services/extractionApi';
 import { listTransmittals } from '../services/transmittalApi';
 import { IconClose } from './Icons';
@@ -1163,25 +1163,7 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
                             <RefreshIcon /> Reprocess
                         </button>
                     )}
-                    {ok && (
-                        <a
-                            href={getDrawingViewUrl(ex.projectId, ex._id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-ghost btn-sm"
-                            style={{ 
-                                fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, 
-                                padding: '4px 8px', color: '#16a34a', textDecoration: 'none' 
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
-                            View
-                        </a>
-                    )}
+
                     {canUpload && (
                         <button
                             className="btn btn-ghost btn-sm btn-icon"

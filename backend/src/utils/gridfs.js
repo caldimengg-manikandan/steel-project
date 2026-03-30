@@ -40,7 +40,7 @@ const storage = {
             if (err) return cb(err);
 
             const filename = buf.toString('hex') + path.extname(file.originalname);
-            const uploadStream = bucket.openUploadStream(filename, {
+            const options = {
                 contentType: file.mimetype,
                 metadata: {
                     originalName: file.originalname,
@@ -48,7 +48,9 @@ const storage = {
                     adminId: req.principal ? req.principal.adminId : null,
                     type: file.fieldname // e.g. "drawings" or "rfis"
                 }
-            });
+            };
+
+            const uploadStream = bucket.openUploadStream(filename, options);
 
             file.stream.pipe(uploadStream);
 
@@ -62,7 +64,7 @@ const storage = {
                 cb(null, {
                     id: uploadStream.id,
                     filename: filename,
-                    metadata: uploadStream.options.metadata
+                    metadata: options.metadata
                 });
             });
         });

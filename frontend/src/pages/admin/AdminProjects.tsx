@@ -180,7 +180,8 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setError('');
-            const { project } = await adminUpdateProject(editTarget.id, {
+            const projectId = editTarget.id || (editTarget as any)._id;
+            const { project } = await adminUpdateProject(projectId, {
                 name: editTarget.name,
                 clientName: editTarget.clientName,
                 description: editTarget.description,
@@ -363,6 +364,7 @@ export default function AdminProjects() {
                                                 <button
                                                     className="btn btn-secondary btn-sm"
                                                     onClick={() => p.id && p.id !== 'undefined' && navigate(`/admin/projects/${p.id}`)}
+
                                                     title="Open Project"
                                                     disabled={!p.id || p.id === 'undefined'}
                                                 >
@@ -810,7 +812,7 @@ export default function AdminProjects() {
                                 <button className="btn btn-secondary" disabled={actionLoading} onClick={() => setEditTarget(null)}>Cancel</button>
                                 <button 
                                     className="btn btn-primary" 
-                                    disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === editTarget.id)?.sequences?.length || 0)} 
+                                    disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === (editTarget.id || (editTarget as any)._id))?.sequences?.length || 0)} 
                                     onClick={handleEditSave}
                                 >
                                     {actionLoading ? 'Saving...' : 'Save Changes'}

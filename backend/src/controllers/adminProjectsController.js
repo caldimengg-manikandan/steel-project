@@ -85,7 +85,10 @@ async function createProject(req, res) {
         drawingCount: 0,
     });
 
-    res.status(201).json({ project });
+    const projectObj = project.toObject({ virtuals: true });
+    projectObj.id = project._id.toString();
+    projectObj._id = project._id.toString();
+    res.status(201).json({ project: projectObj });
 }
 
 /**
@@ -123,7 +126,10 @@ async function updateProject(req, res) {
     }
 
     await project.save();
-    res.json({ project });
+    const projectObj = project.toObject({ virtuals: true });
+    projectObj.id = project._id.toString();
+    projectObj._id = project._id.toString();
+    res.json({ project: projectObj });
 }
 
 /**
