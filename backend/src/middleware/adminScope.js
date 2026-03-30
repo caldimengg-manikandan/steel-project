@@ -155,14 +155,19 @@ async function scopeProjectToUser(req, res, next) {
  * Sets: req.scopedProject and req.userPermission.
  */
 async function scopeProjectAccess(req, res, next) {
-    let { projectId } = req.params;
     const { id, role, adminId } = req.principal;
+    let { projectId } = req.params;
 
-    // Remove any trailing slashes or junk if captured by mistake
-    if (typeof projectId === 'string') projectId = projectId.trim().replace(/\/$/, "");
+    // Standardize and validate projectId
+    if (typeof projectId === 'string') {
+        projectId = projectId.trim().replace(/\/$/, "");
+    } else {
+        console.error(`[Guard] Blocked non-string projectId:`, typeof projectId);
+        return res.status(400).json({ error: 'Invalid projectId format (expecting string).' });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        console.error(`[Guard] Blocked invalid projectId: "${projectId}"`);
+        console.error(`[Guard] Blocked invalid projectId: "${projectId}" — Length: ${projectId.length}`);
         return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
     }
 

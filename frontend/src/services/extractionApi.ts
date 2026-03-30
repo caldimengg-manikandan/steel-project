@@ -88,8 +88,7 @@ export async function listExtractions(projectId: string): Promise<{
 
     const res = await fetch(`${BASE}/extractions/${String(projectId)}`, {
         headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${token}`
         },
     });
     return handleResponse(res);

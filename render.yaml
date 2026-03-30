@@ -34,7 +34,7 @@ services:
     rootDir: frontend
     routes:
       - type: rewrite
-        source: /*
+        source: /**
         destination: /index.html
     envVars:
       - key: VITE_API_URL
