@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -108,7 +108,8 @@ function ThemeToggle() {
 }
 
 export default function AppLayout() {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const { pathname } = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -118,6 +119,11 @@ export default function AppLayout() {
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
     const isAdmin = user?.role === 'admin';
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     return (
         <div className="app-shell">
@@ -136,7 +142,29 @@ export default function AppLayout() {
                         <span className={`topbar-badge ${isAdmin ? 'admin-badge' : ''}`}>
                             {isAdmin ? 'Admin' : 'User'}
                         </span>
-                        <div className="topbar-user-avatar">{initials}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                            <div className="topbar-user-avatar">{initials}</div>
+                            <button 
+                                onClick={handleLogout}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '0',
+                                    fontSize: '9px',
+                                    fontWeight: 700,
+                                    color: 'var(--color-danger-mid)',
+                                    cursor: 'pointer',
+                                    opacity: 0.8,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.4px',
+                                    lineHeight: 1
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+                            >
+                                Logout
+                            </button>
+                        </div>
                     </div>
                 </header>
 

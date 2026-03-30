@@ -1,9 +1,9 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logoImg from '../assets/logo/caldim_engineering_logo.jpg';
 import {
     IconDashboard, IconFolder, IconUsers,
-    IconPermissions, IconLogout, IconShield, IconSettings, IconChart
+    IconPermissions, IconShield, IconSettings, IconChart
 } from './Icons';
 
 interface NavItem {
@@ -55,15 +55,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
     const navItems = isAdmin ? adminNav : userNav;
 
-    function handleLogout() {
-        logout();
-        navigate('/login');
-    }
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
 
@@ -125,17 +120,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         </div>
                     )}
                 </div>
-
-                {/* Logout */}
-                <button 
-                    className="sidebar-nav-item" 
-                    onClick={handleLogout} 
-                    style={{ marginTop: 2 }}
-                    title={collapsed ? 'Logout' : ''}
-                >
-                    <span className="icon-only"><IconLogout /></span>
-                    {!collapsed && <span>Logout</span>}
-                </button>
             </div>
         </aside>
     );
