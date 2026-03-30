@@ -41,7 +41,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const allowedOrigins = [
     'https://steel-dms-frontend.onrender.com',
-    'https://steel-dms-frontend.onrender.com/',
+    // 'https://steel-dms-frontend.onrender.com/',
     'http://localhost:5173'
 ];
 
