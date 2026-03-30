@@ -141,7 +141,7 @@ export default function AdminDashboard() {
                                                         className="dropdown-item"
                                                         onMouseDown={(e) => {
                                                             e.stopPropagation();
-                                                            navigate(`/admin/project/${p.id}`);
+                                                            navigate(`/admin/projects/${p.id}`);
                                                         }}
                                                         style={{ borderBottom: 'none', paddingBottom: 6 }}
                                                     >
@@ -157,7 +157,7 @@ export default function AdminDashboard() {
                                                                 key={idx}
                                                                 onMouseDown={(e) => {
                                                                     e.stopPropagation();
-                                                                    navigate(`/admin/project/${p.id}`);
+                                                                    navigate(`/admin/projects/${p.id}`);
                                                                 }}
                                                                 style={{ fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                                                                 onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)' }}
@@ -228,7 +228,7 @@ export default function AdminDashboard() {
                                             <tr key={p._id || p.id}>
                                                 <td 
                                                     style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
-                                                    onClick={() => navigate(`/admin/project/${String(p._id || p.id)}`)}
+                                                    onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
                                                 >
                                                     {p.name}
                                                 </td>
@@ -311,7 +311,7 @@ export default function AdminDashboard() {
                                     return delayedTasks.map((t: any, i: number) => (
                                         <tr 
                                             key={i} 
-                                            onClick={() => navigate(`/admin/project/${String(t.projId)}`)}
+                                            onClick={() => navigate(`/admin/projects/${String(t.projId)}`)}
                                             style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
                                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
                                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
@@ -330,7 +330,7 @@ export default function AdminDashboard() {
                                                     style={{ color: 'var(--color-primary)' }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate(`/admin/project/${String(t.projId)}`);
+                                                        navigate(`/admin/projects/${String(t.projId)}`);
                                                     }}
                                                 >
                                                     View Project →
