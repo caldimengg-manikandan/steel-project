@@ -55,7 +55,7 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact, connectionDesignEmail } = req.body;
 
     if (!name || (!clientName && !clientId)) {
         return res.status(400).json({ error: 'name and either clientName or clientId are required.' });
@@ -73,6 +73,7 @@ async function createProject(req, res) {
         sequences: sequences || [],
         connectionDesignVendor: connectionDesignVendor || '',
         connectionDesignContact: connectionDesignContact || '',
+        connectionDesignEmail: connectionDesignEmail || '',
         createdByAdminId: adminId,
         assignments: [
             {
@@ -106,7 +107,7 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact, connectionDesignEmail } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
@@ -118,6 +119,7 @@ async function updateProject(req, res) {
     if (sequences !== undefined) project.sequences = sequences;
     if (connectionDesignVendor !== undefined) project.connectionDesignVendor = connectionDesignVendor;
     if (connectionDesignContact !== undefined) project.connectionDesignContact = connectionDesignContact;
+    if (connectionDesignEmail !== undefined) project.connectionDesignEmail = connectionDesignEmail;
     if (status !== undefined) {
         if (!['active', 'on_hold', 'completed', 'archived'].includes(status)) {
             return res.status(400).json({ error: 'Invalid status value.' });
