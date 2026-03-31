@@ -20,11 +20,7 @@ const Project = require('../models/Project');
  * Returns ONLY users belonging to the logged-in admin.
  */
 async function listUsers(req, res) {
-    const adminId = req.principal.adminId;
-
-    const users = await User
-        .find({ adminId })
-        .select('-password_hash')
+    const users = await User.find({ role: 'user' })
         .sort({ createdAt: -1 });
 
     res.json({ count: users.length, users });
@@ -101,12 +97,12 @@ async function updateUser(req, res) {
  */
 async function deleteUser(req, res) {
     const user = req.scopedUser;
-    const adminId = req.principal.adminId;
+    const id = user._id;
 
     // Remove user from all project assignments (within this admin only)
     await Project.updateMany(
-        { createdByAdminId: adminId },
-        { $pull: { assignments: { userId: user._id } } }
+        { 'assignments.userId': id },
+        { $pull: { assignments: { userId: id } } }
     );
 
     await user.deleteOne();

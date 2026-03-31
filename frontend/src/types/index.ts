@@ -95,6 +95,7 @@ export interface Project {
     }>;
     connectionDesignVendor?: string;
     connectionDesignContact?: string;
+    connectionDesignEmail?: string;
     /** Multi-tenant key: the admin who created this project */
     createdByAdminId: string;
     /** User-specific permission (injected for user dashboard) */

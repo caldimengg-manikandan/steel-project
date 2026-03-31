@@ -145,6 +145,10 @@ const projectSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        connectionDesignEmail: {
+            type: String,
+            default: '',
+        },
     },
     {
         timestamps: true,
