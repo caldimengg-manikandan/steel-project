@@ -27,13 +27,12 @@ const Project = require('../models/Project');
  */
 async function scopeUserToAdmin(req, res, next) {
     const { userId } = req.params;
-    const adminId = req.principal.adminId;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ error: 'Invalid userId.' });
     }
 
-    const user = await User.findOne({ _id: userId, adminId }).select('-password_hash');
+    const user = await User.findOne({ _id: userId }).select('-password_hash');
     if (!user) {
         // Return 404 rather than 403 to avoid leaking that the user exists
         return res.status(404).json({ error: 'User not found within your admin scope.' });
@@ -53,7 +52,6 @@ async function scopeUserToAdmin(req, res, next) {
  */
 async function scopeProjectToAdmin(req, res, next) {
     let { projectId } = req.params;
-    const adminId = req.principal.adminId;
 
     if (typeof projectId === 'string') projectId = projectId.trim().replace(/\/$/, "");
 
@@ -62,9 +60,9 @@ async function scopeProjectToAdmin(req, res, next) {
         return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
     }
 
-    const project = await Project.findOne({ _id: projectId, createdByAdminId: adminId });
+    const project = await Project.findById(projectId);
     if (!project) {
-        return res.status(404).json({ error: 'Project not found within your admin scope.' });
+        return res.status(404).json({ error: 'Project not found.' });
     }
 
     req.scopedProject = project;
@@ -87,7 +85,6 @@ async function scopeProjectToAdmin(req, res, next) {
  */
 async function validateCrossAdminAssignment(req, res, next) {
     const { userId } = req.body;
-    const adminId = req.principal.adminId;
 
     if (!userId) {
         return res.status(400).json({ error: 'userId is required in request body.' });
@@ -98,7 +95,7 @@ async function validateCrossAdminAssignment(req, res, next) {
     }
 
     // Look up user AND verify it belongs to THIS admin
-    const user = await User.findOne({ _id: userId, adminId }).select('-password_hash');
+    const user = await User.findOne({ _id: userId }).select('-password_hash');
     if (!user) {
         return res.status(403).json({
             error: 'Cross-admin assignment rejected. The specified user does not belong to your admin scope.',
@@ -187,19 +184,16 @@ async function scopeProjectAccess(req, res, next) {
 
     let project;
     if (role === 'admin') {
-        project = await Project.findOne({ _id: projectId, createdByAdminId: adminId });
-    } else {
-        project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
-    }
-
-    if (!project) {
-        return res.status(404).json({ error: 'Project not found or access denied.' });
-    }
-
-    req.scopedProject = project;
-    if (role === 'admin') {
+        project = await Project.findById(projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found.' });
+        req.scopedProject = project;
         req.userPermission = 'admin';
     } else {
+        project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found or access denied.' });
+        }
+        req.scopedProject = project;
         req.userPermission = project.assignments.find(a => a.userId.toString() === id)?.permission || 'viewer';
     }
 

@@ -31,7 +31,7 @@ async function listProjects(req, res) {
     const adminId = req.principal.adminId;
     const { status, search } = req.query;
 
-    const filter = { createdByAdminId: adminId };
+    const filter = {};
     if (status) filter.status = status;
     if (search) {
         filter.$or = [
@@ -226,10 +226,8 @@ async function removeAssignment(req, res) {
  *           Hold Count, Pending Count, Failed Count, Overall Status, Last Updated
  */
 async function downloadAllProjectsStatusExcel(req, res) {
-    const adminId = req.principal.adminId;
-
-    // Fetch all projects for this admin
-    const projects = await Project.find({ createdByAdminId: adminId }).sort({ createdAt: -1 }).lean();
+    // Fetch all projects
+    const projects = await Project.find({}).sort({ createdAt: -1 }).lean();
 
     if (projects.length === 0) {
         return res.status(404).json({ error: 'No projects found.' });

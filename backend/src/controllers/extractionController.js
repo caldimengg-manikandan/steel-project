@@ -201,7 +201,6 @@ exports.getExtraction = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-        createdByAdminId: adminId,         // ← tenant isolation
     }).lean();
 
     if (!doc) {
@@ -219,7 +218,6 @@ exports.reprocess = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-        createdByAdminId: adminId,
     });
 
     if (!doc) {
@@ -254,7 +252,6 @@ exports.viewPdf = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-        createdByAdminId: adminId,
     }).lean();
 
     if (!doc) {
@@ -298,7 +295,6 @@ exports.downloadExcel = async (req, res) => {
     // Fetch all completed extractions for this project (fresh, live data)
     const extractions = await DrawingExtraction.find({
         projectId,
-        createdByAdminId: adminId,
         status: 'completed',
     })
         .sort({ createdAt: 1 })
@@ -371,7 +367,6 @@ exports.deleteExtraction = async (req, res) => {
     const doc = await DrawingExtraction.findOneAndDelete({
         _id: id,
         projectId,
-        createdByAdminId: adminId,
     });
 
     if (!doc) {

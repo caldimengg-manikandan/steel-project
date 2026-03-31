@@ -9,17 +9,15 @@ const { attachProjectStats } = require('../services/projectStatsService');
  * Aggregated stats for the admin dashboard.
  */
 async function getAdminStats(req, res) {
-    const adminId = req.principal.adminId;
-
     const [projects, users, totalClients] = await Promise.all([
-        Project.find({ createdByAdminId: adminId }).sort({ updatedAt: -1 }),
-        User.find({ adminId }).sort({ createdAt: -1 }),
-        Client.countDocuments({ createdByAdminId: adminId })
+        Project.find({}).sort({ updatedAt: -1 }),
+        User.find({}).sort({ createdAt: -1 }),
+        Client.countDocuments({})
     ]);
 
     const projectIds = projects.map(p => p._id);
 
-    const totalDrawings = await DrawingExtraction.countDocuments({ createdByAdminId: adminId, status: 'completed' });
+    const totalDrawings = await DrawingExtraction.countDocuments({ status: 'completed' });
 
     // Use common service for stats to ensure consistency
     const recentProjectsWithStats = await attachProjectStats(projects.slice(0, 10));

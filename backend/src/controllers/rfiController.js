@@ -48,7 +48,7 @@ exports.listRfiExtractions = async (req, res) => {
     const adminId = req.principal.adminId;
 
     try {
-        const extractions = await RfiExtraction.find({ projectId, createdByAdminId: adminId })
+        const extractions = await RfiExtraction.find({ projectId })
             .sort({ createdAt: -1 })
             .lean();
 
@@ -67,7 +67,6 @@ exports.downloadRfiExcel = async (req, res) => {
     try {
         const query = {
             projectId,
-            createdByAdminId: adminId,
             status: 'completed'
         };
 
@@ -109,7 +108,7 @@ exports.updateRfiResponse = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -172,7 +171,7 @@ exports.updateRfiStatus = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -198,10 +197,8 @@ exports.updateRfiStatus = async (req, res) => {
 // Delete single RFI extraction
 exports.deleteRfiExtraction = async (req, res) => {
     const { id } = req.params;
-    const adminId = req.principal.adminId;
-
     try {
-        const doc = await RfiExtraction.findOneAndDelete({ _id: id, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOneAndDelete({ _id: id });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // Delete from GridFS if present
@@ -247,7 +244,7 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {

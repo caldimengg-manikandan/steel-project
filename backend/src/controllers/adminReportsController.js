@@ -11,13 +11,12 @@ const { attachProjectStats } = require('../services/projectStatsService');
  */
 async function getReportsData(req, res) {
     try {
-        const adminId = req.principal.adminId;
         const days = parseInt(req.query.days) || 30;
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Fetch all projects for this admin, sorted by most recent activity
-        const rawProjects = await Project.find({ createdByAdminId: adminId }).populate('clientId').sort({ updatedAt: -1 }).lean();
+        // Fetch all projects, sorted by most recent activity
+        const rawProjects = await Project.find({}).populate('clientId').sort({ updatedAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)
         const projects = await attachProjectStats(rawProjects);
