@@ -104,6 +104,7 @@ export default function AdminReports() {
     const [error, setError] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+    const [selectedClient, setSelectedClient] = useState('all');
     const reportRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
 
@@ -179,13 +180,17 @@ export default function AdminReports() {
     const { projectProgress, projects } = data;
 
     // Local filtering and stat recalculation
-    const filteredProjects = selectedProjectIds.length > 0 
-        ? projects.filter((p: any) => selectedProjectIds.includes(String(p.id)))
-        : projects;
+    const filteredProjects = projects.filter((p: any) => {
+        const matchesClient = selectedClient === 'all' || p.clientName === selectedClient;
+        const matchesProject = selectedProjectIds.length === 0 || selectedProjectIds.includes(String(p.id));
+        return matchesClient && matchesProject;
+    });
 
-    const filteredProgress = selectedProjectIds.length > 0 
-        ? projectProgress.filter((p: any) => selectedProjectIds.includes(String(p.id)))
-        : projectProgress;
+    const filteredProgress = projectProgress.filter((p: any) => {
+        const matchesClient = selectedClient === 'all' || projects.find((proj: any) => proj.id === p.id)?.clientName === selectedClient;
+        const matchesProject = selectedProjectIds.length === 0 || selectedProjectIds.includes(String(p.id));
+        return matchesClient && matchesProject;
+    });
 
     // Group projects by client for visualization
     const clientGroups = filteredProjects.reduce((acc: any, p: any) => {
@@ -218,7 +223,6 @@ export default function AdminReports() {
     const OVERVIEW_STATS = [
         { label: 'TOTAL PROJECTS', value: currentStats.totalProjects, icon: <IconFolder /> },
         { label: 'ACTIVE RFIS', value: currentStats.activeRfis, icon: <IconChart /> },
-        { label: 'TOTAL DRAWINGS', value: (currentStats.totalDrawings || 0).toLocaleString(), icon: <IconChart /> },
         { label: 'DELAYED TASKS', value: currentStats.delayedTasks, icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
@@ -235,6 +239,21 @@ export default function AdminReports() {
                         <button className={`btn ${days === 30 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(30)}>Last 30 Days</button>
                         <button className={`btn ${days === 90 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(90)}>Last 90 Days</button>
                     </div>
+
+                    <select 
+                        className="form-control btn-sm" 
+                        value={selectedClient}
+                        onChange={(e) => {
+                            setSelectedClient(e.target.value);
+                            setSelectedProjectIds([]); // Reset project filter when client changes
+                        }}
+                        style={{ width: 'auto', minWidth: 160, display: 'inline-block' }}
+                    >
+                        <option value="all">All Clients</option>
+                        {Array.from(new Set(projects.map((p: any) => p.clientName))).filter(Boolean).sort().map((c: any) => (
+                            <option key={c} value={c}>{c}</option>
+                        ))}
+                    </select>
                     
                     <div style={{ position: 'relative' }} ref={filterRef}>
                         <button 
@@ -298,7 +317,7 @@ export default function AdminReports() {
             <div ref={reportRef} style={{ background: 'var(--color-bg-page)', padding: '16px', borderRadius: '12px' }}>
 
             {/* Top Overview Cards */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 32 }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 32 }}>
                 {OVERVIEW_STATS.map((stat, i) => (
                     <StatCard key={i} {...stat} />
                 ))}
@@ -306,8 +325,8 @@ export default function AdminReports() {
 
             {/* Row 1: Project Progress (Full Width) */}
             <div style={{ marginBottom: 32 }}>
-                <ChartCard title="Approval & Fabrication Progress %">
-                    {projectProgress.length === 0 ? (
+                <ChartCard title={selectedClient === 'all' ? "Approval & Fabrication Progress %" : `Approval & Fabrication Progress % - ${selectedClient}`}>
+                    {filteredProgress.length === 0 ? (
                         <div className="table-empty">No project data available for charts.</div>
                     ) : (
                         <ResponsiveContainer width="100%" height={360}>

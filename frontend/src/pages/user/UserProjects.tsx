@@ -84,8 +84,8 @@ export default function UserProjects() {
                         <thead>
                             <tr>
                                 <th style={{ width: 40 }}>#</th>
-                                <th>Project Name</th>
                                 <th>Client Name</th>
+                                <th>Project Name</th>
                                 <th>Your Role</th>
                                 <th>Approval %</th>
                                 <th>Fabrication %</th>
@@ -107,8 +107,8 @@ export default function UserProjects() {
                                 projects.map((p: Project, i: number) => (
                                     <tr key={p.id}>
                                         <td className="text-muted font-mono" style={{ fontSize: 12 }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>{p.name}</td>
                                         <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
+                                        <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>{p.name}</td>
                                         <td>
                                             <span className={`role-chip ${p.permission || 'viewer'}`}>
                                                 {(p.permission || 'viewer').toUpperCase()}

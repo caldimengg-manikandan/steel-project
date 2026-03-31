@@ -17,6 +17,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showDelayedList, setShowDelayedList] = useState(false);
+    const [clientFilter, setClientFilter] = useState('all');
     const navigate = useNavigate();
 
     const fetchStats = useCallback(async () => {
@@ -83,9 +84,11 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="stat-card accent-violet">
-                    <div className="stat-card-label">Total Drawings</div>
-                    <div className="stat-card-value" style={{ color: 'var(--accent-violet)' }}>{stats.totalDrawings || 0}</div>
-                    <div className="stat-card-meta">Processed & approved DWGs</div>
+                    <div className="stat-card-label">Total Active Projects</div>
+                    <div className="stat-card-value" style={{ color: 'var(--accent-violet)' }}>
+                        {stats.recentProjects?.filter((p: any) => p.status === 'active').length || 0}
+                    </div>
+                    <div className="stat-card-meta">Live & ongoing projects</div>
                 </div>
 
                 {(() => {
@@ -191,18 +194,38 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
                 {/* My Projects Table */}
                 <div className="card">
-                    <div className="card-header">
-                        <span className="card-header-title">My Projects</span>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <span className="card-header-title">My Projects</span>
+                            <div className="filter-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Filter by Client:</span>
+                                <select 
+                                    className="form-control btn-sm" 
+                                    style={{ padding: '2px 8px', height: 28, fontSize: 12, width: 'auto', minWidth: 120 }}
+                                    value={clientFilter}
+                                    onChange={(e) => setClientFilter(e.target.value)}
+                                >
+                                    <option value="all">All Clients</option>
+                                    {Array.from(new Set(stats.recentProjects?.map((p: any) => p.clientName?.toLowerCase()))).filter(Boolean).sort().map((c: any) => (
+                                        <option key={c} value={c}>
+                                            {stats.recentProjects.find((p: any) => p.clientName?.toLowerCase() === c)?.clientName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                            {stats.totalProjects} total
+                            {clientFilter === 'all' 
+                                ? `${stats.totalProjects} total` 
+                                : `${stats.recentProjects.filter((p: any) => p.clientName?.toLowerCase() === clientFilter).length} projects`}
                         </span>
                     </div>
                     <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Project Name</th>
                                     <th>Client</th>
+                                    <th>Project Name</th>
                                     <th>Approx. DWGs</th>
                                     <th>Approval %</th>
                                     <th>Fabrication %</th>
@@ -219,20 +242,22 @@ export default function AdminDashboard() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    stats.recentProjects.map((p: any) => {
+                                    stats.recentProjects
+                                        .filter((p: any) => clientFilter === 'all' || p.clientName?.toLowerCase() === clientFilter)
+                                        .map((p: any) => {
                                         const hasDelayed = (p.sequences || []).some((s: any) => {
                                             const targetDate = s.approvalDate || s.deadline;
                                             return s.status !== 'Completed' && targetDate && targetDate < today;
                                         });
                                         return (
                                             <tr key={p._id || p.id}>
+                                                <td style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>{p.clientName}</td>
                                                 <td 
-                                                    style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                                    style={{ fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer' }}
                                                     onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
                                                 >
                                                     {p.name}
                                                 </td>
-                                                <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
                                                 <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

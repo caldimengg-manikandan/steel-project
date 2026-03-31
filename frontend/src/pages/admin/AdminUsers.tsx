@@ -18,6 +18,7 @@ export default function AdminUsers() {
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
+    const [selectedAssignClient, setSelectedAssignClient] = useState('all');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
 
     const [showCreate, setShowCreate] = useState(false);
@@ -260,7 +261,12 @@ export default function AdminUsers() {
                                             <div className="btn-group">
                                                 <button
                                                     className="btn btn-secondary btn-sm"
-                                                    onClick={() => { setAssignTarget(u); setAssignProject(''); setAssignRole('viewer'); }}
+                                                    onClick={() => { 
+                                                        setAssignTarget(u); 
+                                                        setAssignProject(''); 
+                                                        setSelectedAssignClient('all');
+                                                        setAssignRole('viewer'); 
+                                                    }}
                                                     title="Assign Project"
                                                 >
                                                     <IconAssign /> Assign
@@ -363,13 +369,33 @@ export default function AdminUsers() {
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
+                                <label className="form-label">Filter by Client</label>
+                                <select 
+                                    className="form-control" 
+                                    value={selectedAssignClient}
+                                    onChange={(e) => {
+                                        setSelectedAssignClient(e.target.value);
+                                        setAssignProject(''); // Reset project selection
+                                    }}
+                                >
+                                    <option value="all">All Clients</option>
+                                    {Array.from(new Set(projects.map(p => p.clientName?.toLowerCase()))).filter(Boolean).sort().map(c => (
+                                        <option key={c} value={c}>
+                                            {projects.find(p => p.clientName?.toLowerCase() === c)?.clientName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
                                 <label className="form-label required">Select Project</label>
                                 <select className="form-control" value={assignProject}
                                     onChange={(e) => setAssignProject(e.target.value)}>
                                     <option value="">— Select a project —</option>
-                                    {projects.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
+                                    {projects
+                                        .filter(p => selectedAssignClient === 'all' || p.clientName?.toLowerCase() === selectedAssignClient)
+                                        .map((p) => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
                                 </select>
                             </div>
                             <div className="form-group">
