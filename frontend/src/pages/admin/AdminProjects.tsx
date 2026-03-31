@@ -294,8 +294,8 @@ export default function AdminProjects() {
                         <thead>
                             <tr>
                                 <th style={{ width: 40 }}>#</th>
-                                <th>Project Name</th>
                                 <th>Client Name</th>
+                                <th>Project Name</th>
                                 <th>Created</th>
                                 <th>Approx. DWGs</th>                                <th>Approval %</th>
                                 <th>Fabrication %</th>
@@ -311,12 +311,12 @@ export default function AdminProjects() {
                                 filtered.map((p, i) => (
                                     <tr key={p.id}>
                                         <td className="text-muted font-mono" style={{ fontSize: 12 }}>{i + 1}</td>
+                                        <td style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>{p.clientName}</td>
                                         <td>
                                             <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>
                                                 {p.name}
                                             </span>
                                         </td>
-                                        <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
                                             {new Date(p.createdAt).toLocaleDateString()}
                                         </td>

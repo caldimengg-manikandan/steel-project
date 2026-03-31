@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
-    BarChart, Bar,
+    BarChart, Bar, PieChart as RePieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
@@ -94,6 +94,33 @@ const ChartCard = ({ title, children, action }: { title: string, children: React
     </div>
 );
 
+const PieChart = ({ data }: { data: any[] }) => {
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <RePieChart>
+                <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    animationBegin={0}
+                    animationDuration={1500}
+                >
+                    {data.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                </Pie>
+                <Tooltip />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: 20, fontSize: 12, fontWeight: 600 }} />
+            </RePieChart>
+        </ResponsiveContainer>
+    );
+};
+
 // ─── Main Page ───
 
 export default function AdminReports() {
@@ -103,6 +130,7 @@ export default function AdminReports() {
     const [exportLoading, setExportLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedClient, setSelectedClient] = useState<string | null>(null);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const reportRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback(async (d: number) => {
@@ -162,16 +190,22 @@ export default function AdminReports() {
         </div>
     );
 
-    if (!data) return null;
+    if (!data) return (
+        <div style={{ padding: '60px', textAlign: 'center', opacity: 0.7 }}>
+            No data available for the selected period.
+        </div>
+    );
 
-    const { projectProgress, projects } = data;
+    const { projectProgress = [], projects = [], overview = {} } = data;
 
     // Group projects by client for visualization (Normalize to Title Case)
     const clientGroups = projects.reduce((acc: any, p: any) => {
         const rawClient = p.clientName || 'Other';
         const client = rawClient.charAt(0).toUpperCase() + rawClient.slice(1).toLowerCase();
         if (!acc[client]) acc[client] = [];
+        const pid = String(p._id || p.id);
         acc[client].push({
+            id: pid,
             name: p.name,
             approval: p.approvalPercentage || 0,
             fabrication: p.fabricationPercentage || 0,
@@ -184,11 +218,20 @@ export default function AdminReports() {
 
     const clientNames = Object.keys(clientGroups).sort();
 
+    // Filter project progress and summary projects based on selection
+    const filteredProgress = projectProgress
+        .filter((p: any) => !selectedClient || (p.clientName || '').toLowerCase() === selectedClient.toLowerCase())
+        .filter((p: any) => !selectedProjectId || String(p._id || p.id) === selectedProjectId);
+
+    const filteredSummaryProjects = projects
+        .filter((p: any) => !selectedClient || (p.clientName || '').toLowerCase() === selectedClient.toLowerCase())
+        .filter((p: any) => !selectedProjectId || String(p._id || p.id) === selectedProjectId);
+
     // Stats always show global totals
     const OVERVIEW_STATS = [
-        { label: 'TOTAL PROJECTS', value: data.overview.totalProjects, icon: <IconFolder /> },
-        { label: 'ACTIVE RFIS', value: data.overview.activeRfis, icon: <IconChart /> },
-        { label: 'DELAYED TASKS', value: data.overview.delayedTasks, icon: <IconTrendingUp />, variant: 'danger' },
+        { label: 'TOTAL PROJECTS', value: overview?.totalProjects || 0, icon: <IconFolder /> },
+        { label: 'ACTIVE RFIS', value: overview?.activeRfis || 0, icon: <IconChart /> },
+        { label: 'DELAYED TASKS', value: overview?.delayedTasks || 0, icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
     return (
@@ -224,153 +267,185 @@ export default function AdminReports() {
 
             <div ref={reportRef} style={{ background: 'var(--color-bg-page)', padding: '16px', borderRadius: '12px' }}>
 
-            {/* Top Overview Cards (3-column) */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 32 }}>
-                {OVERVIEW_STATS.map((stat, i) => (
-                    <StatCard key={i} {...stat} />
-                ))}
-            </div>
-
-            {/* Client Selection Bar */}
-            <div style={{ 
-                marginBottom: 32, 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 16, 
-                background: 'var(--color-bg-card)', 
-                padding: '12px 24px', 
-                borderRadius: 12,
-                border: '1px solid var(--color-border-light)',
-                overflowX: 'auto'
-            }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>CLIENTS:</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button 
-                        onClick={() => setSelectedClient(null)}
-                        style={{
-                            padding: '6px 16px',
-                            borderRadius: '20px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            border: '1px solid var(--color-border-light)',
-                            background: selectedClient === null ? 'var(--color-primary)' : 'transparent',
-                            color: selectedClient === null ? '#fff' : 'var(--color-text-secondary)',
-                            transition: 'all 0.2s ease',
-                            whiteSpace: 'nowrap'
-                        }}
-                    >
-                        OVERALL
-                    </button>
-                    {clientNames.map(name => (
-                        <button 
-                            key={name}
-                            onClick={() => setSelectedClient(name)}
-                            style={{
-                                padding: '6px 16px',
-                                borderRadius: '20px',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                border: '1px solid var(--color-border-light)',
-                                background: selectedClient === name ? 'var(--color-primary)' : 'transparent',
-                                color: selectedClient === name ? '#fff' : 'var(--color-text-secondary)',
-                                transition: 'all 0.2s ease',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            {name}
-                        </button>
+                {/* Top Overview Cards (3-column) */}
+                <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 32 }}>
+                    {OVERVIEW_STATS.map((stat, i) => (
+                        <StatCard key={i} {...stat} />
                     ))}
                 </div>
-            </div>
 
-            {/* Row 1: Project Progress (Full Width) */}
-            <div style={{ marginBottom: 32 }}>
-                <ChartCard title="Overall Approval & Fabrication Progress">
-                    {projectProgress.length === 0 ? (
-                        <div className="table-empty">No project data available for charts.</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={360}>
-                            <BarChart data={projectProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="barGradientPrimary" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="var(--color-primary-light)" stopOpacity={1} />
-                                    </linearGradient>
-                                    <linearGradient id="barGradientSuccess" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#34d399" stopOpacity={1} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)', fontWeight: 600 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary-glow)', opacity: 0.1 }} />
-                                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 600 }} />
-                                <Bar dataKey="approval" name="Approval" fill="url(#barGradientPrimary)" radius={[6, 6, 0, 0]} barSize={40} />
-                                <Bar dataKey="fabrication" name="Fabrication" fill="url(#barGradientSuccess)" radius={[6, 6, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                {/* Filter Bar */}
+                <div style={{ 
+                    marginBottom: 32, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 16, 
+                    background: 'var(--color-bg-card)', 
+                    padding: '12px 24px', 
+                    borderRadius: 12,
+                    border: '1px solid var(--color-border-light)',
+                    overflowX: 'auto'
+                }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>FILTER BY CLIENT:</span>
+                    <select
+                        className="form-control"
+                        style={{ width: 'auto', minWidth: 200, fontWeight: 600 }}
+                        value={selectedClient || ''}
+                        onChange={(e) => {
+                            setSelectedClient(e.target.value || null);
+                            setSelectedProjectId(null);
+                        }}
+                    >
+                        <option value="">ALL CLIENTS</option>
+                        {clientNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
+                    </select>
+
+                    {selectedClient && (
+                        <>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)', marginLeft: 16 }}>SELECT PROJECT:</span>
+                            <select
+                                className="form-control"
+                                style={{ width: 'auto', minWidth: 240, fontWeight: 600 }}
+                                value={selectedProjectId || ''}
+                                onChange={(e) => setSelectedProjectId(e.target.value || null)}
+                            >
+                                <option value="">All Associated Projects</option>
+                                {clientGroups[selectedClient]?.map((p: any) => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </>
                     )}
-                </ChartCard>
-            </div>
+                </div>
 
+                {/* Line 1: Bar Chart */}
+                <div style={{ marginBottom: 32 }}>
+                    <ChartCard title="Overall Approval & Fabrication Progress">
+                        {filteredProgress.length === 0 ? (
+                            <div className="table-empty">No data matches the selected filters.</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={360}>
+                                <BarChart data={filteredProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)', fontWeight: 600 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 600 }} />
+                                    <Bar dataKey="approval" name="Approval" fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={40} />
+                                    <Bar dataKey="fabrication" name="Fabrication" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </ChartCard>
+                </div>
 
+                {/* Line 2: Pie Charts */}
+                <div className="grid-2" style={{ gap: 24, marginBottom: 32 }}>
+                    <ChartCard title="Project Distribution">
+                        <PieChart data={filteredSummaryProjects.reduce((acc: any, p: any) => {
+                            const status = p.status || 'active';
+                            const existing = acc.find((v: any) => v.name === status);
+                            if (existing) existing.value++;
+                            else acc.push({ name: status, value: 1 });
+                            return acc;
+                        }, [])} />
+                    </ChartCard>
 
-            {/* Row 3: Client Wise Project Analysis */}
-            <div style={{ marginBottom: 32 }}>
-                {selectedClient && clientGroups[selectedClient] ? (
-                    <ChartCard title={`Client Wise Analysis: ${selectedClient}`}>
-                        <div style={{ marginBottom: 24, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
-                            {clientGroups[selectedClient].map((p: any, idx: number) => (
-                                <div key={idx} style={{ 
-                                    padding: '12px 16px', 
-                                    background: 'var(--color-bg-page)', 
-                                    borderRadius: 12, 
-                                    border: '1px solid var(--color-border-light)',
-                                    minWidth: '200px',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                                }}>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 6 }}>{p.name}</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Drawings:</span>
-                                            <span style={{ color: 'var(--color-primary)' }}>{p.drawings}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Active RFIs:</span>
-                                            <span style={{ color: p.rfis > 0 ? '#ef4444' : 'var(--color-text-muted)' }}>{p.rfis}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border-light)', paddingTop: 4, marginTop: 4 }}>
-                                            <span>Status:</span>
-                                            <span style={{ color: p.status === 'active' ? '#10b981' : '#94a3b8' }}>{p.status?.toUpperCase()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                    <ChartCard title="Projects per Client">
+                        <PieChart data={Object.entries(clientGroups)
+                            .filter(([name]) => !selectedClient || name.toLowerCase() === selectedClient.toLowerCase())
+                            .map(([name, items]: any) => ({
+                                name,
+                                value: items.filter((p: any) => !selectedProjectId || p.id === selectedProjectId).length
+                            }))
+                            .filter(v => v.value > 0)} />
+                    </ChartCard>
+                </div>
+
+                {/* Line 3: Delayed Tasks */}
+                <div style={{ marginBottom: 32 }}>
+                    <ChartCard title="Delayed Tasks by Project">
                         <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={clientGroups[selectedClient]}>
+                            <BarChart data={projects
+                                .filter((p: any) => !selectedClient || (p.clientName || '').toLowerCase() === selectedClient.toLowerCase())
+                                .filter((p: any) => !selectedProjectId || String(p._id || p.id) === selectedProjectId)
+                                .map((p: any) => ({
+                                    name: p.name,
+                                    delayed: (p.sequences || []).filter((s: any) => {
+                                        const today = new Date().toISOString().split('T')[0];
+                                        const target = s.approvalDate || s.deadline;
+                                        return s.status !== 'Completed' && target && target < today;
+                                    }).length
+                                }))
+                                .filter((v: any) => v.delayed > 0)} 
+                            >
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)', fontWeight: 600 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                                <Bar dataKey="approval" name="Approval %" fill="url(#barGradientPrimary)" radius={[4, 4, 0, 0]} barSize={30} />
-                                <Bar dataKey="fabrication" name="Fabrication %" fill="url(#barGradientSuccess)" radius={[4, 4, 0, 0]} barSize={30} />
+                                <Legend iconType="circle" />
+                                <Bar dataKey="delayed" name="Delayed Tasks" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={40} />
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartCard>
-                ) : !selectedClient && (
-                    <div className="card" style={{ padding: '48px', textAlign: 'center', background: 'var(--color-bg-page)', border: '1px dashed var(--color-border)' }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                            Select a client above to view specific project analytics.
-                        </div>
-                    </div>
-                )}
-            </div>
+                </div>
 
+                {/* Row 4: Client Wise Analysis (Details) */}
+                <div style={{ marginBottom: 32 }}>
+                    {selectedClient && clientGroups[selectedClient] ? (
+                        <ChartCard title={`Client Wise Analysis: ${selectedClient}`}>
+                            <div style={{ marginBottom: 24, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
+                                {clientGroups[selectedClient]
+                                    .filter((p: any) => !selectedProjectId || p.id === selectedProjectId)
+                                    .map((p: any, idx: number) => (
+                                    <div key={idx} style={{ 
+                                        padding: '12px 16px', 
+                                        background: 'var(--color-bg-page)', 
+                                        borderRadius: 12, 
+                                        border: '1px solid var(--color-border-light)',
+                                        minWidth: '200px',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                                    }}>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 6 }}>{p.name}</div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>Drawings:</span>
+                                                <span style={{ color: 'var(--color-primary)' }}>{p.drawings}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>Active RFIs:</span>
+                                                <span style={{ color: p.rfis > 0 ? '#ef4444' : 'var(--color-text-muted)' }}>{p.rfis}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border-light)', paddingTop: 4, marginTop: 4 }}>
+                                                <span>Status:</span>
+                                                <span style={{ color: p.status === 'active' ? '#10b981' : '#94a3b8' }}>{p.status?.toUpperCase()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={clientGroups[selectedClient].filter((p: any) => !selectedProjectId || p.id === selectedProjectId)}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)', fontWeight: 600 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                                    <Bar dataKey="approval" name="Approval %" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={30} />
+                                    <Bar dataKey="fabrication" name="Fabrication %" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </ChartCard>
+                    ) : !selectedClient && (
+                        <div className="card" style={{ padding: '48px', textAlign: 'center', background: 'var(--color-bg-page)', border: '1px dashed var(--color-border)' }}>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                                Select a client above to view specific project analytics.
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

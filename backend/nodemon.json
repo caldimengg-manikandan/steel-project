@@ -1,7 +1,0 @@
-{
-    "ignore": [
-        "uploads/*",
-        "node_modules/*"
-    ],
-    "delay": "2500"
-}

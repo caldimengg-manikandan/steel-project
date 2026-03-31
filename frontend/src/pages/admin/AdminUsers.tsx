@@ -19,6 +19,7 @@ export default function AdminUsers() {
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
+    const [selectedAssignClient, setSelectedAssignClient] = useState('all');
 
     const [showCreate, setShowCreate] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
@@ -363,13 +364,33 @@ export default function AdminUsers() {
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
+                                <label className="form-label">Filter by Client</label>
+                                <select 
+                                    className="form-control" 
+                                    value={selectedAssignClient}
+                                    onChange={(e) => {
+                                        setSelectedAssignClient(e.target.value);
+                                        setAssignProject(''); // Reset project selection
+                                    }}
+                                >
+                                    <option value="all">All Clients</option>
+                                    {Array.from(new Set(projects.map(p => (p.clientName || '').trim().toLowerCase()))).filter(Boolean).sort().map(c => (
+                                        <option key={c} value={c}>
+                                            {projects.find(p => (p.clientName || '').trim().toLowerCase() === c)?.clientName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
                                 <label className="form-label required">Select Project</label>
                                 <select className="form-control" value={assignProject}
                                     onChange={(e) => setAssignProject(e.target.value)}>
                                     <option value="">— Select a project —</option>
-                                    {projects.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
+                                    {projects
+                                        .filter(p => selectedAssignClient === 'all' || (p.clientName || '').trim().toLowerCase() === selectedAssignClient)
+                                        .map((p) => (
+                                            <option key={p.id} value={p.id}>{p.clientName} — {p.name}</option>
+                                        ))}
                                 </select>
                             </div>
                             <div className="form-group">

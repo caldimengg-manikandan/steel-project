@@ -1,2 +1,0 @@
-﻿CLOUD PROJECTS: [{"id":"69c2582914733bdf79a0fe3a","name":"sds"},{"id":"69c2584c14733bdf79a0fe3d","name":"caldim"},{"id":"69c2586314733bdf79a0fe44","name":"steel"}]
-CLOUD TRANSMITTALS: []
