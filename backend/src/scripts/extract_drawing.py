@@ -99,6 +99,7 @@ def normalize_date_string(date_str):
     if not date_str:
         return ""
     
+<<<<<<< Updated upstream
     # Extract only the relevant date part to avoid trailing/leading junk characters
     m_ext = re.search(r'(\d{1,2}\s*[-/\.]\s*\d{1,2}\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2})|'
                       r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+\d{1,2}[\s,]+\d{4})', date_str, re.I)
@@ -160,6 +161,27 @@ def strip_all_dates(s: str) -> str:
     # Clean up excess whitespace
     s = re.sub(r'\s+', ' ', s).strip()
     return s
+=======
+    # Textual MMM DD YYYY
+    m1 = re.search(r'([A-Z]{3,})\s+(\d{1,2})[\s,]+(\d{4})', ds, re.I)
+    if m1:
+        months = {'JAN':'01','FEB':'02','MAR':'03','APR':'04','MAY':'05','JUN':'06',
+                  'JUL':'07','AUG':'08','SEP':'09','OCT':'10','NOV':'11','DEC':'12'}
+        ma = str(m1.group(1))[:3].upper() # type: ignore
+        if ma in months:
+            try: return f"{int(m1.group(2)):02d}-{months[ma]}-{m1.group(3)}"
+            except: pass
+    
+    # DD MMM YYYY
+    m2 = re.search(r'(\d{1,2})\s+([A-Z]{3,})[\s,]+(\d{4})', ds, re.I)
+    if m2:
+        months = {'JAN':'01','FEB':'02','MAR':'03','APR':'04','MAY':'05','JUN':'06',
+                  'JUL':'07','AUG':'08','SEP':'09','OCT':'10','NOV':'11','DEC':'12'}
+        ma = str(m2.group(2))[:3].upper() # type: ignore
+        if ma in months:
+            try: return f"{int(m2.group(1)):02d}-{months[ma]}-{m2.group(3)}"
+            except: pass
+>>>>>>> Stashed changes
 
 
 def fix_doubled(m):
@@ -443,8 +465,28 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
         "remarks": "",
         "revisionHistory": []
     }
+<<<<<<< Updated upstream
     fields = fields_dict
 
+=======
+    
+    try: import fitz # type: ignore
+    except ImportError: fitz = None
+
+    full_text = ""
+    blocks: List[Any] = []
+    w, h = 800.0, 600.0
+    
+    if fitz:
+        try:
+            with fitz.open(pdf_path) as doc:
+                if len(doc) > 0:
+                    p = doc[0]
+                    full_text = str(p.get_text("text")) # type: ignore
+                    blocks = p.get_text("blocks") # type: ignore
+                    w, h = float(p.rect.width), float(p.rect.height)
+        except: pass
+>>>>>>> Stashed changes
 
     if not pdfplumber:
         fields["description"] = "Error: pdfplumber not installed"
@@ -526,6 +568,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
             # Combine full text with targeted region text for better coverage
             augmented_text = clean_text + "\n" + rev_region_text
 
+<<<<<<< Updated upstream
             # --- 1. Drawing Number ---
             fn_base = os.path.basename(pdf_path).split('_')
             fn_hint = next((p for p in fn_base if re.search(r'\d+[A-Z]\d+|S-\d+|[A-Z]{2,}\d+|[a-z]+\d+', p, re.I)), "")
@@ -536,6 +579,47 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 if dn_val.upper() not in ["DESCRIPTION", "TITLE", "PROJECT", "DWG", "STEEL", "FAB"] and \
                    len(dn_val) > 2 and any(c.isdigit() for c in dn_val):
                     fields["drawingNumber"] = dn_val
+=======
+    # 1b. Remarks/Status in title block area
+    m_rem_tb = re.search(r'\b(?:REMARKS|STATUS|NOTE[S]?)\b\s*[:.\-]+\s*([A-Z\s0-9\-_]{2,50})', full_text, re.I)
+    if m_rem_tb:
+        rem_val = m_rem_tb.group(1).strip()
+        if len(rem_val) > 1 and not is_date_pattern(rem_val):
+            res["remarks"] = rem_val
+
+    # 2. Drawing Title - Look for prominent text in title block area
+    if blocks:
+        # Title block is usually bottom-right, but can be larger
+        candidates = []
+        for blk in blocks:
+            if not isinstance(blk, (list, tuple)) or len(blk) < 5: continue
+            x0, y0, x1, y1, txt = blk[0], blk[1], blk[2], blk[3], blk[4]
+            # Expanding heuristic: title is often in the bottom-right half
+            if x0 > w * 0.2 and y0 > h * 0.3:
+                ct = clean_text(txt)
+                if len(ct) > 4 and not is_date_pattern(ct):
+                    # Blacklist for labels and noise
+                    blacklist = [r'^NO[\s\.:]*PROJ', r'NOT\s+FOR\s+CONSTRUCTION', r'DRAWING\s*NO', r'PROJECT\s*NAME', r'CLIENT\s*NAME']
+                    if any(re.search(b, ct, re.I) for b in blacklist): continue
+                    
+                    # Exclude common labels and short codes
+                    if not re.match(r'^[A-Z\s]{3,20}:$', ct):
+                        # Multi-part titles usually have spaces
+                        score = (float(y1)/h) + (float(x1)/w)
+                        # Preference for text with spaces (titles) over single words (ids)
+                        if ' ' in ct: score += 1.2
+                        # Preference for mostly alphabetic over numeric
+                        if re.search(r'[A-Z]{4,}', ct): score += 0.8
+                        # Length preference (most titles are 8-30 chars)
+                        if 8 < len(ct) < 40: score += 0.5
+                        
+                        candidates.append({"v": ct, "s": score})
+        
+        if candidates:
+            # Sort by score (bottom-right-ness + heuristic)
+            candidates.sort(key=lambda x: x["s"], reverse=True)
+            res["drawingTitle"] = candidates[0]["v"]
+>>>>>>> Stashed changes
 
             if not fields["drawingNumber"] and fn_hint:
                 fields["drawingNumber"] = fn_hint.replace(".pdf", "")
@@ -544,6 +628,7 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                 pl_match = re.search(r'(?:DWG\s+)?(pl\d{3,}|[A-Z\d]{5,})', clean_text, re.I)
                 fields["drawingNumber"] = pl_match.group(1) if pl_match else (fn_hint or os.path.basename(pdf_path).replace(".pdf", ""))
 
+<<<<<<< Updated upstream
             # --- 2. Drawing Title (Multi-pass extraction) ---
             all_lines: List[str] = clean_text.splitlines()
 
@@ -572,6 +657,105 @@ def extract_locally_pass(pdf_path: str, extraction_mode: str = "layout") -> dict
                     val = strip_all_dates(m2.group(1).strip())
                     if val and is_valid_title_candidate(val):
                         explicit_title = val
+=======
+                # best_tbls = [] # This variable was not used in the original snippet, keeping it commented out.
+                for tbl in tbls:
+                    if not isinstance(tbl, list) or len(tbl) < 2 or not isinstance(tbl[0], list): continue
+                    num_cols = len(tbl[0])
+                    
+                    # 1. Broad header & content analysis
+                    c_dates = {i: 0 for i in range(num_cols)}
+                    c_marks = {i: 0 for i in range(num_cols)}
+                    c_descs = {i: 0 for i in range(num_cols)}
+                    c_htypes = {i: "" for i in range(num_cols)}
+                    
+                    for row in tbl:
+                        if not isinstance(row, list): continue
+                        for j in range(min(num_cols, len(row))):
+                            cell_val = row[j]
+                            v = str(cell_val or '').strip().upper()
+                            if not v: continue
+                            if is_date_pattern(v): c_dates[j] += 1 # type: ignore
+                            elif len(v) <= 3: c_marks[j] += 1 # type: ignore
+                            elif len(v) > 3: c_descs[j] += 1 # type: ignore
+                            
+                            # Header detection (can be in any row)
+                            if len(v) < 40:
+                                if any(x == v for x in ["REV", "REV.", "REV#", "REVISION", "MK", "REV-NO"]): c_htypes[j] = "mark"
+                                elif "DATE" in v and len(v) < 15: c_htypes[j] = "date"
+                                elif "REMARKS" in v: c_htypes[j] = "rem"
+                                elif any(x in v for x in ["DESCRIPTION", "DESC", "REVISIONS"]): c_htypes[j] = "desc"
+
+                    # 2. Score the table
+                    has_rev_headers = any(t in ["mark", "date"] for t in c_htypes.values())
+                    tbl_score: int = sum(c_dates.values()) * 10
+                    if any(t == "mark" for t in c_htypes.values()): tbl_score += 30
+                    if any(t == "date" for t in c_htypes.values()): tbl_score += 30
+                    
+                    # Penalize BOM only if no revision headers
+                    if not has_rev_headers:
+                        has_bom = False
+                        for r_idx in range(min(5, len(tbl))):
+                            r = tbl[r_idx]
+                            if not isinstance(r, list): continue
+                            for c in r:
+                                v_bom = str(c or '').upper()
+                                if any(bk in v_bom for bk in ["WEIGHT", "MATERIAL", "LENGTH", "QTY", "BOM", "PIECE"]):
+                                    has_bom = True; break
+                        if has_bom: tbl_score -= 100
+                    else:
+                        tbl_score += 20 # Bonus for having headers
+
+                    if tbl_score > 40:
+                        # 3. Identify best columns
+                        c_date: int = -1
+                        for j in range(num_cols):
+                            if c_htypes[j] == "date": c_date = j; break
+                        if c_date < 0:
+                            max_dates = -1
+                            for j in range(num_cols):
+                                if c_dates[j] > max_dates and c_dates[j] > 0: # type: ignore
+                                    max_dates = c_dates[j]; c_date = j # type: ignore
+                        
+                        c_mark: int = -1
+                        for j in range(num_cols):
+                            if c_htypes[j] == "mark": c_mark = j; break
+                        if c_mark < 0 and c_date >= 0:
+                            max_marks = -1
+                            for j in range(num_cols):
+                                if j != c_date and c_marks[j] > max_marks: # type: ignore
+                                    max_marks = c_marks[j]; c_mark = j # type: ignore
+                                    
+                        c_desc: int = -1
+                        best_dist = 999
+                        for j in range(num_cols):
+                            if c_htypes[j] in ["rem", "desc"]: # type: ignore
+                                dist = abs(j - c_date) if c_date >= 0 else 0 # type: ignore
+                                score = dist * 10 + (1 if c_htypes[j] == "desc" else 0) # type: ignore
+                                if score < best_dist:
+                                    best_dist = score
+                                    c_desc = j
+                        
+                        if c_desc < 0 and c_date >= 0:
+                            max_descs = -1
+                            for j in range(num_cols):
+                                if j not in [c_date, c_mark] and c_descs[j] > max_descs: # type: ignore
+                                    max_descs = c_descs[j]; c_desc = j # type: ignore
+
+                        print(f"DEBUG Table scoring - cols: mark={c_mark}, date={c_date}, desc={c_desc}")
+                        if c_date >= 0:
+                            for row in tbl:
+                                if not isinstance(row, list): continue
+                                if 0 <= c_date < len(row):
+                                    val_d = str(row[c_date] or '').strip()
+                                    if is_date_pattern(val_d):
+                                        val_m = str(row[c_mark] or '').strip() if 0 <= c_mark < len(row) else ""
+                                        val_r = str(row[c_desc] or '').strip() if 0 <= c_desc < len(row) else ""
+                                        if is_date_pattern(val_m): val_m = ""
+                                        if val_m.upper() in ["REV", "MK", "REV.", "DATE", "REV#"]: val_m = ""
+                                        _add(val_m, val_d, val_r)
+        except: pass
+>>>>>>> Stashed changes
 
             # Reversed scan (bottom-right title blocks have label at end)
             if not explicit_title:

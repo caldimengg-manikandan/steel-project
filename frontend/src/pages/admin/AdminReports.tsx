@@ -6,7 +6,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
-    IconChart, IconFilter, IconDownload,
+    IconChart, IconDownload,
     IconFolder, IconTrendingUp
 } from '../../components/Icons';
 import { adminGetReportsData } from '../../services/adminUserApi';
@@ -102,10 +102,8 @@ export default function AdminReports() {
     const [loading, setLoading] = useState(true);
     const [exportLoading, setExportLoading] = useState(false);
     const [error, setError] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
-    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+    const [selectedClient, setSelectedClient] = useState<string | null>(null);
     const reportRef = useRef<HTMLDivElement>(null);
-    const filterRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback(async (d: number) => {
         try {
@@ -149,16 +147,6 @@ export default function AdminReports() {
         fetchData(days);
     }, [days, fetchData]);
 
-    // Close filters when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-                setShowFilters(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
 
     if (loading && !data) return (
         <div style={{ padding: '100px 0', textAlign: 'center' }}>
@@ -178,18 +166,10 @@ export default function AdminReports() {
 
     const { projectProgress, projects } = data;
 
-    // Local filtering and stat recalculation
-    const filteredProjects = selectedProjectIds.length > 0 
-        ? projects.filter((p: any) => selectedProjectIds.includes(String(p.id)))
-        : projects;
-
-    const filteredProgress = selectedProjectIds.length > 0 
-        ? projectProgress.filter((p: any) => selectedProjectIds.includes(String(p.id)))
-        : projectProgress;
-
-    // Group projects by client for visualization
-    const clientGroups = filteredProjects.reduce((acc: any, p: any) => {
-        const client = p.clientName || 'Unknown';
+    // Group projects by client for visualization (Normalize to Title Case)
+    const clientGroups = projects.reduce((acc: any, p: any) => {
+        const rawClient = p.clientName || 'Other';
+        const client = rawClient.charAt(0).toUpperCase() + rawClient.slice(1).toLowerCase();
         if (!acc[client]) acc[client] = [];
         acc[client].push({
             name: p.name,
@@ -202,24 +182,13 @@ export default function AdminReports() {
         return acc;
     }, {});
 
-    // Recalculate overview based on filtered selection
-    const currentStats = {
-        totalProjects: filteredProjects.length,
-        activeRfis: filteredProjects.reduce((acc: number, p: any) => acc + (p.openRfiCount || 0), 0),
-        totalDrawings: filteredProjects.reduce((acc: number, p: any) => acc + (p.drawingCount || 0), 0),
-        delayedTasks: filteredProjects.reduce((acc: number, p: any) => {
-            const delayed = (p.sequences || []).filter((s: any) => 
-                s.status !== 'Completed' && s.deadline && new Date(s.deadline) < new Date()
-            ).length;
-            return acc + delayed;
-        }, 0)
-    };
+    const clientNames = Object.keys(clientGroups).sort();
 
+    // Stats always show global totals
     const OVERVIEW_STATS = [
-        { label: 'TOTAL PROJECTS', value: currentStats.totalProjects, icon: <IconFolder /> },
-        { label: 'ACTIVE RFIS', value: currentStats.activeRfis, icon: <IconChart /> },
-        { label: 'TOTAL DRAWINGS', value: (currentStats.totalDrawings || 0).toLocaleString(), icon: <IconChart /> },
-        { label: 'DELAYED TASKS', value: currentStats.delayedTasks, icon: <IconTrendingUp />, variant: 'danger' },
+        { label: 'TOTAL PROJECTS', value: data.overview.totalProjects, icon: <IconFolder /> },
+        { label: 'ACTIVE RFIS', value: data.overview.activeRfis, icon: <IconChart /> },
+        { label: 'DELAYED TASKS', value: data.overview.delayedTasks, icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
     return (
@@ -234,48 +203,6 @@ export default function AdminReports() {
                         <button className={`btn ${days === 7 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(7)}>Last 7 Days</button>
                         <button className={`btn ${days === 30 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(30)}>Last 30 Days</button>
                         <button className={`btn ${days === 90 ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setDays(90)}>Last 90 Days</button>
-                    </div>
-                    
-                    <div style={{ position: 'relative' }} ref={filterRef}>
-                        <button 
-                            className={`btn ${selectedProjectIds.length > 0 ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setShowFilters(!showFilters)}
-                        >
-                            <IconFilter /> Filters {selectedProjectIds.length > 0 && `(${selectedProjectIds.length})`}
-                        </button>
-
-                        {showFilters && (
-                            <div style={{ 
-                                position: 'absolute', top: '100%', right: 0, marginTop: 8,
-                                background: '#fff', border: '1px solid var(--color-border)',
-                                borderRadius: 12, boxShadow: 'var(--shadow-lg)', zIndex: 100,
-                                minWidth: 240, padding: 12
-                            }}>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>FILTER BY PROJECT</span>
-                                    <span style={{ cursor: 'pointer', color: 'var(--color-primary)' }} onClick={() => setSelectedProjectIds([])}>Clear</span>
-                                </div>
-                                <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    {projects.map((p: any) => (
-                                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }} className="hover-bg">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={selectedProjectIds.includes(String(p.id))}
-                                                onChange={() => {
-                                                    const pid = String(p.id);
-                                                    if (selectedProjectIds.includes(pid)) {
-                                                        setSelectedProjectIds(selectedProjectIds.filter(id => id !== pid));
-                                                    } else {
-                                                        setSelectedProjectIds([...selectedProjectIds, pid]);
-                                                    }
-                                                }}
-                                            />
-                                            <span style={{ fontWeight: 600 }}>{p.clientName}</span> - {p.name}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <button 
@@ -297,21 +224,75 @@ export default function AdminReports() {
 
             <div ref={reportRef} style={{ background: 'var(--color-bg-page)', padding: '16px', borderRadius: '12px' }}>
 
-            {/* Top Overview Cards */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 32 }}>
+            {/* Top Overview Cards (3-column) */}
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 32 }}>
                 {OVERVIEW_STATS.map((stat, i) => (
                     <StatCard key={i} {...stat} />
                 ))}
             </div>
 
+            {/* Client Selection Bar */}
+            <div style={{ 
+                marginBottom: 32, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 16, 
+                background: 'var(--color-bg-card)', 
+                padding: '12px 24px', 
+                borderRadius: 12,
+                border: '1px solid var(--color-border-light)',
+                overflowX: 'auto'
+            }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>CLIENTS:</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button 
+                        onClick={() => setSelectedClient(null)}
+                        style={{
+                            padding: '6px 16px',
+                            borderRadius: '20px',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: '1px solid var(--color-border-light)',
+                            background: selectedClient === null ? 'var(--color-primary)' : 'transparent',
+                            color: selectedClient === null ? '#fff' : 'var(--color-text-secondary)',
+                            transition: 'all 0.2s ease',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        OVERALL
+                    </button>
+                    {clientNames.map(name => (
+                        <button 
+                            key={name}
+                            onClick={() => setSelectedClient(name)}
+                            style={{
+                                padding: '6px 16px',
+                                borderRadius: '20px',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                border: '1px solid var(--color-border-light)',
+                                background: selectedClient === name ? 'var(--color-primary)' : 'transparent',
+                                color: selectedClient === name ? '#fff' : 'var(--color-text-secondary)',
+                                transition: 'all 0.2s ease',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Row 1: Project Progress (Full Width) */}
             <div style={{ marginBottom: 32 }}>
-                <ChartCard title="Approval & Fabrication Progress %">
+                <ChartCard title="Overall Approval & Fabrication Progress">
                     {projectProgress.length === 0 ? (
                         <div className="table-empty">No project data available for charts.</div>
                     ) : (
                         <ResponsiveContainer width="100%" height={360}>
-                            <BarChart data={filteredProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                            <BarChart data={projectProgress} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="barGradientPrimary" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={1} />
@@ -338,50 +319,55 @@ export default function AdminReports() {
 
 
             {/* Row 3: Client Wise Project Analysis */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
-                {Object.keys(clientGroups).length === 0 ? (
-                    <div className="card" style={{ padding: '40px', textAlign: 'center', gridColumn: '1 / -1' }}>
-                        <div className="table-empty">No projects found.</div>
-                    </div>
-                ) : (
-                    Object.entries(clientGroups).map(([clientName, clientProjects]: [string, any]) => (
-                        <ChartCard key={clientName} title={`Client: ${clientName}`}>
-                            <div style={{ marginBottom: 16, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
-                                {clientProjects.map((p: any, idx: number) => (
-                                    <div key={idx} style={{ 
-                                        padding: '10px 14px', 
-                                        background: 'var(--color-bg-page)', 
-                                        borderRadius: 8, 
-                                        border: '1px solid var(--color-border-light)',
-                                        minWidth: 'fit-content'
-                                    }}>
-                                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{p.name}</div>
-                                        <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                            <span>DWGS: {p.drawings}</span>
-                                            <span>RFIs: {p.rfis}</span>
+            <div style={{ marginBottom: 32 }}>
+                {selectedClient && clientGroups[selectedClient] ? (
+                    <ChartCard title={`Client Wise Analysis: ${selectedClient}`}>
+                        <div style={{ marginBottom: 24, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
+                            {clientGroups[selectedClient].map((p: any, idx: number) => (
+                                <div key={idx} style={{ 
+                                    padding: '12px 16px', 
+                                    background: 'var(--color-bg-page)', 
+                                    borderRadius: 12, 
+                                    border: '1px solid var(--color-border-light)',
+                                    minWidth: '200px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                                }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 6 }}>{p.name}</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>Drawings:</span>
+                                            <span style={{ color: 'var(--color-primary)' }}>{p.drawings}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>Active RFIs:</span>
+                                            <span style={{ color: p.rfis > 0 ? '#ef4444' : 'var(--color-text-muted)' }}>{p.rfis}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border-light)', paddingTop: 4, marginTop: 4 }}>
+                                            <span>Status:</span>
                                             <span style={{ color: p.status === 'active' ? '#10b981' : '#94a3b8' }}>{p.status?.toUpperCase()}</span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            <ResponsiveContainer width="100%" height={260}>
-                                <BarChart data={clientProjects}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
-                                    <XAxis 
-                                        dataKey="name" 
-                                        axisLine={false} 
-                                        tickLine={false} 
-                                        tick={{ fontSize: 10, fill: 'var(--color-text-muted)', fontWeight: 600 }} 
-                                    />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                                    <Bar dataKey="approval" name="Approval %" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={25} />
-                                    <Bar dataKey="fabrication" name="Fabrication %" fill="#10b981" radius={[4, 4, 0, 0]} barSize={25} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </ChartCard>
-                    ))
+                                </div>
+                            ))}
+                        </div>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={clientGroups[selectedClient]}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)', fontWeight: 600 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} domain={[0, 100]} />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                                <Bar dataKey="approval" name="Approval %" fill="url(#barGradientPrimary)" radius={[4, 4, 0, 0]} barSize={30} />
+                                <Bar dataKey="fabrication" name="Fabrication %" fill="url(#barGradientSuccess)" radius={[4, 4, 0, 0]} barSize={30} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+                ) : !selectedClient && (
+                    <div className="card" style={{ padding: '48px', textAlign: 'center', background: 'var(--color-bg-page)', border: '1px dashed var(--color-border)' }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                            Select a client above to view specific project analytics.
+                        </div>
+                    </div>
                 )}
             </div>
 

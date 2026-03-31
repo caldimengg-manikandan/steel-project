@@ -235,6 +235,24 @@ export default function AdminProjectStatus() {
                                     <div className="project-status-info">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                             <div className="project-status-name">{project.name}</div>
+                                            {project.connectionDesignVendor && (
+                                                <div style={{ 
+                                                    fontSize: 10, 
+                                                    fontWeight: 700, 
+                                                    color: 'var(--color-text-secondary)', 
+                                                    background: '#f1f5f9', 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: 12, 
+                                                    border: '1px solid #e2e8f0',
+                                                    display: 'flex',
+                                                    gap: 6,
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>CD:</span> {project.connectionDesignVendor}
+                                                    {project.connectionDesignContact && <span style={{ opacity: 0.6 }}>| {project.connectionDesignContact}</span>}
+                                                    {project.connectionDesignEmail && <span style={{ opacity: 0.6 }}>| {project.connectionDesignEmail.split(/[\n,]/)[0].trim()}{project.connectionDesignEmail.includes('\n') || project.connectionDesignEmail.includes(',') ? '...' : ''}</span>}
+                                                </div>
+                                             )}
                                             {project.location && (
                                                 <div style={{ 
                                                     fontSize: 10, 

@@ -12,7 +12,7 @@ const Project = require('../models/Project');
  */
 async function listClients(req, res) {
     const adminId = req.principal.adminId;
-    const clients = await Client.find({ createdByAdminId: adminId }).sort({ name: 1 });
+    const clients = await Client.find({}).sort({ name: 1 });
     res.json({ count: clients.length, clients });
 }
 
@@ -172,8 +172,10 @@ async function bulkCreateClients(req, res) {
             const phone = phoneValue ? String(phoneValue).trim() : '';
 
             // Check duplicate client name
-            const exists = await Client.findOne({ name: name, createdByAdminId: adminId });
-            if (exists) {
+            const existing = await Client.findOne({
+                name: { $regex: new RegExp(`^${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+            });
+            if (existing) {
                 errorList.push(`Row ${rowNumber}: Client "${name}" already exists.`);
                 skippedCount++;
                 continue;
