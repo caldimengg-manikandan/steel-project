@@ -28,6 +28,7 @@ interface CreateProjectForm {
     sequenceCount: string;
     connectionDesignVendor: string;
     connectionDesignContact: string;
+    connectionDesignEmail: string;
 }
 const DEFAULT_FORM: CreateProjectForm = { 
     name: '', 
@@ -41,7 +42,8 @@ const DEFAULT_FORM: CreateProjectForm = {
     location: '', 
     sequenceCount: '0',
     connectionDesignVendor: '',
-    connectionDesignContact: ''
+    connectionDesignContact: '',
+    connectionDesignEmail: ''
 };
 
 export default function AdminProjects() {
@@ -141,7 +143,8 @@ export default function AdminProjects() {
                     fabricationDate: s.fabricationDate
                 })),
                 connectionDesignVendor: form.connectionDesignVendor,
-                connectionDesignContact: form.connectionDesignContact
+                connectionDesignContact: form.connectionDesignContact,
+                connectionDesignEmail: form.connectionDesignEmail
             });
 
             const newProject = {
@@ -190,7 +193,8 @@ export default function AdminProjects() {
                 location: editTarget.location,
                 sequences: editTarget.sequences,
                 connectionDesignVendor: editTarget.connectionDesignVendor,
-                connectionDesignContact: editTarget.connectionDesignContact
+                connectionDesignContact: editTarget.connectionDesignContact,
+                connectionDesignEmail: editTarget.connectionDesignEmail
             });
 
             // Re-map with consistent ID
@@ -614,13 +618,23 @@ export default function AdminProjects() {
                                         {distinctVendors.map((v, i) => <option key={`vendor-${i}`} value={v} />)}
                                     </datalist>
                                 </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                <div className="form-group">
                                     <label className="form-label">Contact Number</label>
                                     <input 
                                         className="form-control" 
                                         placeholder="Phone number" 
                                         value={form.connectionDesignContact}
                                         onChange={(e) => setForm({ ...form, connectionDesignContact: e.target.value })} 
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Email Address (Connection Design)</label>
+                                    <textarea 
+                                        className="form-control" 
+                                        placeholder="Enter email IDs (one per line or comma separated)" 
+                                        rows={2}
+                                        value={form.connectionDesignEmail}
+                                        onChange={(e) => setForm({ ...form, connectionDesignEmail: e.target.value })} 
                                     />
                                 </div>
                             </div>
@@ -808,6 +822,45 @@ export default function AdminProjects() {
                                     </div>
                                 </div>
                             )}
+
+                            <div style={{ marginTop: 24, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+                                    Connection Design
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Vendor / Client Name</label>
+                                    <input 
+                                        className="form-control" 
+                                        placeholder="Enter vendor details" 
+                                        list="client-list-edit"
+                                        value={editTarget.connectionDesignVendor || ''}
+                                        onChange={(e) => setEditTarget({ ...editTarget, connectionDesignVendor: e.target.value })} 
+                                    />
+                                    <datalist id="client-list-edit">
+                                        {distinctVendors.map((v, i) => <option key={`vendor-edit-${i}`} value={v} />)}
+                                    </datalist>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Contact Number</label>
+                                    <input 
+                                        className="form-control" 
+                                        placeholder="Phone number" 
+                                        value={editTarget.connectionDesignContact || ''}
+                                        onChange={(e) => setEditTarget({ ...editTarget, connectionDesignContact: e.target.value })} 
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Email Address (Connection Design)</label>
+                                    <textarea 
+                                        className="form-control" 
+                                        placeholder="Enter email IDs" 
+                                        rows={2}
+                                        value={editTarget.connectionDesignEmail || ''}
+                                        onChange={(e) => setEditTarget({ ...editTarget, connectionDesignEmail: e.target.value })} 
+                                    />
+                                </div>
+                            </div>
+
                             <div className="form-actions">
                                 <button className="btn btn-secondary" disabled={actionLoading} onClick={() => setEditTarget(null)}>Cancel</button>
                                 <button 
