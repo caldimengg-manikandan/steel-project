@@ -1,0 +1,143 @@
+/**
+ * RFI API Service (Frontend)
+ * Wraps all backend RFI endpoints.
+ */
+
+const BASE = import.meta.env.VITE_API_URL || '/steeldms/api';
+
+// ── Auth token helper — matches extractionApi.ts exactly ──
+function getToken(): string {
+    try {
+        const u = sessionStorage.getItem('sdms_user');
+        return u ? JSON.parse(u).token ?? '' : '';
+    } catch {
+        return '';
+    }
+}
+
+function authHeaders(): Record<string, string> {
+    const tok = getToken();
+    return tok ? { Authorization: `Bearer ${tok}` } : {};
+}
+
+export const uploadRfiDrawing = async (projectId: string, files: File[], localSavePath?: string, sequences?: string[]) => {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    if (localSavePath) formData.append('localSavePath', localSavePath);
+    if (sequences && sequences.length > 0) {
+        sequences.forEach(s => formData.append('sequences', s));
+    }
+
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/upload`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+        body: formData,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Upload failed');
+    }
+    return res.json();
+};
+
+export const listRfiExtractions = async (projectId: string) => {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}`, {
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to list RFIs');
+    }
+    return res.json();
+};
+
+export const getRfiExcelDownloadUrl = (projectId: string, extractionId?: string, baseUrl?: string, status?: string): string => {
+    const tok = getToken();
+    let url = `${BASE}/rfis/${String(projectId)}/excel/download?token=${tok}`;
+    if (extractionId) {
+        url += `&extractionId=${String(extractionId)}`;
+    }
+    if (baseUrl && baseUrl.trim()) {
+        url += `&baseUrl=${encodeURIComponent(baseUrl.trim())}`;
+    }
+    if (status) {
+        url += `&status=${status}`;
+    }
+    return url;
+};
+
+export const deleteRfiExtraction = async (projectId: string, extractionId: string) => {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete');
+    }
+    return res.json();
+};
+
+export const updateRfiResponse = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number,
+    response: string,
+    remarks: string,
+    clientRfiNumber?: string
+) => {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ response, remarks, clientRfiNumber }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save response');
+    }
+    return res.json();
+};
+
+export const updateRfiStatus = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number,
+    status: 'OPEN' | 'CLOSED'
+) => {
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/status/${rfiIndex}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to update status');
+    }
+    return res.json();
+};
+
+export const uploadRfiResponseAttachment = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number,
+    file: File
+) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}/attachment`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+        body: formData,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload response attachment');
+    }
+    return res.json();
+};
+
+export const getRfiViewPdfUrl = (projectId: string, extractionId: string): string => {
+    const tok = getToken();
+    return `${BASE}/rfis/${String(projectId)}/${String(extractionId)}/view?token=${tok}`;
+};

@@ -1,0 +1,10 @@
+pdfplumber
+pydantic
+pytesseract
+pdf2image
+pandas
+openpyxl
+PyMuPDF
+schedule
+pymongo
+python-dotenv

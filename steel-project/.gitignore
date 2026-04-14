@@ -1,0 +1,36 @@
+# Dependency directories
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+backend/.env
+frontend/.env
+*.local
+
+# Build outputs
+dist/
+backend/dist/
+frontend/dist/
+
+# Storage / Dynamic Data
+uploads/
+backend/uploads/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Agentic / System generated
+.gemini/
+.agents/
+brain/
+*.log
+git_status.txt
+git_staged.txt
+git_status_utf8.txt
