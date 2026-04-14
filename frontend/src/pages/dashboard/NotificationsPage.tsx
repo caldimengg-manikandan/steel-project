@@ -19,7 +19,7 @@ export default function NotificationsPage() {
 
     useEffect(() => {
         if (token) {
-            fetch('/steeldms/api/notifications', {
+            fetch('/steel/api/notifications', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => res.json())

@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-        const BASE = import.meta.env.VITE_API_URL || '/steeldms/api';
+        const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
         try {
             // First, try Admin login

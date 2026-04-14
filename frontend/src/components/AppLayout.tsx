@@ -42,7 +42,7 @@ function NotificationBell() {
 
     useEffect(() => {
         if (token) {
-            fetch('/steeldms/api/notifications', {
+            fetch('/steel/api/notifications', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => res.json())
@@ -65,7 +65,7 @@ function NotificationBell() {
     const handleMarkAllRead = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
-            await fetch('/steeldms/api/notifications/mark-read', {
+            await fetch('/steel/api/notifications/mark-read', {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

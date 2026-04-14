@@ -3,7 +3,7 @@
  * Wraps all backend RFI endpoints.
  */
 
-const BASE = import.meta.env.VITE_API_URL || '/steeldms/api';
+const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
 // ── Auth token helper — matches extractionApi.ts exactly ──
 function getToken(): string {

@@ -1,6 +1,6 @@
 import type { Client } from '../types';
 
-const BASE = import.meta.env.VITE_API_URL || '/steeldms/api';
+const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
 function authHeaders(): Record<string, string> {
     const stored = sessionStorage.getItem('sdms_user');
