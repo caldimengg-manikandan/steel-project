@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logo from '../assets/tablogo/steel.png';
+import logo from '../assets/logo/caldim_engineering_logo.jpg';
 
 export default function LoginPage() {
     const { login, user } = useAuth();
