@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logoImg from '../assets/logo/caldim_engineering_logo.jpg';
+import logoImg from '../assets/tablogo/steel.png';
 import { useSettings } from '../context/SettingsContext';
 import {
     IconDashboard, IconFolder, IconUsers,
