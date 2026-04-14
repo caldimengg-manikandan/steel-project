@@ -27,7 +27,7 @@ export default function App() {
   return (
     <SettingsProvider>
       <AuthProvider>
-        <BrowserRouter basename="/steel-projects">
+        <BrowserRouter basename="/steel">
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
