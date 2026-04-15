@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { User, Project } from '../../types';
 import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, adminBulkCreateUsers } from '../../services/adminUserApi';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
+import { useMessage } from '../../context/MessageContext';
 import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload } from '../../components/Icons';
 
 interface CreateUserForm {
@@ -20,12 +21,12 @@ const DEFAULT_FORM: CreateUserForm = {
 };
 
 export default function AdminUsers() {
+    const { showMessage, showConfirm } = useMessage();
     const [users, setUsers] = useState<User[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
-    const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
@@ -74,21 +75,24 @@ export default function AdminUsers() {
             setUsers((prev) => [{ ...user, id: user._id || user.id }, ...prev]);
             setShowCreate(false);
             setForm(DEFAULT_FORM);
+            showMessage('Success', 'User account created successfully.', 'success');
         } catch (err: any) {
-            setError(`Create failed: ${err.message}`);
+            showMessage('Error', err.message, 'error');
         } finally {
             setCreating(false);
         }
     }
 
-    async function handleDelete(id: string) {
-        try {
-            await adminDeleteUser(id);
-            setUsers((prev) => prev.filter((u) => u.id !== id));
-            setDeleteTarget(null);
-        } catch (err: any) {
-            setError(`Delete failed: ${err.message}`);
-        }
+    async function handleDelete(id: string, username: string) {
+        showConfirm('Remove User', `Remove user "${username}" from the system? All project assignments for this user will also be removed. This cannot be undone.`, async () => {
+            try {
+                await adminDeleteUser(id);
+                setUsers((prev) => prev.filter((u) => u.id !== id));
+                showMessage('Deleted', 'User has been removed successfully.', 'success');
+            } catch (err: any) {
+                showMessage('Error', err.message, 'error');
+            }
+        });
     }
 
     async function handleToggleStatus(u: User) {
@@ -98,8 +102,9 @@ export default function AdminUsers() {
             setUsers((prev) =>
                 prev.map((item) => (item.id === u.id ? { ...user, id: user._id || user.id } : item))
             );
+            showMessage('Status Updated', `User is now ${newStatus}.`, 'success');
         } catch (err: any) {
-            setError(`Update failed: ${err.message}`);
+            showMessage('Error', err.message, 'error');
         }
     }
 
@@ -112,8 +117,9 @@ export default function AdminUsers() {
             });
             await fetchData(); // Refresh to get updated role counts
             setAssignTarget(null);
+            showMessage('Success', 'Project assigned successfully.', 'success');
         } catch (err: any) {
-            setError(`Assignment failed: ${err.message}`);
+            showMessage('Error', err.message, 'error');
         }
     }
 
@@ -304,7 +310,7 @@ export default function AdminUsers() {
                                                 </button>
                                                 <button
                                                     className="btn btn-danger btn-sm btn-icon"
-                                                    onClick={() => setDeleteTarget(u)}
+                                                    onClick={() => handleDelete(u.id, u.username)}
                                                     title="Remove User"
                                                 >
                                                     <IconTrash />
@@ -368,29 +374,6 @@ export default function AdminUsers() {
                 </div>
             )}
 
-            {/* ── Delete Confirm ── */}
-            {deleteTarget && (
-                <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
-                    <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <span className="modal-title">Remove User</span>
-                            <button className="modal-close" onClick={() => setDeleteTarget(null)}><IconClose /></button>
-                        </div>
-                        <div className="modal-body">
-                            <p className="confirm-dialog-text">
-                                Remove user <strong>"{deleteTarget.username}"</strong> from the system?
-                                All project assignments for this user will also be removed. This cannot be undone.
-                            </p>
-                            <div className="form-actions">
-                                <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
-                                <button className="btn btn-danger btn-lg" onClick={() => handleDelete(deleteTarget.id)}>
-                                    Remove User
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* ── Assign Project Modal ── */}
             {assignTarget && (

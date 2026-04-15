@@ -16,8 +16,8 @@ const { pickLatestRevision } = require('./transmittalService');
 
 const EXCEL_DIR = path.join(__dirname, '../../uploads/excel');
 
-// Dynamic logo path — works on any machine regardless of username
-const LOGO_PATH = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
+// Default logo fallback
+const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
 // Ensure directory exists
 if (!fs.existsSync(EXCEL_DIR)) {
@@ -104,29 +104,56 @@ async function appendRowsToProjectExcel(projectId, rows) {
         }
 
         // Sl. No. Calculation
-        const startSlNo = worksheet.rowCount - 1;
+        const sheetMap = new Map();
+        worksheet.eachRow((r, rowNumber) => {
+            if (rowNumber <= 2) return; // Skip headers
+            const sheetNo = (r.getCell(2).value || '').toString().trim().toUpperCase();
+            if (sheetNo) sheetMap.set(sheetNo, r);
+        });
 
         rows.forEach((row, index) => {
-            const slNo = startSlNo + index;
-            worksheet.addRow({
-                slNo: slNo > 0 ? slNo : 1,
-                drawingNumber: row.drawingNumber || '',
-                drawingTitle: row.drawingTitle || row.drawingDescription || '',
-                revision: row.revision || '',
-                date: row.date || '',
-                remarks: row.remarks || '',
-                fileName: row.fileName || '',
-            });
+            const searchVal = (row.drawingNumber || '').toString().trim().toUpperCase();
+            const existingRow = searchVal ? sheetMap.get(searchVal) : null;
 
-            // Style the new row
-            const newRow = worksheet.lastRow;
-            newRow.eachCell((cell) => {
-                cell.border = {
-                    top: { style: 'thin' }, bottom: { style: 'thin' },
-                    left: { style: 'thin' }, right: { style: 'thin' },
-                };
-                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            });
+            if (existingRow) {
+                // Update existing row (Sheet No index is 2)
+                existingRow.getCell(3).value = row.drawingTitle || row.drawingDescription || '';
+                existingRow.getCell(4).value = row.revision || '';
+                existingRow.getCell(5).value = row.date || '';
+                existingRow.getCell(6).value = row.remarks || '';
+                existingRow.getCell(7).value = row.fileName || '';
+                
+                // Keep consistent styling
+                existingRow.eachCell((cell) => {
+                    cell.border = commonBorderStyle || {
+                        top: { style: 'thin' }, bottom: { style: 'thin' },
+                        left: { style: 'thin' }, right: { style: 'thin' },
+                    };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                });
+            } else {
+                // Add new row as before
+                const startSlNo = worksheet.rowCount - 1;
+                worksheet.addRow({
+                    slNo: startSlNo > 0 ? startSlNo : 1,
+                    drawingNumber: row.drawingNumber || '',
+                    drawingTitle: row.drawingTitle || row.drawingDescription || '',
+                    revision: row.revision || '',
+                    date: row.date || '',
+                    remarks: row.remarks || '',
+                    fileName: row.fileName || '',
+                });
+
+                // Style the new row
+                const newRow = worksheet.lastRow;
+                newRow.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin' }, bottom: { style: 'thin' },
+                        left: { style: 'thin' }, right: { style: 'thin' },
+                    };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                });
+            }
         });
 
         await workbook.xlsx.writeFile(filePath);
@@ -217,10 +244,12 @@ const COL_COUNT = 7; // Sl.No + Sheet No + Title + Rev + Date + Remarks + Filena
  *   • Flat list of every completed extraction row (same as before).
  *
  * @param {Array<object>} rows  — completed extraction records from MongoDB (.lean())
- * @param {string}        projectName  — used in the title cell
- * @returns {Promise<Buffer>}
+ * @param {object}        projectDetails  — used in the title cell
+ * @param {string}        type - 'transmittal' or 'log'
+ * @param {string}        logoPath - dynamic logo path from settings
+ * @returns {Promise<object>} { buffer, filename }
  */
-async function generateProjectExcel(rows, projectDetails, type) {
+async function generateProjectExcel(rows, projectDetails, type, logoPath) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Caldim Steel Detailing DMS';
     workbook.created = new Date();
@@ -269,14 +298,15 @@ async function generateProjectExcel(rows, projectDetails, type) {
     if (!type || type === 'transmittal') {
         const trSheet = workbook.addWorksheet('Transmittal');
 
-        // ── Caldim Logo (dynamic path) ────────────────────────
+        // ── Brand Logo (dynamic path) ────────────────────────
         try {
-            if (fs.existsSync(LOGO_PATH)) {
-                const imageId = workbook.addImage({ filename: LOGO_PATH, extension: 'png' });
+            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            if (fs.existsSync(finalLogo)) {
+                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
                 // Place logo in rows 1-6 (6 row tall banner)
                 trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 6 } });
             }
-        } catch (err) { console.error('[ExcelService] Logo error:', err.message); }
+        } catch (err) { console.error('[ExcelService] Transmittal logo error:', err.message); }
 
         // Row heights for logo area spacer
         for (let r = 1; r <= 6; r++) trSheet.getRow(r).height = 18;
@@ -431,14 +461,15 @@ async function generateProjectExcel(rows, projectDetails, type) {
     if (!type || type === 'log') {
         const logSheet = workbook.addWorksheet('Drawing Log');
 
-        // ── Caldim Logo (dynamic path) ────────────────────────
+        // ── Brand Logo (dynamic path) ────────────────────────
         try {
-            if (fs.existsSync(LOGO_PATH)) {
-                const imageId = workbook.addImage({ filename: LOGO_PATH, extension: 'png' });
+            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            if (fs.existsSync(finalLogo)) {
+                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
                 // Scale logo to top left, roughly spanning A and C columns
                 logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
             }
-        } catch (err) { console.error('[ExcelService] Logo error:', err.message); }
+        } catch (err) { console.error('[ExcelService] Log logo error:', err.message); }
 
         for (let r = 1; r <= 6; r++) logSheet.getRow(r).height = 18;
         logSheet.getRow(7).height = 6; // thin spacer

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useMessage } from '../context/MessageContext';
 import { useAuth } from '../context/AuthContext';
 import {
     uploadRfiDrawing,
@@ -35,6 +36,8 @@ export default function RfiExtractionPanel({
     const [searchTerm, setSearchTerm] = useState('');
     const [sequenceFilter, setSequenceFilter] = useState('');
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    
+    const { showMessage, showConfirm } = useMessage();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollRef = useRef<any>(null);
@@ -81,10 +84,9 @@ export default function RfiExtractionPanel({
         if (projectName) {
             const invalidFiles = fileArray.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
             if (invalidFiles.length > 0) {
-                const msg = `Validation Error: The following files do not contain the project name "${projectName}":\n\n` + 
-                            invalidFiles.map(f => `• ${f.name}`).join('\n') + 
-                            `\n\nPlease ensure your drawing filenames include the project name.`;
-                alert(msg);
+                showMessage('Naming Validation Error', `The following files do not contain the project name "${projectName}":\n\n` + 
+                          invalidFiles.map(f => `• ${f.name}`).join(', ') + 
+                          `\n\nPlease ensure your drawing filenames include the project name.`, 'error');
                 setUploadError(`Drawing filenames must include the project name "${projectName}".`);
                 return;
             }
@@ -116,14 +118,16 @@ export default function RfiExtractionPanel({
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!window.confirm('Are you sure you want to delete this RFI extraction?')) return;
-        try {
-            await deleteRfiExtraction(projectId, id);
-            setExtractions(prev => prev.filter(x => x._id !== id));
-        } catch (err) {
-            console.error(err);
-            alert('Failed to delete');
-        }
+        showConfirm('Delete RFI', 'Are you sure you want to delete this RFI extraction? This action cannot be undone.', async () => {
+            try {
+                await deleteRfiExtraction(projectId, id);
+                setExtractions(prev => prev.filter(x => x._id !== id));
+                showMessage('Deleted', 'RFI extraction deleted successfully.', 'success');
+            } catch (err) {
+                console.error(err);
+                showMessage('Delete Failed', 'Failed to delete the extraction. Please try again.', 'error');
+            }
+        });
     };
 
     const StatusBadge = ({ status }: { status: string }) => {
@@ -184,15 +188,15 @@ export default function RfiExtractionPanel({
                         <button
                             className="btn btn-primary"
                             disabled={uploading}
-                            onClick={() => {
-                                if (pendingFiles.length === 0) {
-                                    alert('Please select at least one PDF file to upload.');
+                            onClick={() => {                                 if (pendingFiles.length === 0) {
+                                    showMessage('No Files Selected', 'Please select at least one PDF file (RFI drawing) to upload and extract.', 'error');
                                     return;
                                 }
                                 if (sequences && sequences.length > 0 && selectedSequences.length === 0) {
-                                    alert('Sequence selection is required for RFI extraction. Please check at least one sequence.');
+                                    showMessage('Sequence Required', 'Please select at least one Sequence (e.g., SEQ 01) before continuing with the RFI extraction.', 'error');
                                     return;
                                 }
+
                                 handleUploads(pendingFiles);
                             }}
                         >

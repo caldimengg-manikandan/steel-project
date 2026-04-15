@@ -15,10 +15,12 @@
  */
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const Project = require('../models/Project');
 const { runExtractionPipeline } = require('../services/extractionService');
 const { getProjectExcelPath, generateProjectExcel } = require('../services/excelService');
+const SystemSettings = require('../models/SystemSettings');
 
 // ── Upload + Start Extraction ─────────────────────────────
 exports.uploadAndExtract = async (req, res) => {
@@ -96,6 +98,27 @@ exports.uploadAndExtract = async (req, res) => {
         sequences,
         status: 'queued',
     }));
+
+    // ── Pre-cleanup: Use originalFileName as a signal for overwrite ──
+    try {
+        const fileNames = validFiles.map(({ file }) => file.originalname);
+        const pId = new mongoose.Types.ObjectId(projectId);
+        
+        // Use a case-insensitive regex for each filename
+        const delResult = await DrawingExtraction.deleteMany({
+            projectId: pId,
+            originalFileName: { $in: fileNames.map(f => new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) }
+        });
+        
+        const logMsg = `[DB_DEBUG] PRE-UPLOAD Cleanup: project=${pId}, files=${fileNames.join(',')}, deleted=${delResult.deletedCount}\n`;
+        fs.appendFileSync(path.join(__dirname, '../../cleanup_debug.log'), logMsg);
+        
+        if (delResult.deletedCount > 0) {
+            console.log(`[Upload] Pre-cleaned ${delResult.deletedCount} existing records with matching filenames for project ${projectId}`);
+        }
+    } catch (cleanErr) {
+        console.error('[Upload] Pre-cleanup error:', cleanErr.message);
+    }
 
     // Batch insert for performance
     const savedDocs = await DrawingExtraction.insertMany(extractionDocs);
@@ -351,8 +374,11 @@ exports.downloadExcel = async (req, res) => {
         }
     } catch (_) { /* non-fatal */ }
 
+    // Fetch system settings for logo
+    const settings = await SystemSettings.findOne().lean();
+
     // Generate fresh Excel with Drawing Log + Extraction Data sheets
-    const { buffer, filename } = await generateProjectExcel(extractions, projectDetails, type);
+    const { buffer, filename } = await generateProjectExcel(extractions, projectDetails, type, settings?.logoPath);
 
     // ── Feature 6: Also save Excel to the uploaded folder path ─────────
     try {

@@ -13,6 +13,7 @@
  *  • Full admin-scoped isolation (only shows this project's data)
  */
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useMessage } from '../context/MessageContext';
 import type { DrawingExtraction, ExtractionStatus } from '../types';
 import {
     uploadDrawing,
@@ -256,6 +257,8 @@ export default function DrawingExtractionPanel({
 
     // Target sequences state
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    
+    const { showMessage, showConfirm } = useMessage();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollRef = useRef<any>(null);
@@ -519,18 +522,20 @@ export default function DrawingExtractionPanel({
                 prev.map((x) => x._id === e._id ? { ...x, status: 'queued' } : x)
             );
         } catch (err: unknown) {
-            alert(`Reprocess failed: ${err instanceof Error ? err.message : String(err)}`);
+            showMessage('Reprocess Failed', err instanceof Error ? err.message : String(err), 'error');
         }
     }
 
     async function handleDelete(e: DrawingExtraction) {
-        if (!confirm(`Delete extraction for "${e.originalFileName}"?`)) return;
-        try {
-            await deleteExtraction(projectId, e._id);
-            setExtractions((prev) => prev.filter((x) => x._id !== e._id));
-        } catch (err: unknown) {
-            alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
+        showConfirm('Delete Extraction', `Are you sure you want to delete the extraction for "${e.originalFileName}"? This action cannot be undone.`, async () => {
+            try {
+                await deleteExtraction(projectId, e._id);
+                setExtractions((prev) => prev.filter((x) => x._id !== e._id));
+                showMessage('Deleted', 'Extraction deleted successfully.', 'success');
+            } catch (err: unknown) {
+                showMessage('Delete Failed', err instanceof Error ? err.message : String(err), 'error');
+            }
+        });
     }
 
     const completedCount = extractions.filter((e) => e.status === 'completed').length;
@@ -1078,22 +1083,17 @@ export default function DrawingExtractionPanel({
                                 >
                                     Cancel
                                 </button>
-                                {sequences && sequences.length > 0 && selectedSequences.length === 0 && (
-                                    <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 12, fontWeight: 700, textAlign: 'right' }}>
-                                        * Please select at least one Sequence to continue
-                                    </div>
-                                )}
                                 <button
                                     className="btn btn-primary"
                                     onClick={() => {
                                         if (sequences && sequences.length > 0 && selectedSequences.length === 0) {
-                                            alert('Please select at least one Sequence before continuing.');
+                                            showMessage('Sequence Required', 'Please select at least one Sequence (e.g., SEQ 01) before continuing with the upload.', 'error');
                                             return;
                                         }
                                         // Validate manual transmittal number for old projects
                                         if (selectedTransmittalNumber === null && projectYear && projectYear <= 2026) {
                                             if (!manualTransmittalNumber || Number(manualTransmittalNumber) < 1) {
-                                                alert('Please enter a valid transmittal number for this project.');
+                                                showMessage('Transmittal Required', 'Please provide a valid Transmittal Number for this project.', 'error');
                                                 return;
                                             }
                                         }

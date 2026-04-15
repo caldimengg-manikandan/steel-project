@@ -35,6 +35,7 @@ const DrawingExtraction = require('../models/DrawingExtraction');
 const Transmittal = require('../models/Transmittal');
 const DrawingLog = require('../models/DrawingLog');
 const Project = require('../models/Project');
+const SystemSettings = require('../models/SystemSettings');
 const { generateTransmittalExcel, generateDrawingLogExcel } = require('../services/transmittalExcelService');
 
 /**
@@ -222,12 +223,14 @@ exports.downloadDrawingLogExcel = async (req, res) => {
     }
 
     const project = await Project.findById(projectId).lean();
+    const settings = await SystemSettings.findOne().lean();
+    
     const projectDetails = {
         projectName: project ? project.name : 'Project',
         clientName: project ? project.clientName : 'CLIENT',
     };
 
-    const { buffer, filename } = await generateDrawingLogExcel(log, projectDetails);
+    const { buffer, filename } = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -252,13 +255,15 @@ exports.downloadTransmittalExcel = async (req, res) => {
     }
 
     const project = await Project.findById(projectId).lean();
+    const settings = await SystemSettings.findOne().lean();
+
     const projectDetails = {
         projectName: project ? project.name : 'Project',
         clientName: project ? project.clientName : 'CLIENT',
         transmittalNo: transmittal.transmittalNumber,
     };
 
-    const { buffer, filename } = await generateTransmittalExcel(transmittal, projectDetails);
+    const { buffer, filename } = await generateTransmittalExcel(transmittal, projectDetails, settings?.logoPath);
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

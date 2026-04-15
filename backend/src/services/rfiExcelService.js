@@ -2,7 +2,7 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 
-const LOGO_PATH = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
+const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
 /**
  * extractSkFromFilename
@@ -159,17 +159,21 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     sheet.mergeCells(1, 1, 1, TOTAL_COLS);
 
     // Embed logo if the file exists
-    if (fs.existsSync(LOGO_PATH)) {
-        const logoImageId = workbook.addImage({
-            filename: LOGO_PATH,
-            extension: 'png',
-        });
-        sheet.addImage(logoImageId, {
-            tl: { col: 0, row: 0 },       // top-left: column A, row 1
-            br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
-            editAs: 'oneCell',
-        });
-    }
+    try {
+        const rawLogo = projectDetails?.logoPath || '';
+        const finalLogo = rawLogo ? path.join(__dirname, '../../', rawLogo.replace(/^\//, '')) : LOGO_DEFAULT;
+        if (fs.existsSync(finalLogo)) {
+            const logoImageId = workbook.addImage({
+                filename: finalLogo,
+                extension: 'png',
+            });
+            sheet.addImage(logoImageId, {
+                tl: { col: 0, row: 0 },       // top-left: column A, row 1
+                br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
+                editAs: 'oneCell',
+            });
+        }
+    } catch (e) { console.error('[RfiExcel] Logo error:', e.message); }
 
     // ════════════════════════════════════════════════════════
     // ROW 2 — "RFI LOG" title (centered, dark navy)

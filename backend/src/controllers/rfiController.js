@@ -1,8 +1,11 @@
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
+const Project = require('../models/Project');
 const RfiExtraction = require('../models/RfiExtraction');
-const { runRfiExtraction } = require('../services/rfiExtractionService');
+const SystemSettings = require('../models/SystemSettings');
 const { generateRfiLogExcel } = require('../services/rfiExcelService');
+const { runRfiExtraction } = require('../services/rfiExtractionService');
 
 // Handle PDF uploads for RFI extraction
 exports.uploadRfiDrawing = async (req, res) => {
@@ -16,6 +19,20 @@ exports.uploadRfiDrawing = async (req, res) => {
     }
 
     const createdExtractions = [];
+
+    // ── Pre-cleanup: Use originalFileName as a signal for overwrite (RFIs) ──
+    try {
+        const fileNames = req.files.map(f => f.originalname);
+        const delResult = await RfiExtraction.deleteMany({
+            projectId: new mongoose.Types.ObjectId(projectId),
+            originalFileName: { $in: fileNames }
+        });
+        if (delResult.deletedCount > 0) {
+            console.log(`[RfiUpload] Pre-cleaned ${delResult.deletedCount} existing RFI records with matching filenames for project ${projectId}`);
+        }
+    } catch (cleanErr) {
+        console.error('[RfiUpload] Pre-cleanup error:', cleanErr.message);
+    }
 
     // Process each file
     for (const file of req.files) {
@@ -90,7 +107,17 @@ exports.downloadRfiExcel = async (req, res) => {
         const token = req.query.token || (req.headers.authorization ? req.headers.authorization.split(' ')[1] : '');
         const rfiStatus = req.query.status; // OPEN or CLOSED
 
-        const { buffer, filename } = await generateRfiLogExcel(extractions, {}, baseUrl, isExternal, token, rfiStatus);
+        const project = await Project.findById(projectId).lean();
+        const settings = await SystemSettings.findOne().lean();
+
+        const projectDetails = {
+            projectName: project ? project.name : 'Project',
+            clientName: project ? project.clientName : 'CUSTOMER',
+            projectNo: project ? project.projectNumber : '',
+            logoPath: settings?.logoPath || ''
+        };
+
+        const { buffer, filename } = await generateRfiLogExcel(extractions, projectDetails, baseUrl, isExternal, token, rfiStatus);
 
         // If filtering by status, it's possible the buffer is nearly empty headers-only
         // But generateRfiLogExcel currently generates a file even if allRfis.length is 0.

@@ -12,6 +12,7 @@ interface Settings {
     moduleProjects: boolean;
     moduleRfi: boolean;
     moduleReports: boolean;
+    logoPath: string;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -26,11 +27,13 @@ const DEFAULT_SETTINGS: Settings = {
     moduleProjects: true,
     moduleRfi: true,
     moduleReports: true,
+    logoPath: '',
 };
 
 interface SettingsContextType {
     settings: Settings;
     updateSettings: (newSettings: Partial<Settings>) => void;
+    refreshSettings: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -41,10 +44,37 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
     });
 
+    const fetchSettings = async () => {
+        try {
+            const stored = sessionStorage.getItem('sdms_user');
+            const token = stored ? JSON.parse(stored).token : '';
+            if (!token) return;
+
+            const res = await fetch('/steel/api/settings', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSettings(prev => ({ 
+                    ...prev, 
+                    ...data,
+                    // If logoPath exists on backend, ensure it's fully qualified for the UI if needed
+                    // Actually /uploads/system/ logo.png is served by backend
+                    logoPath: data.logoPath ? `/steel${data.logoPath}` : ''
+                }));
+            }
+        } catch (err) {
+            console.error('Failed to fetch settings:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchSettings();
+    }, []);
+
     useEffect(() => {
         localStorage.setItem('app_settings', JSON.stringify(settings));
         
-        // Sync with Theme if darkMode changes
         if (settings.darkMode) {
             document.documentElement.setAttribute('data-theme', 'dark');
         } else {
@@ -52,12 +82,30 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     }, [settings]);
 
-    const updateSettings = (newSettings: Partial<Settings>) => {
+    const updateSettings = async (newSettings: Partial<Settings>) => {
         setSettings(prev => ({ ...prev, ...newSettings }));
+
+        // Sync to backend
+        try {
+            const stored = sessionStorage.getItem('sdms_user');
+            const token = stored ? JSON.parse(stored).token : '';
+            if (!token) return;
+
+            await fetch('/steel/api/settings', {
+                method: 'PATCH',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newSettings)
+            });
+        } catch (err) {
+            console.error('Failed to sync settings to backend:', err);
+        }
     };
 
     return (
-        <SettingsContext.Provider value={{ settings, updateSettings }}>
+        <SettingsContext.Provider value={{ settings, updateSettings, refreshSettings: fetchSettings }}>
             {children}
         </SettingsContext.Provider>
     );

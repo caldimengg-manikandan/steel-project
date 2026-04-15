@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { useMessage } from '../context/MessageContext';
 
 const PAGE_TITLES: Record<string, string> = {
     '/admin': 'Dashboard Overview',
@@ -304,6 +305,7 @@ function ThemeToggle() {
 
 export default function AppLayout() {
     const { user, logout } = useAuth();
+    const { showConfirm } = useMessage();
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -400,10 +402,10 @@ export default function AppLayout() {
                                         className="btn btn-ghost" 
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (window.confirm('Are you sure?')) {
+                                            showConfirm('Logout', 'Are you sure you want to log out of the system?', () => {
                                                 logout();
                                                 navigate('/login');
-                                            }
+                                            });
                                         }}
                                         style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', color: '#dc2626' }}
                                     >

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMessage } from '../../context/MessageContext';
 import {
     IconUsers, IconNotification,
     IconActivity, IconSettings,
@@ -7,7 +8,7 @@ import {
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'notifications' | 'ui' | 'audit';
+type TabId = 'access' | 'notifications' | 'ui' | 'branding' | 'audit';
 
 interface TabItem {
     id: TabId;
@@ -19,7 +20,8 @@ interface TabItem {
 const TABS: TabItem[] = [
     { id: 'access', label: 'User & Access', icon: <IconUsers />, desc: 'Roles, permissions and user management' },
     { id: 'notifications', label: 'Notifications', icon: <IconNotification />, desc: 'Email alerts and reminder schedules' },
-    { id: 'ui', label: 'System Prefs', icon: <IconSettings />, desc: 'Theme, timezone and language' },
+    { id: 'ui', label: 'System Preference', icon: <IconSettings />, desc: 'Theme, timezone and language' },
+    { id: 'branding', label: 'Company Profile', icon: <IconSettings />, desc: 'Logo and branding' },
 
     { id: 'audit', label: 'Logs & Audit', icon: <IconActivity />, desc: 'System activity and change history' },
 ];
@@ -89,11 +91,44 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [logSearch, setLogSearch] = useState('');
-    const { settings, updateSettings } = useSettings();
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const { settings, updateSettings, refreshSettings } = useSettings();
+    const { showMessage } = useMessage();
     const navigate = useNavigate();
 
     const handleSettingChange = (key: string, value: any) => {
         updateSettings({ [key]: value });
+    };
+
+    const handleLogoUpload = async () => {
+        if (!logoFile) return;
+        setUploadingLogo(true);
+        try {
+            const formData = new FormData();
+            formData.append('logo', logoFile);
+            
+            const token = sessionStorage.getItem('sdms_user') ? JSON.parse(sessionStorage.getItem('sdms_user')!).token : '';
+            const res = await fetch('/steel/api/settings/logo', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            
+            if (res.ok) {
+                showMessage('Success', 'Logo updated successfully!', 'success');
+                setLogoFile(null);
+                refreshSettings();
+            } else {
+                const err = await res.json();
+                showMessage('Upload Failed', err.error || 'Unknown error occurred during logo upload.', 'error');
+            }
+        } catch (err) {
+            console.error('Logo upload error:', err);
+            showMessage('Error', 'An unexpected error occurred during the upload process. Please try again.', 'error');
+        } finally {
+            setUploadingLogo(false);
+        }
     };
 
     return (
@@ -284,6 +319,57 @@ export default function AdminSettings() {
                             <SettingRow title="Dark Mode" desc="Enable high-contrast dark interface">
                                 <Toggle enabled={settings.darkMode} onChange={(v) => handleSettingChange('darkMode', v)} />
                             </SettingRow>
+                        </Card>
+                    )}
+
+                    {activeTab === 'branding' && (
+                        <Card title="Company Branding">
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                                    <div style={{ 
+                                        width: 100, height: 60, 
+                                        border: '2px dashed var(--color-border)', 
+                                        borderRadius: 8,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        overflow: 'hidden', background: 'var(--color-bg-page)'
+                                    }}>
+                                        {settings.logoPath ? (
+                                            <img src={settings.logoPath} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%' }} />
+                                        ) : (
+                                            <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>No Logo</span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 600 }}>System Logo</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>This logo will appear in Transmittals and Drawing Logs.</div>
+                                    </div>
+                               </div>
+
+                               <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8 }}>
+                                   <input 
+                                        type="file" 
+                                        id="logo-upload" 
+                                        accept="image/*" 
+                                        style={{ display: 'none' }} 
+                                        onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                                   />
+                                   <label htmlFor="logo-upload" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                                       {logoFile ? 'Change File' : 'Select Logo'}
+                                   </label>
+                                   {logoFile && (
+                                       <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 500 }}>
+                                           {logoFile.name}
+                                       </div>
+                                   )}
+                                   <button 
+                                        className="btn btn-primary btn-sm" 
+                                        disabled={!logoFile || uploadingLogo}
+                                        onClick={handleLogoUpload}
+                                   >
+                                       {uploadingLogo ? 'Uploading...' : 'Upload & Save'}
+                                   </button>
+                               </div>
+                           </div>
                         </Card>
                     )}
 

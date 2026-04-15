@@ -10,6 +10,7 @@ import {
     uploadRfiResponseAttachment
 } from '../../services/rfiApi';
 import { useAuth } from '../../context/AuthContext';
+import { useMessage } from '../../context/MessageContext';
 
 // ── Inline SVG icons ──────────────────────────────────────
 const IconQuestion = () => (
@@ -52,6 +53,7 @@ const IconClip = () => (
 
 export default function UserRfi() {
     const { user } = useAuth();
+    const { showMessage, showConfirm } = useMessage();
     const location = useLocation();
 
     const [projects, setProjects] = useState<any[]>([]);
@@ -135,17 +137,16 @@ export default function UserRfi() {
 
         const invalidFiles = files.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
         if (invalidFiles.length > 0) {
-            const msg = `Validation Error: The following files do not contain the project name "${projectName}":\n\n` + 
-                        invalidFiles.map(f => `• ${f.name}`).join('\n') + 
-                        `\n\nPlease ensure your drawing filenames include the project name.`;
-            alert(msg);
+            showMessage('Naming Validation Error', `The following files do not contain the project name "${projectName}":\n\n` + 
+                        invalidFiles.map(f => `• ${f.name}`).join(', ') + 
+                        `\n\nPlease ensure your drawing filenames include the project name.`, 'error');
             setUploadError(`Drawing filenames must include the project name "${projectName}".`);
             return;
         }
 
         // Sequence Validation
         if (selectedProject.sequences && selectedProject.sequences.length > 0 && selectedSequences.length === 0) {
-            alert('Please select at least one Sequence before uploading.');
+            showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
             setUploadError('Sequence selection is required.');
             return;
         }
@@ -159,25 +160,27 @@ export default function UserRfi() {
                 ? `File "${duplicates[0].originalFileName}" already exists in RFI. Should I replace the image?`
                 : `${duplicates.length} files already exist in RFI. Should I replace the images?`;
             
-            if (!window.confirm(msg)) {
-                return;
-            }
-
-            setUploading(true);
-            try {
-                for (const dup of duplicates) {
-                    await deleteRfiExtraction(projectId, dup._id);
+            showConfirm('Duplicate Files Found', msg, async () => {
+                setUploading(true);
+                try {
+                    for (const dup of duplicates) {
+                        await deleteRfiExtraction(projectId, dup._id);
+                    }
+                    setExtractions(prev => prev.filter(x => !duplicates.some(d => d._id === x._id)));
+                    await processActualUpload(files, projectId);
+                } catch (err) {
+                    setUploading(false);
+                    showMessage('Error', 'Failed to remove existing file(s) for replacement.', 'error');
                 }
-                setExtractions(prev => prev.filter(x => !duplicates.some(d => d._id === x._id)));
-            } catch (err) {
-                setUploading(false);
-                setUploadError('Failed to remove existing file(s) for replacement.');
-                return;
-            }
+            });
+            return;
         } else {
             setUploading(true);
+            await processActualUpload(files, projectId);
         }
+    };
 
+    const processActualUpload = async (files: File[], projectId: string) => {
         setUploadError(''); setUploadSuccess('');
         try {
             await uploadRfiDrawing(projectId, files, undefined, selectedSequences);
@@ -193,11 +196,15 @@ export default function UserRfi() {
 
     const handleDelete = async (extractionId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!window.confirm('Delete this RFI extraction?')) return;
-        try {
-            await deleteRfiExtraction(selectedProject._id || selectedProject.id, extractionId);
-            setExtractions(prev => prev.filter(x => x._id !== extractionId));
-        } catch { alert('Failed to delete.'); }
+        showConfirm('Delete RFI', 'Are you sure you want to delete this RFI extraction? This action cannot be undone.', async () => {
+            try {
+                await deleteRfiExtraction(selectedProject._id || selectedProject.id, extractionId);
+                setExtractions(prev => prev.filter(x => x._id !== extractionId));
+                showMessage('Deleted', 'RFI extraction deleted successfully.', 'success');
+            } catch {
+                showMessage('Delete Failed', 'Failed to delete the extraction. Please try again.', 'error');
+            }
+        });
     };
 
     const handleSaveResponse = async (extractionId: string, rfiIndex: number, responseText: string, remarksText: string, clientRfiNo: string) => {
@@ -223,7 +230,7 @@ export default function UserRfi() {
             setSavedResponse(prev => ({ ...prev, [key]: true }));
             setTimeout(() => setSavedResponse(prev => ({ ...prev, [key]: false })), 2000);
         } catch (err: any) {
-            alert(`Failed to save response: ${err.message}`);
+            showMessage('Save Failed', `Failed to save response: ${err.message}`, 'error');
         } finally {
             setSavingResponse(prev => ({ ...prev, [key]: false }));
         }
@@ -250,7 +257,7 @@ export default function UserRfi() {
             setSavedResponse(prev => ({ ...prev, [key]: true }));
             setTimeout(() => setSavedResponse(prev => ({ ...prev, [key]: false })), 2000);
         } catch (err: any) {
-            alert(`Failed to upload attachment: ${err.message}`);
+            showMessage('Upload Failed', `Failed to upload attachment: ${err.message}`, 'error');
         } finally {
             setSavingResponse(prev => ({ ...prev, [key]: false }));
         }
@@ -525,11 +532,11 @@ export default function UserRfi() {
                                             <button
                                                 onClick={() => {
                                                     if (pendingFiles.length === 0) {
-                                                        alert('Please select at least one PDF file to upload.');
+                                                        showMessage('No Files Selected', 'Please select at least one PDF file to upload.', 'error');
                                                         return;
                                                     }
                                                     if (selectedProject.sequences && selectedProject.sequences.length > 0 && selectedSequences.length === 0) {
-                                                        alert('Sequence selection is required for RFI extraction. Please check at least one sequence.');
+                                                        showMessage('Sequence Required', 'Sequence selection is required for RFI extraction. Please check at least one sequence.', 'error');
                                                         return;
                                                     }
                                                     doUpload(pendingFiles);

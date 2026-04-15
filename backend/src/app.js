@@ -29,6 +29,7 @@ const extractionRoutes = require('./routes/extractionRoutes');
 const transmittalRoutes = require('./routes/transmittalRoutes');
 const rfiRoutes = require('./routes/rfiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
@@ -111,6 +112,7 @@ app.use('/api/extractions/:projectId', extractionRoutes);
 app.use('/api/transmittals/:projectId', transmittalRoutes);
 app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

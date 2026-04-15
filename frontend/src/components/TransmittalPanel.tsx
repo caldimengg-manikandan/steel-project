@@ -6,8 +6,10 @@ import {
     getTransmittalExcelUrl,
     getDrawingLogExcelUrl
 } from '../services/transmittalApi';
+import { useMessage } from '../context/MessageContext';
 
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
+    const { showMessage, showConfirm } = useMessage();
     const [transmittals, setTransmittals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
@@ -37,21 +39,27 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
             const preview = await previewTransmittal(projectId, undefined, targetTransmittalNumber);
 
             if (preview.newCount === 0 && preview.revisedCount === 0) {
-                alert('No new or revised completed extractions ready for a transmittal.');
+                showMessage('No Drawings to Transmit', 'No new or revised completed extractions ready for a transmittal.', 'info');
                 return;
             }
 
-            if (!confirm(`This will generate a new transmittal with ${preview.newCount} new and ${preview.revisedCount} revised drawings. Continue?`)) {
-                return;
-            }
-
-            const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
-            if (data.transmittal) {
-                alert(data.message);
-                fetchTransmittals();
-            } else {
-                alert(data.message || 'No new drawings to transmit.');
-            }
+            showConfirm('Generate Transmittal', `This will generate a new transmittal with ${preview.newCount} new and ${preview.revisedCount} revised drawings. Continue?`, async () => {
+                try {
+                    setGenerating(true);
+                    const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
+                    if (data.transmittal) {
+                        showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
+                        fetchTransmittals();
+                    } else {
+                        showMessage('Notice', data.message || 'No new drawings to transmit.', 'info');
+                    }
+                } catch (err: any) {
+                    setError(err.message || 'Failed to generate transmittal');
+                } finally {
+                    setGenerating(false);
+                }
+            });
+            return; // Return early because generation continues in callback
         } catch (err: any) {
             setError(err.message || 'Failed to generate transmittal');
         } finally {

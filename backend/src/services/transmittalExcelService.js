@@ -16,7 +16,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
 
-const LOGO_PATH = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
+const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
 const commonBorderStyle = {
     top: { style: 'thin' }, bottom: { style: 'thin' },
@@ -33,7 +33,7 @@ const commonBorderStyle = {
  * @param {object} projectDetails  — { projectName, clientName, transmittalNo }
  * @returns {Promise<{ buffer: Buffer, filename: string }>}
  */
-async function generateTransmittalExcel(transmittal, projectDetails) {
+async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Caldim Steel Detailing DMS';
     workbook.created = new Date();
@@ -48,8 +48,10 @@ async function generateTransmittalExcel(transmittal, projectDetails) {
 
     // ── Logo ────────────────────────────────────────────────
     try {
-        if (fs.existsSync(LOGO_PATH)) {
-            const imageId = workbook.addImage({ filename: LOGO_PATH, extension: 'png' });
+        const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        console.log('[TransmittalExcel] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
+        if (fs.existsSync(finalLogo)) {
+            const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
             trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 6 } });
         }
     } catch (err) { console.error('[TransmittalExcel] Logo error:', err.message); }
@@ -206,7 +208,7 @@ async function generateTransmittalExcel(transmittal, projectDetails) {
  * @param {object} projectDetails — { projectName, clientName }
  * @returns {Promise<{ buffer: Buffer, filename: string }>}
  */
-async function generateDrawingLogExcel(drawingLog, projectDetails) {
+async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Caldim Steel Detailing DMS';
     workbook.created = new Date();
@@ -218,8 +220,10 @@ async function generateDrawingLogExcel(drawingLog, projectDetails) {
 
     // ── Logo ────────────────────────────────────────────────
     try {
-        if (fs.existsSync(LOGO_PATH)) {
-            const imageId = workbook.addImage({ filename: LOGO_PATH, extension: 'png' });
+        const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        console.log('[DrawingLogExcel] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
+        if (fs.existsSync(finalLogo)) {
+            const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
             // Scale logo to top left, roughly spanning A and B columns
             logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
         }

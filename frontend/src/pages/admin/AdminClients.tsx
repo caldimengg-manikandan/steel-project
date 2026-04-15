@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { adminListClients, adminCreateClient, adminDeleteClient, adminUpdateClient, adminBulkCreateClients } from '../../services/adminClientApi';
+import { useMessage } from '../../context/MessageContext';
 import type { Client, ClientContact } from '../../types';
 import { 
     IconPlus, IconTrash, IconUsers, IconBuilding, IconSearch, 
@@ -7,6 +8,7 @@ import {
 } from '../../components/Icons';
 
 export default function AdminClients() {
+    const { showMessage, showConfirm } = useMessage();
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -93,9 +95,9 @@ export default function AdminClients() {
     };
 
     const handleSave = async () => {
-        if (!name.trim()) return alert('Client name is required');
+        if (!name.trim()) return showMessage('Validation Error', 'Client name is required', 'error');
         const validContacts = contacts.filter(c => c.name.trim() && c.email.trim());
-        if (validContacts.length === 0) return alert('At least one contact person with name and email is required');
+        if (validContacts.length === 0) return showMessage('Validation Error', 'At least one contact person with name and email is required', 'error');
 
         try {
             const payload = { name, contacts: validContacts, status };
@@ -106,19 +108,22 @@ export default function AdminClients() {
             }
             handleCloseModal();
             fetchClients();
+            showMessage('Success', `Client ${editingClient ? 'updated' : 'created'} successfully`, 'success');
         } catch (err: any) {
-            alert(err.message);
+            showMessage('Error', err.message, 'error');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this client? This will remove all associated contact information.')) return;
-        try {
-            await adminDeleteClient(id);
-            fetchClients();
-        } catch (err: any) {
-            alert(err.message);
-        }
+        showConfirm('Delete Client', 'Are you sure you want to delete this client? This will remove all associated contact information. This action cannot be undone.', async () => {
+            try {
+                await adminDeleteClient(id);
+                fetchClients();
+                showMessage('Deleted', 'Client has been removed successfully.', 'success');
+            } catch (err: any) {
+                showMessage('Delete Failed', err.message, 'error');
+            }
+        });
     };
 
     const filteredClients = clients.filter(c => {

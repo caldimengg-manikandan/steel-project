@@ -102,7 +102,30 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         const result = JSON.parse(match[0]);
         if (!result.success) throw new Error(result.error);
 
-        doc.rfis = result.rfis;
+        // ── Overwrite logic: Ensure unique RFI numbers per project ──
+        const extractedRfis = result.rfis || [];
+        const rfiNumbers = extractedRfis.map(r => r.rfiNumber).filter(Boolean);
+
+        if (rfiNumbers.length > 0) {
+            try {
+                // Remove these RFI numbers from ANY other extraction records for this project
+                await RfiExtraction.updateMany(
+                    {
+                        projectId: new mongoose.Types.ObjectId(doc.projectId),
+                        _id: { $ne: extractionId },
+                        'rfis.rfiNumber': { $in: rfiNumbers }
+                    },
+                    {
+                        $pull: { rfis: { rfiNumber: { $in: rfiNumbers } } }
+                    }
+                );
+                console.log(`[RfiService] Cleared duplicate RFIs (${rfiNumbers.join(', ')}) from previous records.`);
+            } catch (rfiDelErr) {
+                console.error('[RfiService] Overwrite cleanup failed:', rfiDelErr.message);
+            }
+        }
+
+        doc.rfis = extractedRfis;
         doc.status = 'completed';
         await doc.save();
 

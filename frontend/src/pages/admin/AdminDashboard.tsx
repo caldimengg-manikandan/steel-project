@@ -97,7 +97,8 @@ export default function AdminDashboard() {
 
                 {settings.moduleProjects && (() => {
                     const delayedTasks = stats.delayedTasks || [];
-                    
+                    if (delayedTasks.length === 0) return null;
+
                     // Get unique projects that are delayed
                     const uniqueDelayedProjects = Array.from(new Map(
                         delayedTasks
@@ -109,39 +110,40 @@ export default function AdminDashboard() {
                             })
                     ).values());
 
-                    if (uniqueDelayedProjects.length === 0) return null;
-
                     return (
-                        <div className="topbar-alerts">
-                            <div 
-                                className="topbar-alert-badge" 
-                                onClick={() => setShowDelayedList(!showDelayedList)}
-                                style={{ background: 'var(--color-danger-glow)', color: 'var(--color-danger)' }}
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14">
+                        <div 
+                            className={`stat-card accent-red pr ${showDelayedList ? 'active' : ''}`}
+                            onClick={() => setShowDelayedList(!showDelayedList)}
+                            style={{ cursor: 'pointer', borderColor: 'var(--color-danger-mid)', background: showDelayedList ? 'var(--color-danger-glow)' : '' }}
+                        >
+                            <div className="stat-card-label" style={{ color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
                                     <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                                    <line x1="12" y1="9" x2="12" y2="13" />
-                                    <line x1="12" y1="17" x2="12.01" y2="17" />
                                 </svg>
-                                <span>{delayedTasks.length} Delayed</span>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12" style={{ transform: showDelayedList ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                                DELAYED TASKS
+                            </div>
+                            <div className="stat-card-value text-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                {delayedTasks.length}
+                                <svg 
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="18" height="18" 
+                                    style={{ transform: showDelayedList ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s' }}
+                                >
                                     <polyline points="6 9 12 15 18 9" />
                                 </svg>
                             </div>
+                            <div className="stat-card-meta">Overdue sequences requiring attention</div>
 
                             {showDelayedList && (
-                                <div className="topbar-dropdown" style={{ right: 0, width: 280 }}>
+                                <div className="delayed-dropdown-list" style={{ width: '100%', left: 0, marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
                                     <div className="dropdown-header">Overdue Sequence & Tasks</div>
-                                    <div className="dropdown-list">
+                                    <div className="dropdown-list" style={{ maxHeight: 300, overflowY: 'auto' }}>
                                         {(uniqueDelayedProjects as any[]).map((p: any) => {
                                             const projectTasks = delayedTasks.filter((t: any) => String(t.projId) === String(p.id || p._id));
                                             return (
                                                 <div key={p.id || p._id} className="dropdown-section">
                                                     <div className="dropdown-section-title">
                                                         <span className="item-name">{p.name}</span>
-                                                        <span className="item-count">
-                                                            {projectTasks.length} tasks
-                                                        </span>
+                                                        <span className="item-count">{projectTasks.length}</span>
                                                     </div>
                                                     <div className="dropdown-items">
                                                         {projectTasks.map((t: any, idx: number) => (
@@ -150,7 +152,7 @@ export default function AdminDashboard() {
                                                                 className="dropdown-item"
                                                                 onClick={() => navigate(`/admin/projects/${String(t.projId)}`)}
                                                             >
-                                                                <span className="item-dot" style={{ background: 'var(--color-danger)' }}></span>
+                                                                <span className="item-dot"></span>
                                                                 <span className="item-name">{t.seqName}</span>
                                                                 <span className="item-date">{new Date(t.deadline).toLocaleDateString()}</span>
                                                             </div>
@@ -159,6 +161,13 @@ export default function AdminDashboard() {
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                    <div className="dropdown-footer" onClick={() => {
+                                        const el = document.getElementById('delayed-tasks-module');
+                                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                        setShowDelayedList(false);
+                                    }}>
+                                        View Detailed Report →
                                     </div>
                                 </div>
                             )}

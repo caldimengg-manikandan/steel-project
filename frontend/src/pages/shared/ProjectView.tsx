@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getProjectById, updateProjectSequences } from '../../services/projectApi';
+import { useMessage } from '../../context/MessageContext';
 import type { Project, ProjectPermission } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
@@ -14,6 +15,7 @@ export default function ProjectView() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { showMessage } = useMessage();
     const isAdmin = user?.role === 'admin';
 
     // DEBUG (Step 5): Log ID for troubleshooting
@@ -130,7 +132,7 @@ export default function ProjectView() {
 
         // Sequence Validation
         if (project.sequences && project.sequences.length > 0 && selectedSequences.length === 0) {
-            alert('Please select at least one Sequence before uploading.');
+            showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
             return;
         }
 
@@ -142,7 +144,7 @@ export default function ProjectView() {
                 numToUse = res.transmittalNumber;
             }
             const res = await uploadDrawing(pId, filesToUpload, localSavePath, numToUse, selectedSequences);
-            alert(res.message);
+            showMessage('Success', res.message, 'success');
             setUploadModal(false);
             setDupModal(false);
             setDupList([]);
@@ -151,7 +153,7 @@ export default function ProjectView() {
             fetchData();
             setActiveTab('extraction');
         } catch (err: any) {
-            alert(`Upload failed: ${err.message}`);
+            showMessage('Upload Failed', err.message, 'error');
         } finally {
             setUploading(false);
         }
@@ -606,7 +608,7 @@ export default function ProjectView() {
                                         const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
                                             if (!id) return;
                                             if (!canEditSequences) {
-                                                alert('Permission denied: Only editors or admins can update sequences.');
+                                                showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
                                                 return;
                                             }
                                             try {
@@ -615,7 +617,7 @@ export default function ProjectView() {
                                                 await updateProjectSequences(id, newSeqs);
                                                 await fetchData();
                                             } catch (err: any) {
-                                                alert(`Failed to update sequence: ${err.message}`);
+                                                showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
                                             }
                                         };
                                         return (

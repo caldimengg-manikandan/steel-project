@@ -7,6 +7,16 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/steel/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/steel\/api/, '/api'),
+      },
+      '/steel/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/steel\/uploads/, '/uploads'),
+      },
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
