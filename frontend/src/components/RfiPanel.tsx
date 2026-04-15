@@ -48,7 +48,33 @@ export default function RfiExtractionPanel({
 
         try {
             const data = await listRfiExtractions(projectId);
-            setExtractions(data.extractions || []);
+            
+            setExtractions((prev) => {
+                // 1. Create a map of server items by their ID
+                const serverMap = new Map();
+                data.extractions.forEach((e: any) => serverMap.set(e._id, e));
+
+                // 2. Identify which optimistic entries are still truly unknown to the server
+                const pendingOptimistic = prev.filter(e => {
+                    if (!e._id || !String(e._id).startsWith('opt_')) return false;
+
+                    // Match by filename within this project.
+                    const matchedServerRecord = data.extractions.find((s: any) =>
+                        s.originalFileName === e.originalFileName
+                    );
+
+                    // Failsafe: older than 45 seconds
+                    const ageMs = Date.now() - new Date(e.createdAt).getTime();
+                    const isStale = ageMs > 45 * 1000;
+
+                    return !matchedServerRecord && !isStale;
+                });
+
+                // 3. Combine server items + actually pending optimistic ones
+                // Prioritize server records; sort by createdAt descending
+                const combined = [...data.extractions, ...pendingOptimistic];
+                return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            });
         } catch (err) {
             console.error('[RfiPanel] Fetch failed:', err);
         } finally {
@@ -102,17 +128,52 @@ export default function RfiExtractionPanel({
         setUploadError('');
         setUploading(true);
 
+        // Optimistic UI — add queued entries immediately
+        const optimisticEntries = fileArray.map(file => ({
+            _id: `opt_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+            projectId,
+            originalFileName: file.name,
+            uploadedBy: user?.username || 'You',
+            status: 'queued',
+            rfis: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }));
+        setExtractions(prev => [...optimisticEntries, ...prev]);
+
         try {
-            await uploadRfiDrawing(projectId, fileArray, localSavePath, selectedSequences);
+            // Upload in parallel batches of 5 (RFIs involve more AI processing, better to keep batches smaller than drawings)
+            const CHUNK_SIZE = 5;
+            const CONCURRENCY = 2;
+
+            const chunks: File[][] = [];
+            for (let i = 0; i < fileArray.length; i += CHUNK_SIZE) {
+                chunks.push(fileArray.slice(i, i + CHUNK_SIZE));
+            }
+
+            const executing = new Set<Promise<any>>();
+            for (const chunk of chunks) {
+                const p = uploadRfiDrawing(projectId, chunk, localSavePath, selectedSequences)
+                    .then(() => fetchExtractions(true));
+                executing.add(p);
+                p.finally(() => executing.delete(p));
+
+                if (executing.size >= CONCURRENCY) {
+                    await Promise.race(executing);
+                }
+            }
+            await Promise.all(executing);
+
             setPendingFiles([]);
             setLocalSavePath('');
             setSelectedSequences([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
-            fetchExtractions();
+            fetchExtractions(true);
         } catch (err: any) {
             setUploadError(err.response?.data?.error || err.message || 'Upload failed');
         } finally {
             setUploading(false);
+            fetchExtractions(true);
         }
     };
 

@@ -112,14 +112,35 @@ export default function AdminRfi() {
         })();
     }, [location.state]);
 
-    const loadExtractions = useCallback(async () => {
+    const loadExtractions = useCallback(async (isBg = false) => {
         if (!selectedProject) return;
-        setLoadingExtractions(true);
+        if (!isBg) setLoadingExtractions(true);
         try {
             const data = await listRfiExtractions(String(selectedProject._id || selectedProject.id));
-            setExtractions(data.extractions || []);
+            
+            setExtractions((prev) => {
+                // 1. Identify which optimistic entries are still truly unknown to the server
+                const pendingOptimistic = prev.filter(e => {
+                    if (!e._id || !String(e._id).startsWith('opt_')) return false;
+
+                    // Match by filename within this project.
+                    const matchedServerRecord = data.extractions.find((s: any) =>
+                        String(s.originalFileName) === String(e.originalFileName)
+                    );
+
+                    // Failsafe: older than 45 seconds
+                    const ageMs = Date.now() - new Date(e.createdAt).getTime();
+                    const isStale = ageMs > 45 * 1000;
+
+                    return !matchedServerRecord && !isStale;
+                });
+
+                // 2. Combine server items + actually pending optimistic ones
+                const combined = [...data.extractions, ...pendingOptimistic];
+                return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            });
         } catch { }
-        finally { setLoadingExtractions(false); }
+        finally { if (!isBg) setLoadingExtractions(false); }
     }, [selectedProject]);
 
     useEffect(() => { loadExtractions(); }, [loadExtractions]);
@@ -128,7 +149,7 @@ export default function AdminRfi() {
     useEffect(() => {
         const hasActive = extractions.some(e => e.status === 'queued' || e.status === 'processing') || uploading;
         if (!hasActive) return;
-        const t = setInterval(loadExtractions, 2500);
+        const t = setInterval(() => loadExtractions(true), 2500);
         return () => clearInterval(t);
     }, [extractions, uploading, loadExtractions]);
 
@@ -189,16 +210,54 @@ export default function AdminRfi() {
 
     const processActualUpload = async (files: File[], projectId: string) => {
         setUploadError(''); setUploadSuccess('');
+        
+        // Optimistic UI — add entries immediately
+        const optimisticEntries = files.map(file => ({
+            _id: `opt_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+            projectId,
+            originalFileName: file.name,
+            uploadedBy: user?.username || 'You',
+            status: 'queued',
+            rfis: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }));
+        setExtractions(prev => [...optimisticEntries, ...prev]);
+
         try {
-            await uploadRfiDrawing(projectId, files, undefined, selectedSequences);
+            const CHUNK_SIZE = 5;
+            const CONCURRENCY = 2;
+
+            const fileArray = Array.from(files);
+            const chunks: File[][] = [];
+            for (let i = 0; i < fileArray.length; i += CHUNK_SIZE) {
+                chunks.push(fileArray.slice(i, i + CHUNK_SIZE));
+            }
+
+            const executing = new Set<Promise<any>>();
+            for (const chunk of chunks) {
+                const p = uploadRfiDrawing(projectId, chunk, undefined, selectedSequences)
+                    .then(() => loadExtractions(true));
+                executing.add(p);
+                p.finally(() => executing.delete(p));
+
+                if (executing.size >= CONCURRENCY) {
+                    await Promise.race(executing);
+                }
+            }
+            await Promise.all(executing);
+
             setPendingFiles([]);
             setSelectedSequences([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             setUploadSuccess(`${files.length} file(s) queued for extraction.`);
-            loadExtractions();
+            loadExtractions(true);
         } catch (err: any) {
             setUploadError(err.message || 'Upload failed');
-        } finally { setUploading(false); }
+        } finally { 
+            setUploading(false);
+            loadExtractions(true);
+        }
     };
 
     const handleDelete = async (extractionId: string, e: React.MouseEvent) => {

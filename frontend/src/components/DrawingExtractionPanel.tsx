@@ -233,7 +233,6 @@ export default function DrawingExtractionPanel({
     const [uploading, setUploading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [uploadError, setUploadError] = useState('');
-    const [expanded, setExpanded] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null); // New error state
     // Duplicate detection state
     const [dupCheckLoading, setDupCheckLoading] = useState(false);
@@ -250,7 +249,7 @@ export default function DrawingExtractionPanel({
     const [loadingTransmittals, setLoadingTransmittals] = useState(false);
     // null = Create New (auto-assign); number = append to that existing transmittal
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
-    // For year <= 2025: user-entered manual transmittal number for new transmittals
+    // For year < 2026: user-entered manual transmittal number for new transmittals
     const [manualTransmittalNumber, setManualTransmittalNumber] = useState<string>('');
     // Files waiting for the user to pick a transmittal
     const [pendingTransmittalFiles, setPendingTransmittalFiles] = useState<File[]>([]);
@@ -371,7 +370,7 @@ export default function DrawingExtractionPanel({
 
         // Default: Create New
         setSelectedTransmittalNumber(null);
-        // For year <= 2025 projects, pre-fill the manual number with startingTransmittalNumber
+        // For year < 2026 projects, pre-fill the manual number with startingTransmittalNumber
         setManualTransmittalNumber(startingTransmittalNumber ? String(startingTransmittalNumber) : '');
         setPendingTransmittalFiles(fileArray);
         setTransmittalModal(true);
@@ -458,7 +457,7 @@ export default function DrawingExtractionPanel({
         // If we are creating a new transmittal:
         if (transmittalNumberToUse === null) {
             // For year <= 2025 projects: use the manually entered number
-            const isOldProject = projectYear && projectYear <= 2026;
+            const isOldProject = projectYear && projectYear < 2026;
             if (isOldProject && manualTransmittalNumber && Number(manualTransmittalNumber) >= 1) {
                 transmittalNumberToUse = Number(manualTransmittalNumber);
                 console.log(`[Upload] Using manually entered transmittal #${transmittalNumberToUse} for ${projectYear} project.`);
@@ -921,8 +920,6 @@ export default function DrawingExtractionPanel({
                         <ExtractionCard
                             key={ex._id}
                             extraction={ex}
-                            isExpanded={expanded === ex._id}
-                            onToggle={() => setExpanded(expanded === ex._id ? null : ex._id)}
                             onReprocess={() => handleReprocess(ex)}
                             onDelete={() => handleDelete(ex)}
                             canUpload={canUpload}
@@ -1016,7 +1013,7 @@ export default function DrawingExtractionPanel({
                                                 Create New Transmittal
                                             </div>
                                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                                                {projectYear && projectYear <= 2026
+                                                {projectYear && projectYear < 2026
                                                     ? `Enter the transmittal number for this ${projectYear} project`
                                                     : 'Auto-assigns the next transmittal number'}
                                             </div>
@@ -1026,8 +1023,8 @@ export default function DrawingExtractionPanel({
                                         )}
                                     </div>
 
-                                    {/* Year <= 2026: show manual transmittal number input */}
-                                    {selectedTransmittalNumber === null && projectYear && projectYear <= 2026 && (
+                                    {/* Year < 2026: show manual transmittal number input */}
+                                    {selectedTransmittalNumber === null && projectYear && projectYear < 2026 && (
                                         <div style={{ marginTop: 12, width: '100%', paddingLeft: 28 }} onClick={(e) => e.stopPropagation()}>
                                             <label style={{ fontSize: 12, fontWeight: 700, color: '#065f46', display: 'block', marginBottom: 6 }}>
                                                 Transmittal Number <span style={{ color: '#dc2626' }}>*</span>
@@ -1090,8 +1087,8 @@ export default function DrawingExtractionPanel({
                                             showMessage('Sequence Required', 'Please select at least one Sequence (e.g., SEQ 01) before continuing with the upload.', 'error');
                                             return;
                                         }
-                                        // Validate manual transmittal number for old projects
-                                        if (selectedTransmittalNumber === null && projectYear && projectYear <= 2026) {
+                                        // Validate manual transmittal number for older projects
+                                        if (selectedTransmittalNumber === null && projectYear && projectYear < 2026) {
                                             if (!manualTransmittalNumber || Number(manualTransmittalNumber) < 1) {
                                                 showMessage('Transmittal Required', 'Please provide a valid Transmittal Number for this project.', 'error');
                                                 return;
@@ -1120,14 +1117,12 @@ export default function DrawingExtractionPanel({
 // ── Extraction Card ───────────────────────────────────────
 interface CardProps {
     extraction: DrawingExtraction;
-    isExpanded: boolean;
-    onToggle: () => void;
     onReprocess: () => void;
     onDelete: () => void;
     canUpload: boolean;
 }
 
-function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onDelete, canUpload }: CardProps) {
+function ExtractionCard({ extraction: ex, onReprocess, onDelete, canUpload }: CardProps) {
     const f = ex.extractedFields;
     const v = ex.validationResult;
     const ok = ex.status === 'completed';
@@ -1161,13 +1156,12 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
         }}>
             {/* Card header */}
             <div
-                onClick={ok ? onToggle : undefined}
                 style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '11px 14px',
-                    cursor: ok ? 'pointer' : 'default',
+                    cursor: 'default',
                     background: ok ? (isOnlyFab ? '#f8fafc' : 'white') : ex.status === 'failed' ? '#fef2f2' : '#eff6ff',
-                    borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
+                    borderBottom: 'none',
                 }}
             >
                 {/* PDF icon */}
@@ -1229,130 +1223,11 @@ function ExtractionCard({ extraction: ex, isExpanded, onToggle, onReprocess, onD
                             <TrashIcon />
                         </button>
                     )}
-                    {ok && (
-                        <svg
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            strokeWidth="2" width="14" height="14"
-                            style={{
-                                color: '#94a3b8', flexShrink: 0,
-                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)',
-                                transition: 'transform 0.2s',
-                            }}
-                        >
-                            <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                    )}
+
                 </div>
             </div>
 
-            {/* Expanded details */}
-            {isExpanded && ok && (
-                <div style={{ padding: '14px 16px' }}>
-                    {/* Validation warnings */}
-                    {v.warnings && v.warnings.length > 0 && (
-                        <div style={{
-                            marginBottom: 12, padding: '8px 12px',
-                            background: '#fffbeb', border: '1px solid #fcd34d',
-                            borderRadius: 6, fontSize: 12, color: '#92400e',
-                        }}>
-                            <strong>⚠ Validation Warnings:</strong>
-                            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                                {v.warnings.map((w, i) => <li key={i}>{w}</li>)}
-                            </ul>
-                        </div>
-                    )}
 
-                    {/* Extracted fields grid */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                        gap: 10, marginBottom: 14,
-                    }}>
-                        {[
-                            { label: 'Drawing No.', value: f.drawingNumber, valid: v.drawingNumberValid },
-                            { label: 'Drawing Title', value: f.drawingTitle, valid: null },
-                            { label: 'Description', value: f.description, valid: null },
-                            { label: 'DWG Desc.', value: f.drawingDescription, valid: null },
-                            { label: 'Revision', value: f.revision, valid: v.revisionValid },
-                            { label: 'Date', value: f.date, valid: v.dateValid },
-                            { label: 'Scale', value: f.scale, valid: null },
-                            { label: 'Project Name', value: f.projectName, valid: null },
-                            { label: 'Client Name', value: f.clientName, valid: null },
-                        ].map(({ label, value, valid }) => (
-                            <div key={label} style={{
-                                background: '#f8fafc', borderRadius: 6,
-                                padding: '8px 10px',
-                                border: '1px solid #f1f5f9',
-                            }}>
-                                <div style={{
-                                    display: 'flex', alignItems: 'center',
-                                    justifyContent: 'space-between', marginBottom: 3,
-                                }}>
-                                    <span style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                        {label}
-                                    </span>
-                                    <ValidDot valid={valid} />
-                                </div>
-                                <div style={{
-                                    fontSize: 13, fontWeight: 600,
-                                    color: value ? 'var(--color-text-primary)' : '#cbd5e1',
-                                    fontFamily: label === 'Drawing No.' ? 'monospace' : undefined,
-                                }}>
-                                    {value || '—'}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Revision history table */}
-                    {f.revisionHistory && f.revisionHistory.length > 0 && (
-                        <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Revision History
-                            </div>
-                            <div className="table-wrapper" style={{ marginBottom: 0 }}>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Mark</th>
-                                            <th>Date</th>
-                                            <th>Remarks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(f.revisionHistory || [])
-                                            .filter((r: any) => {
-                                                const mark = (r.mark || '').trim().toUpperCase();
-                                                const remarks = (r.remarks || '').toLowerCase();
-                                                // Only show Revision 0 if it has fabrication remarks
-                                                if (mark === '0' && !remarks.includes('fabrication')) return false;
-                                                return true;
-                                            })
-                                            .map((r: any, i: number) => (
-                                                <tr key={i}>
-                                                    <td><span className="role-chip viewer" style={{ fontFamily: 'monospace' }}>{r.mark}</span></td>
-                                                    <td className="text-muted">{r.date}</td>
-                                                    <td>{r.remarks}</td>
-                                                </tr>
-                                            ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Footer meta */}
-                    <div style={{
-                        display: 'flex', gap: 16, marginTop: 12,
-                        fontSize: 11, color: '#94a3b8', flexWrap: 'wrap',
-                    }}>
-                        <span>Uploaded by <strong>{ex.uploadedBy}</strong></span>
-                        <span>Processed in <strong>{(ex.processingTimeMs / 1000).toFixed(1)}s</strong></span>
-                        <span>Uploaded <strong>{new Date(ex.createdAt).toLocaleDateString()}</strong></span>
-                        <span>File size <strong>{(ex.fileSize / 1024).toFixed(0)} KB</strong></span>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

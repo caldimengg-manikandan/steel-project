@@ -4,7 +4,7 @@ import { useMessage } from '../../context/MessageContext';
 import type { Client, ClientContact } from '../../types';
 import { 
     IconPlus, IconTrash, IconUsers, IconBuilding, IconSearch, 
-    IconEdit, IconFilter, IconClose, IconOpen, IconUpload
+    IconEdit, IconFilter, IconClose, IconUpload
 } from '../../components/Icons';
 
 export default function AdminClients() {
@@ -229,9 +229,6 @@ export default function AdminClients() {
                         </div>
 
                         <div className="client-card-footer">
-                            <button className="btn btn-ghost btn-sm" title="View Details">
-                                <IconOpen />
-                            </button>
                             <button className="btn btn-secondary btn-sm" onClick={() => handleOpenModal(client)}>
                                 <IconEdit /> Edit
                             </button>

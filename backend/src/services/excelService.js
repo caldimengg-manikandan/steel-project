@@ -840,19 +840,19 @@ async function generateProjectStatusExcel(projectsData) {
 
         const dataRow = sheet.addRow({
             cdeNo: '', // Placeholder
-            branch: '', // Placeholder
-            fabricator: '', // Placeholder
+            branch: proj.location || '', 
+            fabricator: proj.clientName || '',
             division: '', // Placeholder
-            fab: '', // Was fabricationPercentage
+            fab: `${fabricationPercentage}%`,
             projectName: proj.name || '',
-            clientContact: proj.clientName || '',
+            clientContact: proj.contactPerson?.name || '',
             pm: '', // Placeholder
             approvalStatus: `${approvalPercentage}%`,
             rfiStatus: `Open: ${proj.openRfiCount || 0}, Closed: ${proj.closedRfiCount || 0}`,
             fabStatus: STATUS_LABEL[proj.status] || proj.status || '',
-            approvedCo: '',
-            pendingCo: '',
-            declinedCo: '',
+            approvedCo: proj.approvedCO || 0,
+            pendingCo: proj.pendingCO || 0,
+            declinedCo: 0,
         });
         dataRow.height = 25; // Increased height to fit wrapped text if any
         dataRow.eachCell((cell, colNum) => {

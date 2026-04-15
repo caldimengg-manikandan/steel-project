@@ -1011,20 +1011,21 @@ export default function ProjectView() {
                             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 16 }}>
                                 Selecting <strong>Continue</strong> will skip the duplicate drawing(s) and only upload new or updated revisions.
                             </p>
-                            <div className="form-actions">
+                            <div className="form-actions" style={{ flexDirection: 'row-reverse' }}>
+                                <button
+                                    autoFocus
+                                    className="btn btn-primary"
+                                    disabled={uploading}
+                                    onClick={() => doUpload(pendingFiles)}
+                                >
+                                    {uploading ? 'Uploading...' : 'Continue'}
+                                </button>
                                 <button
                                     className="btn btn-secondary"
                                     disabled={uploading}
                                     onClick={() => { setDupModal(false); setDupList([]); setPendingFiles([]); }}
                                 >
                                     Cancel Upload
-                                </button>
-                                <button
-                                    className="btn btn-primary"
-                                    disabled={uploading}
-                                    onClick={() => doUpload(pendingFiles)}
-                                >
-                                    {uploading ? 'Uploading...' : 'Continue'}
                                 </button>
                             </div>
                         </div>

@@ -52,7 +52,23 @@ export function MessageProvider({ children }: { children: ReactNode }) {
         <MessageContext.Provider value={{ showMessage, showConfirm, hideMessage }}>
             {children}
             {msg.show && (
-                <div className="modal-overlay" style={{ zIndex: 99999 }} onClick={hideMessage}>
+                <div 
+                    className="modal-overlay" 
+                    style={{ zIndex: 99999 }} 
+                    onClick={hideMessage}
+                    tabIndex={-1}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            hideMessage();
+                        }
+                        // Enter is naturally handled by the focused button's onClick.
+                        // We only catch it here if for some reason the button isn't focused.
+                        if (e.key === 'Enter' && e.target === e.currentTarget) {
+                            if (msg.isConfirm) handleConfirm();
+                            else hideMessage();
+                        }
+                    }}
+                >
                     <div className="modal" style={{ maxWidth: 400, textAlign: 'center', padding: '32px 24px' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{
                             width: 60, height: 60, borderRadius: '50%',
@@ -75,9 +91,17 @@ export function MessageProvider({ children }: { children: ReactNode }) {
                             {msg.body}
                         </p>
                         
-                        <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
                             {msg.isConfirm ? (
                                 <>
+                                    <button
+                                        autoFocus
+                                        className="btn btn-primary"
+                                        style={{ flex: 1, justifyContent: 'center', padding: '10px', background: msg.type === 'error' ? '#dc2626' : '' }}
+                                        onClick={handleConfirm}
+                                    >
+                                        Confirm
+                                    </button>
                                     <button
                                         className="btn btn-secondary"
                                         style={{ flex: 1, justifyContent: 'center', padding: '10px' }}
@@ -85,16 +109,10 @@ export function MessageProvider({ children }: { children: ReactNode }) {
                                     >
                                         Cancel
                                     </button>
-                                    <button
-                                        className="btn btn-primary"
-                                        style={{ flex: 1, justifyContent: 'center', padding: '10px', background: msg.type === 'error' ? '#dc2626' : '' }}
-                                        onClick={handleConfirm}
-                                    >
-                                        Confirm
-                                    </button>
                                 </>
                             ) : (
                                 <button
+                                    autoFocus
                                     className="btn btn-primary"
                                     style={{ width: '100%', justifyContent: 'center', padding: '10px' }}
                                     onClick={hideMessage}
