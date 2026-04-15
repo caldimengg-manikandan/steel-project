@@ -200,16 +200,7 @@ function ConfidenceMeter({ value }: { value: number }) {
 }
 */
 
-// ── Validation dot ────────────────────────────────────────
-function ValidDot({ valid }: { valid: boolean | null }) {
-    if (valid === null) return <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>;
-    return (
-        <span style={{
-            display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-            background: valid ? '#16a34a' : '#dc2626',
-        }} title={valid ? 'Valid' : 'Warning'} />
-    );
-}
+
 
 // ── Main component ────────────────────────────────────────
 interface DrawingExtractionPanelProps {
@@ -1124,7 +1115,6 @@ interface CardProps {
 
 function ExtractionCard({ extraction: ex, onReprocess, onDelete, canUpload }: CardProps) {
     const f = ex.extractedFields;
-    const v = ex.validationResult;
     const ok = ex.status === 'completed';
 
     // Highlight in grey if "Only Fabrication" (no approval revisions)
