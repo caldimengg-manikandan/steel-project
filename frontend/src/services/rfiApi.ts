@@ -34,8 +34,15 @@ export const uploadRfiDrawing = async (projectId: string, files: File[], localSa
         body: formData,
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Upload failed');
+        const text = await res.text().catch(() => '');
+        let errDetails = 'Upload failed';
+        try {
+            const parsed = JSON.parse(text);
+            errDetails = parsed.error || parsed.message || `Error ${res.status}`;
+        } catch (e) {
+            errDetails = `HTTP ${res.status}: ${res.statusText || 'Server Error'}`;
+        }
+        throw new Error(errDetails);
     }
     return res.json();
 };

@@ -41,9 +41,11 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         await doc.save();
 
         // ── GridFS/OneDrive Check ────────────────────────────
+        const os = require('os');
+        const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
+
         if (mongoose.Types.ObjectId.isValid(fileRef)) {
             // Likely GridFS (24 hex)
-            const tempDir = path.join(__dirname, '../../uploads/temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             
             const tempFileName = `temp_rfi_gridfs_${extractionId}_${Date.now()}.pdf`;
@@ -54,7 +56,6 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
             isTemp = true;
         } else if (typeof fileRef === 'string' && fileRef.length > 20) {
             // Likely OneDrive ID
-            const tempDir = path.join(__dirname, '../../uploads/temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             
             const tempFileName = `temp_rfi_onedrive_${extractionId}_${Date.now()}.pdf`;

@@ -24,7 +24,9 @@ const storage = {
     _handleFile: async function (req, file, cb) {
         try {
             // STEP 1: Always save to local "Bridge" folder first for speed
-            const tempDir = path.join(__dirname, '../../uploads/temp');
+            // Use os.tmpdir() for hosted environments where project folders are read-only
+            const os = require('os');
+            const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
             const uniqueFilename = `${crypto.randomUUID()}${path.extname(file.originalname)}`;

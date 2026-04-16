@@ -63,8 +63,8 @@ router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), u
 // Stream PDF for viewing
 router.get('/:id/view', viewRfiPdf);
 
-// Delete single Extraction (admin only)
-router.delete('/:id', requirePermission('admin'), deleteRfiExtraction);
+// Delete single Extraction (editor + admin)
+router.delete('/:id', requirePermission('editor'), deleteRfiExtraction);
 
 
 module.exports = router;

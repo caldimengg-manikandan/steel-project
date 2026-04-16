@@ -189,7 +189,7 @@ async function scopeProjectAccess(req, res, next) {
         return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
     }
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'pm', 'tl'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
     let project;
