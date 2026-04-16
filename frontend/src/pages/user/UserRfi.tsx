@@ -232,7 +232,6 @@ export default function UserRfi() {
             setPendingFiles([]);
             setSelectedSequences([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
-            setUploadSuccess(`${files.length} file(s) queued for extraction.`);
             loadExtractions(true);
         } catch (err: any) {
             setUploadError(err.message || 'Upload failed');
@@ -571,7 +570,6 @@ export default function UserRfi() {
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                                             {uploadError && <span style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>⚠ {uploadError}</span>}
-                                            {uploadSuccess && <span style={{ fontSize: 12, color: '#059669', flex: 1 }}>✓ {uploadSuccess}</span>}
                                             {!uploadError && !uploadSuccess && <span style={{ flex: 1 }} />}
                                             <button
                                                 onClick={() => {

@@ -250,7 +250,6 @@ export default function AdminRfi() {
             setPendingFiles([]);
             setSelectedSequences([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
-            setUploadSuccess(`${files.length} file(s) queued for extraction.`);
             loadExtractions(true);
         } catch (err: any) {
             setUploadError(err.message || 'Upload failed');
@@ -607,11 +606,6 @@ export default function AdminRfi() {
                                         {uploadError && (
                                             <span style={{ fontSize: 12, color: '#dc2626', flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                                                 ⚠ {uploadError}
-                                            </span>
-                                        )}
-                                        {uploadSuccess && (
-                                            <span style={{ fontSize: 12, color: '#059669', flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                ✓ {uploadSuccess}
                                             </span>
                                         )}
                                         {!uploadError && !uploadSuccess && <span style={{ flex: 1 }} />}
