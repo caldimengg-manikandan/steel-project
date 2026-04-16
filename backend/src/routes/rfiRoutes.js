@@ -25,7 +25,8 @@ const upload = multer({
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF allowed'), false);
-    }
+    },
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 });
 
 const uploadResponse = multer({
@@ -34,7 +35,8 @@ const uploadResponse = multer({
         const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
         if (allowed.includes(file.mimetype)) cb(null, true);
         else cb(new Error('File type not allowed'), false);
-    }
+    },
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 });
 
 // All routes here are scoped under /api/rfis/:projectId

@@ -32,7 +32,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
 });
 
 // ── Apply unified scope to all extraction routes ──────────
