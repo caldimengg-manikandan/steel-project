@@ -44,10 +44,10 @@ export default function LoginPage() {
             {/* Header area */}
             <div className="login-logo-area">
                 <div className="login-logo">
-                    <img src={logo} alt="Steel DWF" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={logo} alt="CALDIM steel dwf" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
                 <h1 className="login-system-name" style={{ textTransform: 'capitalize' }}>
-                    Steel DWF
+                    CALDIM steel dwf
                 </h1>
                 <p className="login-subtitle">Project &amp; Drawing Control Portal</p>
             </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 </form>
             </div>
 
-            <div className="login-footer">© 2026 Steel DWF. All rights reserved.</div>
+            <div className="login-footer">© 2026 CALDIM steel dwf. All rights reserved.</div>
         </div>
     );
 }
