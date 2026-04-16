@@ -86,8 +86,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 </div>
                 {!collapsed && (
                     <div className="sidebar-brand">
-                        <span className="sidebar-brand-name">CALDIM</span>
-                        <span className="sidebar-brand-sub">steel dwf</span>
+                        <span className="sidebar-brand-name">Steel</span>
+                        <span className="sidebar-brand-sub">DWF</span>
                     </div>
                 )}
             </div>
