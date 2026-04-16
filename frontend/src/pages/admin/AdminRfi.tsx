@@ -600,11 +600,7 @@ export default function AdminRfi() {
                                         </div>
                                     )}
                                     
-                                    {selectedProject.sequences && selectedProject.sequences.length > 0 && selectedSequences.length === 0 && (
-                                        <div style={{ fontSize: 12, color: '#dc2626', marginTop: 12, fontWeight: 700, textAlign: 'right' }}>
-                                            * Sequence selection is required to upload RFIs
-                                        </div>
-                                    )}
+
 
                                     {/* Action row */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>

@@ -82,12 +82,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {/* Brand */}
             <div className="sidebar-header">
                 <div className="sidebar-logo">
-                    <img src={logoImg} alt="Caldim Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                    <img src={logoImg} alt="CALDIM Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
                 </div>
                 {!collapsed && (
                     <div className="sidebar-brand">
-                        <span className="sidebar-brand-name">Caldim</span>
-                        <span className="sidebar-brand-sub">Steel Detailing</span>
+                        <span className="sidebar-brand-name">CALDIM</span>
+                        <span className="sidebar-brand-sub">steel dwf</span>
                     </div>
                 )}
             </div>

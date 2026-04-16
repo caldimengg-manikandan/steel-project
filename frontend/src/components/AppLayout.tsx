@@ -19,6 +19,8 @@ const PAGE_TITLES: Record<string, string> = {
     '/dashboard': 'My Dashboard',
     '/dashboard/projects': 'My Projects',
     '/dashboard/rfi': 'My RFIs',
+    '/admin/clients': 'Client Management',
+    '/admin/rfi': 'RFI Management',
     '/dashboard/settings': 'Account Settings',
     '/dashboard/notifications': 'Notifications Hub',
 };
@@ -313,7 +315,7 @@ export default function AppLayout() {
 
     const pageTitle =
         PAGE_TITLES[pathname] ??
-        (pathname.includes('/projects/') ? 'Project View' : 'Steel Detailing DMS');
+        (pathname.includes('/projects/') ? 'Project View' : 'CALDIM steel dwf');
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
     const isAdmin = user?.role === 'admin';
