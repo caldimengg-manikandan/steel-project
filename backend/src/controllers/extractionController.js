@@ -419,8 +419,9 @@ exports.deleteExtraction = async (req, res) => {
     const adminId = req.principal.adminId;
 
     const doc = await DrawingExtraction.findOneAndDelete({ 
+        _id: id,
         projectId,
-    }); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+    });
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });

@@ -221,36 +221,18 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             { new: true }
         );
 
-        // ── Step 5a.2: Overwrite logic (Delete ALL previous records with same drawingNumber OR same filename) ──
+        // ── Step 5a.2: Overwrite logic (Delete previous records with the EXACT same filename) ──
         try {
-            const targetDwg = fields.drawingNumber;
             const targetFileName = originalFileName;
             const pId = new mongoose.Types.ObjectId(projectId);
             const eId = new mongoose.Types.ObjectId(extractionId);
 
-            // 1. Cleanup by Drawing Number
-            if (targetDwg) {
-                const dwgDel = await DrawingExtraction.deleteMany({
-                    projectId: pId,
-                    'extractedFields.drawingNumber': targetDwg,
-                    _id: { $ne: eId }
-                });
-                const logMsg = `[DB_DEBUG] Drawing Cleanup: project=${pId}, dwg=${targetDwg}, current=${eId}, deleted=${dwgDel.deletedCount}\n`;
-                fs.appendFileSync(path.join(__dirname, '../../cleanup_debug.log'), logMsg);
-                if (dwgDel.deletedCount > 0) {
-                   console.log(`[Extraction] Drawing Overwrite: Deleted ${dwgDel.deletedCount} items for Dwg #${targetDwg}`);
-                }
-            }
-
-            // 2. Cleanup by Filename (redundant safety)
             if (targetFileName) {
                 const fileDel = await DrawingExtraction.deleteMany({
                     projectId: pId,
                     originalFileName: targetFileName,
                     _id: { $ne: eId }
                 });
-                const logMsg = `[DB_DEBUG] Filename Cleanup: project=${pId}, file=${targetFileName}, current=${eId}, deleted=${fileDel.deletedCount}\n`;
-                fs.appendFileSync(path.join(__dirname, '../../cleanup_debug.log'), logMsg);
                 if (fileDel.deletedCount > 0) {
                     console.log(`[Extraction] Filename Overwrite: Deleted ${fileDel.deletedCount} items for File: ${targetFileName}`);
                 }
