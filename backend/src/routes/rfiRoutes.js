@@ -26,7 +26,7 @@ const upload = multer({
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF allowed'), false);
     },
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
+    limits: { fileSize: 500 * 1024 * 1024 } // 500MB
 });
 
 const uploadResponse = multer({
@@ -36,7 +36,7 @@ const uploadResponse = multer({
         if (allowed.includes(file.mimetype)) cb(null, true);
         else cb(new Error('File type not allowed'), false);
     },
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
+    limits: { fileSize: 500 * 1024 * 1024 } // 500MB
 });
 
 // All routes here are scoped under /api/rfis/:projectId
