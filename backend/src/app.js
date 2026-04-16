@@ -89,8 +89,8 @@ app.use(helmet({
     crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
 app.use(morgan('dev'));
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(express.json({ limit: '1GB' }));
+app.use(express.urlencoded({ extended: true, limit: '1GB' }));
 
 // Debugging log (Remove after fixing)
 app.use((req, res, next) => {
