@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo/caldim_engineering_logo.jpg';
@@ -13,9 +13,11 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
 
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
-    if (user) {
-        navigate(FULL_ACCESS_ROLES.includes(user.role) ? '/admin' : '/dashboard', { replace: true });
-    }
+    useEffect(() => {
+        if (user) {
+            navigate(FULL_ACCESS_ROLES.includes(user.role) ? '/admin' : '/dashboard', { replace: true });
+        }
+    }, [user, navigate]);
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();

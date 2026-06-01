@@ -38,6 +38,7 @@ const allowedOrigins = [
     'https://steel-dms-frontend.onrender.com',
     'https://steel-project-iota.vercel.app',
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:3000'
 ];
 
@@ -49,6 +50,7 @@ if (process.env.CORS_ORIGIN) {
         }
     });
 }
+console.log('[DEBUG] Allowed Origins:', allowedOrigins);
 
 // ── App setup ─────────────────────────────────────────────
 const app = express();
@@ -168,9 +170,15 @@ async function ensureDefaultAdmin() {
 // ── Start server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
+const { startAiService } = require('./utils/aiServiceManager');
+
 connectDB().then(async () => {
     initGridFS();
     await ensureDefaultAdmin();
+    
+    // Start AI service automatically
+    startAiService();
+
     app.listen(PORT, () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
@@ -180,4 +188,4 @@ connectDB().then(async () => {
     process.exit(1);
 });
 
-module.exports = app;
+module.exports = app; // Trigger restart to reload AI service with dynamic model loading support

@@ -57,6 +57,11 @@ async function createProject(req, res) {
     const adminId = req.principal.adminId;
     const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber } = req.body;
 
+    // ---- New validation: sequences is mandatory ----
+    if (!Array.isArray(sequences) || sequences.length === 0) {
+        return res.status(400).json({ error: 'The "sequences" field is required and must contain at least one entry.' });
+    }
+
     if (!name || (!clientName && !clientId)) {
         return res.status(400).json({ error: 'name and either clientName or clientId are required.' });
     }

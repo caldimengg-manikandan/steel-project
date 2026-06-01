@@ -23,88 +23,103 @@ function signToken(payload) {
  * Body: { username, password }
  */
 async function adminLogin(req, res) {
-    const { username, password } = req.body;
-    console.log(`[AUTH] Admin login attempt for: "${username}"`);
-    
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required.' });
+    try {
+        const { username, password } = req.body;
+        console.log(`[AUTH] Admin login attempt for: "${username}"`);
+        
+        if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ error: 'Username and password are required and must be strings.' });
+        }
+
+        const admin = await Admin.findOne({ username: username.trim().toLowerCase() })
+            .select('+password_hash');
+
+        if (!admin) {
+            console.warn(`[AUTH] No admin found with username: ${username}`);
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        const valid = await admin.matchPassword(password);
+        if (!valid) {
+            console.warn(`[AUTH] Invalid password for admin: ${username}`);
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined in environment variables');
+        }
+
+        console.log(`[AUTH] Admin ${username} logged in successfully!`);
+        const token = signToken({
+            id: admin._id.toString(),
+            username: admin.username,
+            email: admin.email,
+            role: 'admin',
+            adminId: admin._id.toString(),
+        });
+
+        res.json({
+            token,
+            user: admin.toSafeObject(),
+        });
+    } catch (err) {
+        console.error('[AUTH_ERROR] adminLogin failed:', err);
+        throw err; // Passed to errorHandler
     }
-
-    const admin = await Admin.findOne({ username: username.trim().toLowerCase() })
-        .select('+password_hash');
-
-    if (!admin) {
-        console.warn(`[AUTH] No admin found with username: ${username}`);
-        return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    const valid = await admin.matchPassword(password);
-    if (!valid) {
-        console.warn(`[AUTH] Invalid password for admin: ${username}`);
-        return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    console.log(`[AUTH] Admin ${username} logged in successfully!`);
-    const token = signToken({
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-        role: 'admin',
-        adminId: admin._id,
-    });
-
-    res.json({
-        token,
-        user: admin.toSafeObject(),
-    });
 }
 
 /**
  * POST /api/auth/user/login
  * Body: { username, password }
- *
- * NOTE: Username alone may not be unique across admins.
- * If your firm has a single login page, you can add
- * an email/username field and match by email globally.
  */
 async function userLogin(req, res) {
-    const { username, password } = req.body;
-    console.log(`[AUTH] User login attempt: ${username}`);
+    try {
+        const { username, password } = req.body;
+        console.log(`[AUTH] User login attempt: ${username}`);
 
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required.' });
+        if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ error: 'Username and password are required and must be strings.' });
+        }
+
+        // Find user by username across ALL admins
+        const user = await User.findOne({ username: username.trim().toLowerCase() })
+            .select('+password_hash');
+
+        if (!user) {
+            console.warn(`[AUTH] No user found with username: ${username}`);
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        if (user.status !== 'active') {
+            return res.status(403).json({ error: 'Your account has been deactivated. Contact your administrator.' });
+        }
+
+        const valid = await user.matchPassword(password);
+        if (!valid) {
+            console.warn(`[AUTH] Invalid password for user: ${username}`);
+            return res.status(401).json({ error: 'Invalid username or password.' });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined in environment variables');
+        }
+
+        const token = signToken({
+            id: user._id.toString(),
+            username: user.username,
+            email: user.email,
+            role: 'user',
+            adminId: user.adminId.toString(),
+        });
+
+        res.json({
+            token,
+            user: user.toSafeObject(),
+        });
+    } catch (err) {
+        console.error('[AUTH_ERROR] userLogin failed:', err);
+        throw err; // Passed to errorHandler
     }
-
-    // Find user by username across ALL admins (email is unique per admin, not globally)
-    // If you want global uniqueness, use email as the login identifier.
-    const user = await User.findOne({ username: username.trim().toLowerCase() })
-        .select('+password_hash');
-
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    if (user.status !== 'active') {
-        return res.status(403).json({ error: 'Your account has been deactivated. Contact your administrator.' });
-    }
-
-    const valid = await user.matchPassword(password);
-    if (!valid) {
-        return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-
-    const token = signToken({
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: 'user',
-        adminId: user.adminId,   // carries admin scope into every request
-    });
-
-    res.json({
-        token,
-        user: user.toSafeObject(),
-    });
 }
 
 /**

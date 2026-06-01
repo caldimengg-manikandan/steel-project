@@ -10,15 +10,15 @@ interface CreateUserForm {
     email: string; 
     password: string; 
     displayName: string;
-    role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user';
+    role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
 }
-const DEFAULT_FORM: CreateUserForm = { 
-    username: '', 
-    email: '', 
-    password: '', 
+const DEFAULT_FORM: CreateUserForm = {
+    username: '',
+    email: '',
+    password: '',
     displayName: '',
-    role: 'team_member'
-};
+    role: ''
+};;
 
 export default function AdminUsers() {
     const { showMessage, showConfirm } = useMessage();
@@ -35,8 +35,11 @@ export default function AdminUsers() {
     const [showCreate, setShowCreate] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
     const [form, setForm] = useState<CreateUserForm>(DEFAULT_FORM);
+    const [duplicateError, setDuplicateError] = useState('');
+    const [duplicateFields, setDuplicateFields] = useState<string[]>([]);
     const [creating, setCreating] = useState(false);
     const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
     const [bulkResult, setBulkResult] = useState<any>(null);
     const [bulkError, setBulkError] = useState('');
 
@@ -76,8 +79,35 @@ export default function AdminUsers() {
             setShowCreate(false);
             setForm(DEFAULT_FORM);
             showMessage('Success', 'User account created successfully.', 'success');
+            setDuplicateError('');
+            setDuplicateFields([]);
         } catch (err: any) {
-            showMessage('Error', err.message, 'error');
+            const msg = err.message || '';
+            const match = msg.match(/Duplicate value for field:\s*(.+)/i);
+            if (match) {
+                const fields = match[1].split(',').map((f: string) => f.trim());
+                setDuplicateFields(fields);
+                
+                // Construct a human-readable message without technical database key names like adminId
+                let cleanMsg = '';
+                const duplicateKeys = fields.filter((f: string) => f !== 'adminId');
+                if (duplicateKeys.includes('email') && duplicateKeys.includes('username')) {
+                    cleanMsg = 'This Username and Email Address already exist in your system.';
+                } else if (duplicateKeys.includes('email')) {
+                    cleanMsg = 'This Email Address already exists in your system.';
+                } else if (duplicateKeys.includes('username')) {
+                    cleanMsg = 'This Username already exists in your system.';
+                } else {
+                    cleanMsg = `Duplicate value for field: ${duplicateKeys.join(', ')}.`;
+                }
+                
+                setDuplicateError(cleanMsg);
+                showMessage('Error', cleanMsg, 'error');
+            } else {
+                setDuplicateFields([]);
+                setDuplicateError(msg);
+                showMessage('Error', msg, 'error');
+            }
         } finally {
             setCreating(false);
         }
@@ -165,7 +195,7 @@ export default function AdminUsers() {
                     <button className="btn btn-secondary" onClick={() => { setShowBulk(true); setBulkResult(null); setBulkFile(null); setBulkError(''); }}>
                         <IconUpload /> Bulk Upload
                     </button>
-                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                    <button className="btn btn-primary" onClick={() => { setShowCreate(true); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateFields([]); setDuplicateError(''); }}>
                         <IconPlus /> New User
                     </button>
                 </div>
@@ -327,48 +357,163 @@ export default function AdminUsers() {
 
             {/* ── Create User Modal ── */}
             {showCreate && (
-                <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                <div className="modal-overlay" onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateError(''); setDuplicateFields([]); }}>
                     <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Create New User</span>
                             <button className="modal-close" onClick={() => setShowCreate(false)}><IconClose /></button>
                         </div>
                         <div className="modal-body">
-                            <div className="form-group">
-                                <label className="form-label required">Username</label>
-                                <input type="text" className="form-control" placeholder="e.g. john_doe"
-                                    value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label required">Email Address</label>
-                                <input type="email" className="form-control" placeholder="e.g. john@example.com"
-                                    value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Display Name</label>
-                                <input type="text" className="form-control" placeholder="e.g. John Doe"
-                                    value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label required">Temporary Password</label>
-                                <input type="password" className="form-control" placeholder="Password"
-                                    value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label required">Account Role</label>
-                                <select className="form-control" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
-                                    <option value="superadmin">Super Admin — Full system access</option>
-                                    <option value="project_manager">Project Manager — Full system access</option>
-                                    <option value="team_lead">Team Lead — Full system access</option>
-                                    <option value="team_member">Team Member — Editor access (assigned)</option>
-                                </select>
-                            </div>
-                            <div className="form-actions">
-                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleCreateUser} disabled={creating || !form.username || !form.email || !form.password}>
-                                    {creating ? 'Creating...' : 'Create User Account'}
-                                </button>
-                            </div>
+                            <form 
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleCreateUser();
+                                }}
+                                autoComplete="off"
+                            >
+                                {/* Dummy hidden inputs to intercept Chrome auto-fill */}
+                                <input 
+                                    type="text" 
+                                    name="prevent_autofill_username" 
+                                    style={{ position: 'absolute', top: -1000, left: -1000, opacity: 0, height: 0, width: 0 }} 
+                                    tabIndex={-1} 
+                                    autoComplete="off" 
+                                />
+                                <input 
+                                    type="password" 
+                                    name="prevent_autofill_password" 
+                                    style={{ position: 'absolute', top: -1000, left: -1000, opacity: 0, height: 0, width: 0 }} 
+                                    tabIndex={-1} 
+                                    autoComplete="off" 
+                                />
+
+                                {duplicateError && (
+                                    <div className="info-box danger" style={{ marginBottom: 16, fontSize: 13 }}>
+                                        {duplicateError}
+                                    </div>
+                                )}
+
+                                {/* Username */}
+                                <div className="form-group">
+                                    <label className="form-label required">Username</label>
+                                    <input 
+                                        type="text"
+                                        name="portal-new-username"
+                                        className="form-control" 
+                                        placeholder="e.g. john_doe"
+                                        autoComplete="new-username"
+                                        value={form.username} 
+                                        onChange={e => setForm({ ...form, username: e.target.value })} 
+                                    />
+                                    {duplicateFields.includes('username') && (
+                                        <div className="text-danger" style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                            Username already exists in this admin scope.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Email Address */}
+                                <div className="form-group">
+                                    <label className="form-label required">Email Address</label>
+                                    <input 
+                                        type="email"
+                                        name="portal-new-email"
+                                        className="form-control" 
+                                        placeholder="e.g. john@example.com"
+                                        autoComplete="new-email"
+                                        value={form.email} 
+                                        onChange={e => setForm({ ...form, email: e.target.value })} 
+                                    />
+                                    {duplicateFields.includes('email') && (
+                                        <div className="text-danger" style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                            Email address already exists in this admin scope.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Display Name */}
+                                <div className="form-group">
+                                    <label className="form-label">Display Name</label>
+                                    <input 
+                                        type="text"
+                                        name="portal-new-displayname"
+                                        className="form-control" 
+                                        placeholder="e.g. John Doe"
+                                        autoComplete="new-displayname"
+                                        value={form.displayName} 
+                                        onChange={e => setForm({ ...form, displayName: e.target.value })} 
+                                    />
+                                </div>
+
+                                {/* Temporary Password */}
+                                <div className="form-group">
+                                    <label className="form-label required">Temporary Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            name="portal-new-password"
+                                            className="form-control"
+                                            placeholder="Temporary Password"
+                                            autoComplete="new-password"
+                                            value={form.password}
+                                            onChange={e => setForm({ ...form, password: e.target.value })}
+                                            style={{ paddingRight: '40px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="btn btn-ghost btn-sm"
+                                            style={{
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                padding: 0,
+                                                border: 'none',
+                                                background: 'transparent',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                zIndex: 2
+                                            }}
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPassword ? (
+                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                                </svg>
+                                            ) : (
+                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                </svg>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Account Role */}
+                                <div className="form-group">
+                                    <label className="form-label required">Account Role</label>
+                                    <select className="form-control" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
+                                        <option value="">Select role</option>
+                                        <option value="superadmin">Super Admin — Full system access</option>
+                                        <option value="project_manager">Project Manager — Full system access</option>
+                                        <option value="team_lead">Team Lead — Full system access</option>
+                                        <option value="team_member">Team Member — Editor access (assigned)</option>
+                                    </select>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="form-actions" style={{ marginTop: 24 }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary" disabled={creating || !form.username || !form.email || !form.password}>
+                                        {creating ? 'Creating...' : 'Create User Account'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

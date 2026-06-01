@@ -53,6 +53,7 @@ export default function AdminProjects() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [modalError, setModalError] = useState('');
     const [search, setSearch] = useState('');
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState<CreateProjectForm>(DEFAULT_FORM);
@@ -117,14 +118,14 @@ export default function AdminProjects() {
     );
 
     async function handleCreate() {
-        if (!form.name.trim() || !form.clientId || !form.location) return;
+        if (!form.name.trim() || !form.clientId) return;
         
         const selectedClient = clients.find(c => (c.id || c._id) === form.clientId);
         if (!selectedClient) return;
 
         try {
             setActionLoading(true);
-            setError('');
+            setModalError('');
             const { project } = await adminCreateProject({
                 name: form.name.trim(),
                 clientName: selectedClient.name,
@@ -159,7 +160,7 @@ export default function AdminProjects() {
             setSequenceNames([]);
             setSeqInput('0');
         } catch (err: any) {
-            setError(`Create failed: ${err.message}`);
+            setModalError(`Create failed: ${err.message}`);
         } finally {
             setActionLoading(false);
         }
@@ -289,7 +290,8 @@ export default function AdminProjects() {
                                 <th>Client Name</th>
                                 <th>Project Name</th>
                                 <th>Created</th>
-                                <th>Approx. DWGs</th>                                <th>Approval %</th>
+                                <th>Approx. DWGs</th>
+                                <th>Approval %</th>
                                 <th>Fabrication %</th>
                                 <th>Sequence</th>
                                 <th>Status</th>
@@ -503,7 +505,7 @@ export default function AdminProjects() {
                                     value={form.approximateDrawingsCount} onChange={(e) => setForm({ ...form, approximateDrawingsCount: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label required">Location</label>
+                                <label className="form-label">Location</label>
                                 <select className="form-control" value={form.location}
                                     onChange={(e) => setForm({ ...form, location: e.target.value })}>
                                     <option value="">Select Location</option>
@@ -519,7 +521,7 @@ export default function AdminProjects() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Number of Sequences</label>
+                                <label className="form-label">Number of Sequences <span style={{color: 'red'}}>*</span></label>
                                 <input 
                                     className="form-control" 
                                     type="number" 
@@ -639,55 +641,38 @@ export default function AdminProjects() {
                                 </div>
                             </div>
 
-                            {error && (
+                            {modalError && (
                                 <div className="info-box danger mb-md" style={{ fontSize: 13, padding: '10px 14px' }}>
-                                    {error}
+                                    {modalError}
                                 </div>
                             )}
 
-                            {(() => {
-                                const missingFields = [];
-                                if (!form.name.trim()) missingFields.push('Project Name');
-                                if (!form.clientId) missingFields.push('Client');
-                                if (!form.location) missingFields.push('Location (Chennai/Hosur)');
-                                if (!form.year || isNaN(Number(form.year))) missingFields.push('Year');
-                                if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (!form.startingTransmittalNumber || Number(form.startingTransmittalNumber) < 1)) missingFields.push('Starting Transmittal Number');
-                                
-                                if (missingFields.length > 0) {
-                                    return (
-                                        <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 12, fontWeight: 700 }}>
-                                            * Please provide: {missingFields.join(', ')}
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
-
                             <div className="form-actions">
                                 <button className="btn btn-secondary"
-                                    onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); setError(''); }}>Cancel</button>
+                                    onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); setError(''); setModalError(''); }}>Cancel</button>
                                 <button className="btn btn-primary"
                                     onClick={() => {
-                                        const missing = [];
-                                        if (!form.name.trim()) missing.push('Project Name');
-                                        if (!form.clientId) missing.push('Client');
-                                        if (!form.location) missing.push('Location');
-                                        if (!form.year || isNaN(Number(form.year))) missing.push('Year');
-                                        if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (!form.startingTransmittalNumber || Number(form.startingTransmittalNumber) < 1)) missing.push('Starting Transmittal Number');
-                                        
-                                        if (missing.length > 0) {
-                                            setError(`Please provide: ${missing.join(', ')}`);
+                                        // Validate required fields and sequences before creating
+                                        if (!form.name.trim() || !form.clientId) {
+                                            setModalError('Please provide: ' + (!form.name.trim() ? 'Project Name' : 'Client'));
                                             return;
                                         }
+                                        if (!form.year || isNaN(Number(form.year))) {
+                                            setModalError('Please provide: Year');
+                                            return;
+                                        }
+                                        if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (!form.startingTransmittalNumber || Number(form.startingTransmittalNumber) < 1)) {
+                                            setModalError('Please provide: Starting Transmittal Number');
+                                            return;
+                                        }
+                                        if (sequenceNames.length === 0) {
+                                            setModalError('Please add at least one Sequence');
+                                            return;
+                                        }
+                                        // All validations passed, proceed with creation
                                         handleCreate();
                                     }}
                                     disabled={actionLoading}
-                                    style={{
-                                        background: (!form.name.trim() || !form.clientId || !form.location || !form.year || actionLoading) ? '#e5e7eb' : '',
-                                        color: (!form.name.trim() || !form.clientId || !form.location || !form.year || actionLoading) ? '#9ca3af' : '',
-                                        cursor: (!form.name.trim() || !form.clientId || !form.location || !form.year || actionLoading) ? 'not-allowed' : 'pointer',
-                                        opacity: (!form.name.trim() || !form.clientId || !form.location || !form.year || actionLoading) ? 0.7 : 1
-                                    }}
                                 >
                                     {actionLoading ? 'Creating...' : 'Create Project'}
                                 </button>
