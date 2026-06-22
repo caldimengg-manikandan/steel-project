@@ -69,6 +69,7 @@ const drawingExtractionSchema = new mongoose.Schema(
         gridFsFileId: { type: mongoose.Schema.Types.ObjectId, index: true }, // Persistent Atlas storage ID
         oneDriveFileId: { type: String, index: true }, // OneDrive unique ID
         oneDriveUrl: { type: String, default: '' }, // Direct web URL to the file
+        storageGatewayPath: { type: String, default: '' }, // Windows Server Storage path
         folderName: { type: String, default: '' },
         fileSize: { type: Number, default: 0 }, // Bytes
         uploadedBy: { type: String, required: true }, // username

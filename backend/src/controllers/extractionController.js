@@ -90,6 +90,7 @@ exports.uploadAndExtract = async (req, res) => {
         fileUrl: file.path || '', // BRIDGE PATH
         oneDriveFileId: file.oneDriveFileId || file.id, 
         oneDriveUrl: file.webUrl || '', 
+        storageGatewayPath: file.storageGatewayPath || '', // Windows Server Storage path
         folderName,
         fileSize: file.size,
         uploadedBy,
@@ -249,13 +250,13 @@ exports.reprocess = async (req, res) => {
         return res.status(404).json({ error: 'Extraction not found.' });
     }
 
-    const fileRef = doc.oneDriveFileId || doc.fileUrl || doc.gridFsFileId;
+    const fileRef = doc.storageGatewayPath || doc.oneDriveFileId || doc.fileUrl || doc.gridFsFileId;
     if (!fileRef) {
         return res.status(400).json({ error: 'Original file reference missing. Please re-upload.' });
     }
 
     // Check if it's a local file and if it exists
-    if (!doc.oneDriveFileId && !doc.gridFsFileId && doc.fileUrl && !fs.existsSync(doc.fileUrl)) {
+    if (!doc.storageGatewayPath && !doc.oneDriveFileId && !doc.gridFsFileId && doc.fileUrl && !fs.existsSync(doc.fileUrl)) {
         return res.status(400).json({ error: 'Original local file no longer exists on disk. Please re-upload.' });
     }
 
@@ -287,6 +288,26 @@ exports.viewPdf = async (req, res) => {
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    // 0. Storage Gateway Mode
+    if (doc.storageGatewayPath) {
+        try {
+            const storageGateway = require('../utils/storageGateway');
+            if (storageGateway.isEnabled()) {
+                const { stream, contentType, contentLength } = await storageGateway.getFileStream(doc.storageGatewayPath);
+                res.setHeader('Content-Type', contentType || 'application/pdf');
+                res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                if (contentLength) res.setHeader('Content-Length', contentLength);
+                
+                stream.pipe(res);
+                return;
+            }
+        } catch (err) {
+            console.error('[ViewPdf] Storage Gateway stream failed:', err.message);
+            // Fallthrough to other methods if they exist, or fail
+            return res.status(500).json({ error: 'Failed to stream file from Storage Gateway.' });
+        }
     }
 
     // 1. OneDrive Mode
@@ -425,6 +446,19 @@ exports.deleteExtraction = async (req, res) => {
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    // Delete from Storage Gateway if present
+    if (doc.storageGatewayPath) {
+        try {
+            const storageGateway = require('../utils/storageGateway');
+            if (storageGateway.isEnabled()) {
+                await storageGateway.deleteFile(doc.storageGatewayPath);
+                console.log(`[Delete] Storage Gateway file ${doc.storageGatewayPath} deleted.`);
+            }
+        } catch (err) {
+            console.error('[Delete] Failed to remove Storage Gateway file:', err.message);
+        }
     }
 
     // Delete uploaded PDF from OneDrive if present

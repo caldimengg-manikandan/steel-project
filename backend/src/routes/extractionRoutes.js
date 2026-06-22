@@ -19,7 +19,8 @@ const router = express.Router({ mergeParams: true });
 const { verifyToken } = require('../middleware/auth');
 const { scopeProjectAccess, requirePermission } = require('../middleware/adminScope');
 const ctrl = require('../controllers/extractionController');
-const { storage } = require('../utils/onedrive');
+const createStorageAgentSync = require('../utils/storageAgentSync');
+const storage = createStorageAgentSync('Extraction');
 
 const fileFilter = (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {

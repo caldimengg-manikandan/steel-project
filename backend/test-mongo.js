@@ -5,5 +5,10 @@ mongoose.connect(uri).then(() => {
   process.exit(0);
 }).catch(err => {
   console.error("Connection failed:", err);
-  process.exit(1);
+  p0066+
+  5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+5+50+6mni omi'u'i'i'ji'k,iomlomm33033000232imuim,6.0.0.0.0.0.6++
+  ,i,mk
+  ...3.
+  
 });
+

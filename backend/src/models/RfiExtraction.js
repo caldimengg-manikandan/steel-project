@@ -56,6 +56,7 @@ const rfiExtractionSchema = new mongoose.Schema(
         },
         oneDriveFileId: { type: String, index: true },
         oneDriveUrl: { type: String, default: '' },
+        storageGatewayPath: { type: String, default: '' },
         errorDetails: {
             type: String,
         },
