@@ -30,10 +30,9 @@ async function handleResponse(res: Response) {
 
 export interface FileEntry {
     name: string;
-    isDirectory: boolean;
-    size?: number;
-    modifiedAt?: string;
-    createdAt?: string;
+    type: 'directory' | 'file';
+    size: number | null;
+    modified: string;
 }
 
 /**
@@ -127,8 +126,7 @@ export async function downloadFile(path: string): Promise<void> {
 
     // Let's use fetch/blob approach so we can handle headers if needed, OR just open URL.
     // The backend `verifyToken` allows req.query.token.
-    const url = `${BASE}/files/download?${params.toString()}`;
-    
+
     // We could open a new tab, but using fetch -> blob is better for keeping the user on the same page 
     // and catching errors if it fails.
     const res = await fetch(`${BASE}/files/download?path=${encodeURIComponent(path)}`, {

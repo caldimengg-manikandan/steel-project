@@ -12,8 +12,7 @@ import {
     IconFile, 
     IconDownload, 
     IconTrash, 
-    IconUpload, 
-    IconSearch 
+    IconUpload
 } from './Icons';
 
 interface FileBrowserPanelProps {
@@ -22,7 +21,7 @@ interface FileBrowserPanelProps {
     canUpload: boolean;
 }
 
-export default function FileBrowserPanel({ projectId, projectName, canUpload }: FileBrowserPanelProps) {
+export default function FileBrowserPanel({ projectName, canUpload }: FileBrowserPanelProps) {
     const { showMessage } = useMessage();
     
     // Determine the base path based on whether a project was passed
@@ -61,7 +60,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload }: 
     }, [currentPath]);
 
     // Format bytes
-    const formatBytes = (bytes: number | undefined) => {
+    const formatBytes = (bytes: number | null | undefined) => {
         if (bytes === undefined || bytes === null) return '-';
         if (bytes === 0) return '0 B';
         const k = 1024;
