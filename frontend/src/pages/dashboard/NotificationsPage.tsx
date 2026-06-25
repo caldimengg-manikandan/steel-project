@@ -22,17 +22,17 @@ export default function NotificationsPage() {
             fetch('/steel/api/notifications', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.notifications) {
-                    setNotifications(data.notifications);
-                }
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error('Failed to fetch notifications:', err);
-                setLoading(false);
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.notifications) {
+                        setNotifications(data.notifications);
+                    }
+                    setLoading(false);
+                })
+                .catch(err => {
+                    console.error('Failed to fetch notifications:', err);
+                    setLoading(false);
+                });
         }
     }, [token]);
 
@@ -57,21 +57,21 @@ export default function NotificationsPage() {
                     ) : notifications.length > 0 ? (
                         <div className="notification-list">
                             {notifications.map((n) => (
-                                <div 
-                                    key={n._id} 
-                                    style={{ 
-                                        padding: '20px 24px', 
-                                        display: 'flex', 
-                                        gap: 20, 
+                                <div
+                                    key={n._id}
+                                    style={{
+                                        padding: '20px 24px',
+                                        display: 'flex',
+                                        gap: 20,
                                         borderBottom: '1px solid var(--color-border-light)',
                                         background: n.read ? 'transparent' : 'rgba(30, 79, 216, 0.02)',
                                         position: 'relative'
                                     }}
                                 >
-                                    <div style={{ 
-                                        width: 44, 
-                                        height: 44, 
-                                        borderRadius: '12px', 
+                                    <div style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: '12px',
                                         background: n.type === 'assignment' ? 'var(--color-primary-glow)' : 'var(--color-bg-page)',
                                         color: n.type === 'assignment' ? 'var(--color-primary)' : 'var(--color-text-muted)',
                                         display: 'flex',
@@ -93,14 +93,14 @@ export default function NotificationsPage() {
                                             {n.body}
                                         </div>
                                         {!n.read && (
-                                            <button 
+                                            <button
                                                 onClick={() => handleMarkRead(n._id)}
-                                                style={{ 
-                                                    marginTop: 12, 
-                                                    fontSize: 12, 
-                                                    color: 'var(--color-primary)', 
-                                                    background: 'none', 
-                                                    border: 'none', 
+                                                style={{
+                                                    marginTop: 12,
+                                                    fontSize: 12,
+                                                    color: 'var(--color-primary)',
+                                                    background: 'none',
+                                                    border: 'none',
                                                     cursor: 'pointer',
                                                     padding: 0,
                                                     fontWeight: 600
@@ -111,13 +111,13 @@ export default function NotificationsPage() {
                                         )}
                                     </div>
                                     {!n.read && (
-                                        <div style={{ 
-                                            position: 'absolute', 
-                                            left: 0, 
-                                            top: 0, 
-                                            bottom: 0, 
-                                            width: 3, 
-                                            background: 'var(--color-primary)' 
+                                        <div style={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            top: 0,
+                                            bottom: 0,
+                                            width: 3,
+                                            background: 'var(--color-primary)'
                                         }} />
                                     )}
                                 </div>

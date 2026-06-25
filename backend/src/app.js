@@ -30,6 +30,7 @@ const transmittalRoutes = require('./routes/transmittalRoutes');
 const rfiRoutes = require('./routes/rfiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
 
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
@@ -116,6 +117,7 @@ app.use('/api/transmittals/:projectId', transmittalRoutes);
 app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/files', fileGatewayRoutes);
 
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -176,6 +178,20 @@ connectDB().then(async () => {
     initGridFS();
     await ensureDefaultAdmin();
     
+    // Validate remote Storage Agent connectivity
+    const storageGateway = require('./utils/storageGateway');
+    const storageCheck = await storageGateway.validateRoot();
+    if (storageCheck.skipped) {
+        console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
+    } else if (storageCheck.ok) {
+        console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
+        if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
+        if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
+    } else {
+        console.warn(`[Storage] WARNING: ${storageCheck.error}`);
+        console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+    }
+
     // Start AI service automatically
     startAiService();
 

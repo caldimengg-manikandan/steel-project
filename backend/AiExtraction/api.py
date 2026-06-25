@@ -106,4 +106,6 @@ async def extract_data(files: list[UploadFile] = File(...), client_name: str = F
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import os
+    port = int(os.environ.get("AI_SERVICE_PORT", 8085))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -10,6 +10,7 @@ import { listTransmittals } from '../../services/transmittalApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
+import FileBrowserPanel from '../../components/FileBrowserPanel';
 
 export default function ProjectView() {
     const { id } = useParams<{ id: string }>();
@@ -27,7 +28,7 @@ export default function ProjectView() {
     const [allRevisions, setAllRevisions] = useState<any[]>([]); // Populated from Extractions
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi' | 'storage'>('dashboard');
     const [uploadModal, setUploadModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     // Duplicate detection state
@@ -267,13 +268,14 @@ export default function ProjectView() {
 
             {/* Tabs */}
             <div className="tab-bar">
-                {(['dashboard', 'transmittals', 'revisions', 'extraction', 'rfi', 'info'] as const).map((tab) => (
+                {(['dashboard', 'storage', 'transmittals', 'revisions', 'extraction', 'rfi', 'info'] as const).map((tab) => (
                     <button
                         key={tab}
                         className={`tab-item${activeTab === tab ? ' active' : ''}`}
                         onClick={() => setActiveTab(tab)}
                     >
                         {tab === 'dashboard' && '📊 Dashboard'}
+                        {tab === 'storage' && '📁 Storage'}
                         {tab === 'transmittals' && 'Transmittals & Log'}
                         {tab === 'revisions' && `Revision History (${allRevisions.length})`}
                         {tab === 'extraction' && 'Extraction'}
@@ -450,6 +452,17 @@ export default function ProjectView() {
                     </div>
                 );
             })()}
+
+            {/* ── Storage Tab ── */}
+            {activeTab === 'storage' && (
+                <div className="card" style={{ padding: 'var(--space-lg)' }}>
+                    <FileBrowserPanel 
+                        projectId={(project?._id || project?.id) as string}
+                        projectName={project.name}
+                        canUpload={canUpload}
+                    />
+                </div>
+            )}
 
             {/* ── AI Extraction Tab ── */}
             {activeTab === 'extraction' && (

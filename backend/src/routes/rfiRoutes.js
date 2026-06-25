@@ -18,7 +18,8 @@ const {
     viewRfiPdf,
 } = require('../controllers/rfiController');
 
-const { storage } = require('../utils/onedrive');
+const createStorageAgentSync = require('../utils/storageAgentSync');
+const storage = createStorageAgentSync('RFI');
 
 const upload = multer({
     storage,

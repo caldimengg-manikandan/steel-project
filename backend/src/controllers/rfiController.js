@@ -45,6 +45,7 @@ exports.uploadRfiDrawing = async (req, res) => {
             fileUrl: file.path || '', // BRIDGE PATH
             oneDriveFileId: file.oneDriveFileId || file.id, 
             oneDriveUrl: file.webUrl || '', 
+            storageGatewayPath: file.storageGatewayPath || '',
             status: 'queued',
             sequences: sequences || [],
         });
@@ -239,6 +240,19 @@ exports.deleteRfiExtraction = async (req, res) => {
         const doc = await RfiExtraction.findOneAndDelete({ _id: id }); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
+        // Delete from Storage Gateway if present
+        if (doc.storageGatewayPath) {
+            try {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled()) {
+                    await storageGateway.deleteFile(doc.storageGatewayPath);
+                    console.log(`[DeleteRFI] Storage Gateway file ${doc.storageGatewayPath} deleted.`);
+                }
+            } catch (err) {
+                console.error('[DeleteRFI] Failed to remove Storage Gateway file:', err.message);
+            }
+        }
+
         // Delete from OneDrive if present
         if (doc.oneDriveFileId) {
             try {
@@ -331,6 +345,25 @@ exports.viewRfiPdf = async (req, res) => {
     try {
         const doc = await RfiExtraction.findOne({ _id: id }); // Global admin visibility
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
+
+        // 0. Storage Gateway Mode
+        if (doc.storageGatewayPath) {
+            try {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled()) {
+                    const { stream, contentType, contentLength } = await storageGateway.getFileStream(doc.storageGatewayPath);
+                    res.setHeader('Content-Type', contentType || 'application/pdf');
+                    res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                    if (contentLength) res.setHeader('Content-Length', contentLength);
+                    
+                    stream.pipe(res);
+                    return;
+                }
+            } catch (err) {
+                console.error('[ViewRfiPdf] Storage Gateway stream failed:', err.message);
+                return res.status(500).json({ error: 'Failed to stream file from Storage Gateway.' });
+            }
+        }
 
         // 1. OneDrive Mode
         if (doc.oneDriveFileId) {
