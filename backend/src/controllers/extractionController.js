@@ -44,6 +44,8 @@ exports.uploadAndExtract = async (req, res) => {
         sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
     }
 
+    const category = req.body.category || '';
+
     // Filter and determine folder name
     const validFiles = [];
     req.files.forEach((file, i) => {
@@ -51,16 +53,33 @@ exports.uploadAndExtract = async (req, res) => {
         const lowerPath = fullPath.toLowerCase();
 
         let folderName = '';
+        const titleRegex = /^(d[\s\-]*sheet|detail[\s\-]*sheets?|e[\s\-]*sheet|erection[\s\-]*sheets?|gather[\s\-]*sheets?)$/i;
+        let matchedTitle = null;
+
         if (fullPath.includes('/')) {
             const parts = fullPath.split('/');
-            if (parts.length > 1) {
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (titleRegex.test(parts[i].trim())) {
+                    matchedTitle = parts[i].trim();
+                }
+            }
+            if (!matchedTitle && parts.length > 1) {
                 folderName = parts[parts.length - 2];
             }
         } else if (fullPath.includes('\\')) {
             const parts = fullPath.split('\\');
-            if (parts.length > 1) {
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (titleRegex.test(parts[i].trim())) {
+                    matchedTitle = parts[i].trim();
+                }
+            }
+            if (!matchedTitle && parts.length > 1) {
                 folderName = parts[parts.length - 2];
             }
+        }
+
+        if (matchedTitle) {
+            folderName = matchedTitle;
         }
 
         if (!folderName) {
@@ -96,6 +115,7 @@ exports.uploadAndExtract = async (req, res) => {
         localSavePath,
         targetTransmittalNumber,
         sequences,
+        category,
         status: 'queued',
     }));
 

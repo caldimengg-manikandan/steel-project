@@ -109,6 +109,8 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
 
         if (rfiNumbers.length > 0) {
             try {
+                // Removed global duplicate cleanup to keep Q numbers from each PDF separate.
+                /*
                 // Remove these RFI numbers from ANY other extraction records for this project
                 await RfiExtraction.updateMany(
                     {
@@ -121,6 +123,7 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
                     }
                 );
                 console.log(`[RfiService] Cleared duplicate RFIs (${rfiNumbers.join(', ')}) from previous records.`);
+                */
             } catch (rfiDelErr) {
                 console.error('[RfiService] Overwrite cleanup failed:', rfiDelErr.message);
             }

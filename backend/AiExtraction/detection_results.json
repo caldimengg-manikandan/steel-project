@@ -1,0 +1,4843 @@
+{
+    "drawings/a1095_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9650210738182068,
+            "box": [
+                926.3514404296875,
+                1162.12548828125,
+                1073.3983154296875,
+                1223.42626953125
+            ],
+            "text": "Drawing Title:\nANGLE",
+            "rows": [
+                [
+                    "ANGLE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599465131759644,
+            "box": [
+                871.3070068359375,
+                730.730712890625,
+                1071.3848876953125,
+                805.240966796875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9180446267127991,
+            "box": [
+                870.7828369140625,
+                1070.9134521484375,
+                986.3785400390625,
+                1096.0955810546875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8857325315475464,
+            "box": [
+                987.0384521484375,
+                1071.125732421875,
+                1072.7017822265625,
+                1096.008544921875
+            ],
+            "text": "a1095\nDrawing #",
+            "rows": [
+                [
+                    "a1095"
+                ]
+            ]
+        }
+    ],
+    "drawings/a1136_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9657697081565857,
+            "box": [
+                926.2781982421875,
+                1162.39111328125,
+                1073.319580078125,
+                1223.4296875
+            ],
+            "text": "Drawing Title:\nANGLE",
+            "rows": [
+                [
+                    "ANGLE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9598047137260437,
+            "box": [
+                871.3074951171875,
+                730.7343139648438,
+                1071.3592529296875,
+                805.2407836914062
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9169726371765137,
+            "box": [
+                870.7713623046875,
+                1070.9013671875,
+                986.3292236328125,
+                1096.069580078125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8827349543571472,
+            "box": [
+                987.064208984375,
+                1071.1201171875,
+                1072.704345703125,
+                1095.9619140625
+            ],
+            "text": "a1136\nDrawing #",
+            "rows": [
+                [
+                    "a1136"
+                ]
+            ]
+        }
+    ],
+    "drawings/a2573_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.964694619178772,
+            "box": [
+                926.32275390625,
+                1162.2552490234375,
+                1073.470703125,
+                1223.4066162109375
+            ],
+            "text": "Drawing Title:\nANGLE",
+            "rows": [
+                [
+                    "ANGLE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599154591560364,
+            "box": [
+                871.3060302734375,
+                730.7296142578125,
+                1071.3876953125,
+                805.240966796875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9169090390205383,
+            "box": [
+                870.7650146484375,
+                1070.894287109375,
+                986.3336181640625,
+                1096.067626953125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8837064504623413,
+            "box": [
+                987.0364990234375,
+                1071.080078125,
+                1072.7269287109375,
+                1095.98291015625
+            ],
+            "text": "a2573\nDrawing #",
+            "rows": [
+                [
+                    "a2573"
+                ]
+            ]
+        }
+    ],
+    "drawings/a3514_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9658717513084412,
+            "box": [
+                926.2833251953125,
+                1162.37353515625,
+                1073.3189697265625,
+                1223.42724609375
+            ],
+            "text": "Drawing Title:\nANGLE",
+            "rows": [
+                [
+                    "ANGLE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9595772624015808,
+            "box": [
+                871.3082275390625,
+                730.73095703125,
+                1071.3543701171875,
+                805.24462890625
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.917029082775116,
+            "box": [
+                870.7723388671875,
+                1070.90087890625,
+                986.3291015625,
+                1096.06884765625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8823619484901428,
+            "box": [
+                987.059326171875,
+                1071.09033203125,
+                1072.64453125,
+                1095.95751953125
+            ],
+            "text": "a3514\nDrawing #",
+            "rows": [
+                [
+                    "a3514"
+                ]
+            ]
+        }
+    ],
+    "drawings/a738_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9653466939926147,
+            "box": [
+                926.3214111328125,
+                1162.17822265625,
+                1073.3726806640625,
+                1223.423828125
+            ],
+            "text": "Drawing Title:\nANGLE",
+            "rows": [
+                [
+                    "ANGLE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599498510360718,
+            "box": [
+                871.3172607421875,
+                730.7318115234375,
+                1071.3863525390625,
+                805.2381591796875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\nFOR FABRICATION\n1\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9177570939064026,
+            "box": [
+                870.7786865234375,
+                1070.9044189453125,
+                986.3934326171875,
+                1096.0845947265625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8845393061637878,
+            "box": [
+                987.0318603515625,
+                1071.0947265625,
+                1072.7406005859375,
+                1096.00244140625
+            ],
+            "text": "a738\nDrawing #",
+            "rows": [
+                [
+                    "a738"
+                ]
+            ]
+        }
+    ],
+    "drawings/bp1000_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.970852255821228,
+            "box": [
+                926.4432373046875,
+                1162.1221923828125,
+                1073.4425048828125,
+                1223.2718505859375
+            ],
+            "text": "Drawing Title:\nBASE PLATE",
+            "rows": [
+                [
+                    "BASE PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9593856334686279,
+            "box": [
+                871.322998046875,
+                730.7109375,
+                1071.333740234375,
+                805.251953125
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.912433922290802,
+            "box": [
+                870.7752685546875,
+                1070.918701171875,
+                986.3883056640625,
+                1096.173583984375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8946342468261719,
+            "box": [
+                986.9620361328125,
+                1071.1448974609375,
+                1072.6002197265625,
+                1096.0516357421875
+            ],
+            "text": "bp1000\nDrawing #",
+            "rows": [
+                [
+                    "bp1000"
+                ]
+            ]
+        }
+    ],
+    "drawings/bp1001_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9714303612709045,
+            "box": [
+                926.3782958984375,
+                1162.1748046875,
+                1073.4176025390625,
+                1223.283203125
+            ],
+            "text": "Drawing Title:\nBASE PLATE",
+            "rows": [
+                [
+                    "BASE PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9597225189208984,
+            "box": [
+                871.3226318359375,
+                730.7325439453125,
+                1071.3482666015625,
+                805.2498779296875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9123637676239014,
+            "box": [
+                870.7763671875,
+                1070.9171142578125,
+                986.39013671875,
+                1096.1658935546875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8947369456291199,
+            "box": [
+                986.9756469726562,
+                1071.136474609375,
+                1072.56689453125,
+                1096.051513671875
+            ],
+            "text": "bp1001\nDrawing #",
+            "rows": [
+                [
+                    "bp1001"
+                ]
+            ]
+        }
+    ],
+    "drawings/bpl1994_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9638628363609314,
+            "box": [
+                926.19921875,
+                1162.2061767578125,
+                1073.381591796875,
+                1223.4603271484375
+            ],
+            "text": "Drawing Title:\nBENT PLATE",
+            "rows": [
+                [
+                    "BENT PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9598049521446228,
+            "box": [
+                871.301025390625,
+                730.7357788085938,
+                1071.390380859375,
+                805.2432250976562
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9188159704208374,
+            "box": [
+                870.7864990234375,
+                1070.9163818359375,
+                986.2855224609375,
+                1096.0220947265625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.897042989730835,
+            "box": [
+                986.9802856445312,
+                1071.18212890625,
+                1072.619873046875,
+                1096.04541015625
+            ],
+            "text": "bpl1994\nDrawing #",
+            "rows": [
+                [
+                    "bpl1994"
+                ]
+            ]
+        }
+    ],
+    "drawings/cp1000_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9711316227912903,
+            "box": [
+                926.415283203125,
+                1162.175048828125,
+                1073.498779296875,
+                1223.285888671875
+            ],
+            "text": "Drawing Title:\nCAP PLATE",
+            "rows": [
+                [
+                    "CAP PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600337743759155,
+            "box": [
+                871.3138427734375,
+                730.729736328125,
+                1071.389404296875,
+                805.236083984375
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9195148348808289,
+            "box": [
+                870.7828369140625,
+                1070.91796875,
+                986.3409423828125,
+                1096.02197265625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8911691308021545,
+            "box": [
+                987.085205078125,
+                1071.165771484375,
+                1072.623046875,
+                1096.047119140625
+            ],
+            "text": "cp1000\nDrawing #",
+            "rows": [
+                [
+                    "cp1000"
+                ]
+            ]
+        }
+    ],
+    "drawings/cp1001_2.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9725872874259949,
+            "box": [
+                926.4404296875,
+                1162.328125,
+                1073.404296875,
+                1223.28271484375
+            ],
+            "text": "Drawing Title:\nCAP PLATE",
+            "rows": [
+                [
+                    "CAP PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9596713185310364,
+            "box": [
+                871.3050537109375,
+                730.550048828125,
+                1071.3306884765625,
+                805.25341796875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025\n1\n2\nREVISED AS NOTED\n09-23-2025\n09-25-2025\n2\n3\nREVISED AS NOTED",
+            "rows": [
+                [
+                    "2",
+                    "3",
+                    "REVISED AS NOTED",
+                    "09-25-2025"
+                ],
+                [
+                    "1",
+                    "2",
+                    "REVISED AS NOTED",
+                    "09-23-2025"
+                ],
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9121248722076416,
+            "box": [
+                870.7591552734375,
+                1070.913330078125,
+                986.3941650390625,
+                1096.161865234375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8846980929374695,
+            "box": [
+                987.0883178710938,
+                1071.155029296875,
+                1072.5771484375,
+                1096.019775390625
+            ],
+            "text": "cp1001\nDrawing #",
+            "rows": [
+                [
+                    "cp1001"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.00A_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9663791656494141,
+            "box": [
+                1102.2274169921875,
+                929.956298828125,
+                1187.4881591796875,
+                948.652099609375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9359034299850464,
+            "box": [
+                1102.909423828125,
+                688.2861328125,
+                1250.603271484375,
+                735.468505859375
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\n0\nFor Construction\n1\n09-25-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "For Construction",
+                    "09-25-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9350709915161133,
+            "box": [
+                1142.9842529296875,
+                997.01904296875,
+                1251.8961181640625,
+                1042.1923828125
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 02 & LEVEL 03\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "PLAN LEVEL 02 & LEVEL 03 \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8687609434127808,
+            "box": [
+                1187.427001953125,
+                929.7313842773438,
+                1251.259033203125,
+                949.0242309570312
+            ],
+            "text": "E-03.00A\nDrawing #",
+            "rows": [
+                [
+                    "E-03.00A"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.00_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.964364230632782,
+            "box": [
+                1102.282470703125,
+                929.9512939453125,
+                1187.500732421875,
+                948.6337890625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9380301833152771,
+            "box": [
+                1143.098876953125,
+                996.9534912109375,
+                1251.443115234375,
+                1042.2528076171875
+            ],
+            "text": "Drawing Title:\nLEVEL & LEVEL 01\nPLAN LEVEL P4 TO COURTYARD\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "LEVEL & LEVEL 01 \n PLAN LEVEL P4 TO COURTYARD \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9303972721099854,
+            "box": [
+                1102.80908203125,
+                688.729248046875,
+                1252.240478515625,
+                735.55419921875
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\nB\nFor Re-Approval\n2\n06-23-2025\n08-22-2025\n3\nC\nFor Re-Approval\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8871217966079712,
+            "box": [
+                1187.105224609375,
+                930.2574462890625,
+                1251.009033203125,
+                948.9552001953125
+            ],
+            "text": "E-03.00\nDrawing #",
+            "rows": [
+                [
+                    "E-03.00"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01A_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9646224975585938,
+            "box": [
+                1102.267822265625,
+                929.9530639648438,
+                1187.485107421875,
+                948.6377563476562
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.934891939163208,
+            "box": [
+                1142.8958740234375,
+                997.1707763671875,
+                1251.9278564453125,
+                1042.0894775390625
+            ],
+            "text": "Drawing Title:\nPLAN  LEVEL 06 & LEVEL 07\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "PLAN  LEVEL 06 & LEVEL 07 \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9290679097175598,
+            "box": [
+                1102.875732421875,
+                688.4846801757812,
+                1250.790771484375,
+                735.4730834960938
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n06-23-2025\nFor Re-Approval\n08-22-2025\nB\n2\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8664889931678772,
+            "box": [
+                1186.972412109375,
+                929.65478515625,
+                1251.299560546875,
+                949.62255859375
+            ],
+            "text": "E-03.01A\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01A"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01B_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9632720947265625,
+            "box": [
+                1102.263671875,
+                929.9517211914062,
+                1187.462890625,
+                948.6406860351562
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9338843822479248,
+            "box": [
+                1142.42529296875,
+                997.00244140625,
+                1250.8896484375,
+                1042.4404296875
+            ],
+            "text": "Drawing Title:\n& MISC PLAN LEVEL 02\nPLAN LEVEL 08\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "& MISC PLAN LEVEL 02 \n PLAN LEVEL 08 \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9289133548736572,
+            "box": [
+                1102.8922119140625,
+                688.4931640625,
+                1250.6995849609375,
+                735.47509765625
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n06-23-2025\nFor Re-Approval\n08-22-2025\nB\n2\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8598147630691528,
+            "box": [
+                1186.9583740234375,
+                929.5689697265625,
+                1251.4652099609375,
+                949.4693603515625
+            ],
+            "text": "E-03.01B\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01B"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01C_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9645817875862122,
+            "box": [
+                1102.20654296875,
+                929.9552001953125,
+                1187.5205078125,
+                948.6466064453125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9302318096160889,
+            "box": [
+                1143.24560546875,
+                997.0799560546875,
+                1252.1181640625,
+                1041.9049072265625
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 03 & LEVEL 04\nSOW #03 -SOUTH WEST MISC",
+            "rows": [
+                [
+                    "PLAN LEVEL 03 & LEVEL 04 \n SOW #03 -SOUTH WEST MISC"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9289777874946594,
+            "box": [
+                1102.8841552734375,
+                688.4781494140625,
+                1250.6976318359375,
+                735.4908447265625
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n06-23-2025\n08-22-2025\nB\nFor Re-Approval\n2\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8691316843032837,
+            "box": [
+                1187.5599365234375,
+                929.69775390625,
+                1251.4288330078125,
+                948.91796875
+            ],
+            "text": "E-03.01C\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01C"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01D_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9646922945976257,
+            "box": [
+                1102.221435546875,
+                929.9537353515625,
+                1187.50732421875,
+                948.6361083984375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9306657910346985,
+            "box": [
+                1142.87744140625,
+                997.2266845703125,
+                1251.59521484375,
+                1042.243896484375
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 05 & LEVEL 06\nSOW #03 -SOUTH WEST MISC",
+            "rows": [
+                [
+                    "PLAN LEVEL 05 & LEVEL 06 \n SOW #03 -SOUTH WEST MISC"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9295617938041687,
+            "box": [
+                1102.8580322265625,
+                688.47998046875,
+                1250.6971435546875,
+                735.483642578125
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n06-23-2025\n08-22-2025\nB\nFor Re-Approval\n2\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8649106025695801,
+            "box": [
+                1187.5548095703125,
+                929.71240234375,
+                1251.4312744140625,
+                948.948974609375
+            ],
+            "text": "E-03.01D\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01D"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01E_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9633527398109436,
+            "box": [
+                1102.281494140625,
+                929.957275390625,
+                1187.549560546875,
+                948.6248779296875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.933673083782196,
+            "box": [
+                1143.246826171875,
+                997.0767822265625,
+                1251.92138671875,
+                1042.0081787109375
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 07\nSOW #03 -SOUTH WEST MISC",
+            "rows": [
+                [
+                    "PLAN LEVEL 07 \n SOW #03 -SOUTH WEST MISC"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9323260188102722,
+            "box": [
+                1102.6982421875,
+                688.2945556640625,
+                1250.59814453125,
+                735.4783935546875
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "08-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8670569062232971,
+            "box": [
+                1187.49365234375,
+                929.69140625,
+                1251.544921875,
+                948.92041015625
+            ],
+            "text": "E-03.01E\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01E"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01F_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9630062580108643,
+            "box": [
+                1102.275390625,
+                929.955322265625,
+                1187.52587890625,
+                948.623779296875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9345155954360962,
+            "box": [
+                1143.280517578125,
+                997.1123046875,
+                1251.909423828125,
+                1041.9620361328125
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 08\nSOW #03 -SOUTH WEST MISC",
+            "rows": [
+                [
+                    "PLAN LEVEL 08 \n SOW #03 -SOUTH WEST MISC"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9338260293006897,
+            "box": [
+                1102.7529296875,
+                688.3047485351562,
+                1250.572021484375,
+                735.4634399414062
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8605208992958069,
+            "box": [
+                1187.02099609375,
+                929.5594482421875,
+                1251.43701171875,
+                949.408935546875
+            ],
+            "text": "E-03.01F\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01F"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.01_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9650232195854187,
+            "box": [
+                1102.26025390625,
+                929.953369140625,
+                1187.477294921875,
+                948.642822265625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9371256232261658,
+            "box": [
+                1142.9462890625,
+                997.065673828125,
+                1251.95361328125,
+                1042.168212890625
+            ],
+            "text": "Drawing Title:\nPLAN LEVEL 04 TO LEVEL 05\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "PLAN LEVEL 04 TO LEVEL 05 \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9312963485717773,
+            "box": [
+                1102.819580078125,
+                688.730712890625,
+                1252.238525390625,
+                735.5693359375
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\nFor Re-Approval\n08-22-2025\nC\n3\n0\n1\nFor Construction\n09-25-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.888274610042572,
+            "box": [
+                1187.428955078125,
+                929.7176513671875,
+                1251.400634765625,
+                948.9989013671875
+            ],
+            "text": "E-03.01\nDrawing #",
+            "rows": [
+                [
+                    "E-03.01"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.02_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9650598168373108,
+            "box": [
+                1102.2841796875,
+                929.9478759765625,
+                1187.49951171875,
+                948.6351318359375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.935109555721283,
+            "box": [
+                1143.19482421875,
+                996.9754638671875,
+                1251.611328125,
+                1042.5098876953125
+            ],
+            "text": "Drawing Title:\nELEVATION VIEWS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "ELEVATION VIEWS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.928895890712738,
+            "box": [
+                1102.812744140625,
+                688.7109375,
+                1252.212158203125,
+                735.527587890625
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n08-22-2025\nC\nFor Re-Approval\n3\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8884068727493286,
+            "box": [
+                1187.4356689453125,
+                929.7271118164062,
+                1251.3184814453125,
+                948.9751586914062
+            ],
+            "text": "E-03.02\nDrawing #",
+            "rows": [
+                [
+                    "E-03.02"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.03_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9651042819023132,
+            "box": [
+                1102.288330078125,
+                929.9503173828125,
+                1187.4873046875,
+                948.6268310546875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9344820380210876,
+            "box": [
+                1142.949462890625,
+                997.1959228515625,
+                1251.782470703125,
+                1042.1597900390625
+            ],
+            "text": "Drawing Title:\nELEVATION VIEWS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "ELEVATION VIEWS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.929498553276062,
+            "box": [
+                1102.8199462890625,
+                688.71630859375,
+                1252.2095947265625,
+                735.5302734375
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8894547820091248,
+            "box": [
+                1187.097900390625,
+                930.2532958984375,
+                1250.843994140625,
+                948.9466552734375
+            ],
+            "text": "E-03.03\nDrawing #",
+            "rows": [
+                [
+                    "E-03.03"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.04_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.966320812702179,
+            "box": [
+                1102.245849609375,
+                929.9507446289062,
+                1187.477783203125,
+                948.6393432617188
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9345462918281555,
+            "box": [
+                1143.148193359375,
+                997.28515625,
+                1251.5986328125,
+                1042.50732421875
+            ],
+            "text": "Drawing Title:\nELEVATION VIEWS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "ELEVATION VIEWS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9294250011444092,
+            "box": [
+                1102.826904296875,
+                688.7177734375,
+                1252.192626953125,
+                735.52392578125
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8836109042167664,
+            "box": [
+                1187.102783203125,
+                930.2544555664062,
+                1251.329345703125,
+                948.9662475585938
+            ],
+            "text": "E-03.04\nDrawing #",
+            "rows": [
+                [
+                    "E-03.04"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.05_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9657688140869141,
+            "box": [
+                1102.285888671875,
+                929.95458984375,
+                1187.471435546875,
+                948.6217041015625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9366196393966675,
+            "box": [
+                1142.90234375,
+                997.4744873046875,
+                1251.5400390625,
+                1042.5650634765625
+            ],
+            "text": "Drawing Title:\n SECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9302909970283508,
+            "box": [
+                1102.8251953125,
+                688.714111328125,
+                1252.1689453125,
+                735.53515625
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.884655237197876,
+            "box": [
+                1187.4588623046875,
+                929.7464599609375,
+                1251.3319091796875,
+                948.9635009765625
+            ],
+            "text": "E-03.05\nDrawing #",
+            "rows": [
+                [
+                    "E-03.05"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.06_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9667744636535645,
+            "box": [
+                1102.23388671875,
+                929.9530639648438,
+                1187.49560546875,
+                948.6441040039062
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9366592764854431,
+            "box": [
+                1143.1669921875,
+                997.2642822265625,
+                1251.625,
+                1042.610107421875
+            ],
+            "text": "Drawing Title:\nSECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9296401739120483,
+            "box": [
+                1102.8310546875,
+                688.7188720703125,
+                1252.201171875,
+                735.5279541015625
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8842640519142151,
+            "box": [
+                1187.44580078125,
+                929.74462890625,
+                1251.330078125,
+                948.980712890625
+            ],
+            "text": "E-03.06\nDrawing #",
+            "rows": [
+                [
+                    "E-03.06"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.07_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9654860496520996,
+            "box": [
+                1102.281494140625,
+                929.9432983398438,
+                1187.533447265625,
+                948.6472778320312
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9391621947288513,
+            "box": [
+                1142.88427734375,
+                997.2613525390625,
+                1251.63623046875,
+                1042.5711669921875
+            ],
+            "text": "Drawing Title:\nSECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.931783139705658,
+            "box": [
+                1102.7684326171875,
+                688.7395629882812,
+                1252.2623291015625,
+                735.5790405273438
+            ],
+            "text": "# of \nCopies\nRevision/\nDestination\nIssue\nDate\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.887066125869751,
+            "box": [
+                1187.4659423828125,
+                929.7245483398438,
+                1251.3507080078125,
+                949.0214233398438
+            ],
+            "text": "E-03.07\nDrawing #",
+            "rows": [
+                [
+                    "E-03.07"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.08_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9654836058616638,
+            "box": [
+                1102.27001953125,
+                929.9484252929688,
+                1187.504638671875,
+                948.6397094726562
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9368026852607727,
+            "box": [
+                1142.851318359375,
+                997.2227783203125,
+                1251.730712890625,
+                1042.199462890625
+            ],
+            "text": "Drawing Title:\nSECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9295360445976257,
+            "box": [
+                1102.826904296875,
+                688.7251586914062,
+                1252.219970703125,
+                735.5403442382812
+            ],
+            "text": "# of \nCopies\nRevision/\nDestination\nIssue\nDate\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8845949769020081,
+            "box": [
+                1187.441162109375,
+                929.7396240234375,
+                1251.306396484375,
+                948.9725341796875
+            ],
+            "text": "E-03.08\nDrawing #",
+            "rows": [
+                [
+                    "E-03.08"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.09_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9653509259223938,
+            "box": [
+                1102.287353515625,
+                929.9498291015625,
+                1187.515869140625,
+                948.6375732421875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9367358088493347,
+            "box": [
+                1143.27490234375,
+                997.1490478515625,
+                1251.73828125,
+                1042.5645751953125
+            ],
+            "text": "Drawing Title:\nSECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9314007759094238,
+            "box": [
+                1102.82763671875,
+                688.7288208007812,
+                1252.212646484375,
+                735.5515747070312
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8890531063079834,
+            "box": [
+                1187.1011962890625,
+                930.2463989257812,
+                1250.8817138671875,
+                948.9434204101562
+            ],
+            "text": "E-03.09\nDrawing #",
+            "rows": [
+                [
+                    "E-03.09"
+                ]
+            ]
+        }
+    ],
+    "drawings/E-03.10_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.967246413230896,
+            "box": [
+                1102.210205078125,
+                929.9505615234375,
+                1187.4619140625,
+                948.6546630859375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9370429515838623,
+            "box": [
+                1143.27587890625,
+                997.149169921875,
+                1251.742431640625,
+                1042.5673828125
+            ],
+            "text": "Drawing Title:\nSECTIONS\nSOW #03 -SOUTH WEST FRAMING",
+            "rows": [
+                [
+                    "SECTIONS \n SOW #03 -SOUTH WEST FRAMING"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9310566186904907,
+            "box": [
+                1102.81591796875,
+                688.7232055664062,
+                1252.203125,
+                735.5510864257812
+            ],
+            "text": "# of \nDestination\nCopies\nDate\nRevision/\nIssue\nA\nFor Approval\n1\n02-27-2025\n2\nFor Re-Approval\n06-23-2025\nB\n3\nFor Re-Approval\nC\n08-22-2025\n1\n09-25-2025\nFor Construction\n0",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "For Construction",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8876366019248962,
+            "box": [
+                1187.10205078125,
+                930.2461547851562,
+                1250.96826171875,
+                948.9421997070312
+            ],
+            "text": "E-03.10\nDrawing #",
+            "rows": [
+                [
+                    "E-03.10"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.00_1.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9666081070899963,
+            "box": [
+                1102.19580078125,
+                929.9356079101562,
+                1187.41796875,
+                948.4657592773438
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9381046891212463,
+            "box": [
+                1102.37109375,
+                687.8552856445312,
+                1251.93408203125,
+                735.4912719726562
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\n3\n08-22-2025\nFor Re-Approval\nC\n0\n4\n09-22-2025\nFor Fabrication\n1\n5\n09-23-2025\nRevised as noted",
+            "rows": [
+                [
+                    "1",
+                    "5",
+                    "Revised as noted",
+                    "09-23-2025"
+                ],
+                [
+                    "0",
+                    "4",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9337686896324158,
+            "box": [
+                1142.7001953125,
+                997.2552490234375,
+                1250.890380859375,
+                1042.5919189453125
+            ],
+            "text": "EMBED PLATE DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "EMBED PLATE DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.903217077255249,
+            "box": [
+                1187.21728515625,
+                929.667236328125,
+                1251.34814453125,
+                948.729736328125
+            ],
+            "text": "F-03.00\nDrawing #",
+            "rows": [
+                [
+                    "F-03.00"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.01_2.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9641892910003662,
+            "box": [
+                1102.20361328125,
+                929.929931640625,
+                1187.474609375,
+                948.487060546875
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9317123889923096,
+            "box": [
+                1142.7470703125,
+                997.2159423828125,
+                1250.8427734375,
+                1042.61767578125
+            ],
+            "text": "COLUMN DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "COLUMN DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9236775040626526,
+            "box": [
+                1103.53857421875,
+                687.6533203125,
+                1251.728515625,
+                735.3797607421875
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0\nRevised as noted\n5\n09-23-2025\n1\nRevised as noted\n6\n09-25-2025\n2",
+            "rows": [
+                [
+                    "5",
+                    "1",
+                    "Revised as noted",
+                    "09-23-2025"
+                ],
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9105377793312073,
+            "box": [
+                1187.520751953125,
+                929.6588745117188,
+                1251.423583984375,
+                948.7520141601562
+            ],
+            "text": "F-03.01\nDrawing #",
+            "rows": [
+                [
+                    "F-03.01"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.02_1.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9637497663497925,
+            "box": [
+                1102.205078125,
+                929.9346923828125,
+                1187.480712890625,
+                948.5101318359375
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9371922016143799,
+            "box": [
+                1102.30224609375,
+                687.9776611328125,
+                1251.746826171875,
+                735.5228271484375
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0\n5\n1\n09-25-2025\nRevised as noted",
+            "rows": [
+                [
+                    "5",
+                    "1",
+                    "Revised as noted",
+                    "09-25-2025"
+                ],
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9316698312759399,
+            "box": [
+                1142.742431640625,
+                997.2403564453125,
+                1250.836669921875,
+                1042.6195068359375
+            ],
+            "text": "COLUMN DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "COLUMN DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9119775891304016,
+            "box": [
+                1187.53173828125,
+                929.6585693359375,
+                1251.397705078125,
+                948.7462158203125
+            ],
+            "text": "F-03.02\nDrawing #",
+            "rows": [
+                [
+                    "F-03.02"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.03_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9652217626571655,
+            "box": [
+                1102.247314453125,
+                929.9260864257812,
+                1187.393310546875,
+                948.4701538085938
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9321247339248657,
+            "box": [
+                1143.193359375,
+                997.2296142578125,
+                1251.5751953125,
+                1042.671875
+            ],
+            "text": "COLUMN DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "COLUMN DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9278513789176941,
+            "box": [
+                1102.796630859375,
+                688.7412719726562,
+                1252.150146484375,
+                735.4801635742188
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0",
+            "rows": [
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9066738486289978,
+            "box": [
+                1187.559326171875,
+                929.6744995117188,
+                1251.328857421875,
+                948.7111206054688
+            ],
+            "text": "F-03.03\nDrawing #",
+            "rows": [
+                [
+                    "F-03.03"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.04_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9632006883621216,
+            "box": [
+                1102.2332763671875,
+                929.9265747070312,
+                1187.4932861328125,
+                948.4738159179688
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9314613938331604,
+            "box": [
+                1142.7315673828125,
+                997.20849609375,
+                1250.8499755859375,
+                1042.6109619140625
+            ],
+            "text": "COLUMN DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "COLUMN DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9278281927108765,
+            "box": [
+                1102.814208984375,
+                688.74658203125,
+                1252.165771484375,
+                735.47998046875
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0",
+            "rows": [
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9093207716941833,
+            "box": [
+                1187.5439453125,
+                929.6553955078125,
+                1251.46533203125,
+                948.7406005859375
+            ],
+            "text": "F-03.04\nDrawing #",
+            "rows": [
+                [
+                    "F-03.04"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.05_1.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.96574866771698,
+            "box": [
+                1102.2222900390625,
+                929.9265747070312,
+                1187.3802490234375,
+                948.4735717773438
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9375228881835938,
+            "box": [
+                1102.347900390625,
+                687.988525390625,
+                1251.7646484375,
+                735.495361328125
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0\n1\n09-25-2025\n5\nRevised as noted",
+            "rows": [
+                [
+                    "1",
+                    "5",
+                    "Revised as noted",
+                    "09-25-2025"
+                ],
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9368765354156494,
+            "box": [
+                1142.7266845703125,
+                997.286376953125,
+                1250.9874267578125,
+                1042.611572265625
+            ],
+            "text": "COLUMN & BEAM DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "COLUMN & BEAM DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9076744318008423,
+            "box": [
+                1187.5723876953125,
+                929.6862182617188,
+                1251.3841552734375,
+                948.7150268554688
+            ],
+            "text": "F-03.05\nDrawing #",
+            "rows": [
+                [
+                    "F-03.05"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.06_1.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.967183530330658,
+            "box": [
+                1102.18701171875,
+                929.9375610351562,
+                1187.543701171875,
+                948.5151977539062
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9373182058334351,
+            "box": [
+                1102.33203125,
+                687.9888916015625,
+                1251.76025390625,
+                735.4984130859375
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0\nRevised as noted\n5\n1\n09-25-2025",
+            "rows": [
+                [
+                    "5",
+                    "1",
+                    "Revised as noted",
+                    "09-25-2025"
+                ],
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9313768744468689,
+            "box": [
+                1142.920166015625,
+                997.2056884765625,
+                1251.778564453125,
+                1042.3367919921875
+            ],
+            "text": "BEAM DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "BEAM DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9081526398658752,
+            "box": [
+                1187.51220703125,
+                929.6676635742188,
+                1251.41064453125,
+                948.7451782226562
+            ],
+            "text": "F-03.06\nDrawing #",
+            "rows": [
+                [
+                    "F-03.06"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.07_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9667454957962036,
+            "box": [
+                1102.1884765625,
+                929.938232421875,
+                1187.52978515625,
+                948.5137939453125
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9322174191474915,
+            "box": [
+                1142.92724609375,
+                997.2066650390625,
+                1251.77978515625,
+                1042.3409423828125
+            ],
+            "text": "BEAM DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "BEAM DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9274510145187378,
+            "box": [
+                1102.810791015625,
+                688.735107421875,
+                1252.1484375,
+                735.4638671875
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0",
+            "rows": [
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9085419774055481,
+            "box": [
+                1187.501953125,
+                929.6610107421875,
+                1251.3759765625,
+                948.7615966796875
+            ],
+            "text": "F-03.07\nDrawing #",
+            "rows": [
+                [
+                    "F-03.07"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.08_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9666987061500549,
+            "box": [
+                1102.19140625,
+                929.9383544921875,
+                1187.54541015625,
+                948.5179443359375
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9319528341293335,
+            "box": [
+                1142.9215087890625,
+                997.203857421875,
+                1251.7779541015625,
+                1042.3369140625
+            ],
+            "text": "BEAM DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "BEAM DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9272143840789795,
+            "box": [
+                1102.80859375,
+                688.74365234375,
+                1252.17822265625,
+                735.473388671875
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0",
+            "rows": [
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9095636606216431,
+            "box": [
+                1187.503662109375,
+                929.6644897460938,
+                1251.392822265625,
+                948.7417602539062
+            ],
+            "text": "F-03.08\nDrawing #",
+            "rows": [
+                [
+                    "F-03.08"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.09_0.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9659366011619568,
+            "box": [
+                1102.214599609375,
+                929.937255859375,
+                1187.537841796875,
+                948.505859375
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9321390390396118,
+            "box": [
+                1142.925537109375,
+                997.2047119140625,
+                1251.779541015625,
+                1042.3367919921875
+            ],
+            "text": "BEAM DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "BEAM DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9267686009407043,
+            "box": [
+                1102.80908203125,
+                688.7325439453125,
+                1252.148681640625,
+                735.4530029296875
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n1\nA\nFor Approval\n02-27-2025\n2\nB\nFor Re-Approval\n06-23-2025\nC\nFor Re-Approval\n08-22-2025\n3\n4\nFor Fabrication\n09-22-2025\n0",
+            "rows": [
+                [
+                    "4",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "3",
+                    "C",
+                    "For Re-Approval",
+                    "08-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "For Re-Approval",
+                    "06-23-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "02-27-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9078390598297119,
+            "box": [
+                1187.49755859375,
+                929.6641845703125,
+                1251.3349609375,
+                948.7432861328125
+            ],
+            "text": "F-03.09\nDrawing #",
+            "rows": [
+                [
+                    "F-03.09"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.11_1.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9673621654510498,
+            "box": [
+                1102.228271484375,
+                929.930419921875,
+                1187.416259765625,
+                948.521240234375
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.93563312292099,
+            "box": [
+                1142.6129150390625,
+                997.2884521484375,
+                1250.9749755859375,
+                1042.6273193359375
+            ],
+            "text": "MISCELLANEOUS DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "MISCELLANEOUS DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9296709895133972,
+            "box": [
+                1102.760498046875,
+                688.630126953125,
+                1252.395751953125,
+                735.542724609375
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n06-23-2025\n1\nA\nFor Approval\n08-22-2025\n2\nB\nNOT IN USE\n3\nFor Fabrication\n09-22-2025\n0\n4\n1\nRevised as noted\n09-25-2025",
+            "rows": [
+                [
+                    "4",
+                    "1",
+                    "Revised as noted",
+                    "09-25-2025"
+                ],
+                [
+                    "3",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "NOT IN USE",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9095185399055481,
+            "box": [
+                1187.505615234375,
+                929.661376953125,
+                1251.360595703125,
+                948.73046875
+            ],
+            "text": "F-03.11\nDrawing #",
+            "rows": [
+                [
+                    "F-03.11"
+                ]
+            ]
+        }
+    ],
+    "drawings/F-03.12_2.pdf": [
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9655038118362427,
+            "box": [
+                1102.2750244140625,
+                929.9378662109375,
+                1187.4703369140625,
+                948.4979248046875
+            ],
+            "text": "224009\nContract #",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9393754005432129,
+            "box": [
+                1102.400146484375,
+                687.7503662109375,
+                1252.081298828125,
+                735.513427734375
+            ],
+            "text": "# of \nDestination\nCopies\nRevision/\nIssue\nDate\n06-23-2025\n1\nA\nFor Approval\n08-22-2025\n2\nB\nNOT IN USE\n3\nFor Fabrication\n09-22-2025\n0\nRevised as noted\n09-23-2025\n1\n4\n5\n2\nRevised as noted\n09-25-2025",
+            "rows": [
+                [
+                    "5",
+                    "2",
+                    "Revised as noted",
+                    "09-25-2025"
+                ],
+                [
+                    "1",
+                    "4",
+                    "Revised as noted",
+                    "09-23-2025"
+                ],
+                [
+                    "3",
+                    "0",
+                    "For Fabrication",
+                    "09-22-2025"
+                ],
+                [
+                    "2",
+                    "B",
+                    "NOT IN USE",
+                    "08-22-2025"
+                ],
+                [
+                    "1",
+                    "A",
+                    "For Approval",
+                    "06-23-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9352481365203857,
+            "box": [
+                1142.6094970703125,
+                997.285888671875,
+                1250.9822998046875,
+                1042.62255859375
+            ],
+            "text": "MISCELLANEOUS DETAIL\nDrawing Title:",
+            "rows": [
+                [
+                    "MISCELLANEOUS DETAIL"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.9167895913124084,
+            "box": [
+                1187.530517578125,
+                929.6553955078125,
+                1251.3955078125,
+                948.722412109375
+            ],
+            "text": "F-03.12\nDrawing #",
+            "rows": [
+                [
+                    "F-03.12"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl1517_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9749777317047119,
+            "box": [
+                926.2960205078125,
+                1162.314453125,
+                1073.3175048828125,
+                1223.31494140625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9598180055618286,
+            "box": [
+                871.296142578125,
+                730.7274169921875,
+                1071.3946533203125,
+                805.24462890625
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9118014574050903,
+            "box": [
+                870.7645263671875,
+                1070.91796875,
+                986.3031005859375,
+                1096.144287109375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8850886225700378,
+            "box": [
+                987.0421142578125,
+                1071.1480712890625,
+                1072.6478271484375,
+                1095.9827880859375
+            ],
+            "text": "pl1517\nDrawing #",
+            "rows": [
+                [
+                    "pl1517"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl1550_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9750607013702393,
+            "box": [
+                926.2872314453125,
+                1162.2945556640625,
+                1073.3118896484375,
+                1223.3209228515625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9601141810417175,
+            "box": [
+                871.30615234375,
+                730.7301025390625,
+                1071.4267578125,
+                805.2374267578125
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9112497568130493,
+            "box": [
+                870.7581787109375,
+                1070.91162109375,
+                986.3040771484375,
+                1096.140625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8829471468925476,
+            "box": [
+                987.0413818359375,
+                1071.15087890625,
+                1072.6624755859375,
+                1095.97802734375
+            ],
+            "text": "pl1550\nDrawing #",
+            "rows": [
+                [
+                    "pl1550"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl1608_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.97505784034729,
+            "box": [
+                926.294189453125,
+                1162.2940673828125,
+                1073.3115234375,
+                1223.3204345703125
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600679278373718,
+            "box": [
+                871.3018798828125,
+                730.7310791015625,
+                1071.4189453125,
+                805.2384033203125
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9111365079879761,
+            "box": [
+                870.76171875,
+                1070.91259765625,
+                986.3018798828125,
+                1096.14013671875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8855199813842773,
+            "box": [
+                987.043212890625,
+                1071.14892578125,
+                1072.634033203125,
+                1095.9833984375
+            ],
+            "text": "pl1608\nDrawing #",
+            "rows": [
+                [
+                    "pl1608"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl2938_1.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9746376872062683,
+            "box": [
+                926.2882080078125,
+                1162.1561279296875,
+                1073.34521484375,
+                1223.3209228515625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.959775984287262,
+            "box": [
+                871.305908203125,
+                730.6396484375,
+                1071.3232421875,
+                805.23974609375
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025\n09-25-2025\n2\n1\nREVISED AS NOTED",
+            "rows": [
+                [
+                    "2",
+                    "1",
+                    "REVISED AS NOTED",
+                    "09-25-2025"
+                ],
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9123584032058716,
+            "box": [
+                870.7697143554688,
+                1070.9150390625,
+                986.3803100585938,
+                1096.16650390625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8872613310813904,
+            "box": [
+                987.0399169921875,
+                1071.118408203125,
+                1072.6510009765625,
+                1096.0087890625
+            ],
+            "text": "pl2938\nDrawing #",
+            "rows": [
+                [
+                    "pl2938"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3056_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9750804305076599,
+            "box": [
+                926.289794921875,
+                1162.2940673828125,
+                1073.31884765625,
+                1223.3209228515625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.959858775138855,
+            "box": [
+                871.3140869140625,
+                730.7265014648438,
+                1071.3865966796875,
+                805.2446899414062
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9113627076148987,
+            "box": [
+                870.7611694335938,
+                1070.911865234375,
+                986.3038940429688,
+                1096.140625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8862835168838501,
+            "box": [
+                987.0493774414062,
+                1071.11279296875,
+                1072.708984375,
+                1095.982421875
+            ],
+            "text": "pl3056\nDrawing #",
+            "rows": [
+                [
+                    "pl3056"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3057_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9750849604606628,
+            "box": [
+                926.295166015625,
+                1162.294189453125,
+                1073.3173828125,
+                1223.320556640625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9598895311355591,
+            "box": [
+                871.31005859375,
+                730.7257080078125,
+                1071.381103515625,
+                805.2447509765625
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9113190770149231,
+            "box": [
+                870.7608642578125,
+                1070.912109375,
+                986.3043212890625,
+                1096.141357421875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8867286443710327,
+            "box": [
+                987.0486450195312,
+                1071.119140625,
+                1072.728271484375,
+                1095.984375
+            ],
+            "text": "pl3057\nDrawing #",
+            "rows": [
+                [
+                    "pl3057"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3732_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9749261736869812,
+            "box": [
+                926.2967529296875,
+                1162.3192138671875,
+                1073.3253173828125,
+                1223.3209228515625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9593784213066101,
+            "box": [
+                871.3114013671875,
+                730.6962890625,
+                1071.3953857421875,
+                805.257568359375
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9125258922576904,
+            "box": [
+                870.7639770507812,
+                1070.9176025390625,
+                986.3139038085938,
+                1096.1475830078125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8864035606384277,
+            "box": [
+                987.0323486328125,
+                1071.131103515625,
+                1072.6549072265625,
+                1095.979736328125
+            ],
+            "text": "pl3732\nDrawing #",
+            "rows": [
+                [
+                    "pl3732"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3738_1.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9745963215827942,
+            "box": [
+                926.3082275390625,
+                1162.1578369140625,
+                1073.3338623046875,
+                1223.3096923828125
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9598408937454224,
+            "box": [
+                871.306396484375,
+                730.6387939453125,
+                1071.302001953125,
+                805.23974609375
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025\n09-25-2025\n2\n1\nREVISED AS NOTED",
+            "rows": [
+                [
+                    "2",
+                    "1",
+                    "REVISED AS NOTED",
+                    "09-25-2025"
+                ],
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9122439622879028,
+            "box": [
+                870.7739868164062,
+                1070.92236328125,
+                986.3745727539062,
+                1096.1669921875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8869204521179199,
+            "box": [
+                987.043212890625,
+                1071.1275634765625,
+                1072.650146484375,
+                1096.0076904296875
+            ],
+            "text": "pl3738\nDrawing #",
+            "rows": [
+                [
+                    "pl3738"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3739_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.974617063999176,
+            "box": [
+                926.2916259765625,
+                1162.154296875,
+                1073.3448486328125,
+                1223.32177734375
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9601364135742188,
+            "box": [
+                871.31103515625,
+                730.73095703125,
+                1071.4066162109375,
+                805.23486328125
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9120455384254456,
+            "box": [
+                870.76806640625,
+                1070.916748046875,
+                986.376220703125,
+                1096.165283203125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8866962790489197,
+            "box": [
+                987.042236328125,
+                1071.1287841796875,
+                1072.668701171875,
+                1096.0133056640625
+            ],
+            "text": "pl3739\nDrawing #",
+            "rows": [
+                [
+                    "pl3739"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3740_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9750979542732239,
+            "box": [
+                926.291259765625,
+                1162.2933349609375,
+                1073.3173828125,
+                1223.3206787109375
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599078893661499,
+            "box": [
+                871.3006591796875,
+                730.721435546875,
+                1071.391845703125,
+                805.242919921875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9112858772277832,
+            "box": [
+                870.7607421875,
+                1070.9117431640625,
+                986.303955078125,
+                1096.1409912109375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.886274516582489,
+            "box": [
+                987.049560546875,
+                1071.116943359375,
+                1072.639892578125,
+                1095.990478515625
+            ],
+            "text": "pl3740\nDrawing #",
+            "rows": [
+                [
+                    "pl3740"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3742_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9749651551246643,
+            "box": [
+                926.2781982421875,
+                1162.309326171875,
+                1073.3277587890625,
+                1223.322998046875
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600313305854797,
+            "box": [
+                871.3143310546875,
+                730.7298583984375,
+                1071.3988037109375,
+                805.2374267578125
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9112593531608582,
+            "box": [
+                870.7584838867188,
+                1070.91162109375,
+                986.3013305664062,
+                1096.140869140625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8868221044540405,
+            "box": [
+                987.0535278320312,
+                1071.102294921875,
+                1072.641845703125,
+                1095.983154296875
+            ],
+            "text": "pl3742\nDrawing #",
+            "rows": [
+                [
+                    "pl3742"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl3749_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.975277304649353,
+            "box": [
+                926.2489013671875,
+                1162.367919921875,
+                1073.2998046875,
+                1223.324462890625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.960107147693634,
+            "box": [
+                871.3126220703125,
+                730.7303466796875,
+                1071.4119873046875,
+                805.2352294921875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n1\n0\n09-25-2025\nFOR FABRICATION",
+            "rows": [
+                [
+                    "1",
+                    "0",
+                    "FOR FABRICATION",
+                    "09-25-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9162948727607727,
+            "box": [
+                870.7672119140625,
+                1070.919921875,
+                986.2764892578125,
+                1096.05322265625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8845718502998352,
+            "box": [
+                987.057373046875,
+                1071.109619140625,
+                1072.666259765625,
+                1095.983154296875
+            ],
+            "text": "pl3749\nDrawing #",
+            "rows": [
+                [
+                    "pl3749"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl462_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9707773923873901,
+            "box": [
+                926.3216552734375,
+                1162.177490234375,
+                1073.4603271484375,
+                1223.318115234375
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9597552418708801,
+            "box": [
+                871.3087158203125,
+                730.7262573242188,
+                1071.3621826171875,
+                805.2450561523438
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9111309051513672,
+            "box": [
+                870.76318359375,
+                1070.915771484375,
+                986.3128662109375,
+                1096.144775390625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8881279230117798,
+            "box": [
+                986.9957275390625,
+                1071.1123046875,
+                1072.6812744140625,
+                1096.056640625
+            ],
+            "text": "pl462\nDrawing #",
+            "rows": [
+                [
+                    "pl462"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl470_1.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.975095808506012,
+            "box": [
+                926.2935791015625,
+                1162.2939453125,
+                1073.3167724609375,
+                1223.3203125
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599034786224365,
+            "box": [
+                871.31103515625,
+                730.64306640625,
+                1071.34033203125,
+                805.2322998046875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025\n09-25-2025\n2\n1\nREVISED AS NOTED",
+            "rows": [
+                [
+                    "2",
+                    "1",
+                    "REVISED AS NOTED",
+                    "09-25-2025"
+                ],
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9113067984580994,
+            "box": [
+                870.7611083984375,
+                1070.91259765625,
+                986.2982177734375,
+                1096.140625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8889848589897156,
+            "box": [
+                987.020751953125,
+                1071.0919189453125,
+                1072.73828125,
+                1096.0242919921875
+            ],
+            "text": "pl470\nDrawing #",
+            "rows": [
+                [
+                    "pl470"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl472_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9730973243713379,
+            "box": [
+                926.28564453125,
+                1162.2025146484375,
+                1073.4150390625,
+                1223.3348388671875
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599514603614807,
+            "box": [
+                871.30615234375,
+                730.7261352539062,
+                1071.387939453125,
+                805.2405395507812
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9121484756469727,
+            "box": [
+                870.767333984375,
+                1070.9150390625,
+                986.3779296875,
+                1096.1650390625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8872066140174866,
+            "box": [
+                987.0078125,
+                1071.11328125,
+                1072.74462890625,
+                1096.0576171875
+            ],
+            "text": "pl472\nDrawing #",
+            "rows": [
+                [
+                    "pl472"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl473_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9731411337852478,
+            "box": [
+                926.2850341796875,
+                1162.2066650390625,
+                1073.4150390625,
+                1223.3341064453125
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600664973258972,
+            "box": [
+                871.3092041015625,
+                730.7303466796875,
+                1071.4085693359375,
+                805.2373046875
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9122978448867798,
+            "box": [
+                870.7672119140625,
+                1070.916015625,
+                986.377197265625,
+                1096.1650390625
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8880950808525085,
+            "box": [
+                987.0123291015625,
+                1071.1075439453125,
+                1072.7264404296875,
+                1096.0560302734375
+            ],
+            "text": "pl473\nDrawing #",
+            "rows": [
+                [
+                    "pl473"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl658_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.973637580871582,
+            "box": [
+                926.2906494140625,
+                1162.103271484375,
+                1073.41796875,
+                1223.343505859375
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600335359573364,
+            "box": [
+                871.3074951171875,
+                730.7308349609375,
+                1071.383056640625,
+                805.2406005859375
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9112133979797363,
+            "box": [
+                870.75830078125,
+                1070.911865234375,
+                986.310546875,
+                1096.139404296875
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8900139927864075,
+            "box": [
+                986.999755859375,
+                1071.08544921875,
+                1072.726806640625,
+                1096.044189453125
+            ],
+            "text": "pl658\nDrawing #",
+            "rows": [
+                [
+                    "pl658"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl665_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9746184349060059,
+            "box": [
+                926.281005859375,
+                1162.1728515625,
+                1073.338134765625,
+                1223.32568359375
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9600163102149963,
+            "box": [
+                871.3092041015625,
+                730.733154296875,
+                1071.421142578125,
+                805.23681640625
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9119871258735657,
+            "box": [
+                870.7696533203125,
+                1070.918212890625,
+                986.3660888671875,
+                1096.1689453125
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8870514631271362,
+            "box": [
+                987.0113525390625,
+                1071.089599609375,
+                1072.7237548828125,
+                1096.039306640625
+            ],
+            "text": "pl665\nDrawing #",
+            "rows": [
+                [
+                    "pl665"
+                ]
+            ]
+        }
+    ],
+    "drawings/pl680_0.pdf": [
+        {
+            "page": 0,
+            "label": "DRAWING_DESCRIPTION",
+            "confidence": 0.9749191403388977,
+            "box": [
+                926.288330078125,
+                1162.316650390625,
+                1073.3250732421875,
+                1223.3212890625
+            ],
+            "text": "Drawing Title:\nPLATE",
+            "rows": [
+                [
+                    "PLATE"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "REVISION_TABLE",
+            "confidence": 0.9599143266677856,
+            "box": [
+                871.302490234375,
+                730.732421875,
+                1071.3828125,
+                805.234619140625
+            ],
+            "text": "Issue\nRevision/\nDestination\nDate\n# of \nCopies\n0\n1\nFOR FABRICATION\n09-22-2025",
+            "rows": [
+                [
+                    "0",
+                    "1",
+                    "FOR FABRICATION",
+                    "09-22-2025"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "PROJECT_NO",
+            "confidence": 0.9113430976867676,
+            "box": [
+                870.758544921875,
+                1070.911865234375,
+                986.301025390625,
+                1096.140380859375
+            ],
+            "text": "Contract # \n224009",
+            "rows": [
+                [
+                    "224009"
+                ]
+            ]
+        },
+        {
+            "page": 0,
+            "label": "DRAWING_NO",
+            "confidence": 0.8878888487815857,
+            "box": [
+                987.01904296875,
+                1071.0958251953125,
+                1072.71484375,
+                1096.0172119140625
+            ],
+            "text": "pl680\nDrawing #",
+            "rows": [
+                [
+                    "pl680"
+                ]
+            ]
+        }
+    ]
+}

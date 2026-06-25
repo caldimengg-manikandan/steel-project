@@ -152,15 +152,15 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         // If fileRef is a 24-char hex string, it could be a GridFS ID.
         // If it's a long alphanumeric string from OneDrive, it won't be a valid ObjectId (usually).
         // Let's check for both.
-        
+
         if (mongoose.Types.ObjectId.isValid(fileRef)) {
             // Likely GridFS (24 hex)
             const tempDir = path.join(__dirname, '../../uploads/temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            
+
             const tempFileName = `temp_gridfs_${extractionId}_${Date.now()}.pdf`;
             localPath = path.join(tempDir, tempFileName);
-            
+
             console.log(`[Extraction] Downloading GridFS file ${fileRef} to ${localPath}`);
             await _downloadFromGridFS(fileRef, localPath);
             isTemp = true;
@@ -168,10 +168,10 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             // Likely OneDrive ID (usually longer and alphanumeric)
             const tempDir = path.join(__dirname, '../../uploads/temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            
+
             const tempFileName = `temp_onedrive_${extractionId}_${Date.now()}.pdf`;
             localPath = path.join(tempDir, tempFileName);
-            
+
             console.log(`[Extraction] Downloading OneDrive file ${fileRef} to ${localPath}`);
             await downloadFromOneDrive(fileRef, localPath);
             isTemp = true;
@@ -185,8 +185,13 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         const doc = await DrawingExtraction.findById(extractionId).lean();
         const originalFileName = doc ? doc.originalFileName : '';
 
+        // Fetch the project to get clientName
+        const Project = require('../models/Project');
+        const project = await Project.findById(projectId).lean();
+        const clientName = project ? project.clientName : '';
+
         // ── Step 1+2: Call Python extraction bridge ────────────
-        result = await _callPythonBridge(localPath, originalFileName);
+        result = await _callPythonBridge(localPath, originalFileName, clientName);
 
         // Cleanup temporary file immediately if we downloaded from GridFS
         if (isTemp && fs.existsSync(localPath)) {
@@ -249,7 +254,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             const history = fields.revisionHistory || [];
             const marks = history.map(r => cleanMark(r.mark));
             const latestMark = cleanMark(fields.revision);
-            
+
             const allMarks = [...marks];
             if (latestMark) allMarks.push(latestMark);
 
@@ -277,13 +282,13 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         // ── Step 5c: Ensure approx count matches local reality ──────
         try {
             const Project = require('../models/Project');
-            const uniqueSheets = await DrawingExtraction.distinct('extractedFields.drawingNumber', { 
-                projectId, 
+            const uniqueSheets = await DrawingExtraction.distinct('extractedFields.drawingNumber', {
+                projectId,
                 status: 'completed',
                 'extractedFields.drawingNumber': { $ne: null, $ne: "" }
             });
             const totalFiles = await DrawingExtraction.countDocuments({ projectId, status: 'completed' });
-            
+
             const targetCount = Math.max(uniqueSheets.length, totalFiles);
 
             const updateResult = await Project.updateOne(
@@ -345,7 +350,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
 
         // Cleanup temporary file on error too
         if (isTemp && fs.existsSync(localPath)) {
-            try { fs.unlinkSync(localPath); } catch (_) {}
+            try { fs.unlinkSync(localPath); } catch (_) { }
         }
 
         try {
@@ -362,57 +367,108 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
     }
 }
 
-function _callPythonBridge(pdfPath, originalFileName = '') {
-    return new Promise((resolve, reject) => {
-        const args = [PYTHON_SCRIPT, pdfPath];
-        if (originalFileName) {
-            args.push('--original_filename', originalFileName);
+async function _callPythonBridge(pdfPath, originalFileName = '', clientName = '') {
+    try {
+        const fileName = originalFileName || path.basename(pdfPath);
+        
+        // Read the file and prepare form data for FastAPI upload
+        const fileData = fs.readFileSync(pdfPath);
+        const fileBlob = new Blob([fileData], { type: 'application/pdf' });
+        const formData = new FormData();
+        formData.append('files', fileBlob, fileName);
+        formData.append('client_name', clientName || '');
+
+        const aiPort = process.env.AI_SERVICE_PORT || '8001';
+        console.log(`[AI API] Sending ${fileName} to AI model at http://localhost:${aiPort}/upload`);
+
+        let response;
+        let lastErr;
+        const maxRetries = 6;
+        const retryDelayMs = 2000;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                response = await fetch(`http://localhost:${aiPort}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    break;
+                } else {
+                    throw new Error(`AI API returned status ${response.status}`);
+                }
+            } catch (err) {
+                lastErr = err;
+                console.warn(`[AI Bridge] Attempt ${attempt}/${maxRetries} failed: ${err.message}. Retrying in ${retryDelayMs / 1000}s...`);
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                }
+            }
         }
 
-        const proc = spawn(PYTHON_BIN, args, {
-            env: { ...process.env },
-        });
+        if (!response || !response.ok) {
+            throw new Error(`AI API request failed after ${maxRetries} attempts. Last error: ${lastErr ? lastErr.message : 'Unknown'}`);
+        }
 
-        console.log(`[Python] Spawned PID ${proc.pid} for ${path.basename(pdfPath)}`);
+        const results = await response.json();
+        
+        // results is a dict with filename as key
+        const aiData = results[fileName];
+        
+        if (!aiData || aiData.error) {
+            return {
+                success: false,
+                error: (aiData && aiData.error) ? aiData.error : 'AI Extraction failed or returned empty',
+                fields: {},
+                validation: {},
+                confidence: 0
+            };
+        }
 
-        let stdout = '';
-        let stderr = '';
+        // Map AI output to the fields expected by the rest of the pipeline
+        const fields = {
+            drawingNumber: aiData.drawing_no || '',
+            drawingTitle: aiData.drawing_description || '', 
+            description: '',
+            drawingDescription: aiData.drawing_description || '',
+            revision: aiData.latest_revision ? aiData.latest_revision.rev : '0',
+            date: aiData.latest_revision ? aiData.latest_revision.date : '',
+            scale: '',
+            clientName: clientName || '',
+            projectName: aiData.project_no || '',
+            remarks: aiData.latest_revision ? aiData.latest_revision.remarks : '',
+            revisionHistory: (aiData.revisions || []).map(r => ({
+                mark: r.rev,
+                date: r.date,
+                remarks: r.remarks
+            }))
+        };
 
-        proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-        proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+        const validation = {
+            drawingNumberValid: !!fields.drawingNumber,
+            revisionValid: !!fields.revision,
+            dateValid: !!fields.date,
+            warnings: []
+        };
 
-        let timeoutId;
+        return {
+            success: true,
+            fields,
+            validation,
+            confidence: 0.95 // YOLO model confidence placeholder
+        };
 
-        proc.on('close', (code) => {
-            clearTimeout(timeoutId);
-            // Log stderr for debugging (doesn't mean failure)
-            if (stderr) console.log('[Python stderr]', stderr.slice(0, 500));
-
-            // Find the last JSON object in stdout (there may be debug prints before)
-            const jsonMatch = stdout.match(/(\{[\s\S]*\})\s*$/);
-            if (!jsonMatch) {
-                return reject(new Error(`Python produced no JSON output. Code=${code}. stderr=${stderr.slice(0, 200)}`));
-            }
-
-            try {
-                const parsed = JSON.parse(jsonMatch[1]);
-                resolve(parsed);
-            } catch (e) {
-                reject(new Error(`Failed to parse Python output as JSON: ${e.message}`));
-            }
-        });
-
-        proc.on('error', (err) => {
-            clearTimeout(timeoutId);
-            reject(new Error(`Failed to spawn Python: ${err.message}`));
-        });
-
-        // Timeout after 10 minutes (increased from 3m to handle complex drawings)
-        timeoutId = setTimeout(() => {
-            proc.kill('SIGKILL');
-            reject(new Error('Extraction timed out after 10 minutes'));
-        }, 10 * 60 * 1000);
-    });
+    } catch (err) {
+        console.error('[AI Bridge] Error calling AI service:', err.message);
+        return {
+            success: false,
+            error: err.message,
+            fields: {},
+            validation: {},
+            confidence: 0
+        };
+    }
 }
 
 /**

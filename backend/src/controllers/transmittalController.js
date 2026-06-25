@@ -257,10 +257,21 @@ exports.downloadTransmittalExcel = async (req, res) => {
     const project = await Project.findById(projectId).lean();
     const settings = await SystemSettings.findOne().lean();
 
+    // Find the first drawing extraction for this transmittal to get the extracted projectNo
+    let projectNo = 'N/A';
+    if (transmittal.drawings && transmittal.drawings.length > 0) {
+        const extractionIds = transmittal.drawings.map(d => d.extractionId).filter(Boolean);
+        const firstExt = await DrawingExtraction.findOne({ _id: { $in: extractionIds } }).lean();
+        if (firstExt && firstExt.extractedFields && firstExt.extractedFields.projectName) {
+            projectNo = firstExt.extractedFields.projectName;
+        }
+    }
+
     const projectDetails = {
         projectName: project ? project.name : 'Project',
         clientName: project ? project.clientName : 'CLIENT',
         transmittalNo: transmittal.transmittalNumber,
+        projectNo,
     };
 
     const { buffer, filename } = await generateTransmittalExcel(transmittal, projectDetails, settings?.logoPath);

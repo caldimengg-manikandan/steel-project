@@ -10,6 +10,11 @@ const fs = require('fs');
 const RCLONE_REMOTE = 'onedrive:';
 const ONEDRIVE_FOLDER = process.env.ONEDRIVE_FOLDER_PATH || 'SteelDMS_Uploads';
 
+// Use local rclone.exe if present in the backend folder, otherwise fallback to system PATH
+const RCLONE_BIN = fs.existsSync(path.join(process.cwd(), 'rclone.exe')) 
+    ? `"${path.join(process.cwd(), 'rclone.exe')}"` 
+    : 'rclone';
+
 /**
  * Uploads a file to OneDrive using rclone copy
  * @param {string} localPath - Path to local file
@@ -22,7 +27,7 @@ async function uploadFile(localPath, remoteName) {
         console.log(`[Rclone] Uploading ${localPath} to ${remotePath}...`);
         
         // Use copy instead of move to keep the bridge file for a while if needed by storage engine
-        exec(`rclone copy "${localPath}" "${RCLONE_REMOTE}${ONEDRIVE_FOLDER}"`, (error, stdout, stderr) => {
+        exec(`${RCLONE_BIN} copy "${localPath}" "${RCLONE_REMOTE}${ONEDRIVE_FOLDER}"`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`[Rclone] Upload failed: ${stderr}`);
                 return reject(error);
@@ -42,7 +47,7 @@ function streamFile(remoteName, res) {
     const remotePath = `${RCLONE_REMOTE}${ONEDRIVE_FOLDER}/${remoteName}`;
     console.log(`[Rclone] Reading stream: ${remotePath}`);
     
-    const rclone = spawn('rclone', ['cat', remotePath]);
+    const rclone = spawn(RCLONE_BIN.replace(/"/g, ''), ['cat', remotePath]);
 
     rclone.stdout.pipe(res);
 
@@ -69,7 +74,7 @@ async function deleteFile(remoteName) {
         const remotePath = `${RCLONE_REMOTE}${ONEDRIVE_FOLDER}/${remoteName}`;
         console.log(`[Rclone] Deleting ${remotePath}...`);
         
-        exec(`rclone delete "${remotePath}"`, (error, stdout, stderr) => {
+        exec(`${RCLONE_BIN} delete "${remotePath}"`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`[Rclone] Delete failed: ${stderr}`);
                 return reject(error);
@@ -87,7 +92,7 @@ async function deleteFile(remoteName) {
 async function fileExists(remoteName) {
     return new Promise((resolve) => {
         const remotePath = `${RCLONE_REMOTE}${ONEDRIVE_FOLDER}/${remoteName}`;
-        exec(`rclone lsjson "${remotePath}"`, (error, stdout, stderr) => {
+        exec(`${RCLONE_BIN} lsjson "${remotePath}"`, (error, stdout, stderr) => {
             if (error || !stdout || stdout.trim() === '[]') {
                 return resolve(false);
             }

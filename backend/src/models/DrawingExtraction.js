@@ -80,6 +80,7 @@ const drawingExtractionSchema = new mongoose.Schema(
 
         // Target sequences for the transmittal mapping
         sequences: { type: [String], default: [] },
+        category: { type: String, default: '' },
 
         // ── Extraction metadata ──
         status: {

@@ -19,6 +19,13 @@ const EXCEL_DIR = path.join(__dirname, '../../uploads/excel');
 // Default logo fallback
 const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
+const commonBorderStyle = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' },
+};
+
 // Ensure directory exists
 if (!fs.existsSync(EXCEL_DIR)) {
     fs.mkdirSync(EXCEL_DIR, { recursive: true });
@@ -300,11 +307,16 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
 
         // ── Brand Logo (dynamic path) ────────────────────────
         try {
-            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
+                finalLogo = LOGO_DEFAULT;
+            }
             if (fs.existsSync(finalLogo)) {
-                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
+                const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
+                const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
+                const imageId = workbook.addImage({ filename: finalLogo, extension });
                 // Place logo in rows 1-6 (6 row tall banner)
-                trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 6 } });
+                trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 6, row: 6 } });
             }
         } catch (err) { console.error('[ExcelService] Transmittal logo error:', err.message); }
 
@@ -324,6 +336,7 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
         trSheet.mergeCells(T_START, 1, T_START, 3);
         r1.getCell(4).value = `TRANSMITTAL NO: TR-${String(transmittalNo).padStart(3, '0')}`;
         r1.getCell(4).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
+        // Extend merge to cover all columns up to 14 for consistent row length
         trSheet.mergeCells(T_START, 4, T_START, 6);
 
         // Row 9: FABRICATOR  |  DATE
@@ -334,15 +347,15 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
         trSheet.mergeCells(T_START + 1, 1, T_START + 1, 3);
         r2.getCell(4).value = `DATE: ${formattedDate}`;
         r2.getCell(4).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
+        // Extend merge to cover all columns up to 14
         trSheet.mergeCells(T_START + 1, 4, T_START + 1, 6);
 
         // Spacer row
         trSheet.getRow(T_START + 2).height = 8;
 
-        // ── Column Header Rows (T_START+3 and T_START+4) ──────
+        // ── Column Header Rows (T_START+3) ──────
         const trH1 = trSheet.getRow(T_START + 3);
-        const trH2 = trSheet.getRow(T_START + 4);
-        trH1.height = 24; trH2.height = 22;
+        trH1.height = 24;
 
         const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // light blue
         const headerStyle = {
@@ -352,47 +365,33 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
             border: commonBorderStyle
         };
 
-        // Determine Header label based on revisions (Numeric = Fabrication, Alpha = Approval)
-        let hasFabrication = false;
-        rows.forEach(r => {
-            const f = r.extractedFields || {};
-            const rev = (f.revision || '').trim();
-            if (rev && !isNaN(parseInt(rev, 10))) hasFabrication = true;
-        });
-        const headerLabel = hasFabrication ? 'Sent for Fabrication' : 'Sent for Approval';
-
-        // Row 1 of header: Sl.No | Sheet No. | Drawing Title | [Dynamic Header] | Revision History
+        
+        // Static header: Sl.No | Sheet No. | Drawing Title | REV# | DATE | Revision History
         trH1.getCell(1).value = 'Sl. No.';
         trH1.getCell(2).value = 'Sheet No.';
         trH1.getCell(3).value = 'Drawing Title';
-        trH1.getCell(4).value = headerLabel;
-        trSheet.mergeCells(T_START + 3, 4, T_START + 3, 5); // D-E merge for header
+        trH1.getCell(4).value = 'REV#';
+        trH1.getCell(5).value = 'DATE';
         trH1.getCell(6).value = 'Revision History';
 
-        // Row 2 of header: sub-labels for fabrication/approval cols
-        trH2.getCell(4).value = 'REV#';
-        trH2.getCell(5).value = 'DATE';
-
-        // Vertical merges for non-split columns
-        trSheet.mergeCells(T_START + 3, 1, T_START + 4, 1);
-        trSheet.mergeCells(T_START + 3, 2, T_START + 4, 2);
-        trSheet.mergeCells(T_START + 3, 3, T_START + 4, 3);
-        trSheet.mergeCells(T_START + 3, 6, T_START + 4, 6);
-
-        // Apply header style to all header cells
-        [trH1, trH2].forEach(r => {
-            for (let i = 1; i <= 6; i++) { r.getCell(i).style = headerStyle; }
+        // Apply header style to all header cells (extend to columns 1-14)
+        [trH1].forEach(r => {
+            for (let i = 1; i <= 6; i++) {
+                const cell = r.getCell(i);
+                cell.style = headerStyle;
+            }
         });
 
-        // Column widths (6 columns)
+        // Column widths (extend to 14 columns)
         trSheet.getColumn(1).width = 12;   // Sl. No.
         trSheet.getColumn(2).width = 22;   // Sheet No.
         trSheet.getColumn(3).width = 50;   // Drawing Title
         trSheet.getColumn(4).width = 18;   // REV#
         trSheet.getColumn(5).width = 18;   // DATE
         trSheet.getColumn(6).width = 40;   // Revision History
+        // No extra placeholder columns; keep only defined columns.
 
-        trSheet.views = [{ state: 'frozen', ySplit: T_START + 4 }];
+        trSheet.views = [{ state: 'frozen', ySplit: T_START + 3 }];
 
         // ── Data rows grouped by folder ───────────────────────
         const folderGroups = {};
@@ -426,7 +425,8 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 alignment: { horizontal: 'center', vertical: 'middle' },
                 border: commonBorderStyle
             };
-            trSheet.mergeCells(rNum, 1, rNum, 6);
+            // Merge folder header across full width (1-14)
+        trSheet.mergeCells(rNum, 1, rNum, 6);
             for (let i = 1; i <= 6; i++) {
                 fRow.getCell(i).border = commonBorderStyle;
                 if (i > 1) fRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
@@ -463,9 +463,14 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
 
         // ── Brand Logo (dynamic path) ────────────────────────
         try {
-            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
+                finalLogo = LOGO_DEFAULT;
+            }
             if (fs.existsSync(finalLogo)) {
-                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
+                const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
+                const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
+                const imageId = workbook.addImage({ filename: finalLogo, extension });
                 // Scale logo to top left, roughly spanning A and C columns
                 logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
             }
@@ -577,8 +582,8 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
         }
 
         if (numRevs.length > 0) {
-            gHead.getCell(curCol).value = 'Sent for Fabrication';
-            if (numRevs.length > 1) logSheet.mergeCells(L_START + 2, curCol, L_START + 2, curCol + numRevs.length - 1);
+            // Removed top-level 'Sent for Fabrication' header; keep numeric revision sub‑headings only
+            // No merge of cells needed for these columns
             for (let i = 0; i < numRevs.length; i++) gHead.getCell(curCol + i).style = { ...cHeadStyle, fill: fabricFill };
             numRevs.forEach(r => {
                 subHead.getCell(curCol).value = `Rev ${r}`;
@@ -745,10 +750,13 @@ async function generateProjectStatusExcel(projectsData) {
 
     // ── Logo ──────────────────────────────────────────────────
     try {
-        if (fs.existsSync(LOGO_PATH)) {
-            const imageId = workbook.addImage({ filename: LOGO_PATH, extension: 'png' });
+        let finalLogo = LOGO_DEFAULT;
+        if (fs.existsSync(finalLogo)) {
+            const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
+            const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
+            const imageId = workbook.addImage({ filename: finalLogo, extension });
             // Logo from A1 to E5
-            sheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 5 } });
+            sheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 14, row: 5 } });
         }
     } catch (err) { console.error('[ExcelService] Logo error:', err.message); }
 

@@ -41,7 +41,8 @@ export async function uploadDrawing(
     files: File[],
     localSavePath?: string,
     targetTransmittalNumber?: number | null,
-    sequences?: string[]
+    sequences?: string[],
+    purpose?: string
 ): Promise<{ message: string; extractionIds: string[]; status: string }> {
     const token = getToken();
     if (!token) {
@@ -65,6 +66,10 @@ export async function uploadDrawing(
 
     if (sequences && sequences.length > 0) {
         sequences.forEach(s => form.append('sequences', s));
+    }
+
+    if (purpose) {
+        form.append('purpose', purpose);
     }
 
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/upload`, {

@@ -247,6 +247,7 @@ export default function DrawingExtractionPanel({
 
     // Target sequences state
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
     
     const { showMessage, showConfirm } = useMessage();
 
@@ -341,10 +342,31 @@ export default function DrawingExtractionPanel({
     // Called by ALL upload entry points before handleUploads.
     // Opens the transmittal selection modal; when user confirms,
     // processUploads() runs with the chosen transmittal number.
+    const ALLOWED_FOLDERS = [
+        'd sheet', 'detail sheet', 'd sheets', 'detail sheets',
+        'e sheet', 'e sheets', 'erection sheet', 'erection sheets',
+        'gather sheet', 'gather sheets',
+        'e-sheets', 'e-sheet', 'd-sheets', 'd-sheet'
+    ];
+
     async function requestTransmittalThenUpload(files: FileList | File[]) {
-        const fileArray = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+        let fileArray = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+
+        // Filter out files that are not in allowed subfolders (only applies to folder uploads where paths are available)
+        fileArray = fileArray.filter(f => {
+            const path = (f as any).customRelativePath || f.webkitRelativePath;
+            if (!path || !path.includes('/')) return true; // Direct file upload, allow
+            const parts = path.toLowerCase().split('/');
+            // Check if any directory part exactly matches an allowed folder name (ignoring symbols like spaces/dashes for robust matching)
+            const normalizedAllowed = ALLOWED_FOLDERS.map(a => a.replace(/[^a-z0-9]/g, ''));
+            return parts.some((part: string) => {
+                const normalizedPart = part.replace(/[^a-z0-9]/g, '');
+                return normalizedAllowed.includes(normalizedPart);
+            });
+        });
+
         if (fileArray.length === 0) {
-            setUploadError('No valid PDF files found.');
+            setUploadError('No valid PDF files found in allowed folders.');
             return;
         }
 
@@ -480,7 +502,7 @@ export default function DrawingExtractionPanel({
                 const executing = new Set<Promise<any>>();
 
                 for (const chunk of chunks) {
-                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse, selectedSequences).then(() => fetchExtractions(true));
+                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse, selectedSequences, uploadPurpose).then(() => fetchExtractions(true));
                     results.push(p);
                     executing.add(p);
                     p.finally(() => executing.delete(p));
@@ -1059,6 +1081,35 @@ export default function DrawingExtractionPanel({
                                     </div>
                                 </div>
                             )}
+
+                            {/* Fabrication or Approval Selection */}
+                            <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Purpose</div>
+                                <div style={{ display: 'flex', gap: 20 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurpose"
+                                            value="Fabrication"
+                                            checked={uploadPurpose === 'Fabrication'}
+                                            onChange={(e) => setUploadPurpose(e.target.value as 'Fabrication' | 'Approval')}
+                                            style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                        />
+                                        Fabrication
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurpose"
+                                            value="Approval"
+                                            checked={uploadPurpose === 'Approval'}
+                                            onChange={(e) => setUploadPurpose(e.target.value as 'Fabrication' | 'Approval')}
+                                            style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                        />
+                                        Approval
+                                    </label>
+                                </div>
+                            </div>
 
                             <div className="form-actions">
                                 <button

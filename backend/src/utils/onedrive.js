@@ -88,8 +88,9 @@ const storage = {
 async function downloadFile(fileId, destPath) {
     // Determine if fileId is an absolute path or just a filename
     const isAbsolute = path.isAbsolute(fileId);
+    const os = require('os');
     const fileName = isAbsolute ? path.basename(fileId) : fileId;
-    const localAttempt = isAbsolute ? fileId : path.join(__dirname, '../../uploads/temp', fileName);
+    const localAttempt = isAbsolute ? fileId : path.join(os.tmpdir(), 'steel-dms-uploads', fileName);
 
     console.log(`[OneDrive] Download request for: ${fileId} -> ${destPath}`);
     console.log(`[OneDrive] Checking local bridge: ${localAttempt}`);
@@ -102,22 +103,20 @@ async function downloadFile(fileId, destPath) {
         return destPath;
     }
 
-    // Fallback to OneDrive via Rclone copy
+    // Fallback to OneDrive via Rclone copyto
     const { exec } = require('child_process');
     const folder = process.env.ONEDRIVE_FOLDER_PATH || 'SteelDMS_Uploads';
+    const RCLONE_BIN = fs.existsSync(path.join(process.cwd(), 'rclone.exe')) 
+        ? `"${path.join(process.cwd(), 'rclone.exe')}"` 
+        : 'rclone';
     
     console.log(`[OneDrive] Not in bridge. Fetching from OneDrive: ${folder}/${fileName}`);
     
     return new Promise((resolve, reject) => {
-        exec(`rclone copy "onedrive:${folder}/${fileName}" "${path.dirname(destPath)}"`, (error, stdout, stderr) => {
+        exec(`${RCLONE_BIN} copyto "onedrive:${folder}/${fileName}" "${destPath}"`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`[OneDrive] Rclone fetch failed: ${stderr}`);
                 return reject(new Error('File not found in Bridge or OneDrive'));
-            }
-            // Rename if necessary (rclone copy keeps remote name)
-            const downloadedPath = path.join(path.dirname(destPath), fileName);
-            if (downloadedPath !== destPath && fs.existsSync(downloadedPath)) {
-                fs.renameSync(downloadedPath, destPath);
             }
             resolve(destPath);
         });

@@ -42,7 +42,161 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     const trNum = transmittalNo || transmittal.transmittalNumber || 1;
 
     const today = new Date();
-    const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const isSteelFab = clientName.toLowerCase().replace(/ /g, '').includes('steelfab');
+    const formattedDate = isSteelFab
+        ? `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}-${today.getFullYear()}`
+        : `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+    if (isSteelFab) {
+        const trSheet = workbook.addWorksheet('Drawings');
+
+        // ── Logo (top-left, A1:A3 area — free space alongside B2:F2 title) ──
+        try {
+            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            console.log('[TransmittalExcel-SteelFab] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
+            if (fs.existsSync(finalLogo)) {
+                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
+                trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 } });
+            }
+        } catch (err) { console.error('[TransmittalExcel-SteelFab] Logo error:', err.message); }
+
+        // Define styles
+        const greenFont = { bold: true, size: 11, color: { argb: 'FF008000' } };
+        const redFont = { bold: true, size: 11, color: { argb: 'FFFF0000' } };
+        const blackBold = { bold: true, size: 11 };
+        const titleFont = { size: 20, bold: true };
+
+        const commonBorder = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } },
+        };
+
+        // Title
+        trSheet.mergeCells('B2:F2');
+        const titleCell = trSheet.getCell('B2');
+        titleCell.value = 'CALDIM ENGINEERING PRIVATE LIMITED';
+        titleCell.font = titleFont;
+        titleCell.alignment = { horizontal: 'center', vertical: 'center' };
+        trSheet.getRow(2).height = 30;
+
+        // Project Info
+        trSheet.mergeCells('A4:C4');
+        const pNameCell = trSheet.getCell('A4');
+        pNameCell.value = `PROJECT NAME : ${projectName.toUpperCase()}`;
+        pNameCell.font = greenFont;
+        pNameCell.alignment = { vertical: 'center' };
+
+        trSheet.mergeCells('E4:F4');
+        const trNumCell = trSheet.getCell('E4');
+        trNumCell.value = `TRANSMITTAL NO: TR-${String(trNum).padStart(3, '0')}`;
+        trNumCell.font = greenFont;
+        trNumCell.alignment = { horizontal: 'right', vertical: 'center' };
+
+        // Determine Project No
+        let projectNo = projectDetails.projectNo || projectDetails.project_no || 'N/A';
+        if (projectNo === 'N/A' && transmittal.drawings && transmittal.drawings.length > 0) {
+            const firstDwg = transmittal.drawings[0];
+            if (firstDwg.projectNo && firstDwg.projectNo !== 'N/A') {
+                projectNo = firstDwg.projectNo;
+            }
+        }
+
+        trSheet.mergeCells('A5:C5');
+        const pNoCell = trSheet.getCell('A5');
+        pNoCell.value = `PROJECT NO : ${projectNo}`;
+        pNoCell.font = greenFont;
+        pNoCell.alignment = { vertical: 'center' };
+
+        trSheet.mergeCells('E5:F5');
+        const dateCell = trSheet.getCell('E5');
+        dateCell.value = `Date: ${formattedDate}`;
+        dateCell.font = greenFont;
+        dateCell.alignment = { horizontal: 'right', vertical: 'center' };
+
+        trSheet.mergeCells('A6:C6');
+        const fabCell = trSheet.getCell('A6');
+        fabCell.value = `FABRICATOR : ${clientName.toUpperCase()}`;
+        fabCell.font = greenFont;
+        fabCell.alignment = { vertical: 'center' };
+
+        // Headers
+        const headers = ["Sl. No.", "DrawingNo.", "Drawing Description", "REV#", "DATE", "Remarks"];
+        const hRow = trSheet.getRow(8);
+        hRow.height = 24;
+        headers.forEach((h, i) => {
+            const cell = hRow.getCell(i + 1);
+            cell.value = h;
+            cell.font = blackBold;
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = commonBorder;
+        });
+
+        // DRAWINGS separator
+        trSheet.mergeCells('A9:F9');
+        const sepCell = trSheet.getCell('A9');
+        sepCell.value = "DRAWINGS";
+        sepCell.font = redFont;
+        sepCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        
+        const sepRow = trSheet.getRow(9);
+        sepRow.height = 22;
+        for (let i = 1; i <= 6; i++) {
+            sepRow.getCell(i).border = commonBorder;
+        }
+
+        // Data Rows
+        let slNo = 1;
+        let rowNum = 10;
+
+        const sortedDrawings = [...(transmittal.drawings || [])].sort((a, b) =>
+            (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+        );
+
+        sortedDrawings.forEach(d => {
+            const dataRow = trSheet.getRow(rowNum);
+            dataRow.height = 22;
+
+            const rowData = [
+                slNo++,
+                d.drawingNumber || '',
+                d.drawingTitle || '',
+                d.revision || '',
+                d.date || '',
+                d.remarks || ''
+            ];
+
+            rowData.forEach((val, colIndex) => {
+                const colNum = colIndex + 1;
+                const cell = dataRow.getCell(colNum);
+                cell.value = val;
+                cell.border = commonBorder;
+
+                if (colNum === 1 || colNum === 4) {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                } else if (colNum === 5) {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                } else {
+                    cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                }
+            });
+
+            rowNum++;
+        });
+
+        // Adjust column widths
+        const columnWidths = { A: 8, B: 20, C: 40, D: 10, E: 15, F: 30 };
+        Object.keys(columnWidths).forEach(col => {
+            trSheet.getColumn(col).width = columnWidths[col];
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const safeProjectName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+        const filename = `${safeProjectName}_TR-${String(trNum).padStart(3, '0')}_Transmittal.xlsx`;
+
+        return { buffer, filename };
+    }
 
     const trSheet = workbook.addWorksheet(`Transmittal TR-${String(trNum).padStart(3, '0')}`);
 
@@ -326,9 +480,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     }
 
     if (numRevs.length > 0) {
-        gHead.getCell(curCol).value = 'Sent for Fabrication';
-        if (numRevs.length > 1) logSheet.mergeCells(L_START + 2, curCol, L_START + 2, curCol + numRevs.length - 1);
-        for (let i = 0; i < numRevs.length; i++) gHead.getCell(curCol + i).style = { ...cHeadStyle, fill: fabricFill };
+        // No top‑level header for fabrication; add numeric revision sub‑headings directly
         numRevs.forEach(r => {
             subHead.getCell(curCol).value = `Rev ${r}`;
             subHead.getCell(curCol).style = { ...cHeadStyle, fill: fabricFill };
