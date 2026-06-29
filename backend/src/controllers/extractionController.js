@@ -443,6 +443,20 @@ exports.downloadExcel = async (req, res) => {
         console.error('[Excel] Failed to save to local folder:', saveErr.message);
     }
 
+    // ── Save Excel to Storage Gateway ─────────
+    try {
+        const storageGateway = require('../utils/storageGateway');
+        if (storageGateway.isEnabled()) {
+            const safeProjectName = projectDetails.projectName.replace(/[^a-zA-Z0-9 _-]/g, '_');
+            const targetDir = `Projects/${safeProjectName}/Logs`;
+            console.log(`[Excel] Uploading Excel to Storage Gateway: ${targetDir}/${filename}`);
+            await storageGateway.uploadFile(targetDir, filename, buffer);
+            console.log(`[Excel] Storage Gateway Upload complete.`);
+        }
+    } catch (gwErr) {
+        console.error('[Excel] Failed to upload to Storage Gateway:', gwErr.message);
+    }
+
     res.setHeader(
         'Content-Disposition',
         `attachment; filename="${filename}"`

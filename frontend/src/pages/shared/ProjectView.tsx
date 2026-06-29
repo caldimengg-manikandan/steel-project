@@ -44,6 +44,7 @@ export default function ProjectView() {
     // null = "Create New Transmittal"; number = existing transmittal number
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
 
     const fetchData = useCallback(async () => {
         if (!id || id === 'undefined' || id.length < 5) {
@@ -144,7 +145,7 @@ export default function ProjectView() {
                 const res = await reserveTransmittalNumber(pId);
                 numToUse = res.transmittalNumber;
             }
-            const res = await uploadDrawing(pId, filesToUpload, localSavePath, numToUse, selectedSequences);
+            const res = await uploadDrawing(pId, filesToUpload, localSavePath, numToUse, selectedSequences, uploadPurpose);
             showMessage('Success', res.message, 'success');
             setUploadModal(false);
             setDupModal(false);
@@ -862,6 +863,35 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Fabrication or Approval Selection */}
+                            <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Purpose</div>
+                                <div style={{ display: 'flex', gap: 20 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurposeProjView"
+                                            value="Fabrication"
+                                            checked={uploadPurpose === 'Fabrication'}
+                                            onChange={(e) => setUploadPurpose(e.target.value as 'Fabrication' | 'Approval')}
+                                            style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                        />
+                                        Fabrication
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurposeProjView"
+                                            value="Approval"
+                                            checked={uploadPurpose === 'Approval'}
+                                            onChange={(e) => setUploadPurpose(e.target.value as 'Fabrication' | 'Approval')}
+                                            style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                        />
+                                        Approval
+                                    </label>
+                                </div>
+                            </div>
 
                             <div className="form-actions">
                                 <button

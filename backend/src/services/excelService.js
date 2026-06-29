@@ -165,6 +165,26 @@ async function appendRowsToProjectExcel(projectId, rows) {
 
         await workbook.xlsx.writeFile(filePath);
         console.log(`[ExcelService] ✓ Excel updated: ${projectId}`);
+
+        // ── Save Excel to Storage Gateway Logs folder ─────────
+        try {
+            const Project = require('../models/Project');
+            const proj = await Project.findById(projectId).lean();
+            if (proj && proj.name) {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled()) {
+                    const safeProjectName = proj.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+                    const targetDir = `Projects/${safeProjectName}/Logs`;
+                    const filename = `${safeProjectName}_Drawing_Log.xlsx`;
+                    const buffer = fs.readFileSync(filePath);
+                    console.log(`[ExcelService] Uploading Excel to Storage Gateway: ${targetDir}/${filename}`);
+                    await storageGateway.uploadFile(targetDir, filename, buffer);
+                }
+            }
+        } catch (gwErr) {
+            console.error('[ExcelService] Failed to upload to Storage Gateway:', gwErr.message);
+        }
+
         return filePath;
     } catch (err) {
         console.error(`[ExcelService] CRITICAL Error writing Excel for ${projectId}:`, err);
