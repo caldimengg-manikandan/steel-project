@@ -3,6 +3,7 @@ import {
     useContext,
     useState,
     useCallback,
+    useEffect,
     type ReactNode,
 } from 'react';
 import type { AuthUser } from '../types';
@@ -12,23 +13,36 @@ interface AuthContextValue {
     login: (username: string, password: string) => Promise<boolean>;
     logout: () => void;
     isAuthenticated: boolean;
+    isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Mock credential database — replace with real API calls
-// Mock credential database — replaced with real API calls
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<AuthUser | null>(() => {
-        try {
-            const stored = sessionStorage.getItem('sdms_user');
-            return stored ? JSON.parse(stored) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [user, setUser] = useState<AuthUser | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+            try {
+                const res = await fetch(`${BASE}/auth/me`, {
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setUser(data.user);
+                } else {
+                    setUser(null);
+                }
+            } catch {
+                setUser(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        checkAuth();
+    }, []);
 
     const login = useCallback(async (username: string, password: string): Promise<boolean> => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
@@ -38,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             let res = await fetch(`${BASE}/auth/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ username, password }),
             });
 
@@ -46,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 res = await fetch(`${BASE}/auth/user/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ username, password }),
                 });
             }
@@ -58,10 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     email: data.user.email,
                     role: data.user.role,
                     adminId: data.user.adminId,
-                    token: data.token,
                 };
                 setUser(authUser);
-                sessionStorage.setItem('sdms_user', JSON.stringify(authUser));
                 return true;
             }
         } catch (err) {
@@ -71,14 +85,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
     }, []);
 
-    const logout = useCallback(() => {
+    const logout = useCallback(async () => {
+        const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+        try {
+            await fetch(`${BASE}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+        } catch (e) {
+            console.error('Logout failed:', e);
+        }
         setUser(null);
-        sessionStorage.removeItem('sdms_user');
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
-            {children}
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
+            {isLoading ? <div>Loading...</div> : children}
         </AuthContext.Provider>
     );
 }

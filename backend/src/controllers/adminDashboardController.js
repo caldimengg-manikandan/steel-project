@@ -10,12 +10,20 @@ const { attachProjectStats } = require('../services/projectStatsService');
  */
 async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
+    const filter = {};
+    if (req.principal.role !== 'superadmin') {
+        filter.createdByAdminId = adminId;
+    }
+    const userFilter = {};
+    if (req.principal.role !== 'superadmin') {
+        userFilter.adminId = adminId;
+    }
 
     const [projects, users, totalClients] = await Promise.all([
-        Project.find({}).sort({ updatedAt: -1 }), // GLOBAL ADMIN VISIBILITY: ALL PROJECTS
-        User.find({}).sort({ createdAt: -1 }),    // GLOBAL ADMIN VISIBILITY: ALL USERS
-        Client.countDocuments({})                  // GLOBAL ADMIN VISIBILITY: ALL CLIENTS
-    ]);
+            Project.find(filter).sort({ updatedAt: -1 }), 
+            User.find(userFilter).sort({ createdAt: -1 }),    
+            Client.countDocuments(req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId })
+        ]);
 
     const projectIds = projects.map(p => p._id);
 

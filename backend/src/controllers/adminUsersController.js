@@ -22,8 +22,9 @@ const Project = require('../models/Project');
 async function listUsers(req, res) {
     const adminId = req.principal.adminId;
 
+    const query = req.principal.role === 'superadmin' ? {} : { adminId };
     const users = await User
-        .find({}) // GLOBAL ADMIN VISIBILITY: FETCH ALL USERS
+        .find(query)
         .select('-password_hash')
         .sort({ createdAt: -1 });
 
@@ -43,8 +44,11 @@ async function createUser(req, res) {
         return res.status(400).json({ error: 'username, email and password are required.' });
     }
 
-    if (password.length < 1) {
-        return res.status(400).json({ error: 'Password is required.' });
+    if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) {
+        return res.status(400).json({ error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number.' });
     }
 
     const VALID_ROLES = ['user', 'superadmin', 'project_manager', 'team_lead', 'team_member'];
@@ -96,7 +100,8 @@ async function updateUser(req, res) {
         user.role = role;
     }
     if (password !== undefined) {
-        if (password.length < 1) return res.status(400).json({ error: 'Password cannot be empty.' });
+        if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) return res.status(400).json({ error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number.' });
         user.password_hash = password;   // hook will re-hash
     }
 
@@ -113,8 +118,9 @@ async function deleteUser(req, res) {
     const adminId = req.principal.adminId;
 
     // Remove user from all project assignments (GLOBAL ADMIN VISIBILITY: SEARCH ALL PROJECTS)
+    const query = req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId };
     await Project.updateMany(
-        {},
+        query,
         { $pull: { assignments: { userId: user._id } } }
     );
 
@@ -196,6 +202,11 @@ async function bulkCreateUsers(req, res) {
                 if (username || email || password) {
                     errors.push(`Row ${rowNumber}: Incomplete data (username, email, and password required).`);
                 }
+                return;
+            }
+
+            if (password.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) {
+                errors.push(`Row ${rowNumber}: Password does not meet complexity requirements.`);
                 return;
             }
 

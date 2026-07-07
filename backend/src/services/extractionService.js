@@ -235,7 +235,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             if (targetFileName) {
                 const fileDel = await DrawingExtraction.deleteMany({
                     projectId: pId,
-                    originalFileName: targetFileName,
+                    originalFileName: new RegExp(`^${targetFileName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i'),
                     _id: { $ne: eId }
                 });
                 if (fileDel.deletedCount > 0) {
@@ -285,7 +285,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             const uniqueSheets = await DrawingExtraction.distinct('extractedFields.drawingNumber', {
                 projectId,
                 status: 'completed',
-                'extractedFields.drawingNumber': { $ne: null, $ne: "" }
+                'extractedFields.drawingNumber': { $nin: [null, ""] }
             });
             const totalFiles = await DrawingExtraction.countDocuments({ projectId, status: 'completed' });
 
@@ -390,7 +390,10 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
             try {
                 response = await fetch(`http://localhost:${aiPort}/upload`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    headers: {
+                        'X-Internal-Api-Key': process.env.AI_SERVICE_INTERNAL_KEY || 'default_dev_key'
+                    }
                 });
                 
                 if (response.ok) {

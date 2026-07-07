@@ -120,26 +120,7 @@ exports.uploadAndExtract = async (req, res) => {
         status: 'queued',
     }));
 
-    // ── Pre-cleanup: Use originalFileName as a signal for overwrite ──
-    try {
-        const fileNames = validFiles.map(({ file }) => file.originalname);
-        const pId = new mongoose.Types.ObjectId(projectId);
-        
-        // Use a case-insensitive regex for each filename
-        const delResult = await DrawingExtraction.deleteMany({
-            projectId: pId,
-            originalFileName: { $in: fileNames.map(f => new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) }
-        });
-        
-        const logMsg = `[DB_DEBUG] PRE-UPLOAD Cleanup: project=${pId}, files=${fileNames.join(',')}, deleted=${delResult.deletedCount}\n`;
-        fs.appendFileSync(path.join(__dirname, '../../cleanup_debug.log'), logMsg);
-        
-        if (delResult.deletedCount > 0) {
-            console.log(`[Upload] Pre-cleaned ${delResult.deletedCount} existing records with matching filenames for project ${projectId}`);
-        }
-    } catch (cleanErr) {
-        console.error('[Upload] Pre-cleanup error:', cleanErr.message);
-    }
+    // ── Pre-cleanup removed: overwrite logic is handled safely by extractionService.js post-processing ──
 
     // Batch insert for performance
     const savedDocs = await DrawingExtraction.insertMany(extractionDocs);
@@ -247,7 +228,8 @@ exports.getExtraction = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }).lean(); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    }).lean();
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
@@ -264,7 +246,8 @@ exports.reprocess = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    });
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
@@ -304,7 +287,8 @@ exports.viewPdf = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }).lean(); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    }).lean();
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });

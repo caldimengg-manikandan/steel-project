@@ -1,16 +1,8 @@
-import type { AuthUser, User } from '../types';
+import type { User } from '../types';
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-function authHeaders(): Record<string, string> {
-    const stored = sessionStorage.getItem('sdms_user');
-    if (!stored) return {};
-    const user: AuthUser = JSON.parse(stored);
-    return {
-        'Authorization': `Bearer ${user.token || ''}`,
-        'Content-Type': 'application/json',
-    };
-}
+
 
 async function handleResponse(res: Response) {
     if (!res.ok) {
@@ -25,7 +17,8 @@ async function handleResponse(res: Response) {
  */
 export async function adminListUsers(): Promise<{ users: User[] }> {
     const res = await fetch(`${BASE}/admin/users`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -42,7 +35,8 @@ export async function adminCreateUser(data: {
 }): Promise<{ user: User }> {
     const res = await fetch(`${BASE}/admin/users`, {
         method: 'POST',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -54,7 +48,8 @@ export async function adminCreateUser(data: {
 export async function adminUpdateUser(userId: string, data: Partial<User> & { password?: string }): Promise<{ user: User }> {
     const res = await fetch(`${BASE}/admin/users/${String(userId)}`, {
         method: 'PATCH',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -66,22 +61,13 @@ export async function adminUpdateUser(userId: string, data: Partial<User> & { pa
 export async function adminDeleteUser(userId: string): Promise<{ message: string }> {
     const res = await fetch(`${BASE}/admin/users/${String(userId)}`, {
         method: 'DELETE',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
 
-/**
- * Get headers for multipart/form-data (exclude Content-Type)
- */
-function authMultipartHeaders(): Record<string, string> {
-    const stored = sessionStorage.getItem('sdms_user');
-    if (!stored) return {};
-    const user: AuthUser = JSON.parse(stored);
-    return {
-        'Authorization': `Bearer ${user.token || ''}`,
-    };
-}
+
 
 /**
  * Bulk create users via Excel
@@ -92,7 +78,7 @@ export async function adminBulkCreateUsers(file: File): Promise<any> {
 
     const res = await fetch(`${BASE}/admin/users/bulk`, {
         method: 'POST',
-        headers: authMultipartHeaders(),
+        credentials: 'include',
         body: formData,
     });
     return handleResponse(res);
@@ -103,7 +89,8 @@ export async function adminBulkCreateUsers(file: File): Promise<any> {
  */
 export async function adminGetDashboardStats(): Promise<any> {
     const res = await fetch(`${BASE}/admin/dashboard/stats`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -112,7 +99,8 @@ export async function adminGetDashboardStats(): Promise<any> {
  */
 export async function adminGetReportsData(days: number = 30): Promise<any> {
     const res = await fetch(`${BASE}/admin/reports?days=${days}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }

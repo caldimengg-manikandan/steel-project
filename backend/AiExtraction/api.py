@@ -1,5 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException
 import shutil
 import os
 from pathlib import Path
@@ -10,13 +9,6 @@ from extraction_steelfab import process_extracted_data as process_steelfab_data
 from extraction_ironfab import process_extracted_data as process_ironfab_data
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Global caches
 model_cache = {}
@@ -60,8 +52,14 @@ def get_model_for_client(client_name: str):
     # Fallback to the default model
     return default_model
 
+def verify_internal_api_key(x_internal_api_key: str):
+    expected_key = os.environ.get("AI_SERVICE_INTERNAL_KEY", "default_dev_key")
+    if not x_internal_api_key or x_internal_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid internal API key")
+
 @app.post("/upload")
-async def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(None)):
+async def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(None), x_internal_api_key: str = Header(None)):
+    verify_internal_api_key(x_internal_api_key)
     results = {}
     
     # Get model based on client name
@@ -108,4 +106,4 @@ if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.environ.get("AI_SERVICE_PORT", 8085))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=port)

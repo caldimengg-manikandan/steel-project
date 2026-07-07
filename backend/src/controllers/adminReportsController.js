@@ -16,10 +16,8 @@ async function getReportsData(req, res) {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Fetch projects updated within the timeframe (GLOBAL ADMIN VISIBILITY)
-        const rawProjects = await Project.find({
-            updatedAt: { $gte: startDate }
-        }).populate('clientId').sort({ updatedAt: -1 }).lean();
+        const query = req.principal.role === 'superadmin' ? { updatedAt: { $gte: startDate } } : { updatedAt: { $gte: startDate }, createdByAdminId: adminId };
+        const rawProjects = await Project.find(query).populate('clientId').sort({ updatedAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)
         const projects = await attachProjectStats(rawProjects);

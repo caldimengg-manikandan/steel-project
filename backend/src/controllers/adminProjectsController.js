@@ -31,7 +31,10 @@ async function listProjects(req, res) {
     const adminId = req.principal.adminId;
     const { status, search } = req.query;
 
-    const filter = {}; // GLOBAL ADMIN VISIBILITY: Admins see all projects regardless of ID.
+    const filter = {};
+    if (req.principal.role !== 'superadmin') {
+        filter.createdByAdminId = adminId;
+    }
     if (status) filter.status = status;
     if (search) {
         filter.$or = [
@@ -252,8 +255,11 @@ async function removeAssignment(req, res) {
 async function downloadAllProjectsStatusExcel(req, res) {
     const adminId = req.principal.adminId;
 
-    // Fetch all projects for this admin (GLOBAL ADMIN VISIBILITY: FETCH ALL)
-    const projects = await Project.find({}).sort({ createdAt: -1 }).lean();
+    const filter = {};
+    if (req.principal.role !== 'superadmin') {
+        filter.createdByAdminId = adminId;
+    }
+    const projects = await Project.find(filter).sort({ createdAt: -1 }).lean();
 
     if (projects.length === 0) {
         return res.status(404).json({ error: 'No projects found.' });
@@ -333,7 +339,7 @@ async function downloadAllProjectsStatusExcel(req, res) {
 
     // ── Aggregate RFI Counts ──────────────────────────────────
     const rfiCounts = await RfiExtraction.aggregate([
-        // { $match: { createdByAdminId: new mongoose.Types.ObjectId(req.principal.adminId) } }, // Remove creator check for global report
+        { $match: { createdByAdminId: new mongoose.Types.ObjectId(req.principal.adminId) } },
         { $unwind: '$rfis' },
         {
             $group: {

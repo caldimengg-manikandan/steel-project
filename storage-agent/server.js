@@ -114,14 +114,13 @@ function sanitizePath(userPath) {
         .replace(/\0/g, '');        // strip null bytes
 
     const resolved = path.resolve(STORAGE_ROOT, cleaned);
-    const normalizedRoot = path.normalize(STORAGE_ROOT);
-    const normalizedResolved = path.normalize(resolved);
+    const rel = path.relative(STORAGE_ROOT, resolved);
 
-    if (!normalizedResolved.startsWith(normalizedRoot)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error('Access denied: path escapes storage root.');
     }
 
-    return normalizedResolved;
+    return path.normalize(resolved);
 }
 
 // ══════════════════════════════════════════════════════════
