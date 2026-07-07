@@ -20,19 +20,6 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     const createdExtractions = [];
 
-    // ── Pre-cleanup: Use originalFileName as a signal for overwrite (RFIs) ──
-    try {
-        const fileNames = req.files.map(f => f.originalname);
-        const delResult = await RfiExtraction.deleteMany({
-            projectId: new mongoose.Types.ObjectId(projectId),
-            originalFileName: { $in: fileNames }
-        });
-        if (delResult.deletedCount > 0) {
-            console.log(`[RfiUpload] Pre-cleaned ${delResult.deletedCount} existing RFI records with matching filenames for project ${projectId}`);
-        }
-    } catch (cleanErr) {
-        console.error('[RfiUpload] Pre-cleanup error:', cleanErr.message);
-    }
 
     // Process each file
     for (const file of req.files) {
@@ -50,6 +37,19 @@ exports.uploadRfiDrawing = async (req, res) => {
             sequences: sequences || [],
         });
         createdExtractions.push(doc);
+
+        try {
+            const delResult = await RfiExtraction.deleteMany({
+                projectId: new mongoose.Types.ObjectId(projectId),
+                originalFileName: file.originalname,
+                _id: { $ne: doc._id }
+            });
+            if (delResult.deletedCount > 0) {
+                console.log(`[RfiUpload] Cleaned ${delResult.deletedCount} old RFI records for ${file.originalname}`);
+            }
+        } catch (cleanErr) {
+            console.error('[RfiUpload] Cleanup error:', cleanErr.message);
+        }
 
         // process in background using local bridge ref first
         const fileRef = doc.fileUrl || doc.oneDriveFileId;
@@ -233,11 +233,11 @@ exports.updateRfiStatus = async (req, res) => {
 
 // Delete single RFI extraction
 exports.deleteRfiExtraction = async (req, res) => {
-    const { id } = req.params;
+    const { projectId, id } = req.params;
     const adminId = req.principal.adminId;
 
     try {
-        const doc = await RfiExtraction.findOneAndDelete({ _id: id, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId, createdByAdminId: adminId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // Delete from Storage Gateway if present
@@ -339,11 +339,11 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
 
 // Stream source PDF for RFI extraction (GridFS / Disk)
 exports.viewRfiPdf = async (req, res) => {
-    const { id } = req.params;
+    const { projectId, id } = req.params;
     const adminId = req.principal.adminId;
 
     try {
-        const doc = await RfiExtraction.findOne({ _id: id, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // 0. Storage Gateway Mode
