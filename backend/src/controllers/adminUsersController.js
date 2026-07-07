@@ -12,6 +12,7 @@
  *   PATCH  /api/admin/users/:userId      — update user
  *   DELETE /api/admin/users/:userId      — remove user
  */
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Project = require('../models/Project');
 
@@ -117,14 +118,21 @@ async function deleteUser(req, res) {
     const user = req.scopedUser;
     const adminId = req.principal.adminId;
 
-    // Remove user from all project assignments (GLOBAL ADMIN VISIBILITY: SEARCH ALL PROJECTS)
-    const query = req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId };
-    await Project.updateMany(
-        query,
-        { $pull: { assignments: { userId: user._id } } }
-    );
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            const query = req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId };
+            await Project.updateMany(
+                query,
+                { $pull: { assignments: { userId: user._id } } },
+                { session }
+            );
 
-    await user.deleteOne();
+            await user.deleteOne({ session });
+        });
+    } finally {
+        session.endSession();
+    }
 
     res.json({ message: `User "${user.username}" deleted. All project assignments removed.` });
 }
