@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { User, Project } from '../../types';
+import type { User, Project, Client } from '../../types';
 import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, adminBulkCreateUsers } from '../../services/adminUserApi';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
+import { adminListClients } from '../../services/adminClientApi';
 import { useMessage } from '../../context/MessageContext';
 import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload } from '../../components/Icons';
 
@@ -24,6 +25,7 @@ export default function AdminUsers() {
     const { showMessage, showConfirm } = useMessage();
     const [users, setUsers] = useState<User[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
@@ -46,13 +48,15 @@ export default function AdminUsers() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [userData, projectData] = await Promise.all([
+            const [userData, projectData, clientData] = await Promise.all([
                 adminListUsers(),
-                adminListProjects()
+                adminListProjects(),
+                adminListClients()
             ]);
 
             setUsers(userData.users.map((u: any) => ({ ...u, id: u._id || u.id })));
             setProjects(projectData.projects.map((p: any) => ({ ...p, id: p._id || p.id })));
+            setClients(clientData.clients || []);
         } catch (err: any) {
             setError(err.message || 'Failed to load data');
         } finally {
@@ -540,10 +544,11 @@ export default function AdminUsers() {
                                     }}
                                 >
                                     <option value="ALL">All Clients</option>
-                                    {Array.from(new Set(projects.map(p => p.clientName)))
+                                    {clients
+                                        .map(client => client.name)
                                         .sort()
-                                        .map(client => (
-                                            <option key={client} value={client}>{client}</option>
+                                        .map(clientName => (
+                                            <option key={clientName} value={clientName}>{clientName}</option>
                                         ))
                                     }
                                 </select>

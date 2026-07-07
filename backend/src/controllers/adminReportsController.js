@@ -16,8 +16,8 @@ async function getReportsData(req, res) {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        const query = req.principal.role === 'superadmin' ? { updatedAt: { $gte: startDate } } : { updatedAt: { $gte: startDate }, createdByAdminId: adminId };
-        const rawProjects = await Project.find(query).populate('clientId').sort({ updatedAt: -1 }).lean();
+        const query = req.principal.role === 'superadmin' ? { createdAt: { $gte: startDate } } : { createdAt: { $gte: startDate }, createdByAdminId: adminId };
+        const rawProjects = await Project.find(query).populate('clientId').sort({ createdAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)
         const projects = await attachProjectStats(rawProjects);
@@ -73,7 +73,8 @@ async function getReportsData(req, res) {
                 fabricationPercentage: p.fabricationPercentage || 0,
                 drawingCount: p.drawingCount || 0,
                 openRfiCount: p.openRfiCount || 0,
-                sequences: p.sequences || []
+                sequences: p.sequences || [],
+                createdAt: p.createdAt
             }))
         });
     } catch (err) {
