@@ -461,6 +461,7 @@ export default function ProjectView() {
                         projectId={(project?._id || project?.id) as string}
                         projectName={project.name}
                         canUpload={canUpload}
+                        sequences={project?.sequences?.map((s: any) => s.name || s) || []}
                     />
                 </div>
             )}

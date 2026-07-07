@@ -15,6 +15,10 @@
  *   POST   /api/admin/projects/:projectId/reserve-transmittal — reserve transmittal number
  */
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 const Project = require('../models/Project');
 const Drawing = require('../models/Drawing');
 const DrawingExtraction = require('../models/DrawingExtraction');
@@ -22,6 +26,8 @@ const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
 const { attachProjectStats } = require('../services/projectStatsService');
+const storageGateway = require('../utils/storageGateway');
+const { runExtractionPipeline } = require('../services/extractionService');
 
 /**
  * GET /api/admin/projects
@@ -145,18 +151,56 @@ async function updateProject(req, res) {
 /**
  * DELETE /api/admin/projects/:projectId
  * Deletes project and all its drawings/extractions.
+ * Also removes the project folder from the remote storage server.
  */
 async function deleteProject(req, res) {
     const project = req.scopedProject;
+    const projectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
 
-    // 1. Delete all associated data
+    // 1. Delete all files from the remote storage server (entire project folder)
+    if (storageGateway.isEnabled()) {
+        const projectFolder = `Projects/${projectName}`;
+        try {
+            await storageGateway.deleteFile(projectFolder);
+            console.log(`[DeleteProject] Storage folder "${projectFolder}" deleted from server.`);
+        } catch (err) {
+            // If folder doesn't exist on storage, that's fine — continue with DB cleanup
+            if (!err.message.includes('not found') && !err.message.includes('404')) {
+                console.error(`[DeleteProject] Failed to delete storage folder "${projectFolder}":`, err.message);
+            }
+        }
+    }
+
+    // 2. Clean up local temp files for any DrawingExtraction records
+    const extractions = await DrawingExtraction.find({ projectId: project._id }).lean();
+    for (const doc of extractions) {
+        if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
+            try { fs.unlinkSync(doc.fileUrl); } catch (_) {}
+        }
+    }
+
+    // 3. Delete all associated DB records
     await Drawing.deleteMany({ projectId: project._id });
     await DrawingExtraction.deleteMany({ projectId: project._id });
+    await RfiExtraction.deleteMany({ projectId: project._id });
+    await ChangeOrder.deleteMany({ projectId: project._id });
 
-    // 2. Delete project itself
+    // Clean up Transmittals if the model exists
+    try {
+        const Transmittal = require('../models/Transmittal');
+        await Transmittal.deleteMany({ projectId: project._id });
+    } catch (_) {}
+
+    // Clean up DrawingLogs if the model exists
+    try {
+        const DrawingLog = require('../models/DrawingLog');
+        await DrawingLog.deleteMany({ projectId: project._id });
+    } catch (_) {}
+
+    // 4. Delete project itself
     await project.deleteOne();
 
-    res.json({ message: `Project "${project.name}" and all related data deleted.` });
+    res.json({ message: `Project "${project.name}" and all related data deleted from database and storage server.` });
 }
 
 /**
@@ -495,6 +539,173 @@ async function reserveTransmittalNumber(req, res) {
     res.json({ transmittalNumber: updated.transmittalCount });
 }
 
+/**
+ * POST /api/admin/projects/:projectId/upload-folder
+ *
+ * Accepts: multipart/form-data with:
+ *   - files[]         — the files with webkitRelativePath preserved as relative path in the folder
+ *   - paths[]         — matching array of relative paths (same index as files)
+ *   - sequences[]     — (optional) sequence tags
+ *   - transmittalNumber — (optional) a pre-reserved transmittal number
+ *
+ * Behaviour:
+ *   1. Uploads ALL files to storage gateway preserving directory structure:
+ *      Projects/<projectName>/<topFolder>/<relativePath>
+ *   2. Detects drawing PDFs inside the "Drawings/Detail sheets" and "Drawings/E-Sheets" folders
+ *      (case-insensitive, backslash or forward-slash separator)
+ *   3. Saves a temp local copy of each drawing PDF for the AI service to read
+ *   4. Creates DrawingExtraction records and fires the extraction pipeline
+ */
+async function uploadFolder(req, res) {
+    const project = req.scopedProject;
+    const adminId = req.principal.adminId;
+    const uploadedBy = req.principal.username;
+    const projectId = project._id.toString();
+
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded.' });
+    }
+
+    const pathArray = Array.isArray(req.body.paths) ? req.body.paths : (req.body.paths ? [req.body.paths] : []);
+    const targetTransmittalNumber = req.body.transmittalNumber ? parseInt(req.body.transmittalNumber, 10) : null;
+    let sequences = [];
+    if (req.body.sequences) {
+        sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
+    }
+
+    const projectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+
+    // Patterns that indicate a drawing PDF worth extracting
+    const DRAWING_FOLDER_PATTERN = /[\\/](detail[\s_-]*sheets?|d[\s_-]*sheets?|e[\s_-]*sheets?|erection[\s_-]*sheets?|gather[\s_-]*sheets?|g[\s_-]*sheets?|shop[\s_-]*drawings?|connection[\s_-]*drawings?|fabrication[\s_-]*drawings?)[\s\\/]/i;
+    const BINDER_PATTERN = /[\/ ](binders?|binder[_\s-]?sheet)[\/ ]/i;
+
+    // ── Step 1: Upload all files to storage gateway ───────
+    const uploadResults = [];
+    const drawingFiles = []; // subset that are drawing PDFs
+
+    for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const relativePath = pathArray[i] || file.originalname;
+
+        // Determine storage path: Projects/<project>/Folder Upload/<relativePath>
+        // Use the top-level folder name from the relative path
+        const targetDir = `Projects/${projectName}/Folder Upload/${path.dirname(relativePath).replace(/\\/g, '/')}`;
+        const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '');
+
+        let storageGatewayPath = null;
+        if (storageGateway.isEnabled()) {
+            let uploaded = false;
+            let lastError = null;
+            const maxRetries = 5;
+            const baseDelay = 1000; // 1 second base delay
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const fileBuffer = fs.readFileSync(file.path);
+                    await storageGateway.uploadFile(cleanTargetDir, file.originalname, fileBuffer);
+                    storageGatewayPath = `${cleanTargetDir}/${file.originalname}`;
+                    console.log(`[FolderUpload] Stored: ${storageGatewayPath} (Attempt ${attempt})`);
+                    uploaded = true;
+                    break;
+                } catch (err) {
+                    lastError = err;
+                    const isRateLimit = err.message.includes('Too many requests') || err.message.includes('429');
+                    const waitTime = isRateLimit ? baseDelay * attempt * 2 : baseDelay * attempt;
+                    
+                    console.warn(`[FolderUpload] Attempt ${attempt} failed for ${file.originalname}. Error: ${err.message}. Retrying in ${waitTime}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+
+            if (!uploaded) {
+                console.error(`[FolderUpload] Failed to store ${relativePath} after ${maxRetries} attempts:`, lastError?.message);
+                uploadResults.push({ name: file.originalname, path: relativePath, status: 'failed', error: lastError?.message || 'Upload failed' });
+                // Cleanup local temp file if upload to storage gateway failed
+                try { fs.unlinkSync(file.path); } catch (_) {}
+                continue;
+            }
+        }
+
+        uploadResults.push({ name: file.originalname, path: relativePath, status: 'stored' });
+
+        // ── Step 2: Check if this file is a drawing PDF ───
+        const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+        const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
+        const isBinderFolder = BINDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
+
+        if (isPdf && isDrawingFolder && !isBinderFolder) {
+            // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets")
+            const parts = relativePath.replace(/\\/g, '/').split('/');
+            let folderName = parts.length >= 2 ? parts[parts.length - 2] : 'DRAWINGS';
+
+            drawingFiles.push({
+                file,
+                relativePath,
+                folderName,
+                storageGatewayPath,
+            });
+        } else {
+            // Not a drawing PDF, clean up from local disk since it was successfully uploaded to gateway
+            try { fs.unlinkSync(file.path); } catch (_) {}
+        }
+    }
+
+    // ── Step 3: Create extraction docs using the existing local disk paths ──
+    const extractionDocs = [];
+
+    for (const { file, relativePath, folderName, storageGatewayPath } of drawingFiles) {
+        extractionDocs.push({
+            projectId,
+            createdByAdminId: adminId,
+            originalFileName: file.originalname,
+            fileUrl: file.path, // Use the disk file path directly
+            storageGatewayPath: storageGatewayPath || '',
+            folderName,
+            fileSize: file.size,
+            uploadedBy,
+            targetTransmittalNumber,
+            sequences,
+            status: 'queued',
+        });
+    }
+
+    let savedDocs = [];
+    if (extractionDocs.length > 0) {
+        // Pre-cleanup: remove any existing extractions with the same filename in this project
+        const fileNames = extractionDocs.map(e => e.originalFileName);
+        await DrawingExtraction.deleteMany({
+            projectId: new mongoose.Types.ObjectId(projectId),
+            originalFileName: { $in: fileNames.map(f => new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) },
+        });
+
+        savedDocs = await DrawingExtraction.insertMany(extractionDocs);
+
+        // Fire extraction pipeline for each drawing
+        for (const doc of savedDocs) {
+            runExtractionPipeline(
+                doc._id.toString(),
+                doc.fileUrl,
+                projectId,
+                targetTransmittalNumber
+            ).catch(err => console.error(`[FolderUpload] Pipeline error for ${doc.originalFileName}:`, err.message));
+        }
+    }
+
+    const storedCount = uploadResults.filter(r => r.status === 'stored').length;
+    const failedCount = uploadResults.filter(r => r.status === 'failed').length;
+
+    res.status(202).json({
+        message: `${storedCount} file(s) stored on server. ${savedDocs.length} drawing(s) queued for extraction.${failedCount > 0 ? ` (${failedCount} files failed to store)` : ''}`,
+        storedCount,
+        drawingsQueued: savedDocs.length,
+        extractionIds: savedDocs.map(d => d._id),
+        transmittalNumber: targetTransmittalNumber,
+        failedCount,
+        results: uploadResults,
+        drawings: savedDocs.map(d => ({ name: d.originalFileName, folder: d.folderName, id: d._id.toString() })),
+    });
+}
+
 module.exports = {
     listProjects,
     createProject,
@@ -506,4 +717,5 @@ module.exports = {
     downloadAllProjectsStatusExcel,
     uploadCOR,
     reserveTransmittalNumber,
+    uploadFolder,
 };
