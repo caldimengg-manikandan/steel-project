@@ -361,7 +361,7 @@ export default function DrawingExtractionPanel({
             const normalizedAllowed = ALLOWED_FOLDERS.map(a => a.replace(/[^a-z0-9]/g, ''));
             return parts.some((part: string) => {
                 const normalizedPart = part.replace(/[^a-z0-9]/g, '');
-                return normalizedAllowed.includes(normalizedPart);
+                return normalizedAllowed.some(allowed => normalizedPart.includes(allowed));
             });
         });
 

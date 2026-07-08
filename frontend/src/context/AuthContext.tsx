@@ -10,7 +10,7 @@ import type { AuthUser } from '../types';
 
 interface AuthContextValue {
     user: AuthUser | null;
-    login: (username: string, password: string) => Promise<boolean>;
+    login: (username: string, password: string) => Promise<AuthUser | null>;
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         checkAuth();
     }, []);
 
-    const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const login = useCallback(async (username: string, password: string): Promise<AuthUser | null> => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
         try {
@@ -76,13 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     adminId: data.user.adminId,
                 };
                 setUser(authUser);
-                return true;
+                return authUser;
             }
         } catch (err) {
             console.error('[Auth] Real API login failed:', err);
         }
 
-        return false;
+        return null;
     }, []);
 
     const logout = useCallback(async () => {

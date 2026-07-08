@@ -11,6 +11,7 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
+const { logActivity } = require('../utils/logger');
 
 function signToken(payload) {
     return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -64,6 +65,9 @@ async function adminLogin(req, res) {
             sameSite: 'none',
             maxAge: 8 * 60 * 60 * 1000
         });
+        
+        await logActivity(admin.username, 'Auth', 'Admin logged in');
+        
         res.json({ user: admin.toSafeObject() });
     } catch (err) {
         console.error('[AUTH_ERROR] adminLogin failed:', err);
@@ -121,6 +125,8 @@ async function userLogin(req, res) {
             sameSite: 'none',
             maxAge: 8 * 60 * 60 * 1000
         });
+        
+        await logActivity(user.username, 'Auth', 'User logged in');
         res.json({ user: user.toSafeObject() });
     } catch (err) {
         console.error('[AUTH_ERROR] userLogin failed:', err);
@@ -141,6 +147,17 @@ async function getMe(req, res) {
  * Clears the sdms_token cookie.
  */
 async function logout(req, res) {
+    let username = 'Unknown';
+    try {
+        const token = req.cookies?.sdms_token;
+        if (token) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+            username = decoded.username;
+        }
+    } catch(e) {}
+    
+    await logActivity(username, 'Auth', 'Logged out');
+    
     res.clearCookie('sdms_token');
     res.json({ message: 'Logged out successfully' });
 }

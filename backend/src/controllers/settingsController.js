@@ -1,6 +1,7 @@
 const SystemSettings = require('../models/SystemSettings');
 const path = require('path');
 const fs = require('fs');
+const { logActivity } = require('../utils/logger');
 
 /**
  * Get System Settings
@@ -22,15 +23,29 @@ exports.updateSettings = async (req, res) => {
         settings = new SystemSettings();
     }
 
-    const { timezone, dateFormat, emailNotifications, weeklyReports, darkMode } = req.body;
+    const { 
+        timezone, dateFormat, emailNotifications, weeklyReports, darkMode,
+        twoFactor, rfiAutoNumber, activityLogging, moduleProjects, moduleRfi, moduleReports
+    } = req.body;
 
     if (timezone !== undefined) settings.timezone = timezone;
     if (dateFormat !== undefined) settings.dateFormat = dateFormat;
     if (emailNotifications !== undefined) settings.emailNotifications = emailNotifications;
     if (weeklyReports !== undefined) settings.weeklyReports = weeklyReports;
     if (darkMode !== undefined) settings.darkMode = darkMode;
+    if (twoFactor !== undefined) settings.twoFactor = twoFactor;
+    if (rfiAutoNumber !== undefined) settings.rfiAutoNumber = rfiAutoNumber;
+    if (activityLogging !== undefined) settings.activityLogging = activityLogging;
+    if (moduleProjects !== undefined) settings.moduleProjects = moduleProjects;
+    if (moduleRfi !== undefined) settings.moduleRfi = moduleRfi;
+    if (moduleReports !== undefined) settings.moduleReports = moduleReports;
 
     await settings.save();
+    
+    // Log the activity
+    const username = req.user ? req.user.username : 'Admin';
+    await logActivity(username, 'Config', 'System settings updated');
+    
     res.json(settings);
 };
 
@@ -60,6 +75,10 @@ exports.uploadLogo = async (req, res) => {
 
     settings.logoPath = relativePath;
     await settings.save();
+
+    // Log the activity
+    const username = req.user ? req.user.username : 'Admin';
+    await logActivity(username, 'Config', 'Company logo updated');
 
     res.json({ message: 'Logo uploaded successfully', logoPath: relativePath });
 };

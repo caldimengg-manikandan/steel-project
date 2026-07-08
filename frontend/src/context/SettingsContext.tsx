@@ -46,12 +46,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const fetchSettings = async () => {
         try {
-            const stored = sessionStorage.getItem('sdms_user');
-            const token = stored ? JSON.parse(stored).token : '';
-            if (!token) return;
-
             const res = await fetch('/steel/api/settings', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -87,17 +83,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Sync to backend
         try {
-            const stored = sessionStorage.getItem('sdms_user');
-            const token = stored ? JSON.parse(stored).token : '';
-            if (!token) return;
-
             await fetch('/steel/api/settings', {
                 method: 'PATCH',
                 headers: { 
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(newSettings)
+                body: JSON.stringify(newSettings),
+                credentials: 'include'
             });
         } catch (err) {
             console.error('Failed to sync settings to backend:', err);

@@ -118,7 +118,7 @@ export default function AdminDashboard() {
                     ).values());
 
                     return (
-                        <div 
+                        <div
                             className={`stat-card accent-red pr ${showDelayedList ? 'active' : ''}`}
                             onClick={() => setShowDelayedList(!showDelayedList)}
                             style={{ cursor: 'pointer', borderColor: 'var(--color-danger-mid)', background: showDelayedList ? 'var(--color-danger-glow)' : '' }}
@@ -131,8 +131,8 @@ export default function AdminDashboard() {
                             </div>
                             <div className="stat-card-value text-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 {delayedTasks.length}
-                                <svg 
-                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="18" height="18" 
+                                <svg
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="18" height="18"
                                     style={{ transform: showDelayedList ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s' }}
                                 >
                                     <polyline points="6 9 12 15 18 9" />
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
                                                     </div>
                                                     <div className="dropdown-items">
                                                         {projectTasks.map((t: any, idx: number) => (
-                                                            <div 
+                                                            <div
                                                                 key={idx}
                                                                 className="dropdown-item"
                                                                 onClick={() => navigate(`/admin/projects/${String(t.projId)}`)}
@@ -191,12 +191,12 @@ export default function AdminDashboard() {
                         <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                             <span className="card-header-title">My Projects</span>
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/admin/projects')}>View All Projects →</button>
-                            
+
                             {/* Client Filter Dropdown */}
                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Filter by Client:</span>
-                                <select 
-                                    className="form-control form-control-sm" 
+                                <select
+                                    className="form-control form-control-sm"
                                     style={{ width: 'auto', minWidth: 140, height: 32, fontSize: 12 }}
                                     value={clientFilter}
                                     onChange={(e) => setClientFilter(e.target.value)}
@@ -237,68 +237,68 @@ export default function AdminDashboard() {
                                         (stats.recentProjects || [])
                                             .filter((p: any) => clientFilter === 'ALL' || p.clientName === clientFilter)
                                             .map((p: any) => {
-                                            const hasDelayed = (p.sequences || []).some((s: any) => {
-                                                const targetDate = s.approvalDate || s.deadline;
-                                                return s.status !== 'Completed' && targetDate && targetDate < today;
-                                            });
-                                            return (
-                                                <tr key={p._id || p.id}>
-                                                    <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
-                                                <td 
-                                                    style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
-                                                    onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
-                                                >
-                                                    {p.name}
-                                                </td>
-                                                <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
-                                                            <div style={{width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)'}} />
-                                                        </div>
-                                                        <span style={{fontSize: 11, fontWeight: 700}}>{p.approvalPercentage || 0}%</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
-                                                            <div style={{width: `${p.fabricationPercentage || 0}%`, height: '100%', background: 'var(--color-success-mid)'}} />
-                                                        </div>
-                                                        <span style={{fontSize: 11, fontWeight: 700}}>{p.fabricationPercentage || 0}%</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    {(() => {
-                                                        const s = p.sequences || [];
-                                                        const total = s.length;
-                                                        const done = s.filter((seq: any) => seq.status === 'Completed').length;
-                                                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                                                        return (
+                                                const hasDelayed = (p.sequences || []).some((s: any) => {
+                                                    const targetDate = s.approvalDate || s.deadline;
+                                                    return s.status !== 'Completed' && targetDate && targetDate < today;
+                                                });
+                                                return (
+                                                    <tr key={p._id || p.id}>
+                                                        <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
+                                                        <td
+                                                            style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                                            onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
+                                                        >
+                                                            {p.name}
+                                                        </td>
+                                                        <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
+                                                        <td>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
-                                                                    <div style={{width: `${pct}%`, height: '100%', background: 'var(--accent-violet)'}} />
+                                                                <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)' }} />
                                                                 </div>
-                                                                <span style={{fontSize: 11, fontWeight: 700, color: 'var(--accent-violet)'}}>{pct}%</span>
-                                                                {hasDelayed && <span className="badge badge-danger" style={{ fontSize: 9, padding: '1px 5px' }}>DELAYED</span>}
+                                                                <span style={{ fontSize: 11, fontWeight: 700 }}>{p.approvalPercentage || 0}%</span>
                                                             </div>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                <td><StatusBadge status={p.status} /></td>
-                                                <td style={{ color: 'var(--color-text-muted)', fontSize: 12.5 }}>
-                                                    {new Date(p.updatedAt).toLocaleDateString('en-US', {
-                                                        day: '2-digit', month: 'short', year: 'numeric',
-                                                        hour: '2-digit', minute: '2-digit',
-                                                    })}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${p.fabricationPercentage || 0}%`, height: '100%', background: 'var(--color-success-mid)' }} />
+                                                                </div>
+                                                                <span style={{ fontSize: 11, fontWeight: 700 }}>{p.fabricationPercentage || 0}%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            {(() => {
+                                                                const s = p.sequences || [];
+                                                                const total = s.length;
+                                                                const done = s.filter((seq: any) => seq.status === 'Completed').length;
+                                                                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                                                                return (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                        <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                                                                            <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-violet)' }} />
+                                                                        </div>
+                                                                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-violet)' }}>{pct}%</span>
+                                                                        {hasDelayed && <span className="badge badge-danger" style={{ fontSize: 9, padding: '1px 5px' }}>DELAYED</span>}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </td>
+                                                        <td><StatusBadge status={p.status} /></td>
+                                                        <td style={{ color: 'var(--color-text-muted)', fontSize: 12.5 }}>
+                                                            {new Date(p.updatedAt).toLocaleDateString('en-US', {
+                                                                day: '2-digit', month: 'short', year: 'numeric',
+                                                                hour: '2-digit', minute: '2-digit',
+                                                            })}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
                 )}
 
                 {/* Delayed Tasks Detailed Module */}
@@ -328,8 +328,8 @@ export default function AdminDashboard() {
                                         }
 
                                         return delayedTasks.map((t: any, i: number) => (
-                                            <tr 
-                                                key={i} 
+                                            <tr
+                                                key={i}
                                                 onClick={() => navigate(`/admin/projects/${String(t.projId)}`)}
                                                 style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
                                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
@@ -344,8 +344,8 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td><span className="badge badge-danger">OVERDUE</span></td>
                                                 <td>
-                                                    <button 
-                                                        className="btn btn-ghost btn-sm" 
+                                                    <button
+                                                        className="btn btn-ghost btn-sm"
                                                         style={{ color: 'var(--color-primary)' }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();

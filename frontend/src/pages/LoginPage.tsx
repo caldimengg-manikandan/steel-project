@@ -28,11 +28,9 @@ export default function LoginPage() {
         }
         setLoading(true);
         try {
-            const ok = await login(username, password);
-            if (ok) {
-                const stored = sessionStorage.getItem('sdms_user');
-                const u = stored ? JSON.parse(stored) : null;
-                navigate(FULL_ACCESS_ROLES.includes(u?.role) ? '/admin' : '/dashboard');
+            const authUser = await login(username, password);
+            if (authUser) {
+                navigate(FULL_ACCESS_ROLES.includes(authUser.role) ? '/admin' : '/dashboard');
             } else {
                 setError('Invalid username or password. Please try again.');
             }

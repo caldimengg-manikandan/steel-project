@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMessage } from '../../context/MessageContext';
 import {
@@ -91,11 +91,39 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [logSearch, setLogSearch] = useState('');
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const { settings, updateSettings, refreshSettings } = useSettings();
     const { showMessage } = useMessage();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (activeTab === 'audit') {
+            fetchLogs();
+        }
+    }, [activeTab]);
+
+    const fetchLogs = async () => {
+        setLoadingLogs(true);
+        try {
+            const res = await fetch('/steel/api/admin/activity-logs', {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setLogs(data.logs || []);
+            } else {
+                showMessage('Error', 'Failed to fetch logs', 'error');
+            }
+        } catch (error) {
+            console.error('Fetch logs error:', error);
+            showMessage('Error', 'An unexpected error occurred while fetching logs', 'error');
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
 
     const handleSettingChange = (key: string, value: any) => {
         updateSettings({ [key]: value });
@@ -108,11 +136,10 @@ export default function AdminSettings() {
             const formData = new FormData();
             formData.append('logo', logoFile);
             
-            const token = sessionStorage.getItem('sdms_user') ? JSON.parse(sessionStorage.getItem('sdms_user')!).token : '';
             const res = await fetch('/steel/api/settings/logo', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
+                body: formData,
+                credentials: 'include'
             });
             
             if (res.ok) {
@@ -400,19 +427,19 @@ export default function AdminSettings() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {[
-                                            { ts: new Date().toISOString(), user: 'System', mod: 'Config', event: 'Settings updated successfully' },
-                                            { ts: new Date(Date.now() - 3600000).toISOString(), user: 'admin1', mod: 'Projects', event: 'Created project: Steel Bridge' },
-                                            { ts: new Date(Date.now() - 7200000).toISOString(), user: 'admin1', mod: 'RFI', event: 'RFIs extracted from PDF' }
-                                        ].filter(l => 
-                                            l.user.toLowerCase().includes(logSearch.toLowerCase()) || 
-                                            l.mod.toLowerCase().includes(logSearch.toLowerCase()) || 
-                                            l.event.toLowerCase().includes(logSearch.toLowerCase())
+                                        {loadingLogs ? (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>Loading logs...</td></tr>
+                                        ) : logs.length === 0 ? (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>No activity logs found.</td></tr>
+                                        ) : logs.filter(l => 
+                                            (l.user && l.user.toLowerCase().includes(logSearch.toLowerCase())) || 
+                                            (l.module && l.module.toLowerCase().includes(logSearch.toLowerCase())) || 
+                                            (l.event && l.event.toLowerCase().includes(logSearch.toLowerCase()))
                                         ).map((l, i) => (
                                             <tr key={i}>
-                                                <td className="font-mono" style={{ fontSize: 12 }}>{new Date(l.ts).toLocaleString()}</td>
+                                                <td className="font-mono" style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleString()}</td>
                                                 <td><span style={{ fontWeight: 600 }}>{l.user}</span></td>
-                                                <td><span style={{ color: 'var(--color-text-muted)' }}>{l.mod}</span></td>
+                                                <td><span style={{ color: 'var(--color-text-muted)' }}>{l.module}</span></td>
                                                 <td>{l.event}</td>
                                             </tr>
                                         ))}

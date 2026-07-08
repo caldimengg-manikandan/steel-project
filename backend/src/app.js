@@ -32,6 +32,7 @@ const rfiRoutes = require('./routes/rfiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
 
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
@@ -119,6 +120,7 @@ app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/files', fileGatewayRoutes);
+app.use('/api/admin/activity-logs', activityLogRoutes);
 
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
