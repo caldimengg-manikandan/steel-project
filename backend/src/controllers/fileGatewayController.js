@@ -16,6 +16,14 @@
  */
 const storageGateway = require('../utils/storageGateway');
 
+function getErrorStatus(err) {
+    const msg = err.message || '';
+    if (msg.includes('Access denied')) return 403;
+    if (msg.includes('not found')) return 404;
+    if (msg.includes('Cannot reach Storage Agent') || msg.includes('fetch failed') || msg.includes('timeout')) return 504;
+    return 400;
+}
+
 /**
  * GET /api/files/browse?path=<relativePath>
  * ──────────────────────────────────────────
@@ -33,9 +41,7 @@ exports.browse = async (req, res) => {
         });
     } catch (err) {
         console.error('[FileGateway] Browse error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -54,9 +60,7 @@ exports.info = async (req, res) => {
         res.json(fileInfo);
     } catch (err) {
         console.error('[FileGateway] Info error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -89,9 +93,7 @@ exports.download = async (req, res) => {
         stream.pipe(res);
     } catch (err) {
         console.error('[FileGateway] Download error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -139,13 +141,13 @@ exports.upload = async (req, res) => {
         const successCount = results.filter(r => r.status === 'saved').length;
         const failCount = results.filter(r => r.status === 'failed').length;
 
-        res.status(failCount === results.length ? 502 : 201).json({
+        res.status(failCount === results.length ? getErrorStatus(new Error(results[0]?.error || 'Upload failed')) : 201).json({
             message: `${successCount} file(s) saved, ${failCount} failed.`,
             results,
         });
     } catch (err) {
         console.error('[FileGateway] Upload error:', err.message);
-        res.status(502).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -193,9 +195,7 @@ exports.remove = async (req, res) => {
         });
     } catch (err) {
         console.error('[FileGateway] Delete error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -217,6 +217,6 @@ exports.search = async (req, res) => {
         res.json(result);
     } catch (err) {
         console.error('[FileGateway] Search error:', err.message);
-        res.status(502).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
