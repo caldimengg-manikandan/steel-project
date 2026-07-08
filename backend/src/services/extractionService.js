@@ -415,6 +415,7 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
         }
 
         const results = await response.json();
+        console.log(`[AI API Response] Looking for key "${fileName}" in results:`, JSON.stringify(results));
         
         // results is a dict with filename as key
         const aiData = results[fileName];
