@@ -70,11 +70,11 @@ export default function ProjectView() {
             completed.forEach((ex: any) => {
                 const sNo = ex.extractedFields.drawingNumber || 'Extracted';
                 if (!drawingMarksMap[sNo]) drawingMarksMap[sNo] = new Set();
-                
+
                 const hist = Array.isArray(ex.extractedFields.revisionHistory) && ex.extractedFields.revisionHistory.length > 0
                     ? ex.extractedFields.revisionHistory
                     : [{ mark: ex.extractedFields.revision }];
-                
+
                 hist.forEach((h: any) => {
                     if (h.mark != null && h.mark !== '') {
                         drawingMarksMap[sNo].add(String(h.mark).trim().toUpperCase());
@@ -288,16 +288,16 @@ export default function ProjectView() {
 
             {/* ── Dashboard Tab ── */}
             {activeTab === 'dashboard' && (() => {
-                const fabCount   = (project as any).fabricationCount || 0;
-                const appCount   = (project as any).approvalCount    || 0;
-                const openRfi    = project.openRfiCount  || 0;
-                const closedRfi  = project.closedRfiCount || 0;
-                const seqs       = project.sequences || [];
-                const seqTotal   = seqs.length;
-                const seqDone    = seqs.filter((s: any) => s.status === 'Completed').length;
-                const seqPct     = seqTotal > 0 ? Math.round((seqDone / seqTotal) * 100) : 0;
-                const fabPct     = project.fabricationPercentage || 0;
-                const appPct     = project.approvalPercentage    || 0;
+                const fabCount = (project as any).fabricationCount || 0;
+                const appCount = (project as any).approvalCount || 0;
+                const openRfi = project.openRfiCount || 0;
+                const closedRfi = project.closedRfiCount || 0;
+                const seqs = project.sequences || [];
+                const seqTotal = seqs.length;
+                const seqDone = seqs.filter((s: any) => s.status === 'Completed').length;
+                const seqPct = seqTotal > 0 ? Math.round((seqDone / seqTotal) * 100) : 0;
+                const fabPct = project.fabricationPercentage || 0;
+                const appPct = project.approvalPercentage || 0;
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>
@@ -310,7 +310,7 @@ export default function ProjectView() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="stat-card-label">Fabrication</div>
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
                                     </div>
                                 </div>
                                 <div className="stat-card-value">{fabCount}</div>
@@ -322,7 +322,7 @@ export default function ProjectView() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="stat-card-label">Approval</div>
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-info-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-info-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                                     </div>
                                 </div>
                                 <div className="stat-card-value">{appCount}</div>
@@ -334,7 +334,7 @@ export default function ProjectView() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="stat-card-label">Open RFIs</div>
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: openRfi > 0 ? 'var(--color-danger-mid)' : 'var(--color-text-primary)' }}>{openRfi}</div>
@@ -346,7 +346,7 @@ export default function ProjectView() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="stat-card-label">Closed RFIs</div>
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: 'var(--color-success-mid)' }}>{closedRfi}</div>
@@ -358,7 +358,7 @@ export default function ProjectView() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="stat-card-label">Sequences</div>
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: 'var(--accent-violet)' }}>{seqDone}<span style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: 0 }}>/{seqTotal}</span></div>
@@ -373,16 +373,16 @@ export default function ProjectView() {
                             <div className="card">
                                 <div className="card-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
                                         <span className="card-header-title">Progress Overview</span>
                                     </div>
                                     <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Fabrication · Approval · Sequences</span>
                                 </div>
                                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                                     {[
-                                        { label: 'Fabrication',  pct: fabPct, count: fabCount, color: 'var(--color-success-mid)', bg: 'var(--color-success-bg)', barBg: 'rgba(22,163,74,0.15)' },
-                                        { label: 'Approval',     pct: appPct, count: appCount, color: 'var(--color-info-mid)',    bg: 'var(--color-info-bg)',    barBg: 'rgba(37,99,235,0.12)' },
-                                        { label: 'Sequences',    pct: seqPct, count: seqDone,  color: 'var(--accent-violet)',     bg: 'rgba(124,58,237,0.08)', barBg: 'rgba(124,58,237,0.12)' },
+                                        { label: 'Fabrication', pct: fabPct, count: fabCount, color: 'var(--color-success-mid)', bg: 'var(--color-success-bg)', barBg: 'rgba(22,163,74,0.15)' },
+                                        { label: 'Approval', pct: appPct, count: appCount, color: 'var(--color-info-mid)', bg: 'var(--color-info-bg)', barBg: 'rgba(37,99,235,0.12)' },
+                                        { label: 'Sequences', pct: seqPct, count: seqDone, color: 'var(--accent-violet)', bg: 'rgba(124,58,237,0.08)', barBg: 'rgba(124,58,237,0.12)' },
                                     ].map(({ label, pct, count, color, bg, barBg }) => (
                                         <div key={label}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -407,7 +407,7 @@ export default function ProjectView() {
                                 <div className="card" style={{ flex: 1 }}>
                                     <div className="card-header">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet)" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet)" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
                                             <span className="card-header-title">Sequences</span>
                                         </div>
                                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-violet)', background: 'rgba(124,58,237,0.1)', padding: '2px 10px', borderRadius: 99 }}>{seqDone}/{seqTotal} done · {seqPct}%</span>
@@ -438,7 +438,7 @@ export default function ProjectView() {
                                 <div className="card" style={{ border: '1.5px dashed var(--color-border)' }}>
                                     <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px var(--space-lg)' }}>
                                         <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
                                         </div>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 3 }}>Change Orders (COR)</div>
@@ -457,7 +457,7 @@ export default function ProjectView() {
             {/* ── Storage Tab ── */}
             {activeTab === 'storage' && (
                 <div className="card" style={{ padding: 'var(--space-lg)' }}>
-                    <FileBrowserPanel 
+                    <FileBrowserPanel
                         projectId={(project?._id || project?.id) as string}
                         projectName={project.name}
                         canUpload={canUpload}
@@ -612,7 +612,7 @@ export default function ProjectView() {
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                                 Sequence Progress
                             </h3>
-                            
+
                             {!project.sequences || project.sequences.length === 0 ? (
                                 <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
                             ) : (
@@ -721,8 +721,8 @@ export default function ProjectView() {
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                                                     <div>
                                                         <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Approval Date</label>
-                                                        <input 
-                                                            type="date" 
+                                                        <input
+                                                            type="date"
                                                             className="form-control form-control-sm"
                                                             style={{ height: 28, fontSize: 11 }}
                                                             value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
@@ -732,8 +732,8 @@ export default function ProjectView() {
                                                     </div>
                                                     <div>
                                                         <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Fabrication Date</label>
-                                                        <input 
-                                                            type="date" 
+                                                        <input
+                                                            type="date"
                                                             className="form-control form-control-sm"
                                                             style={{ height: 28, fontSize: 11 }}
                                                             value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}

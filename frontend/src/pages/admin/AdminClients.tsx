@@ -242,7 +242,9 @@ export default function AdminClients() {
 
             {filteredClients.length === 0 && !loading && (
                 <div style={{ textAlign: 'center', padding: 100, background: 'var(--color-bg-card)', borderRadius: 12, border: '1px dashed var(--color-border)' }}>
-                    <div style={{ opacity: 0.2, marginBottom: 16 }}><IconBuilding /></div>
+                    <div style={{ opacity: 0.2, margin: '0 auto 16px', width: 64, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <IconBuilding />
+                    </div>
                     <h3 style={{ color: 'var(--color-text-primary)' }}>No clients found</h3>
                     <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Try adjusting your search or filters</p>
                 </div>

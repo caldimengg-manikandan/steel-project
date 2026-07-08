@@ -58,10 +58,13 @@ async function adminLogin(req, res) {
             adminId: admin._id.toString(),
         });
 
-        res.json({
-            token,
-            user: admin.toSafeObject(),
+        res.cookie('sdms_token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge: 8 * 60 * 60 * 1000
         });
+        res.json({ user: admin.toSafeObject() });
     } catch (err) {
         console.error('[AUTH_ERROR] adminLogin failed:', err);
         throw err; // Passed to errorHandler
@@ -112,10 +115,13 @@ async function userLogin(req, res) {
             adminId: user.adminId.toString(),
         });
 
-        res.json({
-            token,
-            user: user.toSafeObject(),
+        res.cookie('sdms_token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge: 8 * 60 * 60 * 1000
         });
+        res.json({ user: user.toSafeObject() });
     } catch (err) {
         console.error('[AUTH_ERROR] userLogin failed:', err);
         throw err; // Passed to errorHandler
@@ -130,4 +136,13 @@ async function getMe(req, res) {
     res.json({ user: req.principal });
 }
 
-module.exports = { adminLogin, userLogin, getMe };
+/**
+ * POST /api/auth/logout
+ * Clears the sdms_token cookie.
+ */
+async function logout(req, res) {
+    res.clearCookie('sdms_token');
+    res.json({ message: 'Logged out successfully' });
+}
+
+module.exports = { adminLogin, userLogin, getMe, logout };

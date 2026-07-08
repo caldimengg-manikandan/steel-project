@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 
 // Models (for auto-seeding)
@@ -70,8 +71,7 @@ app.use(cors({
             if (o === origin) return true;
             // Match without trailing slash
             if (o.replace(/\/$/, '') === origin.replace(/\/$/, '')) return true;
-            // Match vercel subdomains
-            if (origin.endsWith('.vercel.app') && o === 'https://steel-project-iota.vercel.app') return true;
+            // Strict match required
             return false;
         });
 
@@ -91,9 +91,10 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
+app.use(cookieParser());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '1GB' }));
-app.use(express.urlencoded({ extended: true, limit: '1GB' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Debugging log (Remove after fixing)
 app.use((req, res, next) => {
@@ -135,39 +136,7 @@ app.use((_req, res) => {
 // ── Global error handler ───────────────────────────────────
 app.use(errorHandler);
 
-// ── Auto-seeding logic ──────────────────────────────────────
-async function ensureDefaultAdmin() {
-    try {
-        let admin = await Admin.findOne({ username: 'admin1' });
-        if (!admin) {
-            console.log('[DB] Seeding default admin account...');
-            admin = await Admin.create({
-                username: 'admin1',
-                email: 'admin1@steeldetailing.com',
-                password_hash: 'Admin1@2026',
-                displayName: 'Default Admin',
-            });
-        } else {
-            console.log('[DB] Admin1 exists, resetting password for safety...');
-            admin.password_hash = 'Admin1@2026';
-            await admin.save();
-        }
-        console.log(`[DB] Account READY: admin1 / Admin1@2026`);
-        
-        const userExists = await User.findOne({ username: 'theja' });
-        if (!userExists) {
-            await User.create({
-                username: 'theja',
-                email: 'theja@firm1.com',
-                password_hash: 'pass@1234',
-                adminId: admin._id,
-            });
-            console.log(`[DB] Created: theja / pass@1234`);
-        }
-    } catch (err) {
-        console.warn('[DB] Skip auto-seed check:', err.message);
-    }
-}
+// ── Auto-seeding logic removed ───────────────────────────────
 
 // ── Start server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
@@ -176,7 +145,6 @@ const { startAiService } = require('./utils/aiServiceManager');
 
 connectDB().then(async () => {
     initGridFS();
-    await ensureDefaultAdmin();
     
     // Validate remote Storage Agent connectivity
     const storageGateway = require('./utils/storageGateway');

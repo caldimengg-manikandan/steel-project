@@ -1,16 +1,8 @@
-import type { AuthUser } from '../types';
+
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-function authHeaders(): Record<string, string> {
-    const stored = sessionStorage.getItem('sdms_user');
-    if (!stored) return {};
-    const user: AuthUser = JSON.parse(stored);
-    return {
-        'Authorization': `Bearer ${user.token || ''}`,
-        'Content-Type': 'application/json',
-    };
-}
+
 
 async function handleResponse(res: Response) {
     const text = await res.text();
@@ -43,7 +35,8 @@ export async function browseFiles(path: string = ''): Promise<{ path: string; en
     if (path) params.append('path', path);
 
     const res = await fetch(`${BASE}/files/browse?${params.toString()}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -56,7 +49,8 @@ export async function getFileInfo(path: string): Promise<FileEntry> {
     params.append('path', path);
 
     const res = await fetch(`${BASE}/files/info?${params.toString()}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -70,7 +64,8 @@ export async function searchFiles(query: string, path: string = ''): Promise<{ r
     if (path) params.append('path', path);
 
     const res = await fetch(`${BASE}/files/search?${params.toString()}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -79,9 +74,6 @@ export async function searchFiles(query: string, path: string = ''): Promise<{ r
  * Upload multiple files to a target path
  */
 export async function uploadFiles(files: File[], targetPath: string = ''): Promise<{ message: string; results: any[] }> {
-    const stored = sessionStorage.getItem('sdms_user');
-    const token = stored ? JSON.parse(stored).token : '';
-
     const formData = new FormData();
     if (targetPath) {
         formData.append('targetPath', targetPath);
@@ -90,9 +82,7 @@ export async function uploadFiles(files: File[], targetPath: string = ''): Promi
 
     const res = await fetch(`${BASE}/files/upload`, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData,
     });
     return handleResponse(res);
@@ -107,7 +97,8 @@ export async function deleteFile(path: string): Promise<{ message: string; path:
 
     const res = await fetch(`${BASE}/files/remove?${params.toString()}`, {
         method: 'DELETE',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -116,21 +107,15 @@ export async function deleteFile(path: string): Promise<{ message: string; path:
  * Helper to download a file in the browser
  */
 export async function downloadFile(path: string): Promise<void> {
-    const stored = sessionStorage.getItem('sdms_user');
-    const token = stored ? JSON.parse(stored).token : '';
-
     const params = new URLSearchParams();
     params.append('path', path);
-    // Add token so the server can authorize from query param if needed, OR we can fetch() and blob()
-    params.append('token', token);
 
     // Let's use fetch/blob approach so we can handle headers if needed, OR just open URL.
-    // The backend `verifyToken` allows req.query.token.
 
     // We could open a new tab, but using fetch -> blob is better for keeping the user on the same page 
     // and catching errors if it fails.
     const res = await fetch(`${BASE}/files/download?path=${encodeURIComponent(path)}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
     });
 
     if (!res.ok) {

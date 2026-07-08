@@ -34,7 +34,7 @@ async function listMyProjects(req, res) {
         query['assignments.userId'] = queryUserId;
     } else {
         // Full access roles of the tenant see all projects created by that tenant
-        query['adminId'] = new mongoose.Types.ObjectId(req.principal.adminId);
+        query['createdByAdminId'] = new mongoose.Types.ObjectId(req.principal.adminId);
     }
 
     const projects = await Project

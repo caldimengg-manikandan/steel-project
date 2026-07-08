@@ -114,14 +114,13 @@ function sanitizePath(userPath) {
         .replace(/\0/g, '');        // strip null bytes
 
     const resolved = path.resolve(STORAGE_ROOT, cleaned);
-    const normalizedRoot = path.normalize(STORAGE_ROOT);
-    const normalizedResolved = path.normalize(resolved);
+    const rel = path.relative(STORAGE_ROOT, resolved);
 
-    if (!normalizedResolved.startsWith(normalizedRoot)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error('Access denied: path escapes storage root.');
     }
 
-    return normalizedResolved;
+    return path.normalize(resolved);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -544,6 +543,12 @@ app.post('/upload', readOnlyGuard, upload.array('files'), async (req, res) => {
         const results = [];
 
         for (const file of req.files) {
+            // Sanitize originalname to prevent traversal
+            file.originalname = file.originalname
+                .replace(/\\/g, '/')       // unify separators
+                .replace(/^\/+/, '')        // strip leading /
+                .replace(/\0/g, '');        // strip null bytes
+
             // Block dangerous file types
             if (isBlockedExtension(file.originalname)) {
                 results.push({
@@ -557,8 +562,8 @@ app.post('/upload', readOnlyGuard, upload.array('files'), async (req, res) => {
             const filePath = path.join(dirPath, file.originalname);
 
             // Double-check path doesn't escape root
-            const normalizedRoot = path.normalize(STORAGE_ROOT);
-            if (!path.normalize(filePath).startsWith(normalizedRoot)) {
+            const rel = path.relative(STORAGE_ROOT, filePath);
+            if (rel.startsWith('..') || path.isAbsolute(rel)) {
                 results.push({
                     name: file.originalname,
                     status: 'blocked',

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminGetDashboardStats } from '../../services/adminUserApi';
+import { adminListClients } from '../../services/adminClientApi';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import type { Client } from '../../types';
 
 function StatusBadge({ status }: { status: string }) {
     const map: Record<string, string> = {
@@ -15,6 +17,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showDelayedList, setShowDelayedList] = useState(false);
@@ -25,8 +28,12 @@ export default function AdminDashboard() {
     const fetchStats = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await adminGetDashboardStats();
+            const [data, clientsData] = await Promise.all([
+                adminGetDashboardStats(),
+                adminListClients()
+            ]);
             setStats(data);
+            setClients(clientsData.clients || []);
         } catch (err: any) {
             setError(err.message || 'Failed to load dashboard');
         } finally {
@@ -195,7 +202,8 @@ export default function AdminDashboard() {
                                     onChange={(e) => setClientFilter(e.target.value)}
                                 >
                                     <option value="ALL">All Clients ({stats.totalProjects})</option>
-                                    {(Array.from(new Set((stats.recentProjects || []).map((p: any) => p.clientName))) as string[])
+                                    {clients
+                                        .map(c => c.name)
                                         .sort()
                                         .map((client: string) => (
                                             <option key={client} value={client}>{client}</option>
