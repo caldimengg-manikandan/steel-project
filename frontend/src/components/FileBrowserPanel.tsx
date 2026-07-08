@@ -7,7 +7,7 @@ import {
     uploadFolder,
     type FileEntry 
 } from '../services/fileApi';
-import { listExtractions, reserveTransmittalNumber } from '../services/extractionApi';
+import { reserveTransmittalNumber } from '../services/extractionApi';
 import { uploadSessionStore, type SessionFile, type UploadSession } from '../services/uploadSessionStore';
 import { useMessage } from '../context/MessageContext';
 import { 

@@ -239,7 +239,6 @@ export const uploadSessionStore = {
 
                     const matched = extractions.find(ex => 
                         ex._id === sf.extractionId || 
-                        ex.id === sf.extractionId ||
                         (ex.originalFileName && ex.originalFileName.toLowerCase() === sf.name.toLowerCase())
                     );
                     if (matched) {
