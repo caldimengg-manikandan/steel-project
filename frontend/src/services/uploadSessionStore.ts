@@ -23,6 +23,8 @@ export interface UploadSession {
     progressDetail: string;
     resultDetails?: any;
     resultModalOpen: boolean;
+    retryActive?: boolean;
+    cancelRetry?: boolean;
 }
 
 let currentSession: UploadSession | null = null;
@@ -137,13 +139,35 @@ export const uploadSessionStore = {
 
     async retryAllFailed(uploadFolderFn: any, sequences: string[]) {
         if (!currentSession) return;
+        currentSession.retryActive = true;
+        currentSession.cancelRetry = false;
+        notify();
+
         const failedIndices: number[] = [];
         currentSession.files.forEach((f, idx) => {
             if (f.status === 'failed') failedIndices.push(idx);
         });
 
         for (const index of failedIndices) {
+            if (currentSession?.cancelRetry) {
+                console.log('[UploadSessionStore] Retry loop cancelled by user.');
+                break;
+            }
             await this.retryFile(index, uploadFolderFn, sequences);
+        }
+
+        if (currentSession) {
+            currentSession.retryActive = false;
+            currentSession.cancelRetry = false;
+            notify();
+        }
+    },
+
+    stopRetry() {
+        if (currentSession) {
+            currentSession.cancelRetry = true;
+            currentSession.retryActive = false;
+            notify();
         }
     },
 

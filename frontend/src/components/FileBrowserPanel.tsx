@@ -665,24 +665,45 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                     ❌ Failed ({sessionFiles.filter(f => f.status === 'failed').length})
                                 </h5>
                                 {sessionFiles.some(f => f.status === 'failed') && (
-                                    <button
-                                        onClick={() => uploadSessionStore.retryAllFailed(uploadFolder, sequences || [])}
-                                        className="btn btn-ghost"
-                                        style={{
-                                            color: 'var(--color-primary)',
-                                            padding: '2px 8px',
-                                            fontSize: 10,
-                                            height: 'auto',
-                                            minHeight: 0,
-                                            fontWeight: 700,
-                                            background: 'var(--color-bg-card)',
-                                            border: '1px solid var(--color-border-light)',
-                                            borderRadius: 4
-                                        }}
-                                        title="Retry all failed files sequentially"
-                                    >
-                                        🔄 Retry All
-                                    </button>
+                                    session?.retryActive ? (
+                                        <button
+                                            onClick={() => uploadSessionStore.stopRetry()}
+                                            className="btn btn-ghost"
+                                            style={{
+                                                color: 'var(--color-danger-mid)',
+                                                padding: '2px 8px',
+                                                fontSize: 10,
+                                                height: 'auto',
+                                                minHeight: 0,
+                                                fontWeight: 700,
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-danger-mid)',
+                                                borderRadius: 4
+                                            }}
+                                            title="Stop current retry process"
+                                        >
+                                            🛑 Stop Retry
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => uploadSessionStore.retryAllFailed(uploadFolder, sequences || [])}
+                                            className="btn btn-ghost"
+                                            style={{
+                                                color: 'var(--color-primary)',
+                                                padding: '2px 8px',
+                                                fontSize: 10,
+                                                height: 'auto',
+                                                minHeight: 0,
+                                                fontWeight: 700,
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-border-light)',
+                                                borderRadius: 4
+                                            }}
+                                            title="Retry all failed files sequentially"
+                                        >
+                                            🔄 Retry All
+                                        </button>
+                                    )
                                 )}
                             </div>
                             <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
