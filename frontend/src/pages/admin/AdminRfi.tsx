@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminListProjects } from '../../services/projectApi';
+import { formatDate } from '../../utils/dateUtils';
 import {
     listRfiExtractions,
     uploadRfiDrawing,
@@ -791,7 +792,7 @@ export default function AdminRfi() {
                                                                             <span title={parent.originalFileName}>{parent.originalFileName.split('_').pop()?.replace('.pdf', '') || 'Drawing'}</span>
                                                                         </div>
                                                                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{parent.uploadedBy}</span>
-                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{new Date(parent.createdAt).toLocaleDateString()}</span>
+                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{formatDate(parent.createdAt)}</span>
                                                                         <span />
                                                                     </div>
                                                                     {isExp && (
@@ -869,7 +870,7 @@ export default function AdminRfi() {
                                                                 <StatusChip status={ext.status} />
                                                                 <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: rfiCount > 0 ? '#2563eb' : '#94a3b8' }}>{rfiCount}</span>
                                                                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{ext.uploadedBy}</span>
-                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{new Date(ext.createdAt).toLocaleDateString()}</span>
+                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{formatDate(ext.createdAt)}</span>
                                                                 {isAdmin && (
                                                                     <button onClick={(e) => handleDelete(ext._id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, opacity: 0.7 }} title="Delete"><IconDelete /></button>
                                                                 )}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User, Project, Client } from '../../types';
 import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, adminBulkCreateUsers } from '../../services/adminUserApi';
+import { formatDate } from '../../utils/dateUtils';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { useMessage } from '../../context/MessageContext';
@@ -318,7 +319,7 @@ export default function AdminUsers() {
                                             </span>
                                         </td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {new Date(u.createdAt).toLocaleDateString()}
+                                            {formatDate(u.createdAt)}
                                         </td>
                                         <td>
                                             <div className="btn-group">

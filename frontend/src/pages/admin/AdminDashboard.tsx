@@ -3,6 +3,7 @@ import { adminGetDashboardStats } from '../../services/adminUserApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import { formatDate } from '../../utils/dateUtils';
 import type { Client } from '../../types';
 
 function StatusBadge({ status }: { status: string }) {
@@ -161,7 +162,7 @@ export default function AdminDashboard() {
                                                             >
                                                                 <span className="item-dot"></span>
                                                                 <span className="item-name">{t.seqName}</span>
-                                                                <span className="item-date">{new Date(t.deadline).toLocaleDateString()}</span>
+                                                                <span className="item-date">{formatDate(t.deadline)}</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -340,7 +341,7 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{t.seqName}</td>
                                                 <td className="font-mono" style={{ color: 'var(--color-danger)' }}>
-                                                    {new Date(t.deadline).toLocaleDateString()}
+                                                    {formatDate(t.deadline)}
                                                 </td>
                                                 <td><span className="badge badge-danger">OVERDUE</span></td>
                                                 <td>

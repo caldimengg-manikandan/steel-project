@@ -13,6 +13,7 @@
  *  • Full admin-scoped isolation (only shows this project's data)
  */
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { formatDate } from '../utils/dateUtils';
 import { useMessage } from '../context/MessageContext';
 import type { DrawingExtraction, ExtractionStatus } from '../types';
 import {
@@ -993,7 +994,7 @@ export default function DrawingExtractionPanel({
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                                                Created: {new Date(t.createdAt).toLocaleDateString()}
+                                                Created: {formatDate(t.createdAt)}
                                             </div>
                                         </div>
                                         {selectedTransmittalNumber === t.transmittalNumber && (

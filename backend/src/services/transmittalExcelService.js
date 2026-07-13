@@ -255,8 +255,8 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     };
 
     const H_ROW = T_START + 4;
-    const headers = ['Sl. No.', 'Sheet No.', 'Drawing Title', 'Revision', 'Date', 'Remarks', 'Status'];
-    const widths = [8, 22, 50, 14, 16, 40, 14];
+    const headers = ['Sl. No.', 'Sheet No.', 'Drawing Title', 'Revision', 'Date', 'Remarks'];
+    const widths = [8, 22, 50, 14, 16, 40];
 
     const hRow = trSheet.getRow(H_ROW);
     hRow.height = 24;
@@ -290,8 +290,8 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
             alignment: { horizontal: 'center', vertical: 'middle' },
             border: commonBorderStyle,
         };
-        trSheet.mergeCells(rNum, 1, rNum, 7);
-        for (let i = 1; i <= 7; i++) {
+        trSheet.mergeCells(rNum, 1, rNum, 6);
+        for (let i = 1; i <= 6; i++) {
             fRow.getCell(i).border = commonBorderStyle;
             if (i > 1) fRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         }
@@ -312,7 +312,6 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                 d.revision || '',
                 d.date || '',
                 d.remarks || '',
-                isNew ? 'NEW' : isRevised ? `REVISED (was ${d.previousRevision || '?'})` : '',
             ]);
 
             dataRow.height = 22;
@@ -333,12 +332,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
             });
 
-            // Bold the status cell
-            const statusCell = dataRow.getCell(7);
-            statusCell.font = {
-                bold: true,
-                color: { argb: isNew ? 'FF00B050' : isRevised ? 'FFFF6600' : 'FF000000' },
-            };
+            // (Removed status cell logic)
         });
     });
 
@@ -480,7 +474,9 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     }
 
     if (numRevs.length > 0) {
-        // No top‑level header for fabrication; add numeric revision sub‑headings directly
+        gHead.getCell(curCol).value = 'Sent for Fabrication';
+        if (numRevs.length > 1) logSheet.mergeCells(L_START + 2, curCol, L_START + 2, curCol + numRevs.length - 1);
+        for (let i = 0; i < numRevs.length; i++) gHead.getCell(curCol + i).style = { ...cHeadStyle, fill: fabricFill };
         numRevs.forEach(r => {
             subHead.getCell(curCol).value = `Rev ${r}`;
             subHead.getCell(curCol).style = { ...cHeadStyle, fill: fabricFill };

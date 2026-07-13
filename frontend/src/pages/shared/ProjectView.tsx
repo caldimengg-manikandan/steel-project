@@ -8,6 +8,7 @@ import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
 import { listTransmittals } from '../../services/transmittalApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
+import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
@@ -802,7 +803,7 @@ export default function ProjectView() {
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                                                Created: {new Date(t.createdAt).toLocaleDateString()}
+                                                Created: {formatDate(t.createdAt)}
                                             </div>
                                         </div>
                                         {selectedTransmittalNumber === t.transmittalNumber && (

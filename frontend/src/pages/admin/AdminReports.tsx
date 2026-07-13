@@ -9,6 +9,7 @@ import {
 } from '../../components/Icons';
 import { adminGetReportsData } from '../../services/adminUserApi';
 import { adminListClients } from '../../services/adminClientApi';
+import { formatDate } from '../../utils/dateUtils';
 import type { Client } from '../../types';
 
 // ─── Simple Sub-components ───
@@ -190,7 +191,7 @@ export default function AdminReports() {
                                         </div>
                                     </td>
                                     <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}
+                                        {p.createdAt ? formatDate(p.createdAt) : 'N/A'}
                                     </td>
                                 </tr>
                             ))}

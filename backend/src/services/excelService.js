@@ -602,8 +602,8 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
         }
 
         if (numRevs.length > 0) {
-            // Removed top-level 'Sent for Fabrication' header; keep numeric revision sub‑headings only
-            // No merge of cells needed for these columns
+            gHead.getCell(curCol).value = 'Sent for Fabrication';
+            if (numRevs.length > 1) logSheet.mergeCells(L_START + 2, curCol, L_START + 2, curCol + numRevs.length - 1);
             for (let i = 0; i < numRevs.length; i++) gHead.getCell(curCol + i).style = { ...cHeadStyle, fill: fabricFill };
             numRevs.forEach(r => {
                 subHead.getCell(curCol).value = `Rev ${r}`;

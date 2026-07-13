@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
+import { formatDate } from '../../utils/dateUtils';
 import type { Project, ProjectStatus, Client, ClientContact } from '../../types';
 
 const STATUS_OPTIONS: ProjectStatus[] = ['active', 'on_hold', 'completed', 'archived'];
@@ -181,13 +182,15 @@ export default function AdminProjects() {
     }
 
     async function handleEditSave() {
-        if (!editTarget || !editTarget.location) return;
+        if (!editTarget) return;
         try {
             setActionLoading(true);
             setError('');
             const { project } = await adminUpdateProject(editTarget.id, {
                 name: editTarget.name,
                 clientName: editTarget.clientName,
+                clientId: editTarget.clientId,
+                contactPerson: editTarget.contactPerson,
                 description: editTarget.description,
                 status: editTarget.status,
                 approximateDrawingsCount: editTarget.approximateDrawingsCount,
@@ -312,7 +315,7 @@ export default function AdminProjects() {
                                             </span>
                                         </td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {new Date(p.createdAt).toLocaleDateString()}
+                                            {formatDate(p.createdAt)}
                                         </td>
                                         <td className="font-mono" style={{ fontWeight: 600 }}>{p.approximateDrawingsCount || 0}</td>
                                         <td>
@@ -700,9 +703,61 @@ export default function AdminProjects() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label required">Client Name</label>
-                                        <input className="form-control" value={editTarget.clientName}
-                                            onChange={(e) => setEditTarget({ ...editTarget, clientName: e.target.value })} />
+                                        <select 
+                                            className="form-control"
+                                            value={editTarget.clientName}
+                                            onChange={(e) => {
+                                                const selectedName = e.target.value;
+                                                const selectedClient = clients.find(c => c.name === selectedName);
+                                                setEditTarget({ 
+                                                    ...editTarget, 
+                                                    clientName: selectedName,
+                                                    clientId: selectedClient ? (selectedClient.id || selectedClient._id) : editTarget.clientId,
+                                                    contactPerson: null
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Select a Client</option>
+                                            {clients.map(c => (
+                                                <option key={c.id || c._id} value={c.name}>{c.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
+
+                                    {editTarget.clientId && (
+                                        <div className="form-group">
+                                            <label className="form-label required">Contact Person</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                                                {clients.find(c => (c.id || c._id) === editTarget.clientId)?.contacts.map((con, idx) => {
+                                                    const isSelected = editTarget.contactPerson?.email === con.email;
+                                                    return (
+                                                        <label 
+                                                            key={idx} 
+                                                            style={{ 
+                                                                display: 'flex', alignItems: 'flex-start', gap: 10, 
+                                                                padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, 
+                                                                borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                transition: 'all 0.2s', margin: 0
+                                                            }}
+                                                        >
+                                                            <input 
+                                                                type="radio" 
+                                                                name="editContactPersonRadio"
+                                                                checked={isSelected}
+                                                                onChange={() => setEditTarget({ ...editTarget, contactPerson: con })}
+                                                                style={{ marginTop: 2, cursor: 'pointer' }}
+                                                            />
+                                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{con.name}</span>
+                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{con.email}</span>
+                                                            </div>
+                                                        </label>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="form-group">
                                         <label className="form-label">Description</label>
                                         <textarea className="form-control" rows={3} value={editTarget.description}

@@ -7,6 +7,7 @@ import {
     getDrawingLogExcelUrl
 } from '../services/transmittalApi';
 import { useMessage } from '../context/MessageContext';
+import { formatDate } from '../utils/dateUtils';
 
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
     const { showMessage, showConfirm } = useMessage();
@@ -159,7 +160,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                     <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
                                                 )}
                                             </td>
-                                            <td className="text-muted">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                            <td className="text-muted">{formatDate(t.createdAt)}</td>
                                             <td><span className="badge badge-success">{t.newCount}</span></td>
                                             <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                             <td>
@@ -195,7 +196,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                             <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
                                         )}
                                     </td>
-                                    <td className="text-muted">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                    <td className="text-muted">{formatDate(t.createdAt)}</td>
                                     <td><span className="badge badge-success">{t.newCount}</span></td>
                                     <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                     <td>

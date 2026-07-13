@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { setGlobalDateFormat } from '../utils/dateUtils';
 
 interface Settings {
     timezone: string;
@@ -70,6 +71,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     useEffect(() => {
         localStorage.setItem('app_settings', JSON.stringify(settings));
+        
+        // Sync global date format for all modules
+        setGlobalDateFormat(settings.dateFormat);
         
         if (settings.darkMode) {
             document.documentElement.setAttribute('data-theme', 'dark');

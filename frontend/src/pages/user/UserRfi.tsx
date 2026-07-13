@@ -11,6 +11,7 @@ import {
 } from '../../services/rfiApi';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
+import { formatDate } from '../../utils/dateUtils';
 
 // ── Inline SVG icons ──────────────────────────────────────
 const IconQuestion = () => (
@@ -689,7 +690,7 @@ export default function UserRfi() {
                                                                     <div style={{ fontSize: 11, fontWeight: 700, color: rfi.status === 'CLOSED' ? '#16a34a' : '#dc2626' }}>{rfi.status || 'OPEN'}</div>
                                                                     <div style={{ fontSize: 12, color: '#64748b' }}>{parent.originalFileName.split('_').pop()}</div>
                                                                     <span style={{ fontSize: 12 }}>{parent.uploadedBy}</span>
-                                                                    <span style={{ fontSize: 12 }}>{new Date(parent.createdAt).toLocaleDateString()}</span>
+                                                                    <span style={{ fontSize: 12 }}>{formatDate(parent.createdAt)}</span>
                                                                 </div>
                                                                 {isExp && (
                                                                     <div style={{ background: '#f8fafc', padding: 20 }}>
@@ -755,7 +756,7 @@ export default function UserRfi() {
                                                         <StatusChip status={ext.status} />
                                                         <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{ext.rfis?.length || 0}</span>
                                                         <span style={{ fontSize: 12 }}>{ext.uploadedBy}</span>
-                                                        <span style={{ fontSize: 12 }}>{new Date(ext.createdAt).toLocaleDateString()}</span>
+                                                        <span style={{ fontSize: 12 }}>{formatDate(ext.createdAt)}</span>
                                                         {canEdit && (
                                                             <button onClick={(e) => handleDelete(ext._id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, opacity: 0.7 }} title="Delete"><IconDelete /></button>
                                                         )}
