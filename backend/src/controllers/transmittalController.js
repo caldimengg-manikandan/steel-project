@@ -106,6 +106,40 @@ exports.generateTransmittal = async (req, res) => {
         });
     }
 
+    // ── Save Transmittals and Drawing Log to Storage Gateway ──
+    try {
+        const storageGateway = require('../utils/storageGateway');
+        if (storageGateway.isEnabled()) {
+            const project = await Project.findById(projectId).lean();
+            const settings = await SystemSettings.findOne().lean();
+            if (project && project.name) {
+                const safeProjectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+                const targetDir = `Projects/${safeProjectName}/Logs`;
+
+                for (const result of results) {
+                    const { transmittal, drawingLog } = result;
+                    const projectDetails = {
+                        projectName: project.name,
+                        clientName: project.clientName,
+                        transmittalNo: transmittal.transmittalNumber,
+                    };
+
+                    // 1. Generate & Upload Transmittal Excel
+                    const trExcel = await generateTransmittalExcel(transmittal, projectDetails, settings?.logoPath);
+                    console.log(`[TransmittalService] Uploading Transmittal Excel to Storage Gateway: ${targetDir}/${trExcel.filename}`);
+                    await storageGateway.uploadFile(targetDir, trExcel.filename, trExcel.buffer);
+
+                    // 2. Generate & Upload Drawing Log Excel
+                    const logExcel = await generateDrawingLogExcel(drawingLog, projectDetails, settings?.logoPath);
+                    console.log(`[TransmittalService] Uploading Drawing Log Excel to Storage Gateway: ${targetDir}/${logExcel.filename}`);
+                    await storageGateway.uploadFile(targetDir, logExcel.filename, logExcel.buffer);
+                }
+            }
+        }
+    } catch (gwErr) {
+        console.error('[TransmittalService] Failed to upload transmittal/drawing log to Storage Gateway:', gwErr.message);
+    }
+
     const transmittalNums = results.map(r => `TR-${String(r.summary.transmittalNumber).padStart(3, '0')}`).join(', ');
     res.status(201).json({
         message: `${transmittalNums} generated successfully.`,
@@ -332,6 +366,47 @@ exports.deleteTransmittal = async (req, res) => {
 
     if (!doc) {
         return res.status(404).json({ error: 'Transmittal not found.' });
+    }
+
+    // Delete the transmittal Excel file and regenerate/update the Drawing Log Excel on the storage server
+    try {
+        const storageGateway = require('../utils/storageGateway');
+        if (storageGateway.isEnabled()) {
+            const project = await Project.findById(projectId).lean();
+            if (project && project.name) {
+                const safeProjectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+                const transmittalFile = `Projects/${safeProjectName}/Logs/${safeProjectName}_TR-${String(doc.transmittalNumber).padStart(3, '0')}_Transmittal.xlsx`;
+                
+                try {
+                    await storageGateway.deleteFile(transmittalFile);
+                    console.log(`[DeleteTransmittal] Deleted transmittal Excel: ${transmittalFile}`);
+                } catch (err) {
+                    if (!err.message.includes('not found') && !err.message.includes('404')) {
+                        console.warn(`[DeleteTransmittal] Failed to delete transmittal Excel:`, err.message);
+                    }
+                }
+
+                // Regenerate the cumulative Drawing Log Excel
+                try {
+                    const log = await getDrawingLog(projectId);
+                    const settings = await SystemSettings.findOne().lean();
+                    if (log) {
+                        const projectDetails = {
+                            projectName: project.name,
+                            clientName: project.clientName,
+                        };
+                        const logExcel = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
+                        const targetDir = `Projects/${safeProjectName}/Logs`;
+                        await storageGateway.uploadFile(targetDir, logExcel.filename, logExcel.buffer);
+                        console.log(`[DeleteTransmittal] Regenerated Drawing Log Excel: ${targetDir}/${logExcel.filename}`);
+                    }
+                } catch (logErr) {
+                    console.error(`[DeleteTransmittal] Failed to regenerate Drawing Log Excel:`, logErr.message);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[DeleteTransmittal] Error during Excel cleanup:', err.message);
     }
 
     res.json({ message: `Transmittal TR-${String(doc.transmittalNumber).padStart(3, '0')} deleted.` });

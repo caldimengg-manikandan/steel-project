@@ -106,7 +106,7 @@ async function downloadFile(fileId, destPath) {
     // Fallback to OneDrive via Rclone copyto
     const { exec } = require('child_process');
     const folder = process.env.ONEDRIVE_FOLDER_PATH || 'SteelDMS_Uploads';
-    const RCLONE_BIN = fs.existsSync(path.join(process.cwd(), 'rclone.exe')) 
+    const RCLONE_BIN = (process.platform === 'win32' && fs.existsSync(path.join(process.cwd(), 'rclone.exe'))) 
         ? `"${path.join(process.cwd(), 'rclone.exe')}"` 
         : 'rclone';
     

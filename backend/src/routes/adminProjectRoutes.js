@@ -18,7 +18,7 @@ const {
     listProjects, createProject, getProject,
     updateProject, deleteProject, assignUser, removeAssignment,
     downloadAllProjectsStatusExcel, uploadCOR,
-    reserveTransmittalNumber,
+    reserveTransmittalNumber, uploadFolder,
 } = require('../controllers/adminProjectsController');
 const multer = require('multer');
 const path = require('path');
@@ -50,6 +50,14 @@ router.post('/', createProject);
 // Project Operations
 router.post('/:projectId/reserve-transmittal', scopeProjectToAdmin, reserveTransmittalNumber);
 router.post('/:projectId/cor', scopeProjectToAdmin, upload.single('file'), uploadCOR);
+router.post(
+    '/:projectId/upload-folder',
+    scopeProjectToAdmin,
+    multer({
+        storage: storage,
+    }).array('files'),
+    uploadFolder
+);
 router.post('/:projectId/assignments', scopeProjectToAdmin, validateCrossAdminAssignment, assignUser);
 router.delete('/:projectId/assignments/:userId', scopeProjectToAdmin, removeAssignment);
 

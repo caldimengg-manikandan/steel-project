@@ -29,7 +29,7 @@ export default function App() {
     <SettingsProvider>
       <MessageProvider>
         <AuthProvider>
-          <BrowserRouter basename="">
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />

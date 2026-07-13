@@ -23,6 +23,8 @@ const { appendToProjectExcel } = require('./excelService');
 const { generateTransmittal } = require('./transmittalService');
 const { getBucket } = require('../utils/gridfs');
 const { downloadFile: downloadFromOneDrive } = require('../utils/onedrive');
+const { Readable } = require('stream');
+const storageGateway = require('../utils/storageGateway');
 
 const PYTHON_SCRIPT = path.join(__dirname, '../scripts/extract_drawing.py');
 const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
@@ -163,6 +165,25 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
 
             console.log(`[Extraction] Downloading GridFS file ${fileRef} to ${localPath}`);
             await _downloadFromGridFS(fileRef, localPath);
+            isTemp = true;
+        } else if (typeof fileRef === 'string' && fileRef.startsWith('Projects/')) {
+            // Storage Gateway Path
+            const tempDir = path.join(__dirname, '../../uploads/temp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+            const tempFileName = `temp_gateway_${extractionId}_${Date.now()}.pdf`;
+            localPath = path.join(tempDir, tempFileName);
+
+            console.log(`[Extraction] Downloading Storage Gateway file ${fileRef} to ${localPath}`);
+            const { stream } = await storageGateway.getFileStream(fileRef);
+            
+            const dest = fs.createWriteStream(localPath);
+            await new Promise((resolve, reject) => {
+                stream.pipe(dest);
+                dest.on('finish', resolve);
+                dest.on('error', reject);
+                stream.on('error', reject);
+            });
             isTemp = true;
         } else if (typeof fileRef === 'string' && fileRef.length > 20) {
             // Likely OneDrive ID (usually longer and alphanumeric)
@@ -415,6 +436,7 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
         }
 
         const results = await response.json();
+        console.log(`[AI API Response] Looking for key "${fileName}" in results:`, JSON.stringify(results));
         
         // results is a dict with filename as key
         const aiData = results[fileName];

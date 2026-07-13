@@ -4,8 +4,11 @@ import {
     uploadFiles, 
     deleteFile, 
     downloadFile,
+    uploadFolder,
     type FileEntry 
 } from '../services/fileApi';
+import { reserveTransmittalNumber } from '../services/extractionApi';
+import { uploadSessionStore, type SessionFile, type UploadSession } from '../services/uploadSessionStore';
 import { useMessage } from '../context/MessageContext';
 import { 
     IconFolder, 
@@ -19,9 +22,10 @@ interface FileBrowserPanelProps {
     projectId?: string;
     projectName?: string;
     canUpload: boolean;
+    sequences?: string[];
 }
 
-export default function FileBrowserPanel({ projectName, canUpload }: FileBrowserPanelProps) {
+export default function FileBrowserPanel({ projectId, projectName, canUpload, sequences }: FileBrowserPanelProps) {
     const { showMessage } = useMessage();
     
     // Determine the base path based on whether a project was passed
@@ -32,10 +36,34 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [uploading, setUploading] = useState<boolean>(false);
+
+    // Global Upload Session Subscription
+    const [session, setSession] = useState<UploadSession | null>(uploadSessionStore.getSession());
+    const [activeReportTab, setActiveReportTab] = useState<'drawings' | 'stored' | 'failed'>('drawings');
+
+    useEffect(() => {
+        const unsubscribe = uploadSessionStore.subscribe((s) => {
+            setSession(s);
+        });
+        return unsubscribe;
+    }, []);
+
+    // Derived states from global session store
+    const uploadingFolder = !!session?.active && !!session?.uploading;
+    const uploadProgressPercent = session?.progressPercent || 0;
+    const uploadProgressSpeed = session?.progressSpeed || '';
+    const uploadProgressStats = session?.progressStats || '';
+    const folderUploadProgress = session?.progressDetail || '';
+    const uploadSessionActive = !!session?.active;
+    const sessionFolderName = session?.folderName || '';
+    const sessionFiles = session?.files || [];
+    const uploadResultModal = !!session?.resultModalOpen;
+    const uploadResultDetails = session?.resultDetails || null;
     
     // Drag & Drop state
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const folderInputRef = useRef<HTMLInputElement>(null);
 
     const loadFiles = async (path: string) => {
         setLoading(true);
@@ -58,6 +86,8 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
     useEffect(() => {
         loadFiles(currentPath);
     }, [currentPath]);
+
+
 
     // Format bytes
     const formatBytes = (bytes: number | null | undefined) => {
@@ -190,6 +220,177 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
         }
     };
 
+    // Folder Upload Handler
+    const handleFolderUpload = async (folderFiles: FileList | null) => {
+        if (!folderFiles || folderFiles.length === 0) return;
+        if (!canUpload) {
+            showMessage('Access Denied', 'You do not have permission to upload files.', 'error');
+            return;
+        }
+        if (!projectId) {
+            showMessage('Error', 'Project ID is missing. Cannot upload folder.', 'error');
+            return;
+        }
+
+        const fileArray = Array.from(folderFiles);
+        const topFolderName = fileArray[0]?.webkitRelativePath?.split('/')?.[0] || 'Folder';
+
+        // Initialize session files
+        const initialSessionFiles = fileArray.map((f): SessionFile => ({
+            name: f.name,
+            path: (f as any).webkitRelativePath || f.name,
+            size: f.size,
+            status: 'uploading'
+        }));
+
+        // Start global session in store
+        uploadSessionStore.startSession(projectId, topFolderName, initialSessionFiles, fileArray);
+
+        // Step 1: Pre-reserve a single transmittal number if this upload contains drawing PDFs
+        let reservedTransmittalNum: number | null = null;
+        const containsDrawings = fileArray.some(f => {
+            const pathLower = ((f as any).webkitRelativePath || f.name).toLowerCase();
+            const isPdf = f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf';
+            const isDrawingFolder = /[\/](detail[\s_-]*sheets?|d[\s_-]*sheets?|e[\s_-]*sheets?|erection[\s_-]*sheets?|gather[\s_-]*sheets?|g[\s_-]*sheets?|shop[\s_-]*drawings?|connection[\s_-]*drawings?|fabrication[\s_-]*drawings?)[\s\/]/i.test('/' + pathLower + '/');
+            const isBinderFolder = /[\\/ ](binders?|binder[_\s-]?sheet)[\\/ ]/i.test('/' + pathLower + '/');
+            return isPdf && isDrawingFolder && !isBinderFolder;
+        });
+
+        if (containsDrawings) {
+            try {
+                const res = await reserveTransmittalNumber(projectId);
+                reservedTransmittalNum = res.transmittalNumber;
+                console.log(`[FolderUpload] Pre-reserved Transmittal #${reservedTransmittalNum} for drawings`);
+            } catch (err) {
+                console.warn('[FolderUpload] Could not reserve transmittal number up-front:', err);
+            }
+        }
+
+        const totalFolderSize = fileArray.reduce((acc, f) => acc + f.size, 0);
+        let totalUploadedBytes = 0;
+        let currentSessionFiles = [...initialSessionFiles];
+
+        const finalResultsList: any[] = [];
+        const finalDrawingsList: any[] = [];
+
+        try {
+            // Step 2: Upload files one-by-one synchronously (in series) to prevent rate limit & network drop issues
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i];
+
+                uploadSessionStore.updateFileStatus(i, { status: 'uploading' });
+                uploadSessionStore.updateProgress(
+                    Math.round((totalUploadedBytes / totalFolderSize) * 100),
+                    '0 KB/s',
+                    `${(totalUploadedBytes / (1024 * 1024)).toFixed(1)} MB / ${(totalFolderSize / (1024 * 1024)).toFixed(1)} MB`,
+                    `Uploading [${i + 1}/${fileArray.length}]: ${file.name}`
+                );
+
+                try {
+                    const result = await uploadFolder(
+                        projectId,
+                        [file], // Send ONLY this single file in the request
+                        reservedTransmittalNum,
+                        sequences || [],
+                        (prog) => {
+                            // Calculate global progress
+                            const loadedSoFar = totalUploadedBytes + prog.loaded;
+                            const overallPct = Math.round((loadedSoFar / totalFolderSize) * 100);
+                            
+                            // Format upload speed
+                            let speedStr = '0 B/s';
+                            if (prog.speed > 1024 * 1024) {
+                                speedStr = `${(prog.speed / (1024 * 1024)).toFixed(1)} MB/s`;
+                            } else if (prog.speed > 1024) {
+                                speedStr = `${(prog.speed / 1024).toFixed(1)} KB/s`;
+                            } else {
+                                speedStr = `${Math.round(prog.speed)} B/s`;
+                            }
+
+                            const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                            uploadSessionStore.updateProgress(
+                                overallPct,
+                                speedStr,
+                                `${formatMB(loadedSoFar)} / ${formatMB(totalFolderSize)}`,
+                                `Uploading [${i + 1}/${fileArray.length}]: ${file.name}`
+                            );
+                        }
+                    );
+
+                    // Add successful upload results
+                    if (result.results && result.results.length > 0) {
+                        finalResultsList.push(...result.results);
+                    }
+                    if (result.drawings && result.drawings.length > 0) {
+                        finalDrawingsList.push(...result.drawings);
+                    }
+
+                    // Update store status
+                    const resMatch = result.results?.find(r => r.path === file.name || r.name === file.name || r.path?.endsWith(file.name));
+                    if (!resMatch || resMatch.status === 'failed') {
+                        currentSessionFiles[i].status = 'failed';
+                        currentSessionFiles[i].error = resMatch?.error || 'Upload failed on storage agent';
+                        uploadSessionStore.updateFileStatus(i, {
+                            status: 'failed',
+                            error: resMatch?.error || 'Upload failed on storage agent'
+                        });
+                    } else {
+                        const drawingMatch = result.drawings?.find(d => d.name === file.name);
+                        if (drawingMatch) {
+                            currentSessionFiles[i].status = 'extracting';
+                            currentSessionFiles[i].folder = drawingMatch.folder;
+                            currentSessionFiles[i].extractionId = drawingMatch.id;
+                            uploadSessionStore.updateFileStatus(i, {
+                                status: 'extracting',
+                                folder: drawingMatch.folder,
+                                extractionId: drawingMatch.id
+                            });
+                        } else {
+                            currentSessionFiles[i].status = 'stored';
+                            uploadSessionStore.updateFileStatus(i, { status: 'stored' });
+                        }
+                    }
+                } catch (err: any) {
+                    console.error(`[FolderUpload] Upload failed for file ${file.name}:`, err.message);
+                    currentSessionFiles[i].status = 'failed';
+                    currentSessionFiles[i].error = err.message || 'Upload error';
+                    uploadSessionStore.updateFileStatus(i, {
+                        status: 'failed',
+                        error: err.message || 'Upload error'
+                    });
+                    finalResultsList.push({ name: file.name, path: (file as any).webkitRelativePath || file.name, status: 'failed', error: err.message });
+                }
+
+                totalUploadedBytes += file.size;
+            }
+
+            // Populate the detailed modal report summary
+            const storedCount = currentSessionFiles.filter(f => f.status === 'stored' || f.status === 'completed' || f.status === 'extracting').length;
+            const failedCount = currentSessionFiles.filter(f => f.status === 'failed').length;
+            const drawingsQueued = currentSessionFiles.filter(f => f.status === 'completed' || f.status === 'extracting').length;
+
+            const summaryReport = {
+                message: `${storedCount} file(s) stored on server. ${drawingsQueued} drawing(s) queued for extraction.`,
+                storedCount,
+                drawingsQueued,
+                failedCount,
+                transmittalNumber: reservedTransmittalNum,
+                results: finalResultsList,
+                drawings: finalDrawingsList
+            };
+
+            uploadSessionStore.setUploadingFinished(summaryReport, currentSessionFiles);
+            setActiveReportTab(drawingsQueued > 0 ? 'drawings' : 'stored');
+            loadFiles(currentPath);
+        } catch (err: any) {
+            showMessage('Folder Upload Failed', err.message, 'error');
+            const failedFiles = currentSessionFiles.map(f => f.status === 'uploading' ? { ...f, status: 'failed' as const, error: err.message } : f);
+            uploadSessionStore.setUploadingFinished(null, failedFiles);
+        } finally {
+            if (folderInputRef.current) folderInputRef.current.value = '';
+        }
+    };
+
     // Drag & Drop Handlers
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -216,11 +417,41 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Header / Actions */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--color-bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                {renderBreadcrumbs()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+                    {renderBreadcrumbs()}
+                </div>
 
-                <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    {/* Live Upload Progress Text & Stats beside upload buttons */}
+                    {uploadingFolder && (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-end',
+                            fontSize: 12,
+                            color: 'var(--color-text-secondary)',
+                            textAlign: 'right',
+                            marginRight: 8,
+                            maxWidth: 240,
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--color-primary)' }}>
+                                <svg className="animate-spin" style={{ animation: 'spin 1s linear infinite', width: 12, height: 12, color: 'var(--color-primary)' }} viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style={{ opacity: 0.75 }} />
+                                </svg>
+                                <span>⚡ {uploadProgressSpeed}</span>
+                                <span style={{ opacity: 0.3 }}>|</span>
+                                <span>{uploadProgressPercent}%</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', maxWidth: 200 }}>
+                                {uploadProgressStats} — {folderUploadProgress}
+                            </div>
+                        </div>
+                    )}
+
                     {canUpload && (
-                        <>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            {/* Regular file upload */}
                             <input 
                                 type="file" 
                                 multiple 
@@ -229,16 +460,299 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
                                 onChange={(e) => handleFileUpload(e.target.files)} 
                             />
                             <button 
-                                className="btn btn-primary" 
+                                className="btn btn-secondary" 
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={uploading}
+                                disabled={uploading || uploadingFolder}
+                                title="Upload individual files to current folder"
                             >
                                 <IconUpload /> {uploading ? 'Uploading...' : 'Upload Files'}
                             </button>
-                        </>
+
+                            {/* Folder upload — only if we have a projectId context */}
+                            {projectId && (
+                                <>
+                                    <input 
+                                        type="file" 
+                                        style={{ display: 'none' }} 
+                                        ref={folderInputRef}
+                                        // @ts-ignore — webkitdirectory is non-standard but widely supported
+                                        webkitdirectory=""
+                                        multiple
+                                        onChange={(e) => handleFolderUpload(e.target.files)}
+                                    />
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={() => folderInputRef.current?.click()}
+                                        disabled={uploading || uploadingFolder}
+                                        title="Upload an entire transmittal folder. Structure is preserved on the server and drawings are auto-detected for extraction."
+                                    >
+                                        <IconUpload /> {uploadingFolder ? 'Uploading...' : '📁 Upload Folder'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
+
+            {/* Live Upload Session Dashboard */}
+            {uploadSessionActive && (
+                <div style={{
+                    background: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-xl)',
+                    padding: 24,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                    boxShadow: 'var(--shadow-sm)',
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                📁 Folder Upload & Processing: <span style={{ color: 'var(--color-primary)' }}>{sessionFolderName}</span>
+                            </h4>
+                            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                Live tracking status of file uploads and AI drawing metadata extractions.
+                            </p>
+                        </div>
+                        <button 
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => uploadSessionStore.dismissSession()}
+                        >
+                            Dismiss Dashboard
+                        </button>
+                    </div>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: 16,
+                    }}>
+                        {/* Column 1: Uploading & Stored */}
+                        <div style={{
+                            background: 'var(--color-bg-page)',
+                            border: '1px solid var(--color-border-light)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                        }}>
+                            <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', paddingBottom: 8 }}>
+                                📦 Stored Files ({sessionFiles.filter(f => f.status === 'stored' || f.status === 'uploading').length})
+                            </h5>
+                            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                                {sessionFiles.filter(f => f.status === 'stored' || f.status === 'uploading').length === 0 ? (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>No general files.</span>
+                                ) : (
+                                    sessionFiles.map((f, i) => {
+                                        if (f.status !== 'stored' && f.status !== 'uploading') return null;
+                                        return (
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, background: 'var(--color-bg-card)', padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border-light)' }}>
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120, flex: 1 }} title={f.path}>{f.name}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    {f.status === 'uploading' ? (
+                                                        <span style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                                            <svg className="animate-spin" style={{ animation: 'spin 1s linear infinite', width: 10, height: 10 }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} /><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4" style={{ opacity: 0.75 }} /></svg>
+                                                            Up...
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ color: 'var(--color-success-mid)', fontWeight: 600, fontSize: 11 }}>✅</span>
+                                                            <button
+                                                                onClick={() => { if (window.confirm(`Delete "${f.name}" from server?`)) uploadSessionStore.deleteSessionFile(i); }}
+                                                                className="btn btn-ghost"
+                                                                style={{ color: 'var(--color-danger-mid)', padding: '1px 4px', fontSize: 10, height: 'auto', minHeight: 0, background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6 }}
+                                                                title="Delete from server"
+                                                            >🗑️</button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Column 2: AI Drawing Extractions */}
+                        <div style={{
+                            background: 'var(--color-bg-page)',
+                            border: '1px solid var(--color-border-light)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                        }}>
+                            <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', paddingBottom: 8 }}>
+                                🤖 AI Extractions ({sessionFiles.filter(f => f.status === 'extracting' || f.status === 'completed').length})
+                            </h5>
+                            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                                {sessionFiles.filter(f => f.status === 'extracting' || f.status === 'completed').length === 0 ? (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>No drawings detected.</span>
+                                ) : (
+                                    sessionFiles.map((f, i) => {
+                                        if (f.status !== 'extracting' && f.status !== 'completed') return null;
+                                        return (
+                                            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, background: 'var(--color-bg-card)', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-light)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100, flex: 1 }} title={f.name}>{f.name}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        {f.status === 'extracting' ? (
+                                                            <span style={{
+                                                                fontSize: 9,
+                                                                fontWeight: 700,
+                                                                color: 'var(--color-primary)',
+                                                                background: 'rgba(37,99,235,0.08)',
+                                                                padding: '2px 6px',
+                                                                borderRadius: 4,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 4
+                                                            }}>
+                                                                <svg className="animate-spin" style={{ animation: 'spin 1s linear infinite', width: 8, height: 8 }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} /><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4" style={{ opacity: 0.75 }} /></svg>
+                                                                AI RUNNING
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{
+                                                                fontSize: 9,
+                                                                fontWeight: 700,
+                                                                color: 'var(--color-success-mid)',
+                                                                background: 'rgba(22,163,74,0.08)',
+                                                                padding: '2px 6px',
+                                                                borderRadius: 4
+                                                            }}>
+                                                                ✅ COMPLETE
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => { if (window.confirm(`Delete extraction for "${f.name}" from server?`)) uploadSessionStore.deleteSessionFile(i); }}
+                                                            className="btn btn-ghost"
+                                                            style={{ color: 'var(--color-danger-mid)', padding: '1px 4px', fontSize: 10, height: 'auto', minHeight: 0, background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6 }}
+                                                            title="Delete extraction from server"
+                                                        >🗑️</button>
+                                                    </div>
+                                                </div>
+                                                <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Target subfolder: {f.folder}</span>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Column 3: Failed Files */}
+                        <div style={{
+                            background: 'var(--color-bg-page)',
+                            border: '1px solid var(--color-border-light)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                borderBottom: '1px solid var(--color-border-light)',
+                                paddingBottom: 8,
+                                margin: 0
+                            }}>
+                                <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                                    ❌ Failed ({sessionFiles.filter(f => f.status === 'failed').length})
+                                </h5>
+                                {sessionFiles.some(f => f.status === 'failed') && (
+                                    session?.retryActive ? (
+                                        <button
+                                            onClick={() => uploadSessionStore.stopRetry()}
+                                            className="btn btn-ghost"
+                                            style={{
+                                                color: 'var(--color-danger-mid)',
+                                                padding: '2px 8px',
+                                                fontSize: 10,
+                                                height: 'auto',
+                                                minHeight: 0,
+                                                fontWeight: 700,
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-danger-mid)',
+                                                borderRadius: 4
+                                            }}
+                                            title="Stop current retry process"
+                                        >
+                                            🛑 Stop Retry
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => uploadSessionStore.retryAllFailed(uploadFolder, sequences || [])}
+                                            className="btn btn-ghost"
+                                            style={{
+                                                color: 'var(--color-primary)',
+                                                padding: '2px 8px',
+                                                fontSize: 10,
+                                                height: 'auto',
+                                                minHeight: 0,
+                                                fontWeight: 700,
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-border-light)',
+                                                borderRadius: 4
+                                            }}
+                                            title="Retry all failed files sequentially"
+                                        >
+                                            🔄 Retry All
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                                {sessionFiles.filter(f => f.status === 'failed').length === 0 ? (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>No failures.</span>
+                                ) : (
+                                    sessionFiles.map((f, i) => {
+                                        if (f.status !== 'failed') return null;
+                                        return (
+                                            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, background: 'rgba(239,68,68,0.02)', padding: '8px 10px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.15)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100, flex: 1 }} title={f.name}>{f.name}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <button
+                                                            onClick={() => uploadSessionStore.retryFile(i, uploadFolder, sequences || [])}
+                                                            className="btn btn-ghost"
+                                                            style={{
+                                                                color: 'var(--color-primary)',
+                                                                padding: '2px 6px',
+                                                                fontSize: 10,
+                                                                height: 'auto',
+                                                                minHeight: 0,
+                                                                fontWeight: 700,
+                                                                background: 'var(--color-bg-card)',
+                                                                border: '1px solid var(--color-border-light)',
+                                                                borderRadius: 4
+                                                            }}
+                                                            title="Retry uploading this file"
+                                                        >
+                                                            🔄 Retry
+                                                        </button>
+                                                        <button
+                                                            onClick={() => uploadSessionStore.deleteSessionFile(i)}
+                                                            className="btn btn-ghost"
+                                                            style={{ color: 'var(--color-danger-mid)', padding: '1px 4px', fontSize: 10, height: 'auto', minHeight: 0, background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6 }}
+                                                            title="Remove from list"
+                                                        >🗑️</button>
+                                                    </div>
+                                                </div>
+                                                <span style={{ fontSize: 10, color: 'var(--color-danger-mid)', fontWeight: 500 }}>{f.error || 'Failed to upload/extract'}</span>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Error State */}
             {error && (
@@ -341,12 +855,12 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
                                                     <IconDownload />
                                                 </button>
                                             )}
-                                            {canUpload && file.type !== 'directory' && (
+                                            {canUpload && (
                                                 <button 
                                                     className="btn btn-ghost btn-sm btn-icon" 
                                                     style={{ color: 'var(--color-danger-mid)' }}
                                                     onClick={() => handleDelete(file.name)}
-                                                    title="Delete"
+                                                    title={file.type === 'directory' ? "Delete Folder" : "Delete"}
                                                 >
                                                     <IconTrash />
                                                 </button>
@@ -359,6 +873,260 @@ export default function FileBrowserPanel({ projectName, canUpload }: FileBrowser
                     </table>
                 </div>
             </div>
+
+            {/* Custom Animation Styles */}
+            <style dangerouslySetInnerHTML={{__html: `
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}} />
+
+
+
+            {/* Folder Upload Complete / Details Modal */}
+            {uploadResultModal && uploadResultDetails && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: 24,
+                }}>
+                    <div style={{
+                        background: 'var(--color-bg-card)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-xl)',
+                        width: '100%',
+                        maxWidth: 800,
+                        maxHeight: '90vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        overflow: 'hidden',
+                    }}>
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '20px 24px',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'linear-gradient(to right, rgba(37,99,235,0.05), rgba(37,99,235,0.01))',
+                        }}>
+                            <div>
+                                <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                                    Folder Upload Report
+                                </h3>
+                                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
+                                    {uploadResultDetails.storedCount} files stored, {uploadResultDetails.drawingsQueued} drawings queued.
+                                    {uploadResultDetails.transmittalNumber && ` Linked to Transmittal #${uploadResultDetails.transmittalNumber}.`}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => uploadSessionStore.setResultModalOpen(false)}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 }}
+                            >
+                                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
+                        {/* Tabs Selector */}
+                        <div style={{
+                            display: 'flex',
+                            borderBottom: '1px solid var(--color-border-light)',
+                            padding: '0 16px',
+                            background: 'var(--color-bg-page)',
+                        }}>
+                            <button
+                                onClick={() => setActiveReportTab('drawings')}
+                                style={{
+                                    padding: '14px 16px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    color: activeReportTab === 'drawings' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                    borderBottom: activeReportTab === 'drawings' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                🤖 Queued Drawings ({uploadResultDetails.drawingsQueued})
+                            </button>
+                            <button
+                                onClick={() => setActiveReportTab('stored')}
+                                style={{
+                                    padding: '14px 16px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    color: activeReportTab === 'stored' ? 'var(--color-success-mid)' : 'var(--color-text-secondary)',
+                                    borderBottom: activeReportTab === 'stored' ? '2px solid var(--color-success-mid)' : '2px solid transparent',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                ✅ Stored Files ({uploadResultDetails.storedCount - uploadResultDetails.failedCount})
+                            </button>
+                            {uploadResultDetails.failedCount > 0 && (
+                                <button
+                                    onClick={() => setActiveReportTab('failed')}
+                                    style={{
+                                        padding: '14px 16px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        color: 'var(--color-danger-mid)',
+                                        borderBottom: activeReportTab === 'failed' ? '2px solid ' + 'var(--color-danger-mid)' : '2px solid transparent',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    ❌ Failed Uploads ({uploadResultDetails.failedCount})
+                                </button>
+                            )}
+                        </div>
+
+                        {/* List Body */}
+                        <div style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            padding: 24,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                        }}>
+                            {activeReportTab === 'drawings' && (
+                                <>
+                                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                                        The system detected these files inside your upload as valid PDF drawings and sent them to the AI pipeline for field extraction.
+                                    </div>
+                                    {(!uploadResultDetails.drawings || uploadResultDetails.drawings.length === 0) ? (
+                                        <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '24px 0' }}>
+                                            No drawings detected in this upload.
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            {uploadResultDetails.drawings.map((dwg: any, i: number) => (
+                                                <div key={i} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '12px 16px',
+                                                    background: 'var(--color-bg-page)',
+                                                    border: '1px solid var(--color-border)',
+                                                    borderRadius: 'var(--radius-md)',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--color-primary)" strokeWidth="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{dwg.name}</div>
+                                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Target subfolder: {dwg.folder}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <span style={{
+                                                            fontSize: 10,
+                                                            fontWeight: 700,
+                                                            color: 'var(--color-primary)',
+                                                            background: 'rgba(37,99,235,0.08)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: 99,
+                                                        }}>QUEUED FOR AI</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {activeReportTab === 'stored' && (
+                                <>
+                                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                                        All files successfully uploaded to the Windows storage drive.
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {uploadResultDetails.results
+                                            ?.filter((r: any) => r.status === 'stored')
+                                            .map((r: any, i: number) => (
+                                                <div key={i} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    padding: '10px 14px',
+                                                    background: 'var(--color-bg-page)',
+                                                    border: '1px solid var(--color-border-light)',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    gap: 12,
+                                                }}>
+                                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="var(--color-success-mid)" strokeWidth="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                                                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Path: {r.path}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {activeReportTab === 'failed' && (
+                                <>
+                                    <div style={{ fontSize: 13, color: 'var(--color-danger-mid)', marginBottom: 8, fontWeight: 500 }}>
+                                        These files encountered errors and could not be uploaded or stored.
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {uploadResultDetails.results
+                                            ?.filter((r: any) => r.status === 'failed')
+                                            .map((r: any, i: number) => (
+                                                <div key={i} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    padding: '12px 16px',
+                                                    background: 'rgba(239,68,68,0.02)',
+                                                    border: '1px solid rgba(239,68,68,0.15)',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    gap: 12,
+                                                }}>
+                                                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--color-danger-mid)" strokeWidth="2" fill="none" style={{ marginTop: 2 }}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{r.name}</div>
+                                                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '2px 0 6px 0' }}>Path: {r.path}</div>
+                                                        <div style={{ fontSize: 12, color: 'var(--color-danger-mid)', fontWeight: 500 }}>Error: {r.error || 'Upload error'}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div style={{
+                            padding: '16px 24px',
+                            borderTop: '1px solid var(--color-border)',
+                            background: 'var(--color-bg-page)',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                        }}>
+                            <button 
+                                onClick={() => uploadSessionStore.setResultModalOpen(false)}
+                                className="btn btn-primary"
+                                style={{ minWidth: 100 }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

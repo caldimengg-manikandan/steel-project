@@ -40,8 +40,8 @@ const { errorHandler } = require('./middleware/errorHandler');
 const allowedOrigins = [
     'https://steel-dms-frontend.onrender.com',
     'https://steel-project-iota.vercel.app',
-    'http://localhost:5173',
     'http://localhost:5174',
+    'http://localhost:5173',
     'http://localhost:3000'
 ];
 
@@ -165,10 +165,13 @@ connectDB().then(async () => {
     // Start AI service automatically
     startAiService();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
     });
+    server.timeout = 1800000;
+    server.headersTimeout = 1800000;
+    server.keepAliveTimeout = 1800000;
 }).catch(err => {
     console.error('Failed to start server:', err);
     process.exit(1);

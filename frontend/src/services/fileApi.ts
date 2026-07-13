@@ -138,3 +138,102 @@ export async function downloadFile(path: string): Promise<void> {
     a.remove();
     URL.revokeObjectURL(objectUrl);
 }
+
+/**
+ * Upload an entire folder to a project, preserving directory structure.
+ * The backend will:
+ *  1. Store all files on the Windows server mirroring the folder structure.
+ *  2. Auto-detect PDFs under Drawings/Detail sheets & Drawings/E-Sheets.
+ *  3. Queue those PDFs for AI extraction linked to the transmittalNumber.
+ */
+export async function uploadFolder(
+    projectId: string,
+    files: File[],
+    transmittalNumber: number | null | undefined,
+    sequences: string[] | undefined,
+    onProgress?: (progress: { loaded: number; total: number; percentage: number; speed: number }) => void
+): Promise<{
+    message: string;
+    storedCount: number;
+    drawingsQueued: number;
+    extractionIds: string[];
+    transmittalNumber: number | null;
+    failedCount: number;
+    results?: Array<{ name: string; path: string; status: 'stored' | 'failed'; error?: string }>;
+    drawings?: Array<{ name: string; folder: string; id: string }>;
+}> {
+    return new Promise((resolve, reject) => {
+        const stored = sessionStorage.getItem('sdms_user');
+        const token = stored ? JSON.parse(stored).token : '';
+
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('files', file, file.name);
+            const relativePath = (file as any).webkitRelativePath || file.name;
+            formData.append('paths', relativePath);
+        });
+
+        if (transmittalNumber != null) {
+            formData.append('transmittalNumber', String(transmittalNumber));
+        }
+        if (sequences && sequences.length > 0) {
+            sequences.forEach(s => formData.append('sequences', s));
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${BASE}/admin/projects/${String(projectId)}/upload-folder`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        let lastLoaded = 0;
+        let lastTime = Date.now();
+
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable && onProgress) {
+                const now = Date.now();
+                const elapsedSeconds = (now - lastTime) / 1000;
+                
+                let speed = 0;
+                if (elapsedSeconds > 0) {
+                    const loadedDiff = event.loaded - lastLoaded;
+                    speed = loadedDiff / elapsedSeconds; // bytes per second
+                }
+
+                // Update tracker values for next tick
+                lastLoaded = event.loaded;
+                lastTime = now;
+
+                const percentage = Math.round((event.loaded / event.total) * 100);
+                onProgress({
+                    loaded: event.loaded,
+                    total: event.total,
+                    percentage,
+                    speed,
+                });
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    resolve(JSON.parse(xhr.responseText));
+                } catch (e) {
+                    reject(new Error('Malformed response from server'));
+                }
+            } else {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    reject(new Error(err.error || xhr.statusText));
+                } catch {
+                    reject(new Error(`API Request failed (${xhr.status})`));
+                }
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Network error occurred'));
+        };
+
+        xhr.send(formData);
+    });
+}
+
