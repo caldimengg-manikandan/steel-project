@@ -713,7 +713,7 @@ export default function AdminProjects() {
                                                     ...editTarget, 
                                                     clientName: selectedName,
                                                     clientId: selectedClient ? (selectedClient.id || selectedClient._id) : editTarget.clientId,
-                                                    contactPerson: null
+                                                    contactPerson: undefined
                                                 });
                                             }}
                                         >
