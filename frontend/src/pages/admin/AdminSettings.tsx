@@ -307,10 +307,10 @@ export default function AdminSettings() {
 
                     {activeTab === 'notifications' && (
                         <Card title="System Reports">
-                            <SettingRow title="Weekly Summary Reports" desc="Send a project status summary to all managers every Friday at 12:00 PM">
+                            <SettingRow title="Weekly Summary Progress" desc="Send a project status summary to all managers every Friday at 12:00 PM">
                                 <Toggle 
-                                    enabled={settings.weeklyReports} 
-                                    onChange={(v) => handleSettingChange('weeklyReports', v)} 
+                                    enabled={settings.weeklyProgresss} 
+                                    onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
                                 />
                             </SettingRow>
                         </Card>

@@ -4,7 +4,7 @@ const systemSettingsSchema = new mongoose.Schema({
     timezone: { type: String, default: 'Asia/Kolkata' },
     dateFormat: { type: String, default: 'DD/MM/YYYY' },
     emailNotifications: { type: Boolean, default: true },
-    weeklyReports: { type: Boolean, default: false },
+    weeklyProgresss: { type: Boolean, default: false },
     darkMode: { type: Boolean, default: false },
     twoFactor: { type: Boolean, default: false },
     rfiAutoNumber: { type: Boolean, default: true },

@@ -121,7 +121,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/files', fileGatewayRoutes);
 app.use('/api/admin/activity-logs', activityLogRoutes);
-
+app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
+app.use('/api/error-log', require('./routes/errorLogRoutes'));
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

@@ -5,7 +5,7 @@ interface Settings {
     timezone: string;
     dateFormat: string;
     emailNotifications: boolean;
-    weeklyReports: boolean;
+    weeklyProgresss: boolean;
     darkMode: boolean;
     twoFactor: boolean;
     rfiAutoNumber: boolean;
@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: Settings = {
     timezone: 'Asia/Kolkata',
     dateFormat: 'DD/MM/YYYY',
     emailNotifications: true,
-    weeklyReports: false,
+    weeklyProgresss: false,
     darkMode: false,
     twoFactor: false,
     rfiAutoNumber: true,

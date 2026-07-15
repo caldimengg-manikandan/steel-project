@@ -24,14 +24,14 @@ exports.updateSettings = async (req, res) => {
     }
 
     const { 
-        timezone, dateFormat, emailNotifications, weeklyReports, darkMode,
+        timezone, dateFormat, emailNotifications, weeklyProgresss, darkMode,
         twoFactor, rfiAutoNumber, activityLogging, moduleProjects, moduleRfi, moduleReports
     } = req.body;
 
     if (timezone !== undefined) settings.timezone = timezone;
     if (dateFormat !== undefined) settings.dateFormat = dateFormat;
     if (emailNotifications !== undefined) settings.emailNotifications = emailNotifications;
-    if (weeklyReports !== undefined) settings.weeklyReports = weeklyReports;
+    if (weeklyProgresss !== undefined) settings.weeklyProgresss = weeklyProgresss;
     if (darkMode !== undefined) settings.darkMode = darkMode;
     if (twoFactor !== undefined) settings.twoFactor = twoFactor;
     if (rfiAutoNumber !== undefined) settings.rfiAutoNumber = rfiAutoNumber;

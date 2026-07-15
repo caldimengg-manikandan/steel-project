@@ -12,6 +12,7 @@ import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
+import WeeklyProgressPanel from '../../components/WeeklyProgressPanel';
 
 export default function ProjectView() {
     const { id } = useParams<{ id: string }>();
@@ -29,7 +30,7 @@ export default function ProjectView() {
     const [allRevisions, setAllRevisions] = useState<any[]>([]); // Populated from Extractions
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi' | 'storage'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi' | 'storage' | 'weekly-report'>('dashboard');
     const [uploadModal, setUploadModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     // Duplicate detection state
@@ -37,7 +38,6 @@ export default function ProjectView() {
     const [dupModal, setDupModal] = useState(false);
     const [dupList, setDupList] = useState<Array<{ filename: string; sheetNumber: string; revision: string }>>([]);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-    const [localSavePath, setLocalSavePath] = useState('');
     // Transmittal selection modal state
     const [transmittalSelectModal, setTransmittalSelectModal] = useState(false);
     const [existingTransmittals, setExistingTransmittals] = useState<any[]>([]);
@@ -146,7 +146,7 @@ export default function ProjectView() {
                 const res = await reserveTransmittalNumber(pId);
                 numToUse = res.transmittalNumber;
             }
-            const res = await uploadDrawing(pId, filesToUpload, localSavePath, numToUse, selectedSequences, uploadPurpose);
+            const res = await uploadDrawing(pId, filesToUpload, '', numToUse, selectedSequences, uploadPurpose);
             showMessage('Success', res.message, 'success');
             setUploadModal(false);
             setDupModal(false);
@@ -968,20 +968,7 @@ export default function ProjectView() {
                                 </div>
                             </div>
 
-                            <div className="form-group" style={{ marginBottom: 24 }}>
-                                <label className="form-label" style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                                    Source Folder Path (Optional)
-                                </label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. C:\TestDrawings\Project1"
-                                    value={localSavePath}
-                                    onChange={(e) => setLocalSavePath(e.target.value)}
-                                    style={{ fontSize: 13 }}
-                                    title="If provided, generated Excel files will be automatically saved here."
-                                />
-                            </div>
+
 
                             <div className="form-actions">
                                 <button className="btn btn-secondary" disabled={uploading} onClick={() => { setUploadModal(false); setPendingFiles([]); }}>Cancel</button>

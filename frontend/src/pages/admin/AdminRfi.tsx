@@ -73,7 +73,6 @@ export default function AdminRfi() {
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
     const isAdmin = user?.role && FULL_ACCESS_ROLES.includes(user.role);
     const { showMessage, showConfirm } = useMessage();
-    const [folderUrl, setFolderUrl] = useState('');  // base URL for 'Link to Source' in Excel
 
     // response editing: key = `${extractionId}_${rfiIndex}`, value = draft text
     const [responseEdits, setResponseEdits] = useState<Record<string, string>>({});
@@ -368,32 +367,10 @@ export default function AdminRfi() {
                 </div>
                 {completedCount > 0 && projectId && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                        {/* Folder URL input */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                                Folder URL (optional)
-                            </label>
-                            <input
-                                type="text"
-                                value={folderUrl}
-                                onChange={e => setFolderUrl(e.target.value)}
-                                placeholder="https://drive.google.com/drive/folders/..."
-                                style={{
-                                    fontSize: 12,
-                                    padding: '6px 10px',
-                                    borderRadius: 7,
-                                    border: '1px solid var(--color-border)',
-                                    background: 'var(--color-background)',
-                                    color: 'var(--color-text-primary)',
-                                    width: 310,
-                                    outline: 'none',
-                                    fontFamily: 'inherit',
-                                }}
-                            />
-                        </div>
+
                         <div style={{ display: 'flex', gap: 8 }}>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl)}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, '')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -407,7 +384,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download RFI Excel
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'OPEN')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, '', 'OPEN')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -420,7 +397,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download Open RFI
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'CLOSED')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, '', 'CLOSED')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,

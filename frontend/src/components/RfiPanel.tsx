@@ -239,13 +239,7 @@ export default function RfiExtractionPanel({
                         <button className="btn btn-secondary" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
                             Choose Files
                         </button>
-                        <input
-                            type="text"
-                            placeholder="Optional: Auto-save Excel here (e.g. C:\RFI)"
-                            value={localSavePath}
-                            onChange={(e) => setLocalSavePath(e.target.value)}
-                            style={{ flex: 1, minWidth: 200, padding: '6px 10px', fontSize: 13, borderRadius: 4, border: '1px solid var(--color-border-light)' }}
-                        />
+
                         <button
                             className="btn btn-primary"
                             disabled={uploading}
