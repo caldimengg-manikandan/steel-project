@@ -12,7 +12,7 @@ import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
-import WeeklyProgressPanel from '../../components/WeeklyProgressPanel';
+
 
 export default function ProjectView() {
     const { id } = useParams<{ id: string }>();

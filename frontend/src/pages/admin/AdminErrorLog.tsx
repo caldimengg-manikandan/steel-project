@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchErrorLogs, saveErrorLogs, getErrorLogDownloadUrl } from '../../services/errorLogApi';
-import { useAuth } from '../../context/AuthContext';
 
 interface ErrorLogItem {
     _id: string;
@@ -23,7 +22,6 @@ interface ErrorLogItem {
 }
 
 export default function AdminErrorLog() {
-    const { user } = useAuth();
     const [logs, setLogs] = useState<ErrorLogItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
