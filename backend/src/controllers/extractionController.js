@@ -44,7 +44,7 @@ exports.uploadAndExtract = async (req, res) => {
         sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
     }
 
-    const category = req.body.category || '';
+    const category = req.body.category || req.body.purpose || '';
 
     // Filter and determine folder name
     const validFiles = [];

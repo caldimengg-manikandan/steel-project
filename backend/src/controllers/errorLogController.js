@@ -3,6 +3,7 @@ const SystemSettings = require('../models/SystemSettings');
 const exceljs = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const { sendErrorLogNotification } = require('../services/emailService');
 
 exports.getErrorLogs = async (req, res) => {
     try {
@@ -16,13 +17,14 @@ exports.getErrorLogs = async (req, res) => {
 
 exports.saveErrorLogs = async (req, res) => {
     try {
-        const { logs } = req.body;
+        const { logs, addedByRole, addedByName } = req.body;
         if (!Array.isArray(logs)) {
             return res.status(400).json({ success: false, error: 'Invalid data format' });
         }
 
-        // We will clear existing and insert new for simplicity of a global log, 
-        // or just upsert based on _id. Upserting is safer.
+        // Identify brand-new entries (no existing _id) before saving
+        const newEntries = logs.filter(log => !log._id || log._id === 'new');
+
         const bulkOps = logs.map(log => {
             if (log._id && log._id !== 'new') {
                 return {
@@ -42,12 +44,21 @@ exports.saveErrorLogs = async (req, res) => {
             }
         });
 
-        // Also delete any logs that are not in the payload (if we consider this a full replace)
+        // Delete logs not in payload
         const logIdsToKeep = logs.filter(l => l._id && l._id !== 'new').map(l => l._id);
         await ErrorLog.deleteMany({ _id: { $nin: logIdsToKeep } });
 
         if (bulkOps.length > 0) {
             await ErrorLog.bulkWrite(bulkOps);
+        }
+
+        // Send email notifications for each new entry (non-blocking)
+        if (newEntries.length > 0 && addedByRole) {
+            for (const entry of newEntries) {
+                sendErrorLogNotification(entry, addedByRole, addedByName).catch(err =>
+                    console.error('[Email] Notification error:', err.message)
+                );
+            }
         }
 
         res.json({ success: true });
@@ -56,6 +67,7 @@ exports.saveErrorLogs = async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to save error logs' });
     }
 };
+
 
 exports.downloadExcel = async (req, res) => {
     try {

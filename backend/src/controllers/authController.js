@@ -68,7 +68,10 @@ async function adminLogin(req, res) {
         
         await logActivity(admin.username, 'Auth', 'Admin logged in');
         
-        res.json({ user: admin.toSafeObject() });
+        res.json({ 
+            user: admin.toSafeObject(),
+            token: token // Return token explicitly
+        });
     } catch (err) {
         console.error('[AUTH_ERROR] adminLogin failed:', err);
         throw err; // Passed to errorHandler
@@ -127,7 +130,10 @@ async function userLogin(req, res) {
         });
         
         await logActivity(user.username, 'Auth', 'User logged in');
-        res.json({ user: user.toSafeObject() });
+        res.json({ 
+            user: user.toSafeObject(),
+            token: token // Return token explicitly
+        });
     } catch (err) {
         console.error('[AUTH_ERROR] userLogin failed:', err);
         throw err; // Passed to errorHandler

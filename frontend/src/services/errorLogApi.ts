@@ -13,11 +13,12 @@ export async function fetchErrorLogs() {
     return res.json();
 }
 
-export async function saveErrorLogs(logs: any[]) {
+export async function saveErrorLogs(logs: any[], addedByRole?: string, addedByName?: string) {
     const res = await fetch(`${API_BASE}/error-log`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ logs })
+        body: JSON.stringify({ logs, addedByRole, addedByName }),
+        credentials: 'include'
     });
     return res.json();
 }

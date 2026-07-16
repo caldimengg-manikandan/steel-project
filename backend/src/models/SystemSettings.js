@@ -12,8 +12,23 @@ const systemSettingsSchema = new mongoose.Schema({
     moduleProjects: { type: Boolean, default: true },
     moduleRfi: { type: Boolean, default: true },
     moduleReports: { type: Boolean, default: true },
-    logoPath: { type: String, default: '' }, // Path to the uploaded logo
+    logoPath: { type: String, default: '' },
+
+    // Email / SMTP configuration
+    emailEnabled: { type: Boolean, default: false },
+    smtpHost: { type: String, default: '' },
+    smtpPort: { type: Number, default: 587 },
+    smtpUser: { type: String, default: '' },       // sender email address
+    smtpPass: { type: String, default: '' },       // app password / SMTP password
+    smtpFromName: { type: String, default: 'Steel Project' },
+
+    // Recipient lists by role (array of email strings)
+    superAdminEmails: { type: [String], default: [] },
+    projectManagerEmails: { type: [String], default: [] },
+    teamLeadEmails: { type: [String], default: [] },
+
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);
+

@@ -8,7 +8,7 @@ import {
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'notifications' | 'ui' | 'branding' | 'audit';
+type TabId = 'access' | 'notifications' | 'email' | 'ui' | 'branding' | 'audit';
 
 interface TabItem {
     id: TabId;
@@ -20,9 +20,9 @@ interface TabItem {
 const TABS: TabItem[] = [
     { id: 'access', label: 'User & Access', icon: <IconUsers />, desc: 'Roles, permissions and user management' },
     { id: 'notifications', label: 'Notifications', icon: <IconNotification />, desc: 'Email alerts and reminder schedules' },
+    { id: 'email', label: 'Email Settings', icon: <IconNotification />, desc: 'SMTP sender config and recipient lists' },
     { id: 'ui', label: 'System Preference', icon: <IconSettings />, desc: 'Theme, timezone and language' },
     { id: 'branding', label: 'Company Profile', icon: <IconSettings />, desc: 'Logo and branding' },
-
     { id: 'audit', label: 'Logs & Audit', icon: <IconActivity />, desc: 'System activity and change history' },
 ];
 
@@ -98,6 +98,41 @@ export default function AdminSettings() {
     const { settings, updateSettings, refreshSettings } = useSettings();
     const { showMessage } = useMessage();
     const navigate = useNavigate();
+
+    // Email settings state
+    const [emailForm, setEmailForm] = useState({
+        emailEnabled: false,
+        smtpHost: '',
+        smtpPort: 587,
+        smtpUser: '',
+        smtpPass: '',
+        smtpFromName: 'Steel Project',
+        superAdminEmails: [] as string[],
+        projectManagerEmails: [] as string[],
+        teamLeadEmails: [] as string[],
+    });
+    const [emailInputs, setEmailInputs] = useState({ superAdmin: '', projectManager: '', teamLead: '' });
+    const [savingEmail, setSavingEmail] = useState(false);
+    const [testingEmail, setTestingEmail] = useState(false);
+    const [testEmailAddr, setTestEmailAddr] = useState('');
+
+    useEffect(() => {
+        // Load email settings from existing settings
+        if (settings) {
+            setEmailForm(prev => ({
+                ...prev,
+                emailEnabled: (settings as any).emailEnabled || false,
+                smtpHost: (settings as any).smtpHost || '',
+                smtpPort: (settings as any).smtpPort || 587,
+                smtpUser: (settings as any).smtpUser || '',
+                smtpPass: (settings as any).smtpPass || '',
+                smtpFromName: (settings as any).smtpFromName || 'Steel Project',
+                superAdminEmails: (settings as any).superAdminEmails || [],
+                projectManagerEmails: (settings as any).projectManagerEmails || [],
+                teamLeadEmails: (settings as any).teamLeadEmails || [],
+            }));
+        }
+    }, [settings]);
 
     useEffect(() => {
         if (activeTab === 'audit') {
@@ -315,6 +350,164 @@ export default function AdminSettings() {
                             </SettingRow>
                         </Card>
                     )}
+
+                    {activeTab === 'email' && (() => {
+                        const addEmail = (role: 'superAdmin' | 'projectManager' | 'teamLead') => {
+                            const key = role === 'superAdmin' ? 'superAdminEmails' : role === 'projectManager' ? 'projectManagerEmails' : 'teamLeadEmails';
+                            const val = emailInputs[role].trim();
+                            if (!val || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
+                                showMessage('Invalid', 'Please enter a valid email address.', 'error');
+                                return;
+                            }
+                            if (emailForm[key].includes(val)) {
+                                showMessage('Duplicate', 'This email is already in the list.', 'error');
+                                return;
+                            }
+                            setEmailForm(prev => ({ ...prev, [key]: [...prev[key as keyof typeof prev] as string[], val] }));
+                            setEmailInputs(prev => ({ ...prev, [role]: '' }));
+                        };
+
+                        const removeEmail = (role: string, email: string) => {
+                            setEmailForm(prev => ({ ...prev, [role]: (prev[role as keyof typeof prev] as string[]).filter(e => e !== email) }));
+                        };
+
+                        const handleSaveEmail = async () => {
+                            setSavingEmail(true);
+                            try {
+                                const res = await fetch('/steel/api/settings/email', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify(emailForm)
+                                });
+                                if (res.ok) {
+                                    showMessage('Saved', 'Email settings saved successfully.', 'success');
+                                    refreshSettings();
+                                } else {
+                                    const err = await res.json();
+                                    showMessage('Error', err.error || 'Failed to save.', 'error');
+                                }
+                            } catch (e) {
+                                showMessage('Error', 'Network error.', 'error');
+                            } finally {
+                                setSavingEmail(false);
+                            }
+                        };
+
+                        const handleTestEmail = async () => {
+                            setTestingEmail(true);
+                            try {
+                                const res = await fetch('/steel/api/settings/email/test', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify({ testEmail: testEmailAddr || emailForm.smtpUser })
+                                });
+                                const data = await res.json();
+                                if (res.ok) showMessage('Success', data.message, 'success');
+                                else showMessage('Failed', data.error, 'error');
+                            } catch (e) {
+                                showMessage('Error', 'Network error.', 'error');
+                            } finally {
+                                setTestingEmail(false);
+                            }
+                        };
+
+                        const renderEmailList = (role: 'superAdmin' | 'projectManager' | 'teamLead', label: string, roleKey: string) => (
+                            <div style={{ marginBottom: 28 }}>
+                                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: 'var(--color-text-primary)' }}>{label} Recipients</div>
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        placeholder={`Add ${label} email...`}
+                                        value={emailInputs[role]}
+                                        onChange={e => setEmailInputs(prev => ({ ...prev, [role]: e.target.value }))}
+                                        onKeyDown={e => e.key === 'Enter' && addEmail(role)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button className="btn btn-primary btn-sm" onClick={() => addEmail(role)}>
+                                        <IconPlus /> Add
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {(emailForm[roleKey as keyof typeof emailForm] as string[]).map(email => (
+                                        <div key={email} style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                                            background: 'var(--color-primary-glow)', border: '1px solid var(--color-primary)',
+                                            borderRadius: 20, padding: '4px 12px', fontSize: 13
+                                        }}>
+                                            <span style={{ color: 'var(--color-primary)' }}>{email}</span>
+                                            <span
+                                                onClick={() => removeEmail(roleKey, email)}
+                                                style={{ cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 700, lineHeight: 1 }}
+                                            >×</span>
+                                        </div>
+                                    ))}
+                                    {(emailForm[roleKey as keyof typeof emailForm] as string[]).length === 0 && (
+                                        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No emails added yet.</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+
+                        return (
+                            <>
+                                <Card title="SMTP Sender Configuration" action={
+                                    <SettingRow title="" desc="">
+                                        <Toggle enabled={emailForm.emailEnabled} onChange={v => setEmailForm(prev => ({ ...prev, emailEnabled: v }))} />
+                                    </SettingRow>
+                                }>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                                        <div className="form-group">
+                                            <label className="form-label">SMTP Host</label>
+                                            <input type="text" className="form-control" placeholder="e.g. smtp.gmail.com" value={emailForm.smtpHost} onChange={e => setEmailForm(p => ({ ...p, smtpHost: e.target.value }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>For Gmail: smtp.gmail.com | For Outlook: smtp.office365.com</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">SMTP Port</label>
+                                            <input type="number" className="form-control" value={emailForm.smtpPort} onChange={e => setEmailForm(p => ({ ...p, smtpPort: Number(e.target.value) }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>587 (TLS) or 465 (SSL)</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Sender Email Address</label>
+                                            <input type="email" className="form-control" placeholder="yourapp@gmail.com" value={emailForm.smtpUser} onChange={e => setEmailForm(p => ({ ...p, smtpUser: e.target.value }))} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">App Password / SMTP Password</label>
+                                            <input type="password" className="form-control" placeholder="Enter app password" value={emailForm.smtpPass} onChange={e => setEmailForm(p => ({ ...p, smtpPass: e.target.value }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Use an App Password, not your regular login password</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Display Name (From)</label>
+                                            <input type="text" className="form-control" placeholder="Steel Project" value={emailForm.smtpFromName} onChange={e => setEmailForm(p => ({ ...p, smtpFromName: e.target.value }))} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--color-border-light)' }}>
+                                        <input type="email" className="form-control" placeholder="Send test to..." value={testEmailAddr} onChange={e => setTestEmailAddr(e.target.value)} style={{ maxWidth: 280 }} />
+                                        <button className="btn btn-secondary btn-sm" onClick={handleTestEmail} disabled={testingEmail}>
+                                            {testingEmail ? 'Sending...' : '📧 Send Test Email'}
+                                        </button>
+                                        <button className="btn btn-primary" onClick={handleSaveEmail} disabled={savingEmail}>
+                                            {savingEmail ? 'Saving...' : 'Save Email Settings'}
+                                        </button>
+                                    </div>
+                                </Card>
+
+                                <Card title="Recipient Email Lists">
+                                    {renderEmailList("superAdmin", "Super Admin", "superAdminEmails")}
+                                    {renderEmailList("projectManager", "Project Manager", "projectManagerEmails")}
+                                    {renderEmailList("teamLead", "Team Lead", "teamLeadEmails")}
+                                    <div style={{ paddingTop: 16, borderTop: '1px solid var(--color-border-light)' }}>
+                                        <button className="btn btn-primary" onClick={handleSaveEmail} disabled={savingEmail}>
+                                            {savingEmail ? 'Saving...' : 'Save Recipient Lists'}
+                                        </button>
+                                    </div>
+                                </Card>
+                            </>
+                        );
+                    })()}
 
                     {activeTab === 'ui' && (
                         <Card title="Regional & Appearance">

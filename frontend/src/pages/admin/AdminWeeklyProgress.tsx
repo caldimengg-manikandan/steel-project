@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { adminListProjects } from '../../services/projectApi';
 import { fetchWeeklyProgresss, getWeeklyProgressDownloadUrl } from '../../services/weeklyProgressApi';
 import WeeklyProgressPanel from '../../components/WeeklyProgressPanel';
 import { IconSearch, IconFolder, IconBack } from '../../components/Icons';
 
 export default function AdminWeeklyProgress() {
+    // mode is read directly from the URL: /admin/weekly-progress/:projectId/view OR /admin/weekly-progress/:projectId/edit
+    const { projectId: urlProjectId, '*': wildcard } = useParams<{ projectId: string; '*': string }>();
+    const navigate = useNavigate();
+
+    // Determine mode from the URL path itself
+    const currentPath = window.location.pathname;
+    const urlMode: 'view' | 'edit' = currentPath.endsWith('/edit') ? 'edit' : 'view';
+
     const [projects, setProjects] = useState<any[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-    const [currentMode, setCurrentMode] = useState<'view' | 'edit'>('view');
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -15,11 +22,9 @@ export default function AdminWeeklyProgress() {
         try {
             const res = await fetchWeeklyProgresss(projectId);
             if (res.reports && res.reports.length > 0) {
-                // Find latest submitted report, or just use latest if none
                 const latest = res.reports.find((r: any) => r.status === 'Submitted') || res.reports[0];
                 window.location.href = getWeeklyProgressDownloadUrl(projectId, latest._id || latest.id);
             } else {
-                // No reports found, download an empty template
                 window.location.href = getWeeklyProgressDownloadUrl(projectId, 'empty');
             }
         } catch (err) {
@@ -42,35 +47,54 @@ export default function AdminWeeklyProgress() {
         fetchProjects();
     }, []);
 
-    const selectedProject = projects.find(p => (p._id || p.id) === selectedProjectId);
+    const selectedProject = projects.find(p => (p._id || p.id) === urlProjectId);
 
-    const filteredProjects = projects.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const filteredProjects = projects.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.clientName && p.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    const handleSelectProject = (projectId: string, mode: 'view' | 'edit') => {
+        navigate(`/admin/weekly-progress/${projectId}/${mode}`);
+    };
+
+    const handleBack = () => {
+        navigate('/admin/weekly-progress');
+    };
+
     return (
         <div className="admin-clients">
-            {selectedProjectId && selectedProject ? (
-                <>
-                    <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedProjectId('')} title="Back">
-                            <IconBack />
-                        </button>
-                        <div>
-                            <h2 className="page-title">{selectedProject.name} - Weekly Progress</h2>
-                            <p className="page-subtitle">Manage and generate progress reports for this project</p>
+            {urlProjectId ? (
+                loading ? (
+                    <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading project...</div>
+                ) : selectedProject ? (
+                    <>
+                        <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <button className="btn btn-ghost btn-sm btn-icon" onClick={handleBack} title="Back">
+                                <IconBack />
+                            </button>
+                            <div>
+                                <h2 className="page-title">{selectedProject.name} - Weekly Progress</h2>
+                                <p className="page-subtitle">
+                                    {urlMode === 'edit' ? 'Editing progress report' : 'Viewing progress report'}
+                                </p>
+                            </div>
                         </div>
+                        <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 24 }}>
+                            <WeeklyProgressPanel
+                                projectId={urlProjectId}
+                                projectName={selectedProject.name}
+                                initialMode={urlMode}
+                                onClose={handleBack}
+                                onModeChange={(mode) => navigate(`/admin/weekly-progress/${urlProjectId}/${mode}`)}
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        Project not found. <button className="btn btn-secondary btn-sm" onClick={handleBack}>Go Back</button>
                     </div>
-                    <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 24 }}>
-                        <WeeklyProgressPanel 
-                            projectId={selectedProjectId} 
-                            projectName={selectedProject.name} 
-                            initialMode={currentMode}
-                            onClose={() => setSelectedProjectId('')}
-                        />
-                    </div>
-                </>
+                )
             ) : (
                 <>
                     <div className="page-header">
@@ -84,10 +108,10 @@ export default function AdminWeeklyProgress() {
                         <div className="toolbar-left">
                             <div className="search-container">
                                 <span className="search-icon"><IconSearch /></span>
-                                <input 
-                                    type="text" 
-                                    className="search-input" 
-                                    placeholder="Search projects..." 
+                                <input
+                                    type="text"
+                                    className="search-input"
+                                    placeholder="Search projects..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -131,13 +155,25 @@ export default function AdminWeeklyProgress() {
                                 </div>
 
                                 <div className="client-card-footer" style={{ display: 'flex', gap: 8 }}>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedProjectId(project._id || project.id); setCurrentMode('view'); }} style={{ flex: 1, justifyContent: 'center' }}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => handleSelectProject(project._id || project.id, 'view')}
+                                        style={{ flex: 1, justifyContent: 'center' }}
+                                    >
                                         View
                                     </button>
-                                    <button className="btn btn-primary btn-sm" onClick={() => { setSelectedProjectId(project._id || project.id); setCurrentMode('edit'); }} style={{ flex: 1, justifyContent: 'center' }}>
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => handleSelectProject(project._id || project.id, 'edit')}
+                                        style={{ flex: 1, justifyContent: 'center' }}
+                                    >
                                         Edit
                                     </button>
-                                    <button onClick={() => handleDownloadLatest(project._id || project.id)} className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                                    <button
+                                        onClick={() => handleDownloadLatest(project._id || project.id)}
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ flex: 1, justifyContent: 'center' }}
+                                    >
                                         Download
                                     </button>
                                 </div>

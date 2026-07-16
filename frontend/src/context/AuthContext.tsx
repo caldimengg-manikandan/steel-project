@@ -25,14 +25,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const checkAuth = async () => {
             const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+            const localToken = localStorage.getItem('token');
             try {
                 const res = await fetch(`${BASE}/auth/me`, {
-                    credentials: 'include'
+                    credentials: 'include',
+                    headers: {
+                        ...(localToken ? { 'Authorization': `Bearer ${localToken}` } : {})
+                    }
                 });
                 if (res.ok) {
                     const data = await res.json();
                     setUser(data.user);
                 } else {
+                    localStorage.removeItem('token');
                     setUser(null);
                 }
             } catch {
@@ -68,6 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (res.ok) {
                 const data = await res.json();
+                
+                // Store token backup in localStorage
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
+
                 const authUser: AuthUser = {
                     id: data.user.id || data.user._id,
                     username: data.user.username,
@@ -87,14 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const logout = useCallback(async () => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+        const localToken = localStorage.getItem('token');
         try {
             await fetch(`${BASE}/auth/logout`, {
                 method: 'POST',
-                credentials: 'include'
+                credentials: 'include',
+                headers: {
+                    ...(localToken ? { 'Authorization': `Bearer ${localToken}` } : {})
+                }
             });
         } catch (e) {
             console.error('Logout failed:', e);
         }
+        localStorage.removeItem('token');
         setUser(null);
     }, []);
 

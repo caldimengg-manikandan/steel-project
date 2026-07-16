@@ -10,7 +10,7 @@ const DEFAULT_SOW = [
     ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
 ];
 
-export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onClose }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void }) {
+export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onClose, onModeChange }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void }) {
     const { showMessage } = useMessage();
     const [loading, setLoading] = useState(false);
     
@@ -59,7 +59,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
             setLoading(true);
             const res = await fetchWeeklyProgresss(projectId);
             
-            // If there's an existing draft, load it. Otherwise, load the latest report if available, else new.
+            // If there's an existing report/draft, load it. Otherwise always show a new empty form.
             if (res.reports && res.reports.length > 0) {
                 const draft = res.reports.find((r: any) => r.status === 'Draft');
                 if (draft) {
@@ -71,24 +71,13 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                     fetchLiveAutoData(latest._id || latest.id);
                 }
             } else {
-                if (initialMode === 'view') {
-                    const draftRes = await fetchWeeklyProgressDraft(projectId, 'dummy');
-                    const hasAutoFetchData = draftRes.autoFetch && (
-                        (draftRes.autoFetch.transmittals && draftRes.autoFetch.transmittals.length > 0) ||
-                        (draftRes.autoFetch.rfis && draftRes.autoFetch.rfis.length > 0) ||
-                        (draftRes.autoFetch.cdrfis && draftRes.autoFetch.cdrfis.length > 0)
-                    );
-                    
-                    if (!hasAutoFetchData) {
-                        showMessage('Info', 'There is no data to view for this project.', 'info');
-                        if (onClose) onClose();
-                        return;
-                    }
-                }
+                // No saved reports — always show the form with auto-fetched data (never close/redirect)
                 handleCreateNew();
             }
         } catch (err) {
             console.error(err);
+            // Even on error, show an empty form instead of a blank page
+            handleCreateNew();
         } finally {
             setLoading(false);
         }
@@ -323,7 +312,6 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
             
             {/* Removed the list view to jump straight to the auto-fetched report form */}
 
-            {(currentReportId || editMode) && (
                 <div className="card" style={{ padding: 24, marginTop: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -332,7 +320,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                 <input type="date" value={weekStartDate} onChange={e => setWeekStartDate(e.target.value)} disabled={!editMode} className="form-control" style={{ width: 160 }} />
                             </div>
                             <div style={{ paddingTop: 20 }}>
-                                {!editMode && <button className="btn btn-secondary" onClick={() => setEditMode(true)}>Edit Draft</button>}
+                                {!editMode && <button className="btn btn-secondary" onClick={() => { setEditMode(true); if (onModeChange) onModeChange('edit'); }}>Edit Draft</button>}
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: 12, paddingTop: 20 }}>
@@ -340,6 +328,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                 <>
                                     <button className="btn btn-secondary" onClick={handleSaveDraft}>Save Draft</button>
                                     <button className="btn btn-primary" onClick={handleSubmitReport}>Submit Report</button>
+                                    <button className="btn btn-ghost" onClick={() => { setEditMode(false); if (onModeChange) onModeChange('view'); }}>Cancel</button>
                                 </>
                             ) : null}
                             {currentReportId && !editMode && <a href={getWeeklyProgressDownloadUrl(projectId, currentReportId)} download className="btn btn-primary">Download Excel</a>}
@@ -612,7 +601,6 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                         )}
                     </div>
                 </div>
-            )}
         </div>
     );
 }

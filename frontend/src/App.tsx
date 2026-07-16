@@ -55,6 +55,8 @@ export default function App() {
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="weekly-progress" element={<AdminWeeklyProgress />} />
+                <Route path="weekly-progress/:projectId/view" element={<AdminWeeklyProgress />} />
+                <Route path="weekly-progress/:projectId/edit" element={<AdminWeeklyProgress />} />
                 <Route path="error-log" element={<AdminErrorLog />} />
                 <Route path="projects/:id" element={<ProjectView />} />
               </Route>
