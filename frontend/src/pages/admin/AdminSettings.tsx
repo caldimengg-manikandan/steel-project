@@ -115,6 +115,27 @@ export default function AdminSettings() {
     const [savingEmail, setSavingEmail] = useState(false);
     const [testingEmail, setTestingEmail] = useState(false);
     const [testEmailAddr, setTestEmailAddr] = useState('');
+    const [loadingTestReport, setLoadingTestReport] = useState(false);
+
+    const handleSendTestReport = async () => {
+        setLoadingTestReport(true);
+        try {
+            const res = await fetch('/steel/api/settings/scheduler/test', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showMessage('Success', 'Project status email triggered successfully. Please check your inbox!', 'success');
+            } else {
+                showMessage('Failed', data.error || 'Failed to trigger test email', 'error');
+            }
+        } catch (e) {
+            showMessage('Error', 'Network error.', 'error');
+        } finally {
+            setLoadingTestReport(false);
+        }
+    };
 
     useEffect(() => {
         // Load email settings from existing settings
@@ -376,6 +397,17 @@ export default function AdminSettings() {
                                             value={settings.weeklyProgressTime || '11:45'}
                                             onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
                                         />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto', alignSelf: 'flex-end' }}>
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary" 
+                                            onClick={handleSendTestReport}
+                                            disabled={loadingTestReport}
+                                            style={{ height: 38 }}
+                                        >
+                                            {loadingTestReport ? 'Sending...' : '📧 Send Test Report Now'}
+                                        </button>
                                     </div>
                                 </div>
                             )}

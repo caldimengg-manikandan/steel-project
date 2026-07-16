@@ -182,3 +182,14 @@ exports.testEmailSettings = async (req, res) => {
     }
 };
 
+exports.testSchedulerEmail = async (req, res) => {
+    try {
+        const { sendProjectStatusEmail } = require('../services/schedulerService');
+        await sendProjectStatusEmail();
+        res.json({ success: true, message: 'Project status summary report email triggered successfully.' });
+    } catch (err) {
+        console.error('testSchedulerEmail error:', err);
+        res.status(500).json({ success: false, error: err.message || 'Failed to trigger test scheduler email' });
+    }
+};
+
