@@ -342,12 +342,43 @@ export default function AdminSettings() {
 
                     {activeTab === 'notifications' && (
                         <Card title="System Reports">
-                            <SettingRow title="Weekly Summary Progress" desc="Send a project status summary to all managers every Friday at 12:00 PM">
+                            <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email active project status Excel files to Project Managers.">
                                 <Toggle 
                                     enabled={settings.weeklyProgresss} 
                                     onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
                                 />
                             </SettingRow>
+                            {settings.weeklyProgresss && (
+                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 16, padding: '16px 20px', background: 'var(--color-bg-page)', borderRadius: 8 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Day</label>
+                                        <select 
+                                            className="form-control" 
+                                            style={{ width: 140 }}
+                                            value={settings.weeklyProgressDay ?? 4}
+                                            onChange={(e) => handleSettingChange('weeklyProgressDay', Number(e.target.value))}
+                                        >
+                                            <option value={0}>Sunday</option>
+                                            <option value={1}>Monday</option>
+                                            <option value={2}>Tuesday</option>
+                                            <option value={3}>Wednesday</option>
+                                            <option value={4}>Thursday</option>
+                                            <option value={5}>Friday</option>
+                                            <option value={6}>Saturday</option>
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Time</label>
+                                        <input 
+                                            type="time" 
+                                            className="form-control" 
+                                            style={{ width: 120 }}
+                                            value={settings.weeklyProgressTime || '11:45'}
+                                            onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </Card>
                     )}
 

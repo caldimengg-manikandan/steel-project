@@ -6,6 +6,8 @@ interface Settings {
     dateFormat: string;
     emailNotifications: boolean;
     weeklyProgresss: boolean;
+    weeklyProgressDay?: number;
+    weeklyProgressTime?: string;
     darkMode: boolean;
     twoFactor: boolean;
     rfiAutoNumber: boolean;
@@ -21,6 +23,8 @@ const DEFAULT_SETTINGS: Settings = {
     dateFormat: 'DD/MM/YYYY',
     emailNotifications: true,
     weeklyProgresss: false,
+    weeklyProgressDay: 4,
+    weeklyProgressTime: '11:45',
     darkMode: false,
     twoFactor: false,
     rfiAutoNumber: true,

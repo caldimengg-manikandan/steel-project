@@ -166,6 +166,14 @@ connectDB().then(async () => {
     // Start AI service automatically
     startAiService();
 
+    // Start Weekly Progress Summary cron job
+    try {
+        const { initWeeklyProgressScheduler } = require('./services/schedulerService');
+        initWeeklyProgressScheduler();
+    } catch (err) {
+        console.error('[Scheduler] Failed to initialize scheduler on startup:', err.message);
+    }
+
     const server = app.listen(PORT, () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);

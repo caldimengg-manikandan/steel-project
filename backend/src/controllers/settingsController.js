@@ -27,7 +27,7 @@ exports.updateSettings = async (req, res) => {
     }
 
     const { 
-        timezone, dateFormat, emailNotifications, weeklyProgresss, darkMode,
+        timezone, dateFormat, emailNotifications, weeklyProgresss, weeklyProgressDay, weeklyProgressTime, darkMode,
         twoFactor, rfiAutoNumber, activityLogging, moduleProjects, moduleRfi, moduleReports
     } = req.body;
 
@@ -35,6 +35,8 @@ exports.updateSettings = async (req, res) => {
     if (dateFormat !== undefined) settings.dateFormat = dateFormat;
     if (emailNotifications !== undefined) settings.emailNotifications = emailNotifications;
     if (weeklyProgresss !== undefined) settings.weeklyProgresss = weeklyProgresss;
+    if (weeklyProgressDay !== undefined) settings.weeklyProgressDay = weeklyProgressDay;
+    if (weeklyProgressTime !== undefined) settings.weeklyProgressTime = weeklyProgressTime;
     if (darkMode !== undefined) settings.darkMode = darkMode;
     if (twoFactor !== undefined) settings.twoFactor = twoFactor;
     if (rfiAutoNumber !== undefined) settings.rfiAutoNumber = rfiAutoNumber;
@@ -44,6 +46,14 @@ exports.updateSettings = async (req, res) => {
     if (moduleReports !== undefined) settings.moduleReports = moduleReports;
 
     await settings.save();
+    
+    // Trigger scheduler update
+    try {
+        const { initWeeklyProgressScheduler } = require('../services/schedulerService');
+        initWeeklyProgressScheduler();
+    } catch (err) {
+        console.error('[Scheduler] Failed to reload scheduler:', err.message);
+    }
     
     const username = req.user ? req.user.username : 'Admin';
     await logActivity(username, 'Config', 'System settings updated');

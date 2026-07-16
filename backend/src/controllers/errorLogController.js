@@ -22,8 +22,13 @@ exports.saveErrorLogs = async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid data format' });
         }
 
-        // Identify brand-new entries (no existing _id) before saving
-        const newEntries = logs.filter(log => !log._id || log._id === 'new');
+        // Identify brand-new entries (no existing _id) that actually have content before saving
+        const newEntries = logs.filter(log => {
+            const isNew = !log._id || log._id === 'new';
+            const hasContent = (log.projectName && log.projectName.trim()) || 
+                               (log.errorDescription && log.errorDescription.trim());
+            return isNew && hasContent;
+        });
 
         const bulkOps = logs.map(log => {
             if (log._id && log._id !== 'new') {

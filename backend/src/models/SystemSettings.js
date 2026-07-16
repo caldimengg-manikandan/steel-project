@@ -5,6 +5,8 @@ const systemSettingsSchema = new mongoose.Schema({
     dateFormat: { type: String, default: 'DD/MM/YYYY' },
     emailNotifications: { type: Boolean, default: true },
     weeklyProgresss: { type: Boolean, default: false },
+    weeklyProgressDay: { type: Number, default: 4 }, // 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday
+    weeklyProgressTime: { type: String, default: '11:45' }, // e.g. "11:45"
     darkMode: { type: Boolean, default: false },
     twoFactor: { type: Boolean, default: false },
     rfiAutoNumber: { type: Boolean, default: true },

@@ -232,308 +232,10 @@ exports.downloadExcel = async (req, res) => {
             }
         }
 
-        if (!fs.existsSync(TEMPLATE_PATH)) {
-            return res.status(404).json({ success: false, error: `Template not found at ${TEMPLATE_PATH}. Please provide the weekly_report_template.xlsx.` });
-        }
-
-        const workbook = new exceljs.Workbook();
-        await workbook.xlsx.readFile(TEMPLATE_PATH);
-
-        // Dynamically remove the REF worksheet if it exists in the template
-        const refSheet = workbook.getWorksheet('REF') || workbook.getWorksheet('ref');
-        if (refSheet) {
-            workbook.removeWorksheet(refSheet.id);
-        }
-
-        // --- SUMMARY TAB ---
-        const summarySheet = workbook.getWorksheet('SUMMARY');
-        if (summarySheet && report.summaryData) {
-            const data = report.summaryData;
-            if (data.date) summarySheet.getCell('C3').value = data.date;
-            if (data.projectName) summarySheet.getCell('C4').value = data.projectName;
-            if (data.projectNo) summarySheet.getCell('L4').value = data.projectNo;
-            if (data.clientName) summarySheet.getCell('C5').value = data.clientName;
-            if (data.clientProjectNo) summarySheet.getCell('L5').value = data.clientProjectNo;
-            if (data.clientAddress) summarySheet.getCell('C6').value = data.clientAddress;
-            if (data.clientProjectManager) summarySheet.getCell('C8').value = data.clientProjectManager;
-            if (data.reportCirculatedTo1) summarySheet.getCell('C9').value = data.reportCirculatedTo1;
-            if (data.caldimProjectManager) summarySheet.getCell('C10').value = data.caldimProjectManager;
-            if (data.reportCirculatedTo2) summarySheet.getCell('C11').value = data.reportCirculatedTo2;
-            if (data.projectType) summarySheet.getCell('E16').value = data.projectType;
-            if (data.projectDescription) {
-                const lines = data.projectDescription.split('\n');
-                for (let i = 0; i < Math.min(lines.length, 3); i++) {
-                    summarySheet.getCell(`B${17 + i}`).value = lines[i];
-                }
-            }
-            if (data.projectStatusLastWeek) {
-                const lines = data.projectStatusLastWeek.split('\n');
-                for (let i = 0; i < Math.min(lines.length, 3); i++) {
-                    summarySheet.getCell(`B${22 + i}`).value = lines[i];
-                }
-            }
-            if (data.overallApprovalStatus) {
-                const lines = data.overallApprovalStatus.split('\n');
-                for (let i = 0; i < Math.min(lines.length, 2); i++) {
-                    summarySheet.getCell(`B${27 + i}`).value = lines[i];
-                }
-            }
-            if (data.overallFabricationStatus) {
-                const lines = data.overallFabricationStatus.split('\n');
-                for (let i = 0; i < Math.min(lines.length, 2); i++) {
-                    summarySheet.getCell(`B${31 + i}`).value = lines[i];
-                }
-            }
-
-            // Handle Logo insertion if available
-            try {
-                const settings = await SystemSettings.findOne();
-                if (settings && settings.companyLogoUrl) {
-                    // This expects a local path or we skip if it's external and we can't fetch it easily.
-                    // For now, we will skip logo embedding unless it's a local file.
-                }
-            } catch (e) {
-                console.warn('Could not fetch logo for export', e);
-            }
-        }
-
-        // --- SOW TAB ---
-        const sowSheet = workbook.getWorksheet('SOW');
-        if (sowSheet) {
-            let sowDataToUse = report.sowData || [];
-            if (sowDataToUse.length === 0 || (sowDataToUse.length === 1 && !sowDataToUse[0].description)) {
-                sowDataToUse = [
-                    { sNo: '', description: 'BASE BID', change: '', receivedDate: '', remarks: '' },
-                    { sNo: '', description: 'STRUCTURAL STEEL:', change: '', receivedDate: '', remarks: '' },
-                    ...Array(10).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' })),
-                    { sNo: '', description: 'MISC. STEEL:', change: '', receivedDate: '', remarks: '' },
-                    ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
-                ];
-            }
-            
-            if (sowDataToUse.length > 0) {
-                let startRow = 3;
-                // Get style from row 3 if it exists
-                const styleRow = sowSheet.getRow(startRow);
-                
-                sowDataToUse.forEach((item, index) => {
-                const row = sowSheet.getRow(startRow + index);
-                row.getCell(1).value = item.sNo;
-                row.getCell(2).value = item.description;
-                row.getCell(3).value = item.change;
-                row.getCell(4).value = item.receivedDate;
-                row.getCell(5).value = item.remarks;
-                // Copy style
-                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                    const templateCell = styleRow.getCell(colNumber);
-                    if (templateCell.style) cell.style = templateCell.style;
-                });
-                
-                const descCell = row.getCell(2);
-                descCell.style = Object.assign({}, descCell.style, {
-                    alignment: { horizontal: 'left', vertical: 'middle', wrapText: true, indent: 1 }
-                });
-
-                if (item.description && (item.description.toUpperCase().includes('STRUCTURAL STEEL:') || item.description.toUpperCase().includes('MISC. STEEL:'))) {
-                    descCell.style = Object.assign({}, descCell.style, {
-                        font: { name: 'Calibri', size: 11, bold: true, underline: true }
-                    });
-                }
-                row.commit();
-            });
-            }
-        }
-
-        // --- SCHEDULE TAB ---
-        const scheduleSheet = workbook.getWorksheet('SCHEDULE');
-        if (scheduleSheet && report.scheduleData && report.scheduleData.length > 0) {
-            let startRow = 3;
-            const styleRow = scheduleSheet.getRow(startRow);
-            
-            report.scheduleData.forEach((item, index) => {
-                const row = scheduleSheet.getRow(startRow + index);
-                row.getCell(1).value = item.sNo;
-                row.getCell(2).value = item.seqArea;
-                row.getCell(3).value = item.status;
-                row.getCell(4).value = item.plannedIfaDate;
-                row.getCell(5).value = item.actualIfaDate;
-                row.getCell(6).value = item.bfaReceivedDate;
-                row.getCell(7).value = item.plannedFabDate;
-                row.getCell(8).value = item.actualFabDate;
-                row.getCell(9).value = item.remarks;
-                
-                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                    const templateCell = styleRow.getCell(colNumber);
-                    if (templateCell.style) cell.style = templateCell.style;
-                });
-                row.commit();
-            });
-        }
-
-        // --- TRANSMITTAL LOG TAB ---
-        const transmittalSheet = workbook.getWorksheet('TRANSMITTAL LOG');
-        if (transmittalSheet) {
-            let transmittalsToExport = [];
-            if (report.transmittalData && report.transmittalData.length > 0) {
-                transmittalsToExport = report.transmittalData;
-            } else {
-                const autoTransmittals = await getAutoFetchedTransmittals(projectId);
-                transmittalsToExport = autoTransmittals.map(t => ({
-                    transmittalNo: t.transmittalNumber ? `TR-${String(t.transmittalNumber).padStart(3, '0')}` : (t.trackingNo || t.id || ''),
-                    date: t.createdAt ? new Date(t.createdAt).toISOString().split('T')[0] : '',
-                    appFab: t.appFab || '',
-                    numberOfSheets: t.drawings ? t.drawings.length : '',
-                    seqArea: t.sequences && t.sequences.length > 0 ? t.sequences.join(', ') : '',
-                    remarks: ''
-                }));
-            }
-
-            if (transmittalsToExport.length > 0) {
-                let startRow = 3;
-                const styleRow = transmittalSheet.getRow(startRow);
-                
-                transmittalsToExport.forEach((item, index) => {
-                    const row = transmittalSheet.getRow(startRow + index);
-                    row.getCell(1).value = index + 1; // S.No
-                    row.getCell(2).value = item.transmittalNo;
-                    row.getCell(3).value = item.date;
-                    row.getCell(4).value = item.appFab;
-                    row.getCell(5).value = item.numberOfSheets;
-                    row.getCell(6).value = item.seqArea;
-                    row.getCell(7).value = item.remarks;
-                    
-                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                        const templateCell = styleRow.getCell(colNumber);
-                        if (templateCell.style) cell.style = templateCell.style;
-                    });
-                    row.commit();
-                });
-            }
-        }
-
-        // (Other tabs like REF, RFI LOG, CDRFI LOG can be filled similarly, but the spec says they are auto-fetched
-        // in the UI. For the export, we should also write the auto-fetched data if needed, or if the user saves it
-        // in the draft. We will only write what is requested. Since RFI and CDRFI LOG are read-only, they might
-        // need to be fetched live for the export. We will fetch them here as well.)
-        
-        const rfiExtractions = await RfiExtraction.find({ projectId });
-        const rfis = [];
-        rfiExtractions.forEach(ext => {
-            if (ext.rfis && Array.isArray(ext.rfis)) {
-                ext.rfis.forEach(rfi => {
-                    rfis.push({
-                        ...rfi.toObject(),
-                        sentDate: ext.createdAt
-                    });
-                });
-            }
-        });
-
-        const rawCdrfis = await ChangeOrder.find({ projectId });
-        const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
-
-        const rfiSheet = workbook.getWorksheet('RFI LOG');
-        if (rfiSheet) {
-            let startRow = 3;
-            const styleRow = rfiSheet.getRow(startRow);
-            
-            let rfisToExport = [];
-            if (report.rfiData && report.rfiData.length > 0) {
-                rfisToExport = report.rfiData;
-            } else {
-                rfisToExport = rfis.map(rfi => ({
-                    rfiNumber: rfi.rfiNumber,
-                    clientRfiNumber: rfi.clientRfiNumber || '',
-                    status: rfi.status,
-                    priority: rfi.priority || '',
-                    sentDate: rfi.sentDate ? new Date(rfi.sentDate).toLocaleDateString() : '',
-                    seqArea: rfi.seqArea || '',
-                    rfiType: rfi.rfiType || '',
-                    description: rfi.description,
-                    receivedDate: rfi.receivedDate || '',
-                    remarks: rfi.remarks || ''
-                }));
-            }
-
-            rfisToExport.forEach((rfi, index) => {
-                const row = rfiSheet.getRow(startRow + index);
-                row.getCell(1).value = rfi.rfiNumber || '';
-                row.getCell(2).value = rfi.clientRfiNumber || '';
-                row.getCell(3).value = rfi.status || '';
-                row.getCell(4).value = rfi.priority || '';
-                row.getCell(5).value = rfi.sentDate || '';
-                row.getCell(6).value = rfi.seqArea || '';
-                row.getCell(7).value = rfi.rfiType || '';
-                row.getCell(8).value = rfi.description || '';
-                row.getCell(9).value = rfi.receivedDate || '';
-                row.getCell(10).value = rfi.remarks || '';
-
-                if (styleRow) {
-                    row.eachCell((cell, colNumber) => {
-                        const styleCell = styleRow.getCell(colNumber);
-                        if (styleCell) {
-                            cell.font = styleCell.font;
-                            cell.border = styleCell.border;
-                            cell.alignment = styleCell.alignment;
-                        }
-                    });
-                }
-                row.commit();
-            });
-        }
-
-        const cdrfiSheet = workbook.getWorksheet('CDRFI LOG');
-        if (cdrfiSheet) {
-            let startRow = 3;
-            const styleRow = cdrfiSheet.getRow(startRow);
-            
-            // If they saved custom cdrfiData, use it, otherwise fall back to auto-fetched ChangeOrders
-            let cdrfisToExport = [];
-            if (report.cdrfiData && report.cdrfiData.length > 0) {
-                cdrfisToExport = report.cdrfiData;
-            } else {
-                cdrfisToExport = cdrfis.map(co => ({
-                    caldimCdrfiNo: co.id,
-                    clientCdrfiNo: '',
-                    status: co.status,
-                    priority: '',
-                    sentDate: '',
-                    seqArea: '',
-                    cdrfiType: '',
-                    description: co.description,
-                    receivedDate: '',
-                    remarks: ''
-                }));
-            }
-
-            cdrfisToExport.forEach((cdrfi, index) => {
-                const row = cdrfiSheet.getRow(startRow + index);
-                row.getCell(1).value = cdrfi.caldimCdrfiNo || '';
-                row.getCell(2).value = cdrfi.clientCdrfiNo || '';
-                row.getCell(3).value = cdrfi.status || '';
-                row.getCell(4).value = cdrfi.priority || '';
-                row.getCell(5).value = cdrfi.sentDate || '';
-                row.getCell(6).value = cdrfi.seqArea || '';
-                row.getCell(7).value = cdrfi.cdrfiType || '';
-                row.getCell(8).value = cdrfi.description || '';
-                row.getCell(9).value = cdrfi.receivedDate || '';
-                row.getCell(10).value = cdrfi.remarks || '';
-
-                if (styleRow) {
-                    row.eachCell((cell, colNumber) => {
-                        const styleCell = styleRow.getCell(colNumber);
-                        if (styleCell) {
-                            cell.font = styleCell.font;
-                            cell.border = styleCell.border;
-                            cell.alignment = styleCell.alignment;
-                        }
-                    });
-                }
-            });
-        }
+        const workbook = await exports.buildWeeklyReportWorkbook(projectId, report);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="Weekly_Progress_${report.weekStartDate}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="Weekly_Progress_${report.weekStartDate || new Date().toISOString().split('T')[0]}.xlsx"`);
 
         await workbook.xlsx.write(res);
         res.end();
@@ -541,4 +243,294 @@ exports.downloadExcel = async (req, res) => {
         console.error('Error generating excel:', error);
         res.status(500).json({ success: false, error: 'Failed to generate excel' });
     }
+};
+
+exports.buildWeeklyReportWorkbook = async (projectId, report) => {
+    if (!fs.existsSync(TEMPLATE_PATH)) {
+        throw new Error(`Template not found at ${TEMPLATE_PATH}. Please provide the weekly_report_template.xlsx.`);
+    }
+
+    const workbook = new exceljs.Workbook();
+    await workbook.xlsx.readFile(TEMPLATE_PATH);
+
+    // Dynamically remove the REF worksheet if it exists in the template
+    const refSheet = workbook.getWorksheet('REF') || workbook.getWorksheet('ref');
+    if (refSheet) {
+        workbook.removeWorksheet(refSheet.id);
+    }
+
+    // --- SUMMARY TAB ---
+    const summarySheet = workbook.getWorksheet('SUMMARY');
+    if (summarySheet && report.summaryData) {
+        const data = report.summaryData;
+        if (data.date) summarySheet.getCell('C3').value = data.date;
+        if (data.projectName) summarySheet.getCell('C4').value = data.projectName;
+        if (data.projectNo) summarySheet.getCell('L4').value = data.projectNo;
+        if (data.clientName) summarySheet.getCell('C5').value = data.clientName;
+        if (data.clientProjectNo) summarySheet.getCell('L5').value = data.clientProjectNo;
+        if (data.clientAddress) summarySheet.getCell('C6').value = data.clientAddress;
+        if (data.clientProjectManager) summarySheet.getCell('C8').value = data.clientProjectManager;
+        if (data.reportCirculatedTo1) summarySheet.getCell('C9').value = data.reportCirculatedTo1;
+        if (data.caldimProjectManager) summarySheet.getCell('C10').value = data.caldimProjectManager;
+        if (data.reportCirculatedTo2) summarySheet.getCell('C11').value = data.reportCirculatedTo2;
+        if (data.projectType) summarySheet.getCell('E16').value = data.projectType;
+        if (data.projectDescription) {
+            const lines = data.projectDescription.split('\n');
+            for (let i = 0; i < Math.min(lines.length, 3); i++) {
+                summarySheet.getCell(`B${17 + i}`).value = lines[i];
+            }
+        }
+        if (data.projectStatusLastWeek) {
+            const lines = data.projectStatusLastWeek.split('\n');
+            for (let i = 0; i < Math.min(lines.length, 3); i++) {
+                summarySheet.getCell(`B${22 + i}`).value = lines[i];
+            }
+        }
+        if (data.overallApprovalStatus) {
+            const lines = data.overallApprovalStatus.split('\n');
+            for (let i = 0; i < Math.min(lines.length, 2); i++) {
+                summarySheet.getCell(`B${27 + i}`).value = lines[i];
+            }
+        }
+        if (data.overallFabricationStatus) {
+            const lines = data.overallFabricationStatus.split('\n');
+            for (let i = 0; i < Math.min(lines.length, 2); i++) {
+                summarySheet.getCell(`B${31 + i}`).value = lines[i];
+            }
+        }
+
+        // Handle Logo insertion if available
+        try {
+            const settings = await SystemSettings.findOne();
+            if (settings && settings.companyLogoUrl) {
+                // This expects a local path or we skip if it's external and we can't fetch it easily.
+                // For now, we will skip logo embedding unless it's a local file.
+            }
+        } catch (e) {
+            console.warn('Could not fetch logo for export', e);
+        }
+    }
+
+    // --- SOW TAB ---
+    const sowSheet = workbook.getWorksheet('SOW');
+    if (sowSheet) {
+        let sowDataToUse = report.sowData || [];
+        if (sowDataToUse.length === 0 || (sowDataToUse.length === 1 && !sowDataToUse[0].description)) {
+            sowDataToUse = [
+                { sNo: '', description: 'BASE BID', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: 'STRUCTURAL STEEL:', change: '', receivedDate: '', remarks: '' },
+                ...Array(10).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' })),
+                { sNo: '', description: 'MISC. STEEL:', change: '', receivedDate: '', remarks: '' },
+                ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
+            ];
+        }
+
+        let currentSNo = 1;
+        let startRow = 14;
+        const styleRow = sowSheet.getRow(startRow);
+
+        sowDataToUse.forEach((sow, index) => {
+            const row = sowSheet.getRow(startRow + index);
+            if (sow.description === 'BASE BID' || sow.description === 'STRUCTURAL STEEL:' || sow.description === 'MISC. STEEL:') {
+                row.getCell(2).value = sow.description;
+                row.getCell(2).font = { bold: true };
+            } else {
+                row.getCell(1).value = currentSNo++;
+                row.getCell(2).value = sow.description || '';
+                row.getCell(3).value = sow.change || '';
+                row.getCell(4).value = sow.receivedDate || '';
+                row.getCell(5).value = sow.remarks || '';
+            }
+
+            if (styleRow) {
+                row.eachCell((cell, colNumber) => {
+                    const styleCell = styleRow.getCell(colNumber);
+                    if (styleCell) {
+                        cell.border = styleCell.border;
+                        cell.alignment = styleCell.alignment;
+                    }
+                });
+            }
+        });
+    }
+
+    // --- SCHEDULE TAB ---
+    const scheduleSheet = workbook.getWorksheet('SCHEDULE');
+    if (scheduleSheet) {
+        let startRow = 14;
+        const styleRow = scheduleSheet.getRow(startRow);
+
+        const scheduleDataToUse = report.scheduleData || [];
+        scheduleDataToUse.forEach((sched, index) => {
+            const row = scheduleSheet.getRow(startRow + index);
+            row.getCell(1).value = sched.sNo || '';
+            row.getCell(2).value = sched.seqArea || '';
+            row.getCell(3).value = sched.status || '';
+            row.getCell(4).value = sched.plannedIfaDate || '';
+            row.getCell(5).value = sched.actualIfaDate || '';
+            row.getCell(6).value = sched.bfaReceivedDate || '';
+            row.getCell(7).value = sched.plannedFabDate || '';
+            row.getCell(8).value = sched.actualFabDate || '';
+            row.getCell(9).value = sched.remarks || '';
+
+            if (styleRow) {
+                row.eachCell((cell, colNumber) => {
+                    const styleCell = styleRow.getCell(colNumber);
+                    if (styleCell) {
+                        cell.border = styleCell.border;
+                        cell.alignment = styleCell.alignment;
+                    }
+                });
+            }
+        });
+    }
+
+    // --- TRANSMITTAL LOG TAB ---
+    const transmittalSheet = workbook.getWorksheet('TRANSMITTAL LOG');
+    if (transmittalSheet) {
+        let startRow = 14;
+        const styleRow = transmittalSheet.getRow(startRow);
+
+        let transmittalsToUse = report.transmittalData || [];
+        if (transmittalsToUse.length === 0) {
+            transmittalsToUse = await getAutoFetchedTransmittals(projectId);
+        }
+
+        transmittalsToUse.forEach((t, index) => {
+            const row = transmittalSheet.getRow(startRow + index);
+            row.getCell(1).value = index + 1;
+            row.getCell(2).value = t.transmittalNo || '';
+            row.getCell(3).value = t.date || '';
+            row.getCell(4).value = t.appFab || '';
+            row.getCell(5).value = t.numberOfSheets || '';
+            row.getCell(6).value = t.seqArea || '';
+            row.getCell(7).value = t.remarks || '';
+
+            if (styleRow) {
+                row.eachCell((cell, colNumber) => {
+                    const styleCell = styleRow.getCell(colNumber);
+                    if (styleCell) {
+                        cell.border = styleCell.border;
+                        cell.alignment = styleCell.alignment;
+                    }
+                });
+            }
+        });
+    }
+
+    const rfiExtractions = await RfiExtraction.find({ projectId });
+    const rfis = [];
+    rfiExtractions.forEach(ext => {
+        if (ext.rfis && Array.isArray(ext.rfis)) {
+            ext.rfis.forEach(rfi => {
+                rfis.push({
+                    ...rfi.toObject(),
+                    sentDate: ext.createdAt
+                });
+            });
+        }
+    });
+
+    const rawCdrfis = await ChangeOrder.find({ projectId });
+    const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
+
+    const rfiSheet = workbook.getWorksheet('RFI LOG');
+    if (rfiSheet) {
+        let startRow = 3;
+        const styleRow = rfiSheet.getRow(startRow);
+        
+        let rfisToExport = [];
+        if (report.rfiData && report.rfiData.length > 0) {
+            rfisToExport = report.rfiData;
+        } else {
+            rfisToExport = rfis.map(rfi => ({
+                rfiNumber: rfi.rfiNumber,
+                clientRfiNumber: rfi.clientRfiNumber || '',
+                status: rfi.status,
+                priority: rfi.priority || '',
+                sentDate: rfi.sentDate ? new Date(rfi.sentDate).toLocaleDateString() : '',
+                seqArea: rfi.seqArea || '',
+                rfiType: rfi.rfiType || '',
+                description: rfi.description,
+                receivedDate: rfi.receivedDate || '',
+                remarks: rfi.remarks || ''
+            }));
+        }
+
+        rfisToExport.forEach((rfi, index) => {
+            const row = rfiSheet.getRow(startRow + index);
+            row.getCell(1).value = rfi.rfiNumber || '';
+            row.getCell(2).value = rfi.clientRfiNumber || '';
+            row.getCell(3).value = rfi.status || '';
+            row.getCell(4).value = rfi.priority || '';
+            row.getCell(5).value = rfi.sentDate || '';
+            row.getCell(6).value = rfi.seqArea || '';
+            row.getCell(7).value = rfi.rfiType || '';
+            row.getCell(8).value = rfi.description || '';
+            row.getCell(9).value = rfi.receivedDate || '';
+            row.getCell(10).value = rfi.remarks || '';
+
+            if (styleRow) {
+                row.eachCell((cell, colNumber) => {
+                    const styleCell = styleRow.getCell(colNumber);
+                    if (styleCell) {
+                        cell.font = styleCell.font;
+                        cell.border = styleCell.border;
+                        cell.alignment = styleCell.alignment;
+                    }
+                });
+            }
+        });
+    }
+
+    const cdrfiSheet = workbook.getWorksheet('CDRFI LOG');
+    if (cdrfiSheet) {
+        let startRow = 3;
+        const styleRow = cdrfiSheet.getRow(startRow);
+        
+        let cdrfisToExport = [];
+        if (report.cdrfiData && report.cdrfiData.length > 0) {
+            cdrfisToExport = report.cdrfiData;
+        } else {
+            cdrfisToExport = cdrfis.map(co => ({
+                caldimCdrfiNo: co.id,
+                clientCdrfiNo: '',
+                status: co.status,
+                priority: '',
+                sentDate: '',
+                seqArea: '',
+                cdrfiType: '',
+                description: co.description,
+                receivedDate: '',
+                remarks: ''
+            }));
+        }
+
+        cdrfisToExport.forEach((cdrfi, index) => {
+            const row = cdrfiSheet.getRow(startRow + index);
+            row.getCell(1).value = cdrfi.caldimCdrfiNo || '';
+            row.getCell(2).value = cdrfi.clientCdrfiNo || '';
+            row.getCell(3).value = cdrfi.status || '';
+            row.getCell(4).value = cdrfi.priority || '';
+            row.getCell(5).value = cdrfi.sentDate || '';
+            row.getCell(6).value = cdrfi.seqArea || '';
+            row.getCell(7).value = cdrfi.cdrfiType || '';
+            row.getCell(8).value = cdrfi.description || '';
+            row.getCell(9).value = cdrfi.receivedDate || '';
+            row.getCell(10).value = cdrfi.remarks || '';
+
+            if (styleRow) {
+                row.eachCell((cell, colNumber) => {
+                    const styleCell = styleRow.getCell(colNumber);
+                    if (styleCell) {
+                        cell.font = styleCell.font;
+                        cell.border = styleCell.border;
+                        cell.alignment = styleCell.alignment;
+                    }
+                });
+            }
+        });
+    }
+
+    return workbook;
 };
