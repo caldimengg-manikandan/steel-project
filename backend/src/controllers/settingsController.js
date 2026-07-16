@@ -45,6 +45,9 @@ exports.updateSettings = async (req, res) => {
     if (moduleRfi !== undefined) settings.moduleRfi = moduleRfi;
     if (moduleReports !== undefined) settings.moduleReports = moduleReports;
 
+    if (req.user && req.user._id) {
+        settings.updatedBy = req.user._id;
+    }
     await settings.save();
     
     // Trigger scheduler update
@@ -118,6 +121,9 @@ exports.updateEmailSettings = async (req, res) => {
         if (projectManagerEmails !== undefined) settings.projectManagerEmails = projectManagerEmails;
         if (teamLeadEmails !== undefined) settings.teamLeadEmails = teamLeadEmails;
 
+        if (req.user && req.user._id) {
+            settings.updatedBy = req.user._id;
+        }
         await settings.save();
 
         const username = req.user ? req.user.username : 'Admin';

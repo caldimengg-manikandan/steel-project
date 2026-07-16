@@ -63,8 +63,12 @@ async function sendProjectStatusEmail() {
             return;
         }
 
-        // Get all active/non-completed projects
-        const projects = await Project.find({ status: { $ne: 'Completed' } }).sort({ createdAt: -1 }).lean();
+        // Get all active/non-completed projects owned by this settings creator
+        const filter = { status: { $ne: 'Completed' } };
+        if (settings.updatedBy) {
+            filter.createdByAdminId = settings.updatedBy;
+        }
+        const projects = await Project.find(filter).sort({ createdAt: -1 }).lean();
         if (projects.length === 0) {
             console.log('[Scheduler] No active projects found. Skipping status report.');
             return;
