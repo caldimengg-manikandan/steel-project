@@ -15,27 +15,25 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-             export NVM_DIR="$HOME/.nvm"
-             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-             cd /var/www/steel-project && echo "=== CD successful ==="
-             git reset --hard && echo "=== Git reset successful ==="
-             git pull origin main && echo "=== Git pull successful ==="
-             
-             # ── Update Backend ──────────────────────────────────────
-             cd backend && echo "=== CD backend successful ==="
-             npm install && echo "=== NPM install backend successful ==="
-             
-             # Kill any orphaned Python AI services to force a clean restart
-             pkill -f api.py || true
-             echo "=== Orphaned AI services killed ==="
-             
-             (pm2 restart steel-dms || pm2 start src/app.js --name steel-dms) && echo "=== PM2 action completed ==="
-             
-              # ── Update Frontend ─────────────────────────────────────
-              cd ../frontend && echo "=== CD frontend successful ==="
-              npm install && echo "=== NPM install frontend successful ==="
-              export NODE_OPTIONS="--max-old-space-size=1024"
-              npm run build && echo "=== Frontend build successful ==="
-             # If using PM2 to serve frontend, restart it here too.
-             # Nginx will automatically pick up the new files in the 'dist' folder.
+            cd /var/www/steel-project && echo "=== CD successful ==="
+            git reset --hard && echo "=== Git reset successful ==="
+            git pull origin main && echo "=== Git pull successful ==="
+
+            # Kill any orphaned Python AI services to force a clean restart with new code
+            pkill -f "AiExtraction/api.py" || true
+            echo "=== Orphaned AI services killed ==="
+
+            # Update Backend
+            cd backend && echo "=== CD backend successful ==="
+            npm install && echo "=== NPM install backend successful ==="
+            (pm2 restart steel-dms || pm2 start src/app.js --name steel-dms) && echo "=== PM2 action completed ==="
+
+            # Update Frontend
+            cd ../frontend && echo "=== CD frontend successful ==="
+            npm install && echo "=== NPM install frontend successful ==="
+            export NODE_OPTIONS="--max-old-space-size=1024"
+            npm run build && echo "=== Frontend build successful ==="
+            # Nginx will automatically pick up the new files in the 'dist' folder.
