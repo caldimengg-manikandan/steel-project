@@ -100,6 +100,11 @@ export default function AdminErrorLog() {
         }]);
     };
 
+    const handleDeleteRow = (index: number) => {
+        const newLogs = logs.filter((_, i) => i !== index);
+        setLogs(newLogs);
+    };
+
     const handleDownload = () => {
         window.open(getErrorLogDownloadUrl(), '_blank');
     };
@@ -139,7 +144,7 @@ export default function AdminErrorLog() {
                 /* Left static / frozen side */
                 .grid-frozen-side {
                     flex: 0 0 auto;
-                    width: 360px;
+                    width: 375px;
                     border-right: 2px solid var(--color-border);
                     background: var(--color-bg-card, #fff);
                     z-index: 10;
@@ -240,9 +245,9 @@ export default function AdminErrorLog() {
                     <div className="grid-container">
                         {/* 1. LEFT STATIC SIDE (S.No, Date, Project Name) */}
                         <div className="grid-frozen-side">
-                            <table className="grid-table" style={{ width: '360px' }}>
+                            <table className="grid-table" style={{ width: '375px' }}>
                                 <colgroup>
-                                    <col style={{ width: '50px' }} />
+                                    <col style={{ width: '65px' }} />
                                     <col style={{ width: '130px' }} />
                                     <col style={{ width: '180px' }} />
                                 </colgroup>
@@ -256,7 +261,25 @@ export default function AdminErrorLog() {
                                 <tbody>
                                     {logs.map((row, idx) => (
                                         <tr key={'frozen-' + idx}>
-                                            <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)' }}>{idx + 1}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)', fontSize: 12 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                                    {editMode && (
+                                                        <button 
+                                                            onClick={() => handleDeleteRow(idx)}
+                                                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                                            title="Delete Row"
+                                                        >
+                                                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="#dc2626" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                            </svg>
+                                                        </button>
+                                                    )}
+                                                    <span>{idx + 1}</span>
+                                                </div>
+                                            </td>
                                             <td>
                                                 <input type="date" className="cell-input" value={row.date} onChange={e => updateLog(idx, 'date', e.target.value)} disabled={!editMode} />
                                             </td>
@@ -342,11 +365,12 @@ export default function AdminErrorLog() {
                         </div>
                     </div>
 
-                    {editMode && (
-                        <div style={{ marginTop: 12 }}>
-                            <button className="btn btn-primary btn-sm" onClick={handleAddRow}>+ Add Error Log</button>
-                        </div>
-                    )}
+                    <div style={{ marginTop: 12 }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => {
+                            if (!editMode) setEditMode(true);
+                            handleAddRow();
+                        }}>+ Add Error Log</button>
+                    </div>
                 </>
             )}
         </div>

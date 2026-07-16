@@ -344,7 +344,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                     </div>
 
                     <div className="tab-bar" style={{ marginBottom: 24 }}>
-                        {['SUMMARY', 'SOW', 'SCHEDULE', 'TRANSMITTAL LOG', 'RFI LOG', 'CDRFI LOG', 'REF'].map(tab => (
+                        {['SUMMARY', 'SOW', 'SCHEDULE', 'TRANSMITTAL LOG', 'RFI LOG', 'CDRFI LOG'].map(tab => (
                             <button key={tab} className={`tab-item ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>{tab}</button>
                         ))}
                     </div>

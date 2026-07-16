@@ -239,6 +239,12 @@ exports.downloadExcel = async (req, res) => {
         const workbook = new exceljs.Workbook();
         await workbook.xlsx.readFile(TEMPLATE_PATH);
 
+        // Dynamically remove the REF worksheet if it exists in the template
+        const refSheet = workbook.getWorksheet('REF') || workbook.getWorksheet('ref');
+        if (refSheet) {
+            workbook.removeWorksheet(refSheet.id);
+        }
+
         // --- SUMMARY TAB ---
         const summarySheet = workbook.getWorksheet('SUMMARY');
         if (summarySheet && report.summaryData) {
