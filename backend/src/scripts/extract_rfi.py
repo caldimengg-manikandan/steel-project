@@ -31,40 +31,43 @@ def extract_rfi(pdf_path, original_filename):
             valid_annots = []
             
             # 1. Grab PDF Annotations (comments, text boxes, markups)
-            page_annots = page.annots() # type: ignore
-            if page_annots:
-                for annot in page_annots:
-                    info = annot.info
-                    content = info.get('content', '')
-                    # Base annotation text
-                    if content and content.strip():
-                        valid_annots.append({
-                            'text': content.strip(),
-                            'x0': annot.rect.x0,
-                            'y0': annot.rect.y0,
-                            'x1': annot.rect.x1,
-                            'y1': annot.rect.y1,
-                            'rect': annot.rect
-                        })
-                    # Check annotation colors for blue (r,g low, b high)
-                    try:
-                        colors = annot.colors or {}
-                        for col in colors.values():
-                            if isinstance(col, (list, tuple)) and len(col) == 3:
-                                r, g, b = col
-                                if r < 0.1 and g < 0.1 and b > 0.5:
-                                    txt = content.strip() if content else ''
-                                    if txt:
-                                        valid_annots.append({
-                                            'text': txt,
-                                            'x0': annot.rect.x0,
-                                            'y0': annot.rect.y0,
-                                            'x1': annot.rect.x1,
-                                            'y1': annot.rect.y1,
-                                            'rect': annot.rect
-                                        })
-                    except Exception:
-                        pass
+            try:
+                page_annots = page.annots() # type: ignore
+                if page_annots:
+                    for annot in page_annots:
+                        info = annot.info
+                        content = info.get('content', '')
+                        # Base annotation text
+                        if content and content.strip():
+                            valid_annots.append({
+                                'text': content.strip(),
+                                'x0': annot.rect.x0,
+                                'y0': annot.rect.y0,
+                                'x1': annot.rect.x1,
+                                'y1': annot.rect.y1,
+                                'rect': annot.rect
+                            })
+                        # Check annotation colors for blue (r,g low, b high)
+                        try:
+                            colors = annot.colors or {}
+                            for col in colors.values():
+                                if isinstance(col, (list, tuple)) and len(col) == 3:
+                                    r, g, b = col
+                                    if r < 0.1 and g < 0.1 and b > 0.5:
+                                        txt = content.strip() if content else ''
+                                        if txt:
+                                            valid_annots.append({
+                                                'text': txt,
+                                                'x0': annot.rect.x0,
+                                                'y0': annot.rect.y0,
+                                                'x1': annot.rect.x1,
+                                                'y1': annot.rect.y1,
+                                                'rect': annot.rect
+                                            })
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"[RfiScript] Warning: Failed to parse annotations on page: {e}")
                     
             try:
                 text_dict = page.get_text("dict")
