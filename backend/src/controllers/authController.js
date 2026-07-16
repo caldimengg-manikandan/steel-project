@@ -164,7 +164,11 @@ async function logout(req, res) {
     
     await logActivity(username, 'Auth', 'Logged out');
     
-    res.clearCookie('sdms_token');
+    res.clearCookie('sdms_token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+    });
     res.json({ message: 'Logged out successfully' });
 }
 
