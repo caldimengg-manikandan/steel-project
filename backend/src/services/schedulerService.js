@@ -65,8 +65,16 @@ async function sendProjectStatusEmail() {
 
         // Get all active/non-completed projects owned by this settings creator
         const filter = { status: { $ne: 'Completed' } };
-        if (settings.updatedBy) {
-            filter.createdByAdminId = settings.updatedBy;
+        let adminId = settings.updatedBy;
+        if (!adminId) {
+            const Admin = require('../models/Admin');
+            const defaultAdmin = await Admin.findOne({ username: 'admin1' }) || await Admin.findOne();
+            if (defaultAdmin) {
+                adminId = defaultAdmin._id;
+            }
+        }
+        if (adminId) {
+            filter.createdByAdminId = adminId;
         }
         const projects = await Project.find(filter).sort({ createdAt: -1 }).lean();
         if (projects.length === 0) {
