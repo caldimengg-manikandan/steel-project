@@ -10,6 +10,14 @@ const DEFAULT_SOW = [
     ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
 ];
 
+function padArray<T>(arr: T[] | undefined, length: number, creator: (index: number) => T): T[] {
+    const list = arr ? [...arr] : [];
+    for (let i = list.length; i < length; i++) {
+        list.push(creator(i));
+    }
+    return list;
+}
+
 export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onModeChange }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void }) {
     const { showMessage } = useMessage();
     const [loading, setLoading] = useState(false);
@@ -104,10 +112,10 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
             overallFabricationStatus: ''
         });
         setSowData(DEFAULT_SOW);
-        setScheduleData([{ sNo: '1', seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' }]);
+        setScheduleData(padArray([], 10, (i) => ({ sNo: String(i + 1), seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' })));
         setTransmittalData([]);
-        setCdrfiData([]);
-        setRfiData([]);
+        setCdrfiData(padArray([], 10, () => ({ isCustomRow: true, caldimCdrfiNo: '', clientCdrfiNo: '', status: '', priority: '', sentDate: '', seqArea: '', cdrfiType: '', description: '', receivedDate: '', remarks: '' })));
+        setRfiData(padArray([], 10, () => ({ isCustomRow: true, rfiNumber: '', clientRfiNumber: '', status: '', priority: '', description: '', sentDate: '', seqArea: '', rfiType: '', receivedDate: '', remarks: '' })));
         setActiveTab('SUMMARY');
         fetchLiveAutoData('new');
     };
@@ -127,7 +135,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                 }
                 setSowData(savedSow);
                 
-                setScheduleData(res.report.scheduleData || []);
+                setScheduleData(padArray(res.report.scheduleData || [], 10, (i) => ({ sNo: String(i + 1), seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' })));
                 let savedTransmittals = res.report.transmittalData || [];
                 let savedRfis = res.report.rfiData || [];
                 if (savedRfis.length === 0 && res.autoFetch && res.autoFetch.rfis && res.autoFetch.rfis.length > 0) {
@@ -145,7 +153,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                         remarks: r.remarks || ''
                     }));
                 }
-                setRfiData(savedRfis);
+                setRfiData(padArray(savedRfis, 10, () => ({ isCustomRow: true, rfiNumber: '', clientRfiNumber: '', status: '', priority: '', description: '', sentDate: '', seqArea: '', rfiType: '', receivedDate: '', remarks: '' })));
                 let savedCdrfis = res.report.cdrfiData || [];
                 if (savedCdrfis.length === 0 && res.autoFetch && res.autoFetch.cdrfis && res.autoFetch.cdrfis.length > 0) {
                     savedCdrfis = res.autoFetch.cdrfis.map((c: any) => ({
@@ -162,7 +170,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                         remarks: ''
                     }));
                 }
-                setCdrfiData(savedCdrfis);
+                setCdrfiData(padArray(savedCdrfis, 10, () => ({ isCustomRow: true, caldimCdrfiNo: '', clientCdrfiNo: '', status: '', priority: '', sentDate: '', seqArea: '', cdrfiType: '', description: '', receivedDate: '', remarks: '' })));
                 if (savedTransmittals.length === 0 && res.autoFetch && res.autoFetch.transmittals && res.autoFetch.transmittals.length > 0) {
                     savedTransmittals = res.autoFetch.transmittals.map((t: any) => ({
                         isCustomRow: false,
@@ -200,7 +208,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                     receivedDate: r.receivedDate || '',
                     remarks: r.remarks || ''
                 }));
-                setRfiData(initialRfis);
+                setRfiData(padArray(initialRfis, 10, () => ({ isCustomRow: true, rfiNumber: '', clientRfiNumber: '', status: '', priority: '', description: '', sentDate: '', seqArea: '', rfiType: '', receivedDate: '', remarks: '' })));
                 const initialCdrfis = res.autoFetch.cdrfis.map((c: any) => ({
                     isCustomRow: false,
                     caldimCdrfiNo: c.id,
@@ -214,7 +222,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                     receivedDate: '',
                     remarks: ''
                 }));
-                setCdrfiData(initialCdrfis);
+                setCdrfiData(padArray(initialCdrfis, 10, () => ({ isCustomRow: true, caldimCdrfiNo: '', clientCdrfiNo: '', status: '', priority: '', sentDate: '', seqArea: '', cdrfiType: '', description: '', receivedDate: '', remarks: '' })));
                 
                 const pDetails = res.autoFetch.projectDetails || {};
                 setSummaryData((prev: any) => ({
