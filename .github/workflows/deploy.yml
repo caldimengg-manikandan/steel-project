@@ -16,6 +16,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
              cd /var/www/steel-project
+             git reset --hard
              git pull origin main
              
              # ── Update Backend ──────────────────────────────────────
