@@ -10,7 +10,7 @@ const DEFAULT_SOW = [
     ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
 ];
 
-export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onClose, onModeChange }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void }) {
+export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onModeChange }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void }) {
     const { showMessage } = useMessage();
     const [loading, setLoading] = useState(false);
     

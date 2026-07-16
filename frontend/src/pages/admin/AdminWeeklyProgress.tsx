@@ -7,7 +7,7 @@ import { IconSearch, IconFolder, IconBack } from '../../components/Icons';
 
 export default function AdminWeeklyProgress() {
     // mode is read directly from the URL: /admin/weekly-progress/:projectId/view OR /admin/weekly-progress/:projectId/edit
-    const { projectId: urlProjectId, '*': wildcard } = useParams<{ projectId: string; '*': string }>();
+    const { projectId: urlProjectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
 
     // Determine mode from the URL path itself

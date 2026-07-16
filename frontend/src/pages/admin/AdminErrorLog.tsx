@@ -60,7 +60,7 @@ export default function AdminErrorLog() {
                 'teamlead': 'teamLead',
             };
             const addedByRole = roleMap[(user?.role || '').toLowerCase()] || 'superAdmin';
-            const addedByName = user?.username || user?.name || 'Admin';
+            const addedByName = user?.username || 'Admin';
 
             const res = await saveErrorLogs(logs, addedByRole, addedByName);
             if (res.success) {
