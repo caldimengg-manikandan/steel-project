@@ -5,11 +5,32 @@
  * Manages the lifecycle of the Python AiExtraction (FastAPI) service.
  * Spawns the process, pipes logs, and handles shutdown.
  */
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 let aiProcess = null;
+
+/**
+ * Kills any orphaned Python AI processes left over from a previous run.
+ * This is critical on hosted servers: when PM2 restarts Node.js, the old
+ * Python child process becomes an orphan still listening on the AI port.
+ * Without killing it, the new Node.js process can't bind to that port.
+ */
+function killOrphanedAiProcesses() {
+    try {
+        if (process.platform === 'win32') {
+            // Windows: find and kill by script name
+            execSync('taskkill /F /FI "WINDOWTITLE eq api.py" /T 2>nul', { stdio: 'ignore' });
+        } else {
+            // Linux/macOS: kill any process running api.py
+            execSync('pkill -f "AiExtraction/api.py" || true', { stdio: 'ignore' });
+        }
+        console.log('[AI_SERVICE] Cleaned up any orphaned AI processes.');
+    } catch (e) {
+        // It's fine if nothing was found to kill
+    }
+}
 
 /**
  * Starts the AI Extraction service (Python FastAPI)
@@ -28,6 +49,9 @@ function startAiService() {
         console.warn(`[AI_SERVICE] ✗ Warning: api.py not found at ${apiScript}`);
         return;
     }
+
+    // Kill any orphaned processes from a previous deployment before starting fresh
+    killOrphanedAiProcesses();
 
     // Determine Python binary
     const pythonBin = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'py' : 'python3');
