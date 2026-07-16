@@ -25,6 +25,11 @@ jobs:
              # ── Update Backend ──────────────────────────────────────
              cd backend && echo "=== CD backend successful ==="
              npm install && echo "=== NPM install backend successful ==="
+             
+             # Kill any orphaned Python AI services to force a clean restart
+             pkill -f api.py || true
+             echo "=== Orphaned AI services killed ==="
+             
              (pm2 restart steel-dms || pm2 start src/app.js --name steel-dms) && echo "=== PM2 action completed ==="
              
               # ── Update Frontend ─────────────────────────────────────
