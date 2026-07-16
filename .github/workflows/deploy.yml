@@ -22,10 +22,6 @@ jobs:
             git reset --hard && echo "=== Git reset successful ==="
             git pull origin main && echo "=== Git pull successful ==="
 
-            # Kill any orphaned Python AI services to force a clean restart with new code
-            pkill -f "AiExtraction/api.py" || true
-            echo "=== Orphaned AI services killed ==="
-
             # Update Backend
             cd backend && echo "=== CD backend successful ==="
             npm install && echo "=== NPM install backend successful ==="
