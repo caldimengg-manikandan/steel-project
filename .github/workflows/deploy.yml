@@ -25,9 +25,10 @@ jobs:
              # Restart the PM2 process (assumes the name is 'steel-dms')
              pm2 restart steel-dms || pm2 start src/app.js --name steel-dms
              
-             # ── Update Frontend ─────────────────────────────────────
-             cd ../frontend
-             npm install
-             npm run build
+              # ── Update Frontend ─────────────────────────────────────
+              cd ../frontend
+              npm install
+              export NODE_OPTIONS="--max-old-space-size=1024"
+              npm run build
              # If using PM2 to serve frontend, restart it here too.
              # Nginx will automatically pick up the new files in the 'dist' folder.
