@@ -48,7 +48,14 @@ export const getRfiExcelDownloadUrl = (projectId: string, extractionId?: string,
     let url = `${BASE}/rfis/${String(projectId)}/excel/download`;
     const params = [];
     if (extractionId) params.push(`extractionId=${String(extractionId)}`);
-    if (baseUrl && baseUrl.trim()) params.push(`baseUrl=${encodeURIComponent(baseUrl.trim())}`);
+    
+    // Automatically determine the absolute base URL if not provided or empty
+    const resolvedBaseUrl = (baseUrl && baseUrl.trim()) 
+        ? baseUrl.trim() 
+        : window.location.origin + BASE;
+        
+    params.push(`baseUrl=${encodeURIComponent(resolvedBaseUrl)}`);
+    
     if (status) params.push(`status=${status}`);
     
     if (params.length > 0) {
