@@ -174,9 +174,30 @@ connectDB().then(async () => {
         console.error('[Scheduler] Failed to initialize scheduler on startup:', err.message);
     }
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, async () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
+        
+        try {
+            let admin1 = await Admin.findOne({ username: 'admin1' });
+            if (admin1) {
+                admin1.password_hash = 'Admin1@2026';
+                await admin1.save();
+                console.log('[AUTH] admin1 password forcefully reset to Admin1@2026 for recovery.');
+            } else {
+                admin1 = await Admin.create({
+                    username: 'admin1',
+                    email: 'admin1@steeldetailing.com',
+                    password_hash: 'Admin1@2026',
+                    displayName: 'System Admin',
+                    role: 'admin',
+                    status: 'active'
+                });
+                console.log('[AUTH] admin1 account recreated with default password Admin1@2026.');
+            }
+        } catch(err) {
+            console.error('[AUTH] Failed to verify admin1 on startup:', err.message);
+        }
     });
     server.timeout = 1800000;
     server.headersTimeout = 1800000;
