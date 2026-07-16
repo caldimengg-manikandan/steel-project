@@ -342,7 +342,7 @@ export default function AdminSettings() {
 
                     {activeTab === 'notifications' && (
                         <Card title="System Reports">
-                            <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email active project status Excel files to Project Managers.">
+                            <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email the consolidated Project Status Excel sheet to Project Managers.">
                                 <Toggle 
                                     enabled={settings.weeklyProgresss} 
                                     onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
