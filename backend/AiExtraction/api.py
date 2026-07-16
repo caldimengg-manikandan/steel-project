@@ -94,8 +94,10 @@ async def extract_data(files: list[UploadFile] = File(...), client_name: str = F
             results[file.filename] = processed_results
             print(f"      - Found {len(file_results)} regions in {file.filename}")
         except Exception as e:
-            print(f"      - Error processing {file.filename}: {e}")
-            results[file.filename] = {"error": str(e)}
+            import traceback
+            tb = traceback.format_exc()
+            print(f"      - Error processing {file.filename}: {e}\n{tb}")
+            results[file.filename] = {"error": f"{str(e)} | Trace: {tb}"}
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
