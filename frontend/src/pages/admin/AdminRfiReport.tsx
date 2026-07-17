@@ -69,7 +69,6 @@ export default function AdminRfiReport() {
                                 projectId={urlProjectId}
                                 projectName={selectedProject.name}
                                 initialMode={urlMode}
-                                onClose={handleBack}
                                 onModeChange={(mode) => navigate(`/admin/rfi-report/${urlProjectId}/${mode}`)}
                             />
                         </div>

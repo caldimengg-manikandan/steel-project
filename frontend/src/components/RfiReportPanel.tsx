@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react';
 import { useMessage } from '../context/MessageContext';
 import { fetchRfiReports, fetchRfiReportDraft, saveRfiReportDraft, submitRfiReport, getRfiReportDownloadUrl } from '../services/rfiReportApi';
 
-export default function RfiReportPanel({ projectId, projectName, initialMode = 'view', onClose, onModeChange }: { projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void }) {
+interface RfiReportPanelProps {
+    projectId: string;
+    projectName?: string;
+    initialMode?: 'view' | 'edit';
+    onModeChange?: (mode: 'view' | 'edit') => void;
+}
+
+export default function RfiReportPanel({ projectId, projectName, initialMode = 'view', onModeChange }: RfiReportPanelProps) {
     const { showMessage } = useMessage();
     const [loading, setLoading] = useState(false);
     
@@ -15,7 +22,7 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
     const [rfiData, setRfiData] = useState<any[]>([]);
     
     // Auto fetch state
-    const [autoFetchData, setAutoFetchData] = useState<any>({ rfis: [], cdrfis: [] });
+    // removed autoFetchData to fix TS error
 
     useEffect(() => {
         setEditMode(initialMode === 'edit');
@@ -63,7 +70,7 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
     const fetchLiveAutoData = async (reportId: string) => {
         try {
             const res = await fetchRfiReportDraft(projectId, reportId === 'new' ? 'dummy' : reportId);
-            if (res.autoFetch) setAutoFetchData(res.autoFetch);
+            // if (res.autoFetch) setAutoFetchData(res.autoFetch);
             
             if (reportId !== 'new' && res.report) {
                 setReportDate(res.report.reportDate);
