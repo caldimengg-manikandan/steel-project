@@ -3,7 +3,7 @@ const SystemSettings = require('../models/SystemSettings');
 const exceljs = require('exceljs');
 const path = require('path');
 const fs = require('fs');
-const { sendErrorLogNotification } = require('../services/emailService');
+const { sendErrorLogNotification, sendErrorLogUpdateSummary } = require('../services/emailService');
 
 exports.getErrorLogs = async (req, res) => {
     try {
@@ -32,10 +32,11 @@ exports.saveErrorLogs = async (req, res) => {
 
         const bulkOps = logs.map(log => {
             if (log._id && log._id !== 'new') {
+                const { _id, ...updateData } = log;
                 return {
                     updateOne: {
                         filter: { _id: log._id },
-                        update: { $set: log },
+                        update: { $set: updateData },
                         upsert: true
                     }
                 };
@@ -57,13 +58,11 @@ exports.saveErrorLogs = async (req, res) => {
             await ErrorLog.bulkWrite(bulkOps);
         }
 
-        // Send email notifications for each new entry (non-blocking)
-        if (newEntries.length > 0 && addedByRole) {
-            for (const entry of newEntries) {
-                sendErrorLogNotification(entry, addedByRole, addedByName).catch(err =>
-                    console.error('[Email] Notification error:', err.message)
-                );
-            }
+        // Send email notification for the update
+        if (addedByRole) {
+            sendErrorLogUpdateSummary(addedByRole, addedByName).catch(err =>
+                console.error('[Email] Notification error:', err.message)
+            );
         }
 
         res.json({ success: true });
@@ -88,31 +87,41 @@ exports.downloadExcel = async (req, res) => {
             logoPath = settings.companyLogoUrl;
         }
 
-        const LOGO_DEFAULT = path.join(__dirname, '../../public/assets/default-logo.png');
-        const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.jpg');
+        const finalLogo = LOGO_DEFAULT; // Force to use excel_img.jpg
         
         try {
             if (fs.existsSync(finalLogo)) {
-                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
-                sheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 3 } });
+                const extension = 'jpeg';
+                const imageId = workbook.addImage({ filename: finalLogo, extension });
+                sheet.addImage(imageId, {
+                    tl: { col: 3, row: 0 }, // Column D
+                    ext: { width: 350, height: 75 }
+                });
             }
         } catch (err) { console.error('Logo error:', err.message); }
 
+        // Increase row heights to prevent overlap
+        sheet.getRow(1).height = 20;
+        sheet.getRow(2).height = 20;
+        sheet.getRow(3).height = 20;
+        sheet.getRow(4).height = 20;
+
         // Title row
-        sheet.mergeCells('A1:P3');
-        const titleCell = sheet.getCell('A1');
+        sheet.mergeCells('A5:P5');
+        const titleCell = sheet.getCell('A5');
         titleCell.value = 'ERROR LOG';
         titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
         titleCell.font = { size: 16, bold: true, color: { argb: 'FF0070C0' } }; // Blue color like screenshot
 
-        // Header Row (Row 4)
+        // Header Row (Row 6)
         const headers = [
             'S No', 'Date', 'Project / Job Name', 'Client / Fabricator', 'Error Category',
             'Error Description', 'Impact (Shop/Fld)', 'PM', 'Modeler', 'Detailer', 'Checker',
             'Root Cause', 'Corrective/Preventive Action', 'Severity', 'Status', 'Remarks'
         ];
         
-        const headerRow = sheet.getRow(4);
+        const headerRow = sheet.getRow(6);
         headerRow.values = headers;
         headerRow.height = 30;
         
@@ -156,11 +165,18 @@ exports.downloadExcel = async (req, res) => {
             
             row.eachCell((cell) => {
                 cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.font = { size: 9 };
+                cell.font = { size: 9, strike: log.strikedOut === true };
                 cell.border = {
                     top: { style: 'thin' }, left: { style: 'thin' },
                     bottom: { style: 'thin' }, right: { style: 'thin' }
                 };
+                if (log.strikedOut === true) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFD9D9D9' } // grey background for struck-out rows
+                    };
+                }
             });
         });
 

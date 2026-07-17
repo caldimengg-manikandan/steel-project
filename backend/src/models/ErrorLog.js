@@ -16,6 +16,7 @@ const errorLogSchema = new mongoose.Schema({
     severity: { type: String, default: '' },
     status: { type: String, default: '' },
     remarks: { type: String, default: '' },
+    strikedOut: { type: Boolean, default: false },
 }, {
     timestamps: true
 });

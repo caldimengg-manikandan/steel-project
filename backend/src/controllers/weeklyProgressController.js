@@ -171,8 +171,6 @@ exports.saveReportDraft = async (req, res) => {
             sowData, 
             scheduleData, 
             transmittalData, 
-            cdrfiData,
-            rfiData,
             status 
         } = req.body;
 
@@ -181,14 +179,14 @@ exports.saveReportDraft = async (req, res) => {
         if (reportId) {
             report = await WeeklyProgress.findByIdAndUpdate(
                 reportId,
-                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, cdrfiData, rfiData, status },
+                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, status },
                 { new: true }
             );
         } else {
             // Check if one exists for the week
             report = await WeeklyProgress.findOneAndUpdate(
                 { projectId, weekStartDate },
-                { summaryData, sowData, scheduleData, transmittalData, cdrfiData, rfiData, status: status || 'Draft' },
+                { summaryData, sowData, scheduleData, transmittalData, status: status || 'Draft' },
                 { new: true, upsert: true }
             );
         }
@@ -221,9 +219,7 @@ exports.downloadExcel = async (req, res) => {
                 summaryData,
                 sowData: [],
                 scheduleData: [],
-                transmittalData: [],
-                rfiData: [],
-                cdrfiData: []
+                transmittalData: []
             };
         } else {
             report = await WeeklyProgress.findById(reportId);
@@ -315,18 +311,26 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
     const sowSheet = workbook.getWorksheet('SOW');
     if (sowSheet) {
         let sowDataToUse = report.sowData || [];
+
         if (sowDataToUse.length === 0 || (sowDataToUse.length === 1 && !sowDataToUse[0].description)) {
             sowDataToUse = [
                 { sNo: '', description: 'BASE BID', change: '', receivedDate: '', remarks: '' },
                 { sNo: '', description: 'STRUCTURAL STEEL:', change: '', receivedDate: '', remarks: '' },
-                ...Array(10).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' })),
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
                 { sNo: '', description: 'MISC. STEEL:', change: '', receivedDate: '', remarks: '' },
-                ...Array(5).fill(null).map(() => ({ sNo: '', description: '', change: '', receivedDate: '', remarks: '' }))
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' },
+                { sNo: '', description: '', change: '', receivedDate: '', remarks: '' }
             ];
         }
 
         let currentSNo = 1;
-        let startRow = 14;
+        let startRow = 3;
         const styleRow = sowSheet.getRow(startRow);
 
         sowDataToUse.forEach((sow, index) => {
@@ -357,7 +361,7 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
     // --- SCHEDULE TAB ---
     const scheduleSheet = workbook.getWorksheet('SCHEDULE');
     if (scheduleSheet) {
-        let startRow = 14;
+        let startRow = 3;
         const styleRow = scheduleSheet.getRow(startRow);
 
         const scheduleDataToUse = report.scheduleData || [];
@@ -388,7 +392,7 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
     // --- TRANSMITTAL LOG TAB ---
     const transmittalSheet = workbook.getWorksheet('TRANSMITTAL LOG');
     if (transmittalSheet) {
-        let startRow = 14;
+        let startRow = 3;
         const styleRow = transmittalSheet.getRow(startRow);
 
         let transmittalsToUse = report.transmittalData || [];
@@ -418,118 +422,15 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
         });
     }
 
-    const rfiExtractions = await RfiExtraction.find({ projectId });
-    const rfis = [];
-    rfiExtractions.forEach(ext => {
-        if (ext.rfis && Array.isArray(ext.rfis)) {
-            ext.rfis.forEach(rfi => {
-                rfis.push({
-                    ...rfi.toObject(),
-                    sentDate: ext.createdAt
-                });
-            });
-        }
-    });
-
-    const rawCdrfis = await ChangeOrder.find({ projectId });
-    const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
-
+    
     const rfiSheet = workbook.getWorksheet('RFI LOG');
     if (rfiSheet) {
-        let startRow = 3;
-        const styleRow = rfiSheet.getRow(startRow);
-        
-        let rfisToExport = [];
-        if (report.rfiData && report.rfiData.length > 0) {
-            rfisToExport = report.rfiData;
-        } else {
-            rfisToExport = rfis.map(rfi => ({
-                rfiNumber: rfi.rfiNumber,
-                clientRfiNumber: rfi.clientRfiNumber || '',
-                status: rfi.status,
-                priority: rfi.priority || '',
-                sentDate: rfi.sentDate ? new Date(rfi.sentDate).toLocaleDateString() : '',
-                seqArea: rfi.seqArea || '',
-                rfiType: rfi.rfiType || '',
-                description: rfi.description,
-                receivedDate: rfi.receivedDate || '',
-                remarks: rfi.remarks || ''
-            }));
-        }
-
-        rfisToExport.forEach((rfi, index) => {
-            const row = rfiSheet.getRow(startRow + index);
-            row.getCell(1).value = rfi.rfiNumber || '';
-            row.getCell(2).value = rfi.clientRfiNumber || '';
-            row.getCell(3).value = rfi.status || '';
-            row.getCell(4).value = rfi.priority || '';
-            row.getCell(5).value = rfi.sentDate || '';
-            row.getCell(6).value = rfi.seqArea || '';
-            row.getCell(7).value = rfi.rfiType || '';
-            row.getCell(8).value = rfi.description || '';
-            row.getCell(9).value = rfi.receivedDate || '';
-            row.getCell(10).value = rfi.remarks || '';
-
-            if (styleRow) {
-                row.eachCell((cell, colNumber) => {
-                    const styleCell = styleRow.getCell(colNumber);
-                    if (styleCell) {
-                        cell.font = styleCell.font;
-                        cell.border = styleCell.border;
-                        cell.alignment = styleCell.alignment;
-                    }
-                });
-            }
-        });
+        workbook.removeWorksheet(rfiSheet.id);
     }
 
     const cdrfiSheet = workbook.getWorksheet('CDRFI LOG');
     if (cdrfiSheet) {
-        let startRow = 3;
-        const styleRow = cdrfiSheet.getRow(startRow);
-        
-        let cdrfisToExport = [];
-        if (report.cdrfiData && report.cdrfiData.length > 0) {
-            cdrfisToExport = report.cdrfiData;
-        } else {
-            cdrfisToExport = cdrfis.map(co => ({
-                caldimCdrfiNo: co.id,
-                clientCdrfiNo: '',
-                status: co.status,
-                priority: '',
-                sentDate: '',
-                seqArea: '',
-                cdrfiType: '',
-                description: co.description,
-                receivedDate: '',
-                remarks: ''
-            }));
-        }
-
-        cdrfisToExport.forEach((cdrfi, index) => {
-            const row = cdrfiSheet.getRow(startRow + index);
-            row.getCell(1).value = cdrfi.caldimCdrfiNo || '';
-            row.getCell(2).value = cdrfi.clientCdrfiNo || '';
-            row.getCell(3).value = cdrfi.status || '';
-            row.getCell(4).value = cdrfi.priority || '';
-            row.getCell(5).value = cdrfi.sentDate || '';
-            row.getCell(6).value = cdrfi.seqArea || '';
-            row.getCell(7).value = cdrfi.cdrfiType || '';
-            row.getCell(8).value = cdrfi.description || '';
-            row.getCell(9).value = cdrfi.receivedDate || '';
-            row.getCell(10).value = cdrfi.remarks || '';
-
-            if (styleRow) {
-                row.eachCell((cell, colNumber) => {
-                    const styleCell = styleRow.getCell(colNumber);
-                    if (styleCell) {
-                        cell.font = styleCell.font;
-                        cell.border = styleCell.border;
-                        cell.alignment = styleCell.alignment;
-                    }
-                });
-            }
-        });
+        workbook.removeWorksheet(cdrfiSheet.id);
     }
 
     return workbook;

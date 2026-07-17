@@ -2,7 +2,7 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 
-const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
+const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.jpg');
 
 /**
  * extractSkFromFilename
@@ -112,7 +112,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     });
 
     const hasClientRfiNo = allRfis.some(r => r.clientRfiNumber && r.clientRfiNumber.trim().length > 0);
-    const TOTAL_COLS = hasClientRfiNo ? 10 : 9;
+    const TOTAL_COLS = hasClientRfiNo ? 11 : 10;
 
     // ── Column widths ─────────────────────────────────────────
     sheet.getColumn(1).width = 8;    // S.NO
@@ -126,11 +126,13 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         sheet.getColumn(8).width = 12;   // Status
         sheet.getColumn(9).width = 14;   // Closed on
         sheet.getColumn(10).width = 30;  // Remarks
+        sheet.getColumn(11).width = 20;  // Link to Source
     } else {
         sheet.getColumn(6).width = 38;   // Response
         sheet.getColumn(7).width = 12;   // Status
         sheet.getColumn(8).width = 14;   // Closed on
         sheet.getColumn(9).width = 30;   // Remarks
+        sheet.getColumn(10).width = 20;  // Link to Source
     }
 
     const commonBorder = {
@@ -141,10 +143,10 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     };
 
     // ════════════════════════════════════════════════════════
-    // ROW 1 — Caldim Logo image
+    // ROW 1 — Logo (spans all columns)
     // ════════════════════════════════════════════════════════
     const logoRow = sheet.getRow(1);
-    logoRow.height = 55; // enough height to display the logo clearly
+    logoRow.height = 80; // enough height to display the logo clearly
 
     // Fill logo row cells with white background
     for (let c = 1; c <= TOTAL_COLS; c++) {
@@ -158,17 +160,15 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
 
     // Embed logo if the file exists
     try {
-        const rawLogo = projectDetails?.logoPath || '';
-        const finalLogo = rawLogo ? path.join(__dirname, '../../', rawLogo.replace(/^\//, '')) : LOGO_DEFAULT;
+        const finalLogo = LOGO_DEFAULT; // Hardcode to use excel_img.jpg
         if (fs.existsSync(finalLogo)) {
             const logoImageId = workbook.addImage({
                 filename: finalLogo,
-                extension: 'png',
+                extension: 'jpeg',
             });
             sheet.addImage(logoImageId, {
-                tl: { col: 0, row: 0 },       // top-left: column A, row 1
-                br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
-                editAs: 'oneCell',
+                tl: { col: 3, row: 0 },
+                ext: { width: 350, height: 75 }
             });
         }
     } catch (e) { console.error('[RfiExcel] Logo error:', e.message); }
@@ -233,7 +233,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     // ROW 4 — Column headers
     const COL_HEADERS = ['S.NO', 'Sent On', 'SK #', 'Ref. Drawing', 'Description'];
     if (hasClientRfiNo) COL_HEADERS.push('CLIENT RFI NUMBER');
-    COL_HEADERS.push('Response', 'Status', 'Closed on', 'Remarks');
+    COL_HEADERS.push('Response', 'Status', 'Closed on', 'Remarks', 'Link to Source');
 
     const colHeaderStyle = {
         font: { bold: true, size: 10, color: { argb: 'FF000000' } },
@@ -348,6 +348,16 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         dataRow.getCell(cursor).value = item.remarks || '';
         dataRow.getCell(cursor).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
         cursor++;
+
+        // Link to Source
+        const linkCell = dataRow.getCell(cursor);
+        if (href) {
+            linkCell.value = { text: 'View PDF', hyperlink: href };
+            linkCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        } else {
+            linkCell.value = 'View PDF';
+            linkCell.style = { font: { size: 10, color: { argb: 'FF9CA3AF' }, italic: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
+        }
 
         // Grouping
         const isSameGroup = (sentOnStr === prevSentOn && skNum === prevSkNum);

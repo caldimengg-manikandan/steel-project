@@ -346,20 +346,7 @@ exports.viewRfiPdf = async (req, res) => {
         const doc = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
-        // 1. Local Disk Mode (Fastest & most reliable if available)
-        const path = require('path');
-        // Handle both relative (uploads/...) and absolute paths
-        const localPath = doc.fileUrl 
-            ? (doc.fileUrl.startsWith('/uploads') ? path.join(process.cwd(), doc.fileUrl) : doc.fileUrl)
-            : null;
-            
-        if (localPath && fs.existsSync(localPath)) {
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
-            return fs.createReadStream(localPath).pipe(res);
-        }
-
-        // 2. Storage Gateway Mode
+        // 0. Storage Gateway Mode
         if (doc.storageGatewayPath) {
             try {
                 const storageGateway = require('../utils/storageGateway');
@@ -374,10 +361,11 @@ exports.viewRfiPdf = async (req, res) => {
                 }
             } catch (err) {
                 console.error('[ViewRfiPdf] Storage Gateway stream failed:', err.message);
+                return res.status(500).json({ error: 'Failed to stream file from Storage Gateway.' });
             }
         }
 
-        // 3. OneDrive Mode
+        // 1. OneDrive Mode
         if (doc.oneDriveFileId) {
             try {
                 const rclone = require('../utils/rcloneOneDrive');
@@ -389,10 +377,11 @@ exports.viewRfiPdf = async (req, res) => {
                 return;
             } catch (err) {
                 console.error('[ViewRfiPdf] Rclone stream failed:', err.message);
+                return res.status(500).json({ error: 'Failed to stream file from OneDrive.' });
             }
         }
 
-        // 4. GridFS Mode (Compatibility)
+        // 2. GridFS Mode (Compatibility)
         if (doc.gridFsFileId) {
             try {
                 const { getBucket } = require('../utils/gridfs');
@@ -407,7 +396,15 @@ exports.viewRfiPdf = async (req, res) => {
                 return;
             } catch (err) {
                 console.error('[ViewRfiPdf] GridFS stream failed:', err.message);
+                return res.status(500).json({ error: 'Failed to stream file from Atlas.' });
             }
+        }
+
+        // 2. Legacy Disk Mode
+        if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+            return fs.createReadStream(doc.fileUrl).pipe(res);
         }
 
         return res.status(404).json({ error: 'Physical PDF file not found.' });

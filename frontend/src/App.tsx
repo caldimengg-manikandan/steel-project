@@ -15,6 +15,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminReports from './pages/admin/AdminReports';
 import AdminClients from './pages/admin/AdminClients';
 import AdminWeeklyProgress from './pages/admin/AdminWeeklyProgress';
+import AdminRfiReport from './pages/admin/AdminRfiReport';
 import AdminErrorLog from './pages/admin/AdminErrorLog';
 import UserDashboard from './pages/user/UserDashboard';
 import UserProjects from './pages/user/UserProjects';
@@ -57,6 +58,9 @@ export default function App() {
                 <Route path="weekly-progress" element={<AdminWeeklyProgress />} />
                 <Route path="weekly-progress/:projectId/view" element={<AdminWeeklyProgress />} />
                 <Route path="weekly-progress/:projectId/edit" element={<AdminWeeklyProgress />} />
+                <Route path="rfi-report" element={<AdminRfiReport />} />
+                <Route path="rfi-report/:projectId/view" element={<AdminRfiReport />} />
+                <Route path="rfi-report/:projectId/edit" element={<AdminRfiReport />} />
                 <Route path="error-log" element={<AdminErrorLog />} />
                 <Route path="projects/:id" element={<ProjectView />} />
               </Route>

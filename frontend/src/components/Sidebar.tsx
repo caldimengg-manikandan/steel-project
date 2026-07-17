@@ -47,6 +47,7 @@ const adminNav: NavItem[] = [
         icon: <IconChart />,
         subItems: [
             { label: 'Weekly Progress', to: '/admin/weekly-progress' },
+            { label: 'RFI Logs', to: '/admin/rfi-report' },
             { label: 'Error Log', to: '/admin/error-log' }
         ]
     },

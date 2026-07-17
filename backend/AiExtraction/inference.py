@@ -75,23 +75,13 @@ def process_pdf(pdf_path, model, original_filename=None):
 
                 # PDF coordinates (72 dpi) from image coordinates (150 dpi)
                 scale_to_pdf = 72 / 150
-                
-                # Safely construct and normalize the rectangle
-                rect = fitz.Rect(
-                    x1_orig * scale_to_pdf, 
-                    y1_orig * scale_to_pdf, 
-                    x2_orig * scale_to_pdf, 
-                    y2_orig * scale_to_pdf
-                )
-                rect.normalize() # Fixes negative or zero areas
+                pdf_box = [x1_orig * scale_to_pdf, y1_orig * scale_to_pdf, 
+                           x2_orig * scale_to_pdf, y2_orig * scale_to_pdf]
 
-                text = page.get_textbox(rect)
+                text = page.get_textbox(pdf_box)
                 rows = []
                 if label == "REVISION_TABLE":
-                    try:
-                        blocks = page.get_text("blocks", clip=rect)
-                    except Exception:
-                        blocks = []
+                    blocks = page.get_text("blocks", clip=pdf_box)
                     blocks.sort(key=lambda b: (b[1], b[0]))
                     current_row = []
                     last_y = -1

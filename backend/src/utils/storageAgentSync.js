@@ -58,10 +58,10 @@ function createStorageAgentSync(folderPrefix) {
                             console.log(`[StorageSync] Upload complete: ${fileInfo.storageGatewayPath}`);
                         } catch (err) {
                             console.error('[StorageSync] Failed to upload to Storage Gateway:', err.message);
-                            // Storage Gateway is optional — if it's unreachable (e.g. Windows agent offline),
-                            // we warn and continue. The file is saved locally so AI extraction still works.
-                            // The file simply won't be synced to the Windows drive this time.
-                            console.warn('[StorageSync] Continuing without Storage Gateway sync. File is saved locally.');
+                            // If we fail, we could cb(err) to fail the whole request,
+                            // or proceed so local AI works but it won't be on Windows drive.
+                            // Let's fail the upload if storage gateway is enabled but fails.
+                            return cb(new Error(`Storage Gateway Error: ${err.message}`));
                         }
                     }
 

@@ -36,27 +36,26 @@ async function getTransporter() {
 }
 
 /**
- * Get all recipient emails EXCEPT for the role of the person who triggered the action.
- * e.g. if a superAdmin added the log, notify projectManagerEmails + teamLeadEmails
+ * Get all recipient emails
  */
-async function getRecipientsExcluding(excludeRole) {
+async function getRecipients() {
     const settings = await SystemSettings.findOne();
     if (!settings) return [];
 
-    const all = {
-        superAdmin: settings.superAdminEmails || [],
-        projectManager: settings.projectManagerEmails || [],
-        teamLead: settings.teamLeadEmails || []
-    };
+    const allRaw = [
+        ...(settings.superAdminEmails || []),
+        ...(settings.projectManagerEmails || []),
+        ...(settings.teamLeadEmails || [])
+    ];
 
-    const recipients = [];
-    for (const [role, emails] of Object.entries(all)) {
-        if (role !== excludeRole) {
-            recipients.push(...emails);
-        }
-    }
+    // Some inputs might be comma-separated strings. Split them up.
+    const allEmails = allRaw
+        .flatMap(str => (typeof str === 'string' ? str.split(/[\s,;]+/) : []))
+        .map(e => e.trim())
+        .filter(e => e && e.includes('@'));
+
     // Remove duplicates
-    return [...new Set(recipients)];
+    return [...new Set(allEmails)];
 }
 
 /**
@@ -73,7 +72,7 @@ async function sendErrorLogNotification(logEntry, addedByRole, addedByName) {
             return;
         }
 
-        const recipients = await getRecipientsExcluding(addedByRole);
+        const recipients = await getRecipients();
         if (recipients.length === 0) {
             console.log('[Email] No recipients found — skipping notification.');
             return;
@@ -202,4 +201,55 @@ async function sendErrorLogNotification(logEntry, addedByRole, addedByName) {
     }
 }
 
-module.exports = { sendErrorLogNotification, getTransporter, getRecipientsExcluding };
+/**
+ * Send a generic Error Log update notification email.
+ */
+async function sendErrorLogUpdateSummary(addedByRole, addedByName) {
+    try {
+        const conn = await getTransporter();
+        if (!conn) return;
+
+        const recipients = await getRecipients();
+        if (recipients.length === 0) return;
+
+        const { transporter, from } = conn;
+
+        const roleLabel = {
+            superAdmin: 'Super Admin',
+            projectManager: 'Project Manager',
+            teamLead: 'Team Lead'
+        }[addedByRole] || addedByRole;
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px;">
+  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="background: #1e3a5f; padding: 24px 32px;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 20px;">🚨 Error Log Updated</h1>
+      <p style="color: #93c5fd; margin: 6px 0 0; font-size: 14px;">
+        The Error Log was updated by <strong>${addedByName || roleLabel}</strong> (${roleLabel}) on ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+      </p>
+    </div>
+    <div style="padding: 28px 32px;">
+      <p style="color: #374151; font-size: 15px;">Changes have been made to the global error log. Please log in to the system to review the updates.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+        await transporter.sendMail({
+            from,
+            to: recipients.join(', '),
+            subject: `🚨 [Error Log] Updates made by ${addedByName || roleLabel}`,
+            html
+        });
+
+        console.log(`[Email] Error log update notification sent to: ${recipients.join(', ')}`);
+    } catch (err) {
+        console.error('[Email] Failed to send error log update notification:', err.message);
+    }
+}
+
+module.exports = { sendErrorLogNotification, sendErrorLogUpdateSummary, getTransporter };

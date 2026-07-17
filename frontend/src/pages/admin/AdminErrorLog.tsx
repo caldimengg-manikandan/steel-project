@@ -20,6 +20,7 @@ interface ErrorLogItem {
     severity: string;
     status: string;
     remarks: string;
+    strikedOut?: boolean;
 }
 
 export default function AdminErrorLog() {
@@ -96,13 +97,34 @@ export default function AdminErrorLog() {
             correctiveAction: '',
             severity: '',
             status: '',
-            remarks: ''
+            remarks: '',
+            strikedOut: false
         }]);
     };
 
     const handleDeleteRow = (index: number) => {
         const newLogs = logs.filter((_, i) => i !== index);
         setLogs(newLogs);
+    };
+
+    const handleToggleStrikeout = async (index: number) => {
+        const newLogs = [...logs];
+        newLogs[index] = { ...newLogs[index], strikedOut: !newLogs[index].strikedOut };
+        setLogs(newLogs);
+        
+        // Auto-save strikeout state to backend immediately so Excel export works without requiring manual save
+        try {
+            const roleMap: Record<string, string> = {
+                'super_admin': 'superAdmin', 'superadmin': 'superAdmin', 'admin': 'superAdmin',
+                'project_manager': 'projectManager', 'projectmanager': 'projectManager',
+                'team_lead': 'teamLead', 'teamlead': 'teamLead',
+            };
+            const addedByRole = roleMap[(user?.role || '').toLowerCase()] || 'superAdmin';
+            const addedByName = user?.username || 'Admin';
+            await saveErrorLogs(newLogs, addedByRole, addedByName);
+        } catch (err) {
+            console.error('Failed to auto-save strikeout state', err);
+        }
     };
 
     const handleDownload = () => {
@@ -210,14 +232,19 @@ export default function AdminErrorLog() {
                 }
 
                 .grid-table .cell-input:disabled {
+                }
+
+                .form-control:disabled {
                     cursor: default;
                     color: var(--color-text-primary);
                 }
             `}</style>
 
-            {/* Toolbar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h1 style={{ margin: 0, fontSize: 22 }}>Global Error Log</h1>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h2 className="page-title">Global Error Log</h2>
+                    <p className="page-subtitle">Track and manage project errors</p>
+                </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     {editMode ? (
                         <>
@@ -238,31 +265,38 @@ export default function AdminErrorLog() {
                 </div>
             </div>
 
-            {loading ? (
-                <p style={{ color: 'var(--color-text-muted)', padding: 20 }}>Loading Error Logs...</p>
-            ) : (
-                <>
-                    <div className="grid-container">
-                        {/* 1. LEFT STATIC SIDE (S.No, Date, Project Name) */}
-                        <div className="grid-frozen-side">
-                            <table className="grid-table" style={{ width: '375px' }}>
-                                <colgroup>
-                                    <col style={{ width: '65px' }} />
-                                    <col style={{ width: '130px' }} />
-                                    <col style={{ width: '180px' }} />
-                                </colgroup>
+            <div className="card" style={{ padding: 'var(--space-lg)' }}>
+                {loading ? (
+                    <p style={{ color: 'var(--color-text-muted)', padding: 20 }}>Loading Error Logs...</p>
+                ) : (
+                    <>
+                        <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                            <table className="excel-table" style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
-                                        <th>S.No</th>
-                                        <th>Date</th>
-                                        <th>Project / Job Name</th>
+                                        <th style={{ width: 65, minWidth: 65, position: 'sticky', left: 0, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>S.No</th>
+                                        <th style={{ width: 130, minWidth: 130, position: 'sticky', left: 65, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>Date</th>
+                                        <th style={{ width: 180, minWidth: 180, position: 'sticky', left: 195, zIndex: 10, background: 'var(--color-bg-card, #1e2533)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}>Project / Job Name</th>
+                                        <th style={{ minWidth: 180 }}>Client / Fabricator</th>
+                                        <th style={{ minWidth: 150 }}>Error Category</th>
+                                        <th style={{ minWidth: 250 }}>Error Description</th>
+                                        <th style={{ minWidth: 140 }}>Impact (Shop/Fld)</th>
+                                        <th style={{ minWidth: 120 }}>PM</th>
+                                        <th style={{ minWidth: 120 }}>Modeler</th>
+                                        <th style={{ minWidth: 120 }}>Detailer</th>
+                                        <th style={{ minWidth: 120 }}>Checker</th>
+                                        <th style={{ minWidth: 200 }}>Root Cause</th>
+                                        <th style={{ minWidth: 250 }}>Corrective/Preventive Action</th>
+                                        <th style={{ minWidth: 110 }}>Severity</th>
+                                        <th style={{ minWidth: 110 }}>Status</th>
+                                        <th style={{ minWidth: 200 }}>Remarks</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {logs.map((row, idx) => (
-                                        <tr key={'frozen-' + idx}>
-                                            <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)', fontSize: 12 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                        <tr key={idx} style={row.strikedOut ? { background: '#e8e8e8', opacity: 0.75 } : {}}>
+                                            <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'var(--color-bg-card, #fff)', textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)', fontSize: 12 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                                                     {editMode && (
                                                         <button 
                                                             onClick={() => handleDeleteRow(idx)}
@@ -277,72 +311,35 @@ export default function AdminErrorLog() {
                                                             </svg>
                                                         </button>
                                                     )}
-                                                    <span>{idx + 1}</span>
+                                                    <button
+                                                        onClick={() => handleToggleStrikeout(idx)}
+                                                        title={row.strikedOut ? 'Remove Strikeout' : 'Mark as Strikeout'}
+                                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: row.strikedOut ? '#6b7280' : '#9ca3af', textDecoration: row.strikedOut ? 'line-through' : 'none', fontWeight: 'bold', fontSize: 11 }}
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                    <span style={{ textDecoration: row.strikedOut ? 'line-through' : 'none', color: row.strikedOut ? '#9ca3af' : undefined }}>{idx + 1}</span>
                                                 </div>
                                             </td>
-                                            <td>
-                                                <input type="date" className="cell-input" value={row.date} onChange={e => updateLog(idx, 'date', e.target.value)} disabled={!editMode} />
+                                            <td style={{ position: 'sticky', left: 65, zIndex: 5, background: 'var(--color-bg-card, #fff)' }}>
+                                                <input type="date" className="form-control" value={row.date} onChange={e => updateLog(idx, 'date', e.target.value)} disabled={!editMode} style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none', color: row.strikedOut ? '#9ca3af' : undefined }} />
                                             </td>
-                                            <td>
-                                                <input type="text" className="cell-input" value={row.projectName} onChange={e => updateLog(idx, 'projectName', e.target.value)} disabled={!editMode} placeholder="—" />
+                                            <td style={{ position: 'sticky', left: 195, zIndex: 5, background: 'var(--color-bg-card, #fff)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}>
+                                                <input type="text" className="form-control" value={row.projectName} onChange={e => updateLog(idx, 'projectName', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none', color: row.strikedOut ? '#9ca3af' : undefined }} />
                                             </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* 2. RIGHT SCROLLABLE SIDE */}
-                        <div className="grid-scrollable-side">
-                            <table className="grid-table" style={{ width: '2300px' }}>
-                                <colgroup>
-                                    <col style={{ width: '180px' }} />
-                                    <col style={{ width: '150px' }} />
-                                    <col style={{ width: '250px' }} />
-                                    <col style={{ width: '140px' }} />
-                                    <col style={{ width: '120px' }} />
-                                    <col style={{ width: '120px' }} />
-                                    <col style={{ width: '120px' }} />
-                                    <col style={{ width: '120px' }} />
-                                    <col style={{ width: '200px' }} />
-                                    <col style={{ width: '250px' }} />
-                                    <col style={{ width: '110px' }} />
-                                    <col style={{ width: '110px' }} />
-                                    <col style={{ width: '200px' }} />
-                                </colgroup>
-                                <thead>
-                                    <tr>
-                                        <th>Client / Fabricator</th>
-                                        <th>Error Category</th>
-                                        <th>Error Description</th>
-                                        <th>Impact (Shop/Fld)</th>
-                                        <th>PM</th>
-                                        <th>Modeler</th>
-                                        <th>Detailer</th>
-                                        <th>Checker</th>
-                                        <th>Root Cause</th>
-                                        <th>Corrective/Preventive Action</th>
-                                        <th>Severity</th>
-                                        <th>Status</th>
-                                        <th>Remarks</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {logs.map((row, idx) => (
-                                        <tr key={'scroll-' + idx}>
-                                            <td><input type="text" className="cell-input" value={row.clientName} onChange={e => updateLog(idx, 'clientName', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.errorCategory} onChange={e => updateLog(idx, 'errorCategory', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.errorDescription} onChange={e => updateLog(idx, 'errorDescription', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.impact} onChange={e => updateLog(idx, 'impact', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.pm} onChange={e => updateLog(idx, 'pm', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.modeler} onChange={e => updateLog(idx, 'modeler', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.detailer} onChange={e => updateLog(idx, 'detailer', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.checker} onChange={e => updateLog(idx, 'checker', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.rootCause} onChange={e => updateLog(idx, 'rootCause', e.target.value)} disabled={!editMode} placeholder="—" /></td>
-                                            <td><input type="text" className="cell-input" value={row.correctiveAction} onChange={e => updateLog(idx, 'correctiveAction', e.target.value)} disabled={!editMode} placeholder="—" /></td>
+                                            <td><input type="text" className="form-control" value={row.clientName} onChange={e => updateLog(idx, 'clientName', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.errorCategory} onChange={e => updateLog(idx, 'errorCategory', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.errorDescription} onChange={e => updateLog(idx, 'errorDescription', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.impact} onChange={e => updateLog(idx, 'impact', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.pm} onChange={e => updateLog(idx, 'pm', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.modeler} onChange={e => updateLog(idx, 'modeler', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.detailer} onChange={e => updateLog(idx, 'detailer', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.checker} onChange={e => updateLog(idx, 'checker', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.rootCause} onChange={e => updateLog(idx, 'rootCause', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td><input type="text" className="form-control" value={row.correctiveAction} onChange={e => updateLog(idx, 'correctiveAction', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td>
-                                                <select className="cell-input" value={row.severity} onChange={e => updateLog(idx, 'severity', e.target.value)} disabled={!editMode}
-                                                    style={{ color: row.severity === 'High' ? '#dc2626' : row.severity === 'Medium' ? '#d97706' : row.severity === 'Low' ? '#16a34a' : 'inherit', height: '100%' }}>
+                                                <select className="form-control" value={row.severity} onChange={e => updateLog(idx, 'severity', e.target.value)} disabled={!editMode}
+                                                    style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', color: row.severity === 'High' ? '#dc2626' : row.severity === 'Medium' ? '#d97706' : row.severity === 'Low' ? '#16a34a' : 'inherit', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
                                                     <option value="">—</option>
                                                     <option value="High">High</option>
                                                     <option value="Medium">Medium</option>
@@ -350,29 +347,29 @@ export default function AdminErrorLog() {
                                                 </select>
                                             </td>
                                             <td>
-                                                <select className="cell-input" value={row.status} onChange={e => updateLog(idx, 'status', e.target.value)} disabled={!editMode} style={{ height: '100%' }}>
+                                                <select className="form-control" value={row.status} onChange={e => updateLog(idx, 'status', e.target.value)} disabled={!editMode} style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
                                                     <option value="">—</option>
                                                     <option value="Open">Open</option>
                                                     <option value="In Progress">In Progress</option>
                                                     <option value="Closed">Closed</option>
                                                 </select>
                                             </td>
-                                            <td><input type="text" className="cell-input" value={row.remarks} onChange={e => updateLog(idx, 'remarks', e.target.value)} disabled={!editMode} placeholder="—" /></td>
+                                            <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateLog(idx, 'remarks', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
 
-                    <div style={{ marginTop: 12 }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => {
-                            if (!editMode) setEditMode(true);
-                            handleAddRow();
-                        }}>+ Add Error Log</button>
-                    </div>
-                </>
-            )}
+                        <div style={{ marginTop: 16 }}>
+                            <button className="btn btn-primary btn-sm" onClick={() => {
+                                if (!editMode) setEditMode(true);
+                                handleAddRow();
+                            }}>+ Add Error Log</button>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }
