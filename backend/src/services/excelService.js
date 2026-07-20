@@ -491,8 +491,12 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
                 const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
                 const imageId = workbook.addImage({ filename: finalLogo, extension });
-                // Scale logo to top left, roughly spanning A and C columns
-                logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
+                // Merge all top cells to create a completely plain background banner
+                logSheet.mergeCells('A1:Z5');
+                // Fill the merged area with solid white to ensure no gridlines are shown at all
+                logSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                // Scale logo to span C to H columns
+                logSheet.addImage(imageId, { tl: { col: 2, row: 0 }, br: { col: 8, row: 5 } });
             }
         } catch (err) { console.error('[ExcelService] Log logo error:', err.message); }
 

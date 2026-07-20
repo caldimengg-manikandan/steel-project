@@ -37,10 +37,14 @@ exports.saveErrorLogs = async (req, res) => {
         existingLogs.forEach(l => existingLogMap[l._id.toString()] = l);
 
         const editedEntries = [];
+        const struckOutEntries = [];
         logs.forEach(log => {
             if (log._id && log._id !== 'new') {
                 const oldLog = existingLogMap[log._id.toString()];
                 if (oldLog) {
+                    // Check if it was newly struck out
+                    const newlyStruckOut = log.strikedOut === true && oldLog.strikedOut !== true;
+                    
                     const fields = ['date', 'projectName', 'clientName', 'errorCategory', 'errorDescription', 'impact', 'pm', 'modeler', 'detailer', 'checker', 'rootCause', 'correctiveAction', 'severity', 'status', 'remarks', 'strikedOut'];
                     let changed = false;
                     for (const f of fields) {
@@ -51,7 +55,9 @@ exports.saveErrorLogs = async (req, res) => {
                             break;
                         }
                     }
-                    if (changed) {
+                    if (newlyStruckOut) {
+                        struckOutEntries.push(log);
+                    } else if (changed) {
                         editedEntries.push(log);
                     }
                 }
@@ -87,8 +93,8 @@ exports.saveErrorLogs = async (req, res) => {
         }
 
         // Send email notification for the update
-        if (addedByRole && (newEntries.length > 0 || editedEntries.length > 0)) {
-            sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries, editedEntries).catch(err =>
+        if (addedByRole && (newEntries.length > 0 || editedEntries.length > 0 || struckOutEntries.length > 0)) {
+            sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries, editedEntries, struckOutEntries).catch(err =>
                 console.error('[Email] Notification error:', err.message)
             );
         }
@@ -123,9 +129,13 @@ exports.downloadExcel = async (req, res) => {
                 const extension = 'jpeg';
                 const imageId = workbook.addImage({ filename: finalLogo, extension });
                 sheet.addImage(imageId, {
-                    tl: { col: 3, row: 0 }, // Column D
-                    ext: { width: 350, height: 75 }
+                    tl: { col: 5, row: 0 }, // Column F
+                    br: { col: 13, row: 4 } // Column M is index 12, col 13 is the right edge of M
                 });
+                // Merge all top cells to create a completely plain background banner
+                sheet.mergeCells('A1:Z4');
+                // Fill the merged area with solid white to ensure no gridlines are shown at all
+                sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
             }
         } catch (err) { console.error('Logo error:', err.message); }
 

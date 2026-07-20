@@ -225,9 +225,13 @@ exports.downloadExcel = async (req, res) => {
 
         if (logoImageIdRfi !== null) {
             rfiSheet.addImage(logoImageIdRfi, {
-                tl: { col: 3, row: 0 }, // Start at Column D, Row 1
-                br: { col: 10, row: 4 } // End before Column K (so covers D to J) and Row 5 (covers 1 to 4)
+                tl: { col: 3, row: 0 },
+                br: { col: 9, row: 4 }
             });
+            // Merge all top cells to create a completely plain background banner
+            rfiSheet.mergeCells('A1:Z4');
+            // Fill the merged area with solid white to ensure no gridlines are shown at all
+            rfiSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
         }
 
         rfiSheet.mergeCells('A5:K5');
@@ -286,9 +290,13 @@ exports.downloadExcel = async (req, res) => {
 
         if (logoImageIdCdrfi !== null) {
             cdrfiSheet.addImage(logoImageIdCdrfi, {
-                tl: { col: 3, row: 0 }, // Start at Column D, Row 1
-                br: { col: 10, row: 4 } // End before Column K (so covers D to J) and Row 5 (covers 1 to 4)
+                tl: { col: 3, row: 0 },
+                br: { col: 9, row: 4 }
             });
+            // Merge all top cells to create a completely plain background banner
+            cdrfiSheet.mergeCells('A1:Z4');
+            // Fill the merged area with solid white to ensure no gridlines are shown at all
+            cdrfiSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
         }
 
         cdrfiSheet.mergeCells('A5:K5');

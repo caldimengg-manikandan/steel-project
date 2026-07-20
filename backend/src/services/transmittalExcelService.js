@@ -207,6 +207,10 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         if (fs.existsSync(finalLogo)) {
             const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
             trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 6 } });
+            // Merge all top cells to create a completely plain background banner
+            trSheet.mergeCells('A1:Z6');
+            // Fill the merged area with solid white to ensure no gridlines are shown at all
+            trSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
         }
     } catch (err) { console.error('[TransmittalExcel] Logo error:', err.message); }
 
@@ -372,8 +376,12 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
         console.log('[DrawingLogExcel] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
         if (fs.existsSync(finalLogo)) {
             const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
-            // Scale logo to top left, roughly spanning A and B columns
-            logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
+            // Scale logo to span C to H columns
+            logSheet.addImage(imageId, { tl: { col: 2, row: 0 }, br: { col: 8, row: 5 } });
+            // Merge all top cells to create a completely plain background banner
+            logSheet.mergeCells('A1:Z5');
+            // Fill the merged area with solid white to ensure no gridlines are shown at all
+            logSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
         }
     } catch (err) { console.error('[DrawingLogExcel] Logo error:', err.message); }
 

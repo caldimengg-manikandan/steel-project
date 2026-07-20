@@ -168,9 +168,8 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 extension: 'png',
             });
             sheet.addImage(logoImageId, {
-                tl: { col: 0, row: 0 },       // top-left: column A, row 1
-                br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
-                editAs: 'oneCell',
+                tl: { col: 0, row: 0 },
+                ext: { width: 350, height: 50 }
             });
         }
     } catch (e) { console.error('[RfiExcel] Logo error:', e.message); }
