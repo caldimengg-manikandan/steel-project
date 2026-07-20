@@ -313,8 +313,6 @@ def extract_rfi(pdf_path, original_filename):
                         '_rect': a2['rect']
                     })
                     existing_qnums.add(rfi_num)
-                            '_rect': a2['rect']
-                        })
             # End of fallback handling
 
             # 3. Process Responses and Status Keywords

@@ -30,6 +30,34 @@ exports.saveErrorLogs = async (req, res) => {
             return isNew && hasContent;
         });
 
+        // Identify edited entries
+        const existingLogIds = logs.filter(l => l._id && l._id !== 'new').map(l => l._id);
+        const existingLogs = await ErrorLog.find({ _id: { $in: existingLogIds } }).lean();
+        const existingLogMap = {};
+        existingLogs.forEach(l => existingLogMap[l._id.toString()] = l);
+
+        const editedEntries = [];
+        logs.forEach(log => {
+            if (log._id && log._id !== 'new') {
+                const oldLog = existingLogMap[log._id.toString()];
+                if (oldLog) {
+                    const fields = ['date', 'projectName', 'clientName', 'errorCategory', 'errorDescription', 'impact', 'pm', 'modeler', 'detailer', 'checker', 'rootCause', 'correctiveAction', 'severity', 'status', 'remarks', 'strikedOut'];
+                    let changed = false;
+                    for (const f of fields) {
+                        const newVal = log[f] === undefined ? '' : log[f];
+                        const oldVal = oldLog[f] === undefined ? '' : oldLog[f];
+                        if (String(newVal) !== String(oldVal)) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                    if (changed) {
+                        editedEntries.push(log);
+                    }
+                }
+            }
+        });
+
         const bulkOps = logs.map(log => {
             if (log._id && log._id !== 'new') {
                 const { _id, ...updateData } = log;
@@ -59,8 +87,8 @@ exports.saveErrorLogs = async (req, res) => {
         }
 
         // Send email notification for the update
-        if (addedByRole) {
-            sendErrorLogUpdateSummary(addedByRole, addedByName).catch(err =>
+        if (addedByRole && (newEntries.length > 0 || editedEntries.length > 0)) {
+            sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries, editedEntries).catch(err =>
                 console.error('[Email] Notification error:', err.message)
             );
         }

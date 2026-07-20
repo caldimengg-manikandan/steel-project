@@ -102,16 +102,11 @@ export default function AdminErrorLog() {
         }]);
     };
 
-    const handleDeleteRow = (index: number) => {
-        const newLogs = logs.filter((_, i) => i !== index);
-        setLogs(newLogs);
-    };
-
     const handleToggleStrikeout = async (index: number) => {
         const newLogs = [...logs];
         newLogs[index] = { ...newLogs[index], strikedOut: !newLogs[index].strikedOut };
         setLogs(newLogs);
-        
+
         // Auto-save strikeout state to backend immediately so Excel export works without requiring manual save
         try {
             const roleMap: Record<string, string> = {
@@ -297,20 +292,6 @@ export default function AdminErrorLog() {
                                         <tr key={idx} style={row.strikedOut ? { background: '#e8e8e8', opacity: 0.75 } : {}}>
                                             <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'var(--color-bg-card, #fff)', textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)', fontSize: 12 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                                                    {editMode && (
-                                                        <button 
-                                                            onClick={() => handleDeleteRow(idx)}
-                                                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                                                            title="Delete Row"
-                                                        >
-                                                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="#dc2626" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                                                            </svg>
-                                                        </button>
-                                                    )}
                                                     <button
                                                         onClick={() => handleToggleStrikeout(idx)}
                                                         title={row.strikedOut ? 'Remove Strikeout' : 'Mark as Strikeout'}

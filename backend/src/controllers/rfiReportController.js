@@ -182,7 +182,7 @@ exports.downloadExcel = async (req, res) => {
                     ext.rfis.forEach(rfi => {
                         rfis.push({
                             id: rfi.rfiNumber || '',
-                            description: rfi.question || '',
+                            description: rfi.description || '',
                             status: 'OPEN', // default
                             originalFileName: ext.originalFileName,
                             sentDate: ext.createdAt
@@ -192,30 +192,43 @@ exports.downloadExcel = async (req, res) => {
             });
         }
         const workbook = new exceljs.Workbook();
-        const logoPath = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.jpg');
-        let logoImageId = null;
+        const logoPath = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
+        let logoImageIdRfi = null;
+        let logoImageIdCdrfi = null;
+        console.log('[DEBUG EXCEL] logoPath:', logoPath);
+        console.log('[DEBUG EXCEL] Exists:', fs.existsSync(logoPath));
         if (fs.existsSync(logoPath)) {
-            logoImageId = workbook.addImage({
-                filename: logoPath,
-                extension: 'jpeg',
+            const logoBuffer = fs.readFileSync(logoPath);
+            console.log('[DEBUG EXCEL] Buffer length:', logoBuffer.length);
+            logoImageIdRfi = workbook.addImage({
+                buffer: logoBuffer,
+                extension: 'png',
             });
+            logoImageIdCdrfi = workbook.addImage({
+                buffer: logoBuffer,
+                extension: 'png',
+            });
+            console.log('[DEBUG EXCEL] Image IDs:', logoImageIdRfi, logoImageIdCdrfi);
         }
         
         // RFI Sheet
         const rfiSheet = workbook.addWorksheet('RFI LOG');
         
-        if (logoImageId) {
-            rfiSheet.addImage(logoImageId, {
-                tl: { col: 3, row: 0 }, // Column D
-                ext: { width: 350, height: 75 }
+        // Fill first 4 rows with white background without vertically merging them
+        for (let r = 1; r <= 4; r++) {
+            const row = rfiSheet.getRow(r);
+            row.height = 20;
+            for (let c = 1; c <= 11; c++) {
+                row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            }
+        }
+
+        if (logoImageIdRfi !== null) {
+            rfiSheet.addImage(logoImageIdRfi, {
+                tl: { col: 3, row: 0 }, // Start at Column D, Row 1
+                br: { col: 10, row: 4 } // End before Column K (so covers D to J) and Row 5 (covers 1 to 4)
             });
         }
-        
-        // Increase row heights to prevent overlap
-        rfiSheet.getRow(1).height = 20;
-        rfiSheet.getRow(2).height = 20;
-        rfiSheet.getRow(3).height = 20;
-        rfiSheet.getRow(4).height = 20;
 
         rfiSheet.mergeCells('A5:K5');
         const rfiTitle = rfiSheet.getCell('A5');
@@ -255,21 +268,28 @@ exports.downloadExcel = async (req, res) => {
             });
         });
         
+        rfiSheet.views = [
+            { state: 'normal', activeCell: 'A6' }
+        ];
+        
         // CDRFI Sheet
         const cdrfiSheet = workbook.addWorksheet('CDRFI LOG');
         
-        if (logoImageId) {
-            cdrfiSheet.addImage(logoImageId, {
-                tl: { col: 3, row: 0 },
-                ext: { width: 350, height: 75 }
+        // Fill first 4 rows with white background without vertically merging them
+        for (let r = 1; r <= 4; r++) {
+            const row = cdrfiSheet.getRow(r);
+            row.height = 20;
+            for (let c = 1; c <= 11; c++) {
+                row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            }
+        }
+
+        if (logoImageIdCdrfi !== null) {
+            cdrfiSheet.addImage(logoImageIdCdrfi, {
+                tl: { col: 3, row: 0 }, // Start at Column D, Row 1
+                br: { col: 10, row: 4 } // End before Column K (so covers D to J) and Row 5 (covers 1 to 4)
             });
         }
-        
-        // Increase row heights to prevent overlap
-        cdrfiSheet.getRow(1).height = 20;
-        cdrfiSheet.getRow(2).height = 20;
-        cdrfiSheet.getRow(3).height = 20;
-        cdrfiSheet.getRow(4).height = 20;
 
         cdrfiSheet.mergeCells('A5:K5');
         const cdrfiTitle = cdrfiSheet.getCell('A5');
@@ -308,6 +328,10 @@ exports.downloadExcel = async (req, res) => {
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
             });
         });
+
+        cdrfiSheet.views = [
+            { state: 'normal', activeCell: 'A6' }
+        ];
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="RFI_Log_${project.name}.xlsx"`);

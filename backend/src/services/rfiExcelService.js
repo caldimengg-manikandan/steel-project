@@ -2,7 +2,7 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 
-const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.jpg');
+const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
 /**
  * extractSkFromFilename
@@ -146,7 +146,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     // ROW 1 — Logo (spans all columns)
     // ════════════════════════════════════════════════════════
     const logoRow = sheet.getRow(1);
-    logoRow.height = 80; // enough height to display the logo clearly
+    logoRow.height = 55; // enough height to display the logo clearly
 
     // Fill logo row cells with white background
     for (let c = 1; c <= TOTAL_COLS; c++) {
@@ -160,15 +160,17 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
 
     // Embed logo if the file exists
     try {
-        const finalLogo = LOGO_DEFAULT; // Hardcode to use excel_img.jpg
+        const rawLogo = projectDetails?.logoPath || '';
+        const finalLogo = rawLogo ? path.join(__dirname, '../../', rawLogo.replace(/^\//, '')) : LOGO_DEFAULT;
         if (fs.existsSync(finalLogo)) {
             const logoImageId = workbook.addImage({
                 filename: finalLogo,
-                extension: 'jpeg',
+                extension: 'png',
             });
             sheet.addImage(logoImageId, {
-                tl: { col: 3, row: 0 },
-                ext: { width: 350, height: 75 }
+                tl: { col: 0, row: 0 },       // top-left: column A, row 1
+                br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
+                editAs: 'oneCell',
             });
         }
     } catch (e) { console.error('[RfiExcel] Logo error:', e.message); }

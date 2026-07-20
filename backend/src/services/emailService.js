@@ -204,7 +204,7 @@ async function sendErrorLogNotification(logEntry, addedByRole, addedByName) {
 /**
  * Send a generic Error Log update notification email.
  */
-async function sendErrorLogUpdateSummary(addedByRole, addedByName) {
+async function sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries = [], editedEntries = []) {
     try {
         const conn = await getTransporter();
         if (!conn) return;
@@ -220,6 +220,182 @@ async function sendErrorLogUpdateSummary(addedByRole, addedByName) {
             teamLead: 'Team Lead'
         }[addedByRole] || addedByRole;
 
+        let addedDataHtml = '';
+        if (newEntries && newEntries.length > 0) {
+            addedDataHtml = newEntries.map((logEntry, i) => {
+                const severityColor = {
+                    'High': '#dc2626',
+                    'Medium': '#f59e0b',
+                    'Low': '#16a34a'
+                }[logEntry.severity] || '#6b7280';
+                
+                return `
+                <div style="margin-top: 24px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
+                  <div style="background: #f8fafc; padding: 12px 16px; font-weight: bold; border-bottom: 1px solid #e5e7eb; color: #1e3a5f;">
+                    New Entry #${i + 1}
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; width: 40%; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Date</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.date || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Project / Job Name</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.projectName || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Client / Fabricator</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.clientName || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Error Category</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.errorCategory || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Error Description</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.errorDescription || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Impact</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.impact || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Severity</td>
+                      <td style="padding: 10px 14px; border-bottom: 1px solid #e5e7eb;">
+                        <span style="background: ${severityColor}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                          ${logEntry.severity || '—'}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">PM</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.pm || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Modeler</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.modeler || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Detailer</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.detailer || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Checker</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.checker || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Root Cause</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.rootCause || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Corrective Action</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.correctiveAction || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Status</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.status || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Remarks</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.remarks || '—'}</td>
+                    </tr>
+                  </table>
+                </div>
+                `;
+            }).join('');
+        }
+
+        let editedDataHtml = '';
+        if (editedEntries && editedEntries.length > 0) {
+            editedDataHtml = editedEntries.map((logEntry, i) => {
+                const severityColor = {
+                    'High': '#dc2626',
+                    'Medium': '#f59e0b',
+                    'Low': '#16a34a'
+                }[logEntry.severity] || '#6b7280';
+                
+                return `
+                <div style="margin-top: 24px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
+                  <div style="background: #fff8e6; padding: 12px 16px; font-weight: bold; border-bottom: 1px solid #e5e7eb; color: #b45309;">
+                    Edited Entry #${i + 1}
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; width: 40%; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Date</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.date || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Project / Job Name</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.projectName || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Client / Fabricator</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.clientName || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Error Category</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.errorCategory || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Error Description</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.errorDescription || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Impact</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.impact || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Severity</td>
+                      <td style="padding: 10px 14px; border-bottom: 1px solid #e5e7eb;">
+                        <span style="background: ${severityColor}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                          ${logEntry.severity || '—'}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">PM</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.pm || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Modeler</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.modeler || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Detailer</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.detailer || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Checker</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.checker || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Root Cause</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.rootCause || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Corrective Action</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.correctiveAction || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Status</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.status || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Remarks</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.remarks || '—'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc;">
+                      <td style="padding: 10px 14px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">Striked Out</td>
+                      <td style="padding: 10px 14px; color: #111827; border-bottom: 1px solid #e5e7eb;">${logEntry.strikedOut ? 'Yes' : 'No'}</td>
+                    </tr>
+                  </table>
+                </div>
+                `;
+            }).join('');
+        }
+
+        const hasUpdates = (newEntries && newEntries.length > 0) || (editedEntries && editedEntries.length > 0);
+
         const html = `
 <!DOCTYPE html>
 <html>
@@ -233,7 +409,9 @@ async function sendErrorLogUpdateSummary(addedByRole, addedByName) {
       </p>
     </div>
     <div style="padding: 28px 32px;">
-      <p style="color: #374151; font-size: 15px;">Changes have been made to the global error log. Please log in to the system to review the updates.</p>
+      <p style="color: #374151; font-size: 15px;">Changes have been made to the global error log. ${hasUpdates ? 'Below are the newly added and edited entries:' : 'Please log in to the system to review the updates.'}</p>
+      ${addedDataHtml}
+      ${editedDataHtml}
     </div>
   </div>
 </body>
