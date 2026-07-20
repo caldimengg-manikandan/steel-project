@@ -328,19 +328,49 @@ export default function AdminErrorLog() {
                                                 <input type="text" className="form-control" value={row.projectName} onChange={e => updateLog(idx, 'projectName', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none', color: row.strikedOut ? '#9ca3af' : undefined }} />
                                             </td>
                                             <td><input type="text" className="form-control" value={row.clientName} onChange={e => updateLog(idx, 'clientName', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
-                                            <td><input type="text" className="form-control" value={row.errorCategory} onChange={e => updateLog(idx, 'errorCategory', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td>
+                                                <select className="form-control" value={row.errorCategory} onChange={e => updateLog(idx, 'errorCategory', e.target.value)} disabled={!editMode} style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
+                                                    <option value="">—</option>
+                                                    <option value="Modeling">Modeling</option>
+                                                    <option value="Connection related issue">Connection related issue</option>
+                                                    <option value="Shop drawing issue">Shop drawing issue</option>
+                                                    <option value="Erection drawing Issue">Erection drawing Issue</option>
+                                                    <option value="Anchor Bolt">Anchor Bolt</option>
+                                                    <option value="Miscellaneous Steel">Miscellaneous Steel</option>
+                                                    <option value="Client Standard">Client Standard</option>
+                                                    <option value="2D Error">2D Error</option>
+                                                    <option value="Checking">Checking</option>
+                                                    <option value="Revision">Revision</option>
+                                                    <option value="Coordination">Coordination</option>
+                                                    <option value="Others">Others</option>
+                                                </select>
+                                            </td>
                                             <td><input type="text" className="form-control" value={row.errorDescription} onChange={e => updateLog(idx, 'errorDescription', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td><input type="text" className="form-control" value={row.impact} onChange={e => updateLog(idx, 'impact', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td><input type="text" className="form-control" value={row.pm} onChange={e => updateLog(idx, 'pm', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td><input type="text" className="form-control" value={row.modeler} onChange={e => updateLog(idx, 'modeler', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td><input type="text" className="form-control" value={row.detailer} onChange={e => updateLog(idx, 'detailer', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td><input type="text" className="form-control" value={row.checker} onChange={e => updateLog(idx, 'checker', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
-                                            <td><input type="text" className="form-control" value={row.rootCause} onChange={e => updateLog(idx, 'rootCause', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
+                                            <td>
+                                                <select className="form-control" value={row.rootCause} onChange={e => updateLog(idx, 'rootCause', e.target.value)} disabled={!editMode} style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
+                                                    <option value="">—</option>
+                                                    <option value="Human Error">Human Error</option>
+                                                    <option value="Lack of Communication">Lack of Communication</option>
+                                                    <option value="Drawing Interpretation">Drawing Interpretation</option>
+                                                    <option value="Client Revision">Client Revision</option>
+                                                    <option value="Missing Information">Missing Information</option>
+                                                    <option value="Software Issue">Software Issue</option>
+                                                    <option value="Training Required">Training Required</option>
+                                                    <option value="Coordination Issue">Coordination Issue</option>
+                                                    <option value="Others">Others</option>
+                                                </select>
+                                            </td>
                                             <td><input type="text" className="form-control" value={row.correctiveAction} onChange={e => updateLog(idx, 'correctiveAction', e.target.value)} disabled={!editMode} placeholder="—" style={{ padding: 4, width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }} /></td>
                                             <td>
                                                 <select className="form-control" value={row.severity} onChange={e => updateLog(idx, 'severity', e.target.value)} disabled={!editMode}
-                                                    style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', color: row.severity === 'High' ? '#dc2626' : row.severity === 'Medium' ? '#d97706' : row.severity === 'Low' ? '#16a34a' : 'inherit', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
+                                                    style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', color: row.severity === 'Critical' ? '#991b1b' : row.severity === 'High' ? '#dc2626' : row.severity === 'Medium' ? '#d97706' : row.severity === 'Low' ? '#16a34a' : 'inherit', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
                                                     <option value="">—</option>
+                                                    <option value="Critical">Critical</option>
                                                     <option value="High">High</option>
                                                     <option value="Medium">Medium</option>
                                                     <option value="Low">Low</option>
@@ -350,7 +380,9 @@ export default function AdminErrorLog() {
                                                 <select className="form-control" value={row.status} onChange={e => updateLog(idx, 'status', e.target.value)} disabled={!editMode} style={{ padding: '4px 24px 4px 8px', width: '100%', background: 'transparent', textDecoration: row.strikedOut ? 'line-through' : 'none' }}>
                                                     <option value="">—</option>
                                                     <option value="Open">Open</option>
+                                                    <option value="Under Review">Under Review</option>
                                                     <option value="In Progress">In Progress</option>
+                                                    <option value="Pending Client Response">Pending Client Response</option>
                                                     <option value="Closed">Closed</option>
                                                 </select>
                                             </td>

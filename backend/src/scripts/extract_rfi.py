@@ -24,6 +24,34 @@ def get_q_num(text):
     return m.group(1) if m else None
 
 
+def is_drawing_note(text):
+    """Detect if a text block is likely a drawing legend or general notes block rather than an RFI description."""
+    text_upper = text.upper()
+    
+    # 1. Explicit Headers
+    if any(h in text_upper for h in ["GENERAL NOTES", "STRUCTURAL NOTES", "TYPICAL NOTES"]):
+        return True
+        
+    # 2. Legends (Denotes/Indicates)
+    if text_upper.count("DENOTES") + text_upper.count("INDICATES") >= 2:
+        return True
+        
+    # 3. Heavy CAD Abbreviations
+    if text_upper.count("U.N.O") >= 2 or text_upper.count("UNO") >= 3:
+        return True
+        
+    # 4. Long Numbered Lists (4+ items) - RFIs rarely have 4+ numbered items in a single bubble
+    list_matches = re.findall(r'\b\d+\s*\.\s*[A-Z\-]', text_upper)
+    if len(list_matches) >= 4:
+        return True
+        
+    # 5. Title block elements
+    if "DRAWING TITLE" in text_upper or "SHEET TITLE" in text_upper:
+        return True
+        
+    return False
+
+
 def extract_rfi(pdf_path, original_filename):
     rfis = []
 
@@ -150,9 +178,9 @@ def extract_rfi(pdf_path, original_filename):
                 text = a['text']
 
                 # Check if it's a STANDALONE Q marker (e.g. exactly "Q1" or "Q1.")
-                standalone_match = re.match(r'^[*\-\s]*Q\s*(\d+)[\.:\-]?[\s]*$', text, re.IGNORECASE)
+                standalone_match = re.match(r'^[*\-\s]*Q[\.\-\:\s]*(\d+[a-zA-Z]?)[\.:\-]?[\s]*$', text, re.IGNORECASE)
                 if standalone_match:
-                    rfi_num = f"Q{standalone_match.group(1)}"
+                    rfi_num = f"Q{standalone_match.group(1).upper()}"
 
                     best_annot = {}
                     min_dist = float('inf')
@@ -160,7 +188,7 @@ def extract_rfi(pdf_path, original_filename):
                     for sibling in valid_annots:
                         if sibling == a:
                             continue
-                        if re.match(r'^Q\d+[\.\-\:]?$', sibling['text'], re.IGNORECASE):
+                        if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
                             continue
 
                         x_dist = max(0, max(a['x0'] - sibling['x1'], sibling['x0'] - a['x1']))
@@ -175,8 +203,10 @@ def extract_rfi(pdf_path, original_filename):
 
                         dist = rect_dist + 0.01 * center_dist - overlap_bonus
 
-                        if dist < min_dist and dist < 2000:
-                            if len(sibling['text']) > 5 or 'response' in sibling['text'].lower():
+                        if dist < min_dist and rect_dist < 200:
+                            if (len(sibling['text']) > 5 or 'response' in sibling['text'].lower()) and len(sibling['text']) < 1500:
+                                if is_drawing_note(sibling['text']):
+                                    continue
                                 min_dist = dist
                                 best_annot = sibling
 
@@ -194,10 +224,14 @@ def extract_rfi(pdf_path, original_filename):
                     continue
 
                 # Check if it's a COMBINED Q marker (e.g., "Q1 The architectural drawing...")
-                combined_match = re.match(r'^Q(\d+)[\.\-\:\s]+(.+)', text, re.IGNORECASE | re.DOTALL)
+                combined_match = re.match(r'^Q[\.\-\:\s]*(\d+[a-zA-Z]?)[\.\-\:\s]+(.+)', text, re.IGNORECASE | re.DOTALL)
                 if combined_match:
-                    rfi_num = f"Q{combined_match.group(1)}"
                     desc = combined_match.group(2).strip()
+                    # Prevent glued labels (e.g., "Q11 Q12") from being extracted as label + description
+                    if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?$', desc, re.IGNORECASE):
+                        continue
+
+                    rfi_num = f"Q{combined_match.group(1).upper()}"
                     page_rfis.append({
                         'rfiNumber': rfi_num,
                         'refDrawing': original_filename,
@@ -209,74 +243,76 @@ def extract_rfi(pdf_path, original_filename):
                         '_rect': a['rect']
                     })
 
-            # Additional fallback: scan raw page text for Q markers when still none found
-            if not page_rfis:
-                raw_text = page.get_text("text")
-                for line in raw_text.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    # Find ALL Q-number occurrences on this raw line - not just
-                    # the first. If two bare labels (e.g. "Q11  Q12") end up on
-                    # the same raw text line, treating everything after the
-                    # first match as its "description" would steal the second
-                    # label's text, as happened with Q11 getting "Q12" here.
-                    matches = list(re.finditer(r'\bQ\s*\d+\b', line, re.IGNORECASE))
-                    if not matches:
-                        continue
+            # Additional fallback: scan raw page text for ANY missed Q markers
+            existing_qnums = {r['rfiNumber'] for r in page_rfis}
+            raw_text = page.get_text("text")
+            
+            for line in raw_text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # Find ALL Q-number occurrences on this raw line
+                matches = list(re.finditer(r'\bQ[\.\-\:\s]*(\d+[a-zA-Z]?)\b', line, re.IGNORECASE))
+                if not matches:
+                    continue
 
-                    if len(matches) == 1:
-                        m = matches[0]
-                        rfi_num = re.sub(r'\s+', '', m.group(0)).upper()
-                        desc = line.replace(m.group(0), '').strip(' :.-')
-                        # Guard: if what's left still looks like a bare Q-label
-                        # (or nothing at all), don't fabricate a description -
-                        # leave it blank rather than borrowing another label's text.
-                        if not desc or re.match(r'^Q\s*\d+[\.:\-]?$', desc, re.IGNORECASE):
-                            desc = ''
+                if len(matches) == 1:
+                    m = matches[0]
+                    rfi_num = f"Q{m.group(1).upper()}"
+                    if rfi_num in existing_qnums:
+                        continue
+                        
+                    desc = line.replace(m.group(0), '').strip(' :.-')
+                    if not desc or re.match(r'^Q[\.\-\:\s]*\d+[a-zA-Z]?[\.:\-]?$', desc, re.IGNORECASE):
+                        desc = ''
+                    page_rfis.append({
+                        'rfiNumber': rfi_num,
+                        'refDrawing': original_filename,
+                        'description': desc,
+                        'response': '',
+                        'status': 'OPEN',
+                        'remarks': '',
+                        'skNumber': sk_number,
+                        '_rect': None
+                    })
+                    existing_qnums.add(rfi_num)
+                else:
+                    for m in matches:
+                        rfi_num = f"Q{m.group(1).upper()}"
+                        if rfi_num in existing_qnums:
+                            continue
                         page_rfis.append({
                             'rfiNumber': rfi_num,
                             'refDrawing': original_filename,
-                            'description': desc,
+                            'description': '',
                             'response': '',
                             'status': 'OPEN',
                             'remarks': '',
                             'skNumber': sk_number,
                             '_rect': None
                         })
-                    else:
-                        # Multiple bare labels sharing a raw line - these are
-                        # standalone anchors with no attached text on this line;
-                        # emit each with an empty description instead of one
-                        # borrowing the other's label as its text.
-                        for m in matches:
-                            rfi_num = re.sub(r'\s+', '', m.group(0)).upper()
-                            page_rfis.append({
-                                'rfiNumber': rfi_num,
-                                'refDrawing': original_filename,
-                                'description': '',
-                                'response': '',
-                                'status': 'OPEN',
-                                'remarks': '',
-                                'skNumber': sk_number,
-                                '_rect': None
-                            })
+                        existing_qnums.add(rfi_num)
 
-            if not page_rfis:
-                for a2 in valid_annots:
-                    txt = a2['text']
-                    fallback_match = re.search(r'\bQ\s*\d+\b', txt, re.IGNORECASE)
-                    if fallback_match:
-                        desc_text = txt.replace(fallback_match.group(0), '').strip(' :.-')
-                        rfi_num = re.sub(r'\s+', '', fallback_match.group(0)).upper()
-                        page_rfis.append({
-                            'rfiNumber': rfi_num,
-                            'refDrawing': original_filename,
-                            'description': desc_text,
-                            'response': '',
-                            'status': 'OPEN',
-                            'remarks': '',
-                            'skNumber': sk_number,
+            for a2 in valid_annots:
+                txt = a2['text']
+                fallback_match = re.search(r'\bQ[\.\-\:\s]*(\d+[a-zA-Z]?)\b', txt, re.IGNORECASE)
+                if fallback_match:
+                    rfi_num = f"Q{fallback_match.group(1).upper()}"
+                    if rfi_num in existing_qnums:
+                        continue
+                        
+                    desc_text = txt.replace(fallback_match.group(0), '').strip(' :.-')
+                    page_rfis.append({
+                        'rfiNumber': rfi_num,
+                        'refDrawing': original_filename,
+                        'description': desc_text,
+                        'response': '',
+                        'status': 'OPEN',
+                        'remarks': '',
+                        'skNumber': sk_number,
+                        '_rect': a2['rect']
+                    })
+                    existing_qnums.add(rfi_num)
                             '_rect': a2['rect']
                         })
             # End of fallback handling
@@ -286,6 +322,12 @@ def extract_rfi(pdf_path, original_filename):
 
             for rfi in page_rfis:
                 desc_text = str(rfi.get('description', ''))
+                
+                # Only drop if the description exactly equals "void", "closed", etc., or starts with "void "
+                desc_lower = desc_text.strip().lower()
+                if desc_lower in ['void', 'closed', 'deleted', 'cancelled'] or desc_lower.startswith('void '):
+                    continue
+
                 resp_match = re.search(r'\b(response|ans|answer)\s*:', desc_text, re.IGNORECASE)
                 if resp_match:
                     start_idx = int(resp_match.start())
@@ -300,15 +342,21 @@ def extract_rfi(pdf_path, original_filename):
                 drect = fitz.Rect(desc_rect)
                 expanded_drect = drect + (-50, -50, 50, 50)
 
+                skip_rfi = False
                 for a in valid_annots:
                     if a['text'] == rfi['description'] or a['text'] == rfi['rfiNumber']:
                         continue
 
                     irect = fitz.Rect(a['rect'])
                     if expanded_drect.intersects(irect):
-                        text_lower = a['text'].lower()
-                        words_set = set(re.findall(r'\b\w+\b', text_lower))
+                        text_lower = a['text'].strip().lower()
+                        
+                        # Check for a specific stamp box that is just "VOID" or "CLOSED"
+                        if text_lower in ['void', 'closed', 'deleted', 'cancelled']:
+                            skip_rfi = True
+                            break
 
+                        words_set = set(re.findall(r'\b\w+\b', text_lower))
                         if any(k in words_set for k in closed_keywords):
                             rfi['status'] = 'CLOSED'
                             if not rfi['response'] and 'confirmed' in words_set: rfi['response'] = 'Confirmed'
@@ -320,23 +368,58 @@ def extract_rfi(pdf_path, original_filename):
                             if len(parts) > 1:
                                 rfi['response'] = parts[-1].strip()
 
-                rfis.append(rfi)
+                if not skip_rfi:
+                    rfis.append(rfi)
 
         doc.close()
 
         # 4. Cleanup and Deduplicate across the whole document
+        desc_owners = {}
+        for r in rfis:
+            rfi_num = r['rfiNumber']
+            desc = r['description'].strip()
+            if desc:
+                if desc not in desc_owners:
+                    desc_owners[desc] = set()
+                desc_owners[desc].add(rfi_num)
+
         unique_rfis = {}
         for r in rfis:
             r.pop('_rect', None)
             rfi_num = r['rfiNumber']
+            desc = r['description'].strip()
+
+            if not desc:
+                score = -20000
+            else:
+                score = len(desc)
+                # Penalize descriptions claimed by multiple different RFI numbers
+                if len(desc_owners.get(desc, set())) > 1:
+                    score -= 10000
 
             if rfi_num not in unique_rfis:
-                unique_rfis[rfi_num] = r
+                unique_rfis[rfi_num] = {'r': r, 'score': score}
             else:
-                if len(r['description']) > len(unique_rfis[rfi_num]['description']):
-                    unique_rfis[rfi_num] = r
+                existing_r = unique_rfis[rfi_num]['r']
+                existing_desc = existing_r['description'].strip().lower()
+                current_desc = desc.lower()
+                
+                # Preserve both if they have completely different valid descriptions (e.g. drafter typo on drawing)
+                if len(current_desc) > 20 and len(existing_desc) > 20:
+                    if current_desc not in existing_desc and existing_desc not in current_desc:
+                        counter = 2
+                        new_rfi_num = f"{rfi_num} ({counter})"
+                        while new_rfi_num in unique_rfis:
+                            counter += 1
+                            new_rfi_num = f"{rfi_num} ({counter})"
+                        r['rfiNumber'] = new_rfi_num
+                        unique_rfis[new_rfi_num] = {'r': r, 'score': score}
+                        continue
 
-        final_rfis = list(unique_rfis.values())
+                if score > unique_rfis[rfi_num]['score']:
+                    unique_rfis[rfi_num] = {'r': r, 'score': score}
+
+        final_rfis = [v['r'] for v in unique_rfis.values()]
         print(json.dumps({"success": True, "rfis": final_rfis}))
 
     except Exception as e:
