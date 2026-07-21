@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { adminListProjects } from '../../services/projectApi';
 import RfiReportPanel from '../../components/RfiReportPanel';
 import { IconSearch, IconFolder, IconBack } from '../../components/Icons';
+import { getRfiReportDownloadUrl } from '../../services/rfiReportApi';
 
 export default function AdminRfiReport() {
     // mode is read directly from the URL: /admin/rfi-report/:projectId/view OR /admin/rfi-report/:projectId/edit
@@ -154,7 +155,7 @@ export default function AdminRfiReport() {
                                     </button>
                                     <button
                                         className="btn btn-ghost btn-sm"
-                                        onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/rfi-report/${project._id || project.id}/download/latest`, '_blank')}
+                                        onClick={() => window.open(getRfiReportDownloadUrl(project._id || project.id, 'latest'), '_blank')}
                                         style={{ flex: '1 1 100%', justifyContent: 'center', marginTop: 4 }}
                                         title="Download Latest RFI Log"
                                     >
