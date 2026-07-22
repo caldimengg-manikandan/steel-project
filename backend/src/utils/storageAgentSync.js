@@ -64,6 +64,31 @@ function createStorageAgentSync(folderPrefix) {
                             return cb(new Error(`Storage Gateway Error: ${err.message}`));
                         }
                     }
+                    // 3. Fallback to GridFS for cloud hosting if Storage Gateway is not enabled
+                    if (!storageGateway.isEnabled()) {
+                        try {
+                            const gridfs = require('./gridfs');
+                            const bucket = gridfs.getBucket();
+                            if (bucket) {
+                                const uploadStream = bucket.openUploadStream(uniqueFilename, {
+                                    contentType: file.mimetype,
+                                    metadata: { originalName: file.originalname }
+                                });
+                                fs.createReadStream(localPath).pipe(uploadStream);
+                                
+                                await new Promise((resolve, reject) => {
+                                    uploadStream.on('finish', () => {
+                                        fileInfo.gridFsFileId = uploadStream.id.toString();
+                                        resolve();
+                                    });
+                                    uploadStream.on('error', reject);
+                                });
+                                console.log(`[StorageSync] Uploaded to GridFS as fallback: ${fileInfo.gridFsFileId}`);
+                            }
+                        } catch (err) {
+                            console.error('[StorageSync] Failed to upload to GridFS:', err);
+                        }
+                    }
 
                     cb(null, fileInfo);
                 });
