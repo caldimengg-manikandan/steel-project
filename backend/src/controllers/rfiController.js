@@ -105,12 +105,10 @@ exports.downloadRfiExcel = async (req, res) => {
         const baseUrl = queryBase || serverOrigin;
         const isExternal = !!queryBase;
 
-        let token = '';
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-            token = req.headers.authorization.split(' ')[1];
-        } else if (req.cookies && req.cookies.sdms_token) {
-            token = req.cookies.sdms_token;
-        }
+        // Generate a tiny viewer token for the Excel links so they don't exceed Excel's 255 character limit,
+        // and so clients can view the PDFs without needing an admin login.
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign({ role: 'viewer' }, process.env.JWT_SECRET, { expiresIn: '30d' });
         
         const rfiStatus = req.query.status; // OPEN or CLOSED
 
