@@ -408,7 +408,13 @@ exports.viewRfiPdf = async (req, res) => {
 
         // 2. Legacy Disk Mode
         if (doc.fileUrl) {
-            const p = path.isAbsolute(doc.fileUrl) ? doc.fileUrl : path.join(__dirname, '../../', doc.fileUrl);
+            // Extract basename to handle cross-OS path differences (e.g. C:\... vs /root/...)
+            const filename = path.basename(doc.fileUrl.replace(/\\/g, '/'));
+            const standardizedPath = path.join(__dirname, '../../uploads/steel-dms-uploads', filename);
+            const originalPath = path.isAbsolute(doc.fileUrl) ? doc.fileUrl : path.join(__dirname, '../../', doc.fileUrl);
+            
+            const p = fs.existsSync(standardizedPath) ? standardizedPath : originalPath;
+
             if (fs.existsSync(p)) {
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
