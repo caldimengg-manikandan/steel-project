@@ -370,7 +370,7 @@ export default function AdminRfi() {
 
                         <div style={{ display: 'flex', gap: 8 }}>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, import.meta.env.VITE_API_URL || '/steel/api')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'))}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -384,7 +384,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download RFI Excel
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, import.meta.env.VITE_API_URL || '/steel/api', 'OPEN')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'OPEN')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -397,7 +397,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download Open RFI
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, import.meta.env.VITE_API_URL || '/steel/api', 'CLOSED')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'CLOSED')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,

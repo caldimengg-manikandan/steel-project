@@ -211,7 +211,7 @@ export default function RfiExtractionPanel({
                 </div>
                 {completedCount > 0 && (
                     <a
-                        href={getRfiExcelDownloadUrl(projectId, undefined, import.meta.env.VITE_API_URL || '/steel/api')}
+                        href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'))}
                         download
                         className="btn btn-secondary"
                         style={{ display: 'flex', gap: 6, alignItems: 'center' }}
