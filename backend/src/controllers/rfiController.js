@@ -33,6 +33,7 @@ exports.uploadRfiDrawing = async (req, res) => {
             oneDriveFileId: file.oneDriveFileId || '', 
             oneDriveUrl: file.webUrl || '', 
             storageGatewayPath: file.storageGatewayPath || '',
+            gridFsFileId: file.gridFsFileId || null,
             status: 'queued',
             sequences: sequences || [],
         });

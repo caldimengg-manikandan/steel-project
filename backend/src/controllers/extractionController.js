@@ -105,6 +105,7 @@ exports.uploadAndExtract = async (req, res) => {
         oneDriveFileId: file.oneDriveFileId || '',
         oneDriveUrl: file.webUrl || '',
         storageGatewayPath: file.storageGatewayPath || '', // Windows Server Storage path
+        gridFsFileId: file.gridFsFileId || null,
         folderName,
         fileSize: file.size,
         uploadedBy,
