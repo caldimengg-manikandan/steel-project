@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const storageGateway = require('../utils/storageGateway');
 
 const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
@@ -90,6 +91,18 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     const today = new Date();
     const updatedOn = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
+    let storageRoot = '';
+    if (storageGateway.isEnabled()) {
+        try {
+            const rootInfo = await storageGateway.validateRoot();
+            if (rootInfo.ok && rootInfo.storageRoot) {
+                storageRoot = rootInfo.storageRoot;
+            }
+        } catch (e) {
+            console.error('[RfiExcel] Failed to get storage root', e);
+        }
+    }
+
     // ── Flatten all RFIs & Check for Client RFI Numbers ───────
     let allRfis = [];
     rfiExtractions.forEach(doc => {
@@ -105,6 +118,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 skNumber: computedSk,
                 sentOn: rfi.sentOn || doc.sentOn || '',
                 fileUrl: doc.fileUrl,
+                storageGatewayPath: doc.storageGatewayPath,
                 projectId: doc.projectId,
                 extractionId: doc._id
             });
@@ -284,7 +298,12 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         const resolvedBase = (baseUrl || '').toString().replace(/\/$/, '');
         
         let href = '';
-        if (item.extractionId && item.projectId) {
+        if (item.storageGatewayPath && storageRoot) {
+            let baseWinPath = storageRoot.replace(/\//g, '\\');
+            if (!baseWinPath.endsWith('\\')) baseWinPath += '\\';
+            const relativeWinPath = item.storageGatewayPath.replace(/\//g, '\\');
+            href = baseWinPath + relativeWinPath;
+        } else if (item.extractionId && item.projectId) {
             href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view?token=${token}`;
         }
 
