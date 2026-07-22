@@ -18,8 +18,8 @@ function createStorageAgentSync(folderPrefix) {
     return {
         _handleFile: async function (req, file, cb) {
             try {
-                // 1. Save locally first
-                const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
+                // 1. Save locally first (make it persistent in case storage gateway is disabled)
+                const tempDir = path.join(__dirname, '../../uploads', 'steel-dms-uploads');
                 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
                 const uniqueFilename = `${crypto.randomUUID()}${path.extname(file.originalname)}`;

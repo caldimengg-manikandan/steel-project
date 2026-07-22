@@ -105,7 +105,13 @@ exports.downloadRfiExcel = async (req, res) => {
         const baseUrl = queryBase || serverOrigin;
         const isExternal = !!queryBase;
 
-        const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : '';
+        let token = '';
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            token = req.headers.authorization.split(' ')[1];
+        } else if (req.cookies && req.cookies.sdms_token) {
+            token = req.cookies.sdms_token;
+        }
+        
         const rfiStatus = req.query.status; // OPEN or CLOSED
 
         const project = await Project.findById(projectId).lean();
@@ -401,10 +407,13 @@ exports.viewRfiPdf = async (req, res) => {
         }
 
         // 2. Legacy Disk Mode
-        if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
-            return fs.createReadStream(doc.fileUrl).pipe(res);
+        if (doc.fileUrl) {
+            const p = path.isAbsolute(doc.fileUrl) ? doc.fileUrl : path.join(__dirname, '../../', doc.fileUrl);
+            if (fs.existsSync(p)) {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                return fs.createReadStream(p).pipe(res);
+            }
         }
 
         return res.status(404).json({ error: 'Physical PDF file not found.' });

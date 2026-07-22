@@ -22,9 +22,9 @@ const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'
  * the account still exists and is active.
  */
 async function verifyToken(req, res, next) {
-    // 1. Extract token (Support Header only to prevent leakage)
+    // 1. Extract token (Support Header, Cookie, or Query)
     const header = req.headers['authorization'] || '';
-    let token = req.cookies?.sdms_token || '';
+    let token = req.cookies?.sdms_token || req.query.token || '';
 
     if (!token && header.startsWith('Bearer ')) {
         token = header.slice(7);
