@@ -67,6 +67,7 @@ router.get('/', requirePermission('viewer'), ctrl.listExtractions);
 router.get('/excel/download', requirePermission('viewer'), ctrl.downloadExcel);
 
 // View PDF stream (Requires Viewer)
+router.get('/:id/view.pdf', requirePermission('viewer'), ctrl.viewPdf);
 router.get('/:id/view', requirePermission('viewer'), ctrl.viewPdf);
 
 // Get a single extraction (Requires Viewer)

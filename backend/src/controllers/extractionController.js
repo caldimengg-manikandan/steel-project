@@ -102,7 +102,7 @@ exports.uploadAndExtract = async (req, res) => {
         createdByAdminId: adminId,
         originalFileName: file.originalname,
         fileUrl: file.path || '', // BRIDGE PATH
-        oneDriveFileId: file.oneDriveFileId || file.id,
+        oneDriveFileId: file.oneDriveFileId || '',
         oneDriveUrl: file.webUrl || '',
         storageGatewayPath: file.storageGatewayPath || '', // Windows Server Storage path
         folderName,
@@ -310,7 +310,7 @@ exports.viewPdf = async (req, res) => {
     }
 
     // 1. OneDrive Mode
-    if (doc.oneDriveFileId) {
+    if (doc.oneDriveFileId && !doc.oneDriveFileId.toLowerCase().endsWith('.pdf')) {
         try {
             const rclone = require('../utils/rcloneOneDrive');
 

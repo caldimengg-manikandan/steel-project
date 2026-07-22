@@ -304,7 +304,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
             const relativeWinPath = item.storageGatewayPath.replace(/\//g, '\\');
             href = baseWinPath + relativeWinPath;
         } else if (item.extractionId && item.projectId) {
-            href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view?token=${token}`;
+            href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view.pdf?token=${token}`;
         }
 
         if (href) {

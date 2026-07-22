@@ -98,7 +98,7 @@ export async function deleteExtraction(
 
 // ── PDF view URL (GridFS stream) ───────────────────────────
 export function getDrawingViewUrl(projectId: string, extractionId: string): string {
-    return `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/view`;
+    return `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/view.pdf`;
 }
 
 // ── Excel download URL ────────────────────────────────────

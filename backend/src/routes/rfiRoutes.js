@@ -69,7 +69,8 @@ router.patch('/:id/status/:rfiIndex', requirePermission('editor'), updateRfiStat
 // Upload attachment for an RFI response (editor + admin)
 router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), uploadResponse.single('file'), uploadRfiResponseAttachment);
 
-// Stream PDF for viewing
+// Stream PDF for viewing (supports both /view and /view.pdf for compatibility with existing Excel files)
+router.get('/:id/view.pdf', viewRfiPdf);
 router.get('/:id/view', viewRfiPdf);
 
 // Delete single Extraction (editor + admin)

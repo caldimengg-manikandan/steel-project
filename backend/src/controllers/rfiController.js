@@ -30,7 +30,7 @@ exports.uploadRfiDrawing = async (req, res) => {
             originalFileName: file.originalname,
             folderName: localSavePath || '',
             fileUrl: file.path || '', // BRIDGE PATH
-            oneDriveFileId: file.oneDriveFileId || file.id, 
+            oneDriveFileId: file.oneDriveFileId || '', 
             oneDriveUrl: file.webUrl || '', 
             storageGatewayPath: file.storageGatewayPath || '',
             status: 'queued',
@@ -347,13 +347,19 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
 exports.viewRfiPdf = async (req, res) => {
     const { projectId, id } = req.params;
     const adminId = req.principal.adminId;
+    console.log(`[DEBUG viewRfiPdf] Start. projectId=${projectId}, id=${id}, adminId=${adminId}`);
 
     try {
         const doc = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
-        if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
+        if (!doc) {
+            console.log('[DEBUG viewRfiPdf] Document not found in DB!');
+            return res.status(404).json({ error: 'RFI extraction not found.' });
+        }
+        console.log(`[DEBUG viewRfiPdf] Found doc. originalFileName=${doc.originalFileName}, fileUrl=${doc.fileUrl}`);
 
         // 0. Storage Gateway Mode
         if (doc.storageGatewayPath) {
+            console.log(`[DEBUG viewRfiPdf] Trying Storage Gateway. path=${doc.storageGatewayPath}`);
             try {
                 const storageGateway = require('../utils/storageGateway');
                 if (storageGateway.isEnabled()) {
@@ -372,7 +378,8 @@ exports.viewRfiPdf = async (req, res) => {
         }
 
         // 1. OneDrive Mode
-        if (doc.oneDriveFileId) {
+        if (doc.oneDriveFileId && !doc.oneDriveFileId.toLowerCase().endsWith('.pdf')) {
+            console.log(`[DEBUG viewRfiPdf] Trying OneDrive.`);
             try {
                 const rclone = require('../utils/rcloneOneDrive');
                 
@@ -389,6 +396,7 @@ exports.viewRfiPdf = async (req, res) => {
 
         // 2. GridFS Mode (Compatibility)
         if (doc.gridFsFileId) {
+            console.log(`[DEBUG viewRfiPdf] Trying GridFS.`);
             try {
                 const { getBucket } = require('../utils/gridfs');
                 const bucket = getBucket();
@@ -406,22 +414,27 @@ exports.viewRfiPdf = async (req, res) => {
             }
         }
 
-        // 2. Legacy Disk Mode
+        // 3. Legacy Disk Mode
         if (doc.fileUrl) {
-            // Extract basename to handle cross-OS path differences (e.g. C:\... vs /root/...)
+            console.log(`[DEBUG viewRfiPdf] Trying Legacy Disk Mode.`);
             const filename = path.basename(doc.fileUrl.replace(/\\/g, '/'));
             const standardizedPath = path.join(__dirname, '../../uploads/steel-dms-uploads', filename);
             const originalPath = path.isAbsolute(doc.fileUrl) ? doc.fileUrl : path.join(__dirname, '../../', doc.fileUrl);
             
             const p = fs.existsSync(standardizedPath) ? standardizedPath : originalPath;
+            console.log(`[DEBUG viewRfiPdf] Checking path p=${p}`);
 
             if (fs.existsSync(p)) {
+                console.log(`[DEBUG viewRfiPdf] File exists! Streaming...`);
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
                 return fs.createReadStream(p).pipe(res);
+            } else {
+                console.log(`[DEBUG viewRfiPdf] File DOES NOT EXIST at ${p}`);
             }
         }
 
+        console.log(`[DEBUG viewRfiPdf] Reached end of function without streaming. Returning 404.`);
         return res.status(404).json({ error: 'Physical PDF file not found.' });
     } catch (err) {
         console.error('[RfiController] viewPdf failed:', err);

@@ -132,5 +132,5 @@ export const uploadRfiResponseAttachment = async (
 };
 
 export const getRfiViewPdfUrl = (projectId: string, extractionId: string): string => {
-    return `${BASE}/rfis/${String(projectId)}/${String(extractionId)}/view`;
+    return `${BASE}/rfis/${String(projectId)}/${String(extractionId)}/view.pdf`;
 };
