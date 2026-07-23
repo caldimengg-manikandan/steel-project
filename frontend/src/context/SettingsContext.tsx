@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { setGlobalDateFormat } from '../utils/dateUtils';
 
 interface Settings {
     timezone: string;
     dateFormat: string;
     emailNotifications: boolean;
-    weeklyReports: boolean;
+    weeklyProgresss: boolean;
+    weeklyProgressDay?: number;
+    weeklyProgressTime?: string;
     darkMode: boolean;
     twoFactor: boolean;
     rfiAutoNumber: boolean;
@@ -19,7 +22,9 @@ const DEFAULT_SETTINGS: Settings = {
     timezone: 'Asia/Kolkata',
     dateFormat: 'DD/MM/YYYY',
     emailNotifications: true,
-    weeklyReports: false,
+    weeklyProgresss: false,
+    weeklyProgressDay: 4,
+    weeklyProgressTime: '11:45',
     darkMode: false,
     twoFactor: false,
     rfiAutoNumber: true,
@@ -46,12 +51,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const fetchSettings = async () => {
         try {
-            const stored = sessionStorage.getItem('sdms_user');
-            const token = stored ? JSON.parse(stored).token : '';
-            if (!token) return;
-
             const res = await fetch('/steel/api/settings', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -75,6 +76,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     useEffect(() => {
         localStorage.setItem('app_settings', JSON.stringify(settings));
         
+        // Sync global date format for all modules
+        setGlobalDateFormat(settings.dateFormat);
+        
         if (settings.darkMode) {
             document.documentElement.setAttribute('data-theme', 'dark');
         } else {
@@ -87,17 +91,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Sync to backend
         try {
-            const stored = sessionStorage.getItem('sdms_user');
-            const token = stored ? JSON.parse(stored).token : '';
-            if (!token) return;
-
             await fetch('/steel/api/settings', {
                 method: 'PATCH',
                 headers: { 
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(newSettings)
+                body: JSON.stringify(newSettings),
+                credentials: 'include'
             });
         } catch (err) {
             console.error('Failed to sync settings to backend:', err);

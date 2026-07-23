@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userListProjects } from '../../services/projectApi';
+import { formatDate } from '../../utils/dateUtils';
 import type { Project, ProjectPermission } from '../../types';
 import { IconOpen } from '../../components/Icons';
 
@@ -156,7 +157,7 @@ export default function UserProjects() {
                                         </td>
                                         <td className="font-mono" style={{ fontWeight: 600 }}>{p.drawingCount}</td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {new Date(p.updatedAt).toLocaleDateString()}
+                                            {formatDate(p.updatedAt)}
                                         </td>
                                         <td>
                                             <button

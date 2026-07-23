@@ -11,21 +11,6 @@ import type { DrawingExtraction } from '../types';
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-// ── Auth token helper ─────────────────────────────────────
-function getToken(): string {
-    try {
-        const u = sessionStorage.getItem('sdms_user');
-        return u ? JSON.parse(u).token ?? '' : '';
-    } catch {
-        return '';
-    }
-}
-
-function authHeaders(): HeadersInit {
-    const t = getToken();
-    return t ? { Authorization: `Bearer ${t}` } : {};
-}
-
 // ── Response handler ─────────────────────────────────────
 async function handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {
@@ -44,11 +29,6 @@ export async function uploadDrawing(
     sequences?: string[],
     purpose?: string
 ): Promise<{ message: string; extractionIds: string[]; status: string }> {
-    const token = getToken();
-    if (!token) {
-        throw new Error('No security token found. Please logout and login again using the "Real Portal Credentials" shown on the login page.');
-    }
-
     const form = new FormData();
     files.forEach(file => {
         form.append('drawings', file);
@@ -74,7 +54,7 @@ export async function uploadDrawing(
 
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/upload`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: form,
     });
     return handleResponse(res);
@@ -86,15 +66,8 @@ export async function listExtractions(projectId: string): Promise<{
     hasExcel: boolean;
     excelDownloadUrl: string | null;
 }> {
-    const token = getToken();
-    if (!token) {
-        throw new Error('No security token found.');
-    }
-
     const res = await fetch(`${BASE}/extractions/${String(projectId)}`, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        },
+        credentials: 'include'
     });
     return handleResponse(res);
 }
@@ -106,7 +79,7 @@ export async function reprocessExtraction(
 ): Promise<{ message: string; status: string }> {
     const res = await fetch(
         `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/reprocess`,
-        { method: 'POST', headers: authHeaders() }
+        { method: 'POST', credentials: 'include' }
     );
     return handleResponse(res);
 }
@@ -118,23 +91,19 @@ export async function deleteExtraction(
 ): Promise<{ message: string }> {
     const res = await fetch(
         `${BASE}/extractions/${String(projectId)}/${String(extractionId)}`,
-        { method: 'DELETE', headers: authHeaders() }
+        { method: 'DELETE', credentials: 'include' }
     );
     return handleResponse(res);
 }
 
 // ── PDF view URL (GridFS stream) ───────────────────────────
 export function getDrawingViewUrl(projectId: string, extractionId: string): string {
-    const t = getToken();
-    const q = t ? `?token=${encodeURIComponent(t)}` : '';
-    return `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/view${q}`;
+    return `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/view.pdf`;
 }
 
 // ── Excel download URL ────────────────────────────────────
 export function getExcelDownloadUrl(projectId: string, type?: 'transmittal' | 'log'): string {
-    const t = getToken();
     const params = [];
-    if (t) params.push(`token=${encodeURIComponent(t)}`);
     if (type) params.push(`type=${type}`);
     const q = params.length > 0 ? '?' + params.join('&') : '';
     return `${BASE}/extractions/${String(projectId)}/excel/download${q}`;
@@ -154,11 +123,10 @@ export async function checkDuplicates(
     duplicateCount: number;
     duplicates: Array<{ filename: string; sheetNumber: string; revision: string }>;
 }> {
-    const token = getToken();
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/check-duplicates`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ filenames }),
@@ -169,10 +137,9 @@ export async function checkDuplicates(
 export async function reserveTransmittalNumber(
     projectId: string
 ): Promise<{ transmittalNumber: number }> {
-    const token = getToken();
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/reserve-transmittal`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include'
     });
     return handleResponse(res);
 }

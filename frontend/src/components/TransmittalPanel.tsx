@@ -7,6 +7,7 @@ import {
     getDrawingLogExcelUrl
 } from '../services/transmittalApi';
 import { useMessage } from '../context/MessageContext';
+import { formatDate } from '../utils/dateUtils';
 
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
     const { showMessage, showConfirm } = useMessage();
@@ -80,7 +81,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                     {sequences && sequences.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 8, flexWrap: 'wrap', background: 'var(--color-background)', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border-light)' }}>
                             <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Filter:</span>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                                 <input
                                     type="checkbox"
@@ -159,7 +160,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                     <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
                                                 )}
                                             </td>
-                                            <td className="text-muted">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                            <td className="text-muted">{formatDate(t.createdAt)}</td>
                                             <td><span className="badge badge-success">{t.newCount}</span></td>
                                             <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                             <td>
@@ -175,37 +176,37 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                     );
                                 }
                                 return (
-                                <tr key={t._id}>
-                                    <td style={{ fontWeight: 600 }}>
-                                        <a href={getTransmittalExcelUrl(projectId, t._id)} download style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Click to download Excel">
-                                            TR-{String(t.transmittalNumber).padStart(3, '0')}
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        </a>
-                                    </td>
-                                    <td>
-                                        {t.sequences && t.sequences.length > 0 ? (
-                                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                                {t.sequences.map((seq: string, idx: number) => (
-                                                    <span key={idx} style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, fontWeight: 600, color: '#475569', border: '1px solid #e2e8f0' }}>
-                                                        {seq}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
-                                        )}
-                                    </td>
-                                    <td className="text-muted">{new Date(t.createdAt).toLocaleDateString()}</td>
-                                    <td><span className="badge badge-success">{t.newCount}</span></td>
-                                    <td><span className="badge badge-warning">{t.revisedCount}</span></td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm">
-                                                📥 Download
+                                    <tr key={t._id}>
+                                        <td style={{ fontWeight: 600 }}>
+                                            <a href={getTransmittalExcelUrl(projectId, t._id)} download style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Click to download Excel">
+                                                TR-{String(t.transmittalNumber).padStart(3, '0')}
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                                             </a>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td>
+                                            {t.sequences && t.sequences.length > 0 ? (
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                    {t.sequences.map((seq: string, idx: number) => (
+                                                        <span key={idx} style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, fontWeight: 600, color: '#475569', border: '1px solid #e2e8f0' }}>
+                                                            {seq}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
+                                            )}
+                                        </td>
+                                        <td className="text-muted">{formatDate(t.createdAt)}</td>
+                                        <td><span className="badge badge-success">{t.newCount}</span></td>
+                                        <td><span className="badge badge-warning">{t.revisedCount}</span></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm">
+                                                    📥 Download
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 );
                             })}
                         </tbody>

@@ -11,6 +11,7 @@ import {
 } from '../../services/rfiApi';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
+import { formatDate } from '../../utils/dateUtils';
 
 // ── Inline SVG icons ──────────────────────────────────────
 const IconQuestion = () => (
@@ -69,7 +70,6 @@ export default function UserRfi() {
     const [dragOver, setDragOver] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [folderUrl, setFolderUrl] = useState('');
 
     // response editing states
     const [responseEdits, setResponseEdits] = useState<Record<string, string>>({});
@@ -347,25 +347,10 @@ export default function UserRfi() {
                 </div>
                 {completedCount > 0 && projectId && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                                Folder URL (optional)
-                            </label>
-                            <input
-                                type="text"
-                                value={folderUrl}
-                                onChange={e => setFolderUrl(e.target.value)}
-                                placeholder="https://drive.google.com/drive/folders/..."
-                                style={{
-                                    fontSize: 12, padding: '6px 10px', borderRadius: 7,
-                                    border: '1px solid var(--color-border)', background: 'var(--color-background)',
-                                    color: 'var(--color-text-primary)', width: 310, outline: 'none', fontFamily: 'inherit',
-                                }}
-                            />
-                        </div>
+
                         <div style={{ display: 'flex', gap: 8 }}>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl)}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'))}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -379,7 +364,7 @@ export default function UserRfi() {
                                 <IconDownload /> Download RFI Excel
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'OPEN')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'OPEN')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -392,7 +377,7 @@ export default function UserRfi() {
                                 <IconDownload /> Download Open RFI
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'CLOSED')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'CLOSED')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -689,7 +674,7 @@ export default function UserRfi() {
                                                                     <div style={{ fontSize: 11, fontWeight: 700, color: rfi.status === 'CLOSED' ? '#16a34a' : '#dc2626' }}>{rfi.status || 'OPEN'}</div>
                                                                     <div style={{ fontSize: 12, color: '#64748b' }}>{parent.originalFileName.split('_').pop()}</div>
                                                                     <span style={{ fontSize: 12 }}>{parent.uploadedBy}</span>
-                                                                    <span style={{ fontSize: 12 }}>{new Date(parent.createdAt).toLocaleDateString()}</span>
+                                                                    <span style={{ fontSize: 12 }}>{formatDate(parent.createdAt)}</span>
                                                                 </div>
                                                                 {isExp && (
                                                                     <div style={{ background: '#f8fafc', padding: 20 }}>
@@ -755,7 +740,7 @@ export default function UserRfi() {
                                                         <StatusChip status={ext.status} />
                                                         <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{ext.rfis?.length || 0}</span>
                                                         <span style={{ fontSize: 12 }}>{ext.uploadedBy}</span>
-                                                        <span style={{ fontSize: 12 }}>{new Date(ext.createdAt).toLocaleDateString()}</span>
+                                                        <span style={{ fontSize: 12 }}>{formatDate(ext.createdAt)}</span>
                                                         {canEdit && (
                                                             <button onClick={(e) => handleDelete(ext._id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, opacity: 0.7 }} title="Delete"><IconDelete /></button>
                                                         )}

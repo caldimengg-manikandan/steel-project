@@ -1,16 +1,8 @@
-import type { AuthUser, Project, ProjectStatus } from '../types';
+import type { Project, ProjectStatus } from '../types';
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-function authHeaders(): Record<string, string> {
-    const stored = sessionStorage.getItem('sdms_user');
-    if (!stored) return {};
-    const user: AuthUser = JSON.parse(stored);
-    return {
-        'Authorization': `Bearer ${user.token || ''}`,
-        'Content-Type': 'application/json',
-    };
-}
+
 
 async function handleResponse(res: Response) {
     const text = await res.text();
@@ -37,7 +29,8 @@ export async function adminListProjects(status?: string, search?: string): Promi
     if (search) params.append('search', search);
 
     const res = await fetch(`${BASE}/admin/projects?${params.toString()}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -67,7 +60,8 @@ export async function adminCreateProject(data: {
 }): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects`, {
         method: 'POST',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -82,7 +76,8 @@ export async function adminAssignUser(projectId: string, data: {
 }): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments`, {
         method: 'POST',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -93,7 +88,8 @@ export async function adminAssignUser(projectId: string, data: {
  */
 export async function userListProjects(): Promise<{ projects: Project[]; recentActivity?: any[] }> {
     const res = await fetch(`${BASE}/user/projects`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -103,12 +99,14 @@ export async function userListProjects(): Promise<{ projects: Project[]; recentA
  */
 export async function getProjectById(id: string): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects/${String(id)}`, {
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     // Fallback try user route if admin fails (or just simplify backend)
     if (!res.ok && res.status === 403) {
         const resUser = await fetch(`${BASE}/user/projects/${String(id)}`, {
-            headers: authHeaders(),
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
         });
         return handleResponse(resUser);
     }
@@ -121,7 +119,8 @@ export async function getProjectById(id: string): Promise<{ project: Project }> 
 export async function adminRemoveUserAssignment(projectId: string, userId: string): Promise<{ success: boolean }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments/${String(userId)}`, {
         method: 'DELETE',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -132,7 +131,8 @@ export async function adminRemoveUserAssignment(projectId: string, userId: strin
 export async function adminDeleteProject(projectId: string): Promise<{ message: string }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'DELETE',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 }
@@ -143,7 +143,8 @@ export async function adminDeleteProject(projectId: string): Promise<{ message: 
 export async function adminUpdateProject(projectId: string, data: Partial<CreateProjectForm>): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -162,7 +163,8 @@ export async function updateProjectSequences(projectId: string, sequences: Array
     // Try Admin endpoint first
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
-        headers: authHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sequences }),
     });
 
@@ -170,7 +172,8 @@ export async function updateProjectSequences(projectId: string, sequences: Array
         // Try User endpoint specifically for sequences
         const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
             method: 'PATCH',
-            headers: authHeaders(),
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sequences }),
         });
         return handleResponse(resUser);
@@ -204,18 +207,12 @@ interface CreateProjectForm {
  * Upload COR Excel (Admin)
  */
 export async function adminUploadCOR(projectId: string, file: File): Promise<{ message: string }> {
-    const stored = sessionStorage.getItem('sdms_user');
-    const token = stored ? JSON.parse(stored).token : '';
-
     const formData = new FormData();
     formData.append('file', file);
 
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/cor`, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-            // Note: browser sets boundary if Content-Type is NOT set manually for FormData
-        },
+        credentials: 'include',
         body: formData
     });
     return handleResponse(res);
@@ -226,11 +223,8 @@ export async function adminUploadCOR(projectId: string, file: File): Promise<{ m
  * Triggers a browser download using a temporary anchor element.
  */
 export async function downloadProjectStatusExcel(): Promise<void> {
-    const stored = sessionStorage.getItem('sdms_user');
-    const token = stored ? JSON.parse(stored).token : '';
-
     const res = await fetch(`${BASE}/admin/projects/status/excel`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
     });
 
     if (!res.ok) {

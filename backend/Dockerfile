@@ -24,7 +24,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
-COPY requirements.txt ./
+COPY AiExtraction/requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy backend source code

@@ -34,10 +34,10 @@ async function scopeUserToAdmin(req, res, next) {
         return res.status(400).json({ error: 'Invalid userId.' });
     }
 
-    // GLOBAL ADMIN VISIBILITY: Admins can see any user.
     const query = { _id: userId };
-    // If we wanted to keep isolation, we'd add: if (req.principal.role !== 'superadmin') query.adminId = adminId;
-    // but the user wants ALL admins to see EVERYTHING.
+    if (req.principal.role !== 'superadmin') {
+        query.adminId = adminId;
+    }
     const user = await User.findOne(query).select('-password_hash');
     if (!user) {
         return res.status(404).json({ error: 'User not found.' });
@@ -67,6 +67,14 @@ async function scopeProjectToAdmin(req, res, next) {
         project = await Project.findOne({ _id: projectId });
     }
 
+<<<<<<< HEAD
+=======
+    const query = { _id: projectId };
+    if (req.principal.role !== 'superadmin') {
+        query.createdByAdminId = adminId;
+    }
+    const project = await Project.findOne(query);
+>>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
     if (!project) {
         // Fallback: Check if it's an external project
         const externalResult = await getExternalProjects();
@@ -111,8 +119,11 @@ async function validateCrossAdminAssignment(req, res, next) {
         return res.status(400).json({ error: 'Invalid userId format.' });
     }
 
-    // GLOBAL ADMIN VISIBILITY: Admins can assign any user to any project.
-    const user = await User.findOne({ _id: userId }).select('-password_hash');
+    const query = { _id: userId };
+    if (req.principal.role !== 'superadmin') {
+        query.adminId = adminId;
+    }
+    const user = await User.findOne(query).select('-password_hash');
     if (!user) {
         return res.status(403).json({
             error: 'Specified user does not exist.',
@@ -202,6 +213,7 @@ async function scopeProjectAccess(req, res, next) {
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'pm', 'tl'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
+<<<<<<< HEAD
     let project = null;
     if (mongoose.Types.ObjectId.isValid(projectId)) {
         if (isFullAccess) {
@@ -210,6 +222,17 @@ async function scopeProjectAccess(req, res, next) {
         } else {
             project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
         }
+=======
+    let project;
+    if (isFullAccess) {
+        const query = { _id: projectId };
+        if (role !== 'superadmin') {
+             query.createdByAdminId = adminId;
+        }
+        project = await Project.findOne(query);
+    } else {
+        project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
+>>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
     }
 
     if (!project) {

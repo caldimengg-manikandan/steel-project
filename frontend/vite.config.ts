@@ -12,6 +12,8 @@ export default defineConfig(({ command }) => ({
         target: 'http://localhost:5000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/steel\/api/, '/api'),
+        timeout: 1800000,
+        proxyTimeout: 1800000,
       },
       '/steel/uploads': {
         target: 'http://localhost:5000',
@@ -21,6 +23,8 @@ export default defineConfig(({ command }) => ({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        timeout: 1800000,
+        proxyTimeout: 1800000,
       },
     },
   },
@@ -30,6 +34,8 @@ export default defineConfig(({ command }) => ({
         target: 'http://localhost:5000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/steel\/api/, '/api'),
+        timeout: 1800000,
+        proxyTimeout: 1800000,
       },
       '/steel/uploads': {
         target: 'http://localhost:5000',
@@ -39,6 +45,8 @@ export default defineConfig(({ command }) => ({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        timeout: 1800000,
+        proxyTimeout: 1800000,
       },
     },
   },

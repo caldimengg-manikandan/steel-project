@@ -10,8 +10,8 @@ const fs = require('fs');
 const RCLONE_REMOTE = 'onedrive:';
 const ONEDRIVE_FOLDER = process.env.ONEDRIVE_FOLDER_PATH || 'SteelDMS_Uploads';
 
-// Use local rclone.exe if present in the backend folder, otherwise fallback to system PATH
-const RCLONE_BIN = fs.existsSync(path.join(process.cwd(), 'rclone.exe')) 
+// Use local rclone.exe if present in the backend folder and on Windows, otherwise fallback to system PATH
+const RCLONE_BIN = (process.platform === 'win32' && fs.existsSync(path.join(process.cwd(), 'rclone.exe'))) 
     ? `"${path.join(process.cwd(), 'rclone.exe')}"` 
     : 'rclone';
 

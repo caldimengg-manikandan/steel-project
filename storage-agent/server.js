@@ -114,14 +114,13 @@ function sanitizePath(userPath) {
         .replace(/\0/g, '');        // strip null bytes
 
     const resolved = path.resolve(STORAGE_ROOT, cleaned);
-    const normalizedRoot = path.normalize(STORAGE_ROOT);
-    const normalizedResolved = path.normalize(resolved);
+    const rel = path.relative(STORAGE_ROOT, resolved);
 
-    if (!normalizedResolved.startsWith(normalizedRoot)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error('Access denied: path escapes storage root.');
     }
 
-    return normalizedResolved;
+    return path.normalize(resolved);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -238,7 +237,7 @@ function apiKeyAuth(req, res, next) {
 
 const limiter = rateLimit({
     windowMs: 60 * 1000,   // 1 minute
-    max: 100,               // 100 requests per minute
+    max: 1000000,           // 1,000,000 requests per minute
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Try again later.' },
@@ -544,6 +543,12 @@ app.post('/upload', readOnlyGuard, upload.array('files'), async (req, res) => {
         const results = [];
 
         for (const file of req.files) {
+            // Sanitize originalname to prevent traversal
+            file.originalname = file.originalname
+                .replace(/\\/g, '/')       // unify separators
+                .replace(/^\/+/, '')        // strip leading /
+                .replace(/\0/g, '');        // strip null bytes
+
             // Block dangerous file types
             if (isBlockedExtension(file.originalname)) {
                 results.push({
@@ -557,8 +562,8 @@ app.post('/upload', readOnlyGuard, upload.array('files'), async (req, res) => {
             const filePath = path.join(dirPath, file.originalname);
 
             // Double-check path doesn't escape root
-            const normalizedRoot = path.normalize(STORAGE_ROOT);
-            if (!path.normalize(filePath).startsWith(normalizedRoot)) {
+            const rel = path.relative(STORAGE_ROOT, filePath);
+            if (rel.startsWith('..') || path.isAbsolute(rel)) {
                 results.push({
                     name: file.originalname,
                     status: 'blocked',
@@ -621,23 +626,29 @@ app.delete('/delete', readOnlyGuard, async (req, res) => {
         }
 
         const filePath = sanitizePath(req.query.path);
-        const stat = await fsPromises.stat(filePath);
+        const normalizedRoot = path.normalize(STORAGE_ROOT);
 
-        if (!stat.isFile()) {
-            return res.status(400).json({ error: 'Path is not a file. Directory deletion is not allowed.' });
+        if (filePath === normalizedRoot) {
+            return res.status(400).json({ error: 'Cannot delete the storage root directory.' });
         }
 
-        await fsPromises.unlink(filePath);
+        const stat = await fsPromises.stat(filePath);
 
-        auditLog('DELETE', req.query.path, req.ip);
-
-        res.json({ message: 'File deleted.', path: req.query.path });
+        if (stat.isDirectory()) {
+            await fsPromises.rm(filePath, { recursive: true, force: true });
+            auditLog('DELETE_DIR', req.query.path, req.ip);
+            res.json({ message: 'Directory deleted.', path: req.query.path });
+        } else {
+            await fsPromises.unlink(filePath);
+            auditLog('DELETE', req.query.path, req.ip);
+            res.json({ message: 'File deleted.', path: req.query.path });
+        }
     } catch (err) {
         if (err.message.includes('Access denied')) {
             return res.status(403).json({ error: err.message });
         }
         if (err.code === 'ENOENT') {
-            return res.status(404).json({ error: 'File not found.' });
+            return res.status(404).json({ error: 'File/Directory not found.' });
         }
         console.error('[Delete] Error:', err.message);
         res.status(500).json({ error: 'Delete failed.' });

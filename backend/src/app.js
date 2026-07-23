@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 
 // Models (for auto-seeding)
@@ -31,6 +32,7 @@ const rfiRoutes = require('./routes/rfiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
 
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
@@ -38,8 +40,8 @@ const { errorHandler } = require('./middleware/errorHandler');
 const allowedOrigins = [
     'https://steel-dms-frontend.onrender.com',
     'https://steel-project-iota.vercel.app',
-    'http://localhost:5173',
     'http://localhost:5174',
+    'http://localhost:5173',
     'http://localhost:3000'
 ];
 
@@ -70,8 +72,7 @@ app.use(cors({
             if (o === origin) return true;
             // Match without trailing slash
             if (o.replace(/\/$/, '') === origin.replace(/\/$/, '')) return true;
-            // Match vercel subdomains
-            if (origin.endsWith('.vercel.app') && o === 'https://steel-project-iota.vercel.app') return true;
+            // Strict match required
             return false;
         });
 
@@ -91,9 +92,10 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
+app.use(cookieParser());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '1GB' }));
-app.use(express.urlencoded({ extended: true, limit: '1GB' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Debugging log (Remove after fixing)
 app.use((req, res, next) => {
@@ -118,7 +120,10 @@ app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/files', fileGatewayRoutes);
-
+app.use('/api/admin/activity-logs', activityLogRoutes);
+app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
+app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));
+app.use('/api/error-log', require('./routes/errorLogRoutes'));
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
@@ -135,39 +140,7 @@ app.use((_req, res) => {
 // ── Global error handler ───────────────────────────────────
 app.use(errorHandler);
 
-// ── Auto-seeding logic ──────────────────────────────────────
-async function ensureDefaultAdmin() {
-    try {
-        let admin = await Admin.findOne({ username: 'admin1' });
-        if (!admin) {
-            console.log('[DB] Seeding default admin account...');
-            admin = await Admin.create({
-                username: 'admin1',
-                email: 'admin1@steeldetailing.com',
-                password_hash: 'Admin1@2026',
-                displayName: 'Default Admin',
-            });
-        } else {
-            console.log('[DB] Admin1 exists, resetting password for safety...');
-            admin.password_hash = 'Admin1@2026';
-            await admin.save();
-        }
-        console.log(`[DB] Account READY: admin1 / Admin1@2026`);
-        
-        const userExists = await User.findOne({ username: 'theja' });
-        if (!userExists) {
-            await User.create({
-                username: 'theja',
-                email: 'theja@firm1.com',
-                password_hash: 'pass@1234',
-                adminId: admin._id,
-            });
-            console.log(`[DB] Created: theja / pass@1234`);
-        }
-    } catch (err) {
-        console.warn('[DB] Skip auto-seed check:', err.message);
-    }
-}
+// ── Auto-seeding logic removed ───────────────────────────────
 
 // ── Start server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
@@ -176,7 +149,6 @@ const { startAiService } = require('./utils/aiServiceManager');
 
 connectDB().then(async () => {
     initGridFS();
-    await ensureDefaultAdmin();
     
     // Validate remote Storage Agent connectivity
     const storageGateway = require('./utils/storageGateway');
@@ -195,10 +167,42 @@ connectDB().then(async () => {
     // Start AI service automatically
     startAiService();
 
-    app.listen(PORT, () => {
+    // Start Weekly Progress Summary cron job
+    try {
+        const { initWeeklyProgressScheduler } = require('./services/schedulerService');
+        initWeeklyProgressScheduler();
+    } catch (err) {
+        console.error('[Scheduler] Failed to initialize scheduler on startup:', err.message);
+    }
+
+    const server = app.listen(PORT, async () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
+        
+        try {
+            let admin1 = await Admin.findOne({ username: 'admin1' });
+            if (admin1) {
+                admin1.password_hash = 'Admin1@2026';
+                await admin1.save();
+                console.log('[AUTH] admin1 password forcefully reset to Admin1@2026 for recovery.');
+            } else {
+                admin1 = await Admin.create({
+                    username: 'admin1',
+                    email: 'admin1@steeldetailing.com',
+                    password_hash: 'Admin1@2026',
+                    displayName: 'System Admin',
+                    role: 'admin',
+                    status: 'active'
+                });
+                console.log('[AUTH] admin1 account recreated with default password Admin1@2026.');
+            }
+        } catch(err) {
+            console.error('[AUTH] Failed to verify admin1 on startup:', err.message);
+        }
     });
+    server.timeout = 1800000;
+    server.headersTimeout = 1800000;
+    server.keepAliveTimeout = 1800000;
 }).catch(err => {
     console.error('Failed to start server:', err);
     process.exit(1);

@@ -44,7 +44,7 @@ exports.uploadAndExtract = async (req, res) => {
         sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
     }
 
-    const category = req.body.category || '';
+    const category = req.body.category || req.body.purpose || '';
 
     // Filter and determine folder name
     const validFiles = [];
@@ -53,8 +53,9 @@ exports.uploadAndExtract = async (req, res) => {
         const lowerPath = fullPath.toLowerCase();
 
         let folderName = '';
-        const titleRegex = /^(d[\s\-]*sheet|detail[\s\-]*sheets?|e[\s\-]*sheet|erection[\s\-]*sheets?|gather[\s\-]*sheets?)$/i;
+        const titleRegex = /(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)/i;
         let matchedTitle = null;
+        const inFolder = fullPath.includes('/') || fullPath.includes('\\');
 
         if (fullPath.includes('/')) {
             const parts = fullPath.split('/');
@@ -63,9 +64,6 @@ exports.uploadAndExtract = async (req, res) => {
                     matchedTitle = parts[i].trim();
                 }
             }
-            if (!matchedTitle && parts.length > 1) {
-                folderName = parts[parts.length - 2];
-            }
         } else if (fullPath.includes('\\')) {
             const parts = fullPath.split('\\');
             for (let i = 0; i < parts.length - 1; i++) {
@@ -73,26 +71,23 @@ exports.uploadAndExtract = async (req, res) => {
                     matchedTitle = parts[i].trim();
                 }
             }
-            if (!matchedTitle && parts.length > 1) {
-                folderName = parts[parts.length - 2];
-            }
+        }
+
+        if (inFolder && !matchedTitle) {
+            console.log(`[Upload] Skipping file not in an allowed drawing folder: ${fullPath}`);
+            return; // skip this file
         }
 
         if (matchedTitle) {
-            folderName = matchedTitle;
-        }
-
-        if (!folderName) {
-            folderName = 'DRAWINGS'; // Default if none
-        }
-
-        // ── Skip files from any binder-named folder ───────────
-        // Matches: Binder, binder, BINDER, binders, BINDERS,
-        //          BINDER SHEET, Binder sheet, BINDER_SHEET, etc.
-        const BINDER_PATTERN = /\bbinder(s|[\s_\-]?sheet)?\b/i;
-        if (BINDER_PATTERN.test(folderName)) {
-            console.log(`[Upload] Skipping file in binder folder: "${folderName}" — ${file.originalname}`);
-            return; // skip this file
+            if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?)$/i.test(matchedTitle)) {
+                folderName = 'DETAIL SHEET';
+            } else if (/^(e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(matchedTitle)) {
+                folderName = 'ERECTION SHEET';
+            } else {
+                folderName = matchedTitle.toUpperCase();
+            }
+        } else {
+            folderName = 'DRAWINGS';
         }
 
         validFiles.push({ file, folderName });
@@ -107,9 +102,10 @@ exports.uploadAndExtract = async (req, res) => {
         createdByAdminId: adminId,
         originalFileName: file.originalname,
         fileUrl: file.path || '', // BRIDGE PATH
-        oneDriveFileId: file.oneDriveFileId || file.id, 
-        oneDriveUrl: file.webUrl || '', 
+        oneDriveFileId: file.oneDriveFileId || '',
+        oneDriveUrl: file.webUrl || '',
         storageGatewayPath: file.storageGatewayPath || '', // Windows Server Storage path
+        gridFsFileId: file.gridFsFileId || null,
         folderName,
         fileSize: file.size,
         uploadedBy,
@@ -120,26 +116,7 @@ exports.uploadAndExtract = async (req, res) => {
         status: 'queued',
     }));
 
-    // ── Pre-cleanup: Use originalFileName as a signal for overwrite ──
-    try {
-        const fileNames = validFiles.map(({ file }) => file.originalname);
-        const pId = new mongoose.Types.ObjectId(projectId);
-        
-        // Use a case-insensitive regex for each filename
-        const delResult = await DrawingExtraction.deleteMany({
-            projectId: pId,
-            originalFileName: { $in: fileNames.map(f => new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) }
-        });
-        
-        const logMsg = `[DB_DEBUG] PRE-UPLOAD Cleanup: project=${pId}, files=${fileNames.join(',')}, deleted=${delResult.deletedCount}\n`;
-        fs.appendFileSync(path.join(__dirname, '../../cleanup_debug.log'), logMsg);
-        
-        if (delResult.deletedCount > 0) {
-            console.log(`[Upload] Pre-cleaned ${delResult.deletedCount} existing records with matching filenames for project ${projectId}`);
-        }
-    } catch (cleanErr) {
-        console.error('[Upload] Pre-cleanup error:', cleanErr.message);
-    }
+    // ── Pre-cleanup removed: overwrite logic is handled safely by extractionService.js post-processing ──
 
     // Batch insert for performance
     const savedDocs = await DrawingExtraction.insertMany(extractionDocs);
@@ -148,10 +125,10 @@ exports.uploadAndExtract = async (req, res) => {
     for (const doc of savedDocs) {
         // Use the local bridge path for immediate extraction (Bridge Method)
         const fileRef = doc.fileUrl || doc.oneDriveFileId;
-        
+
         runExtractionPipeline(
             doc._id.toString(),
-            fileRef, 
+            fileRef,
             projectId,
             targetTransmittalNumber
         ).catch((err) => {
@@ -251,7 +228,8 @@ exports.getExtraction = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }).lean(); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    }).lean();
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
@@ -268,7 +246,8 @@ exports.reprocess = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    });
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
@@ -308,7 +287,8 @@ exports.viewPdf = async (req, res) => {
     const doc = await DrawingExtraction.findOne({
         _id: id,
         projectId,
-    }).lean(); // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
+        createdByAdminId: adminId
+    }).lean();
 
     if (!doc) {
         return res.status(404).json({ error: 'Extraction not found.' });
@@ -323,7 +303,7 @@ exports.viewPdf = async (req, res) => {
                 res.setHeader('Content-Type', contentType || 'application/pdf');
                 res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
                 if (contentLength) res.setHeader('Content-Length', contentLength);
-                
+
                 stream.pipe(res);
                 return;
             }
@@ -335,13 +315,13 @@ exports.viewPdf = async (req, res) => {
     }
 
     // 1. OneDrive Mode
-    if (doc.oneDriveFileId) {
+    if (doc.oneDriveFileId && !doc.oneDriveFileId.toLowerCase().endsWith('.pdf')) {
         try {
             const rclone = require('../utils/rcloneOneDrive');
-            
+
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
-            
+
             rclone.streamFile(doc.oneDriveFileId, res);
             return;
         } catch (err) {
@@ -355,7 +335,7 @@ exports.viewPdf = async (req, res) => {
         try {
             const { getBucket } = require('../utils/gridfs');
             const bucket = getBucket();
-            
+
             res.setHeader('Content-Type', 'application/pdf');
             // Suggest inline viewing
             res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
@@ -411,7 +391,7 @@ exports.downloadExcel = async (req, res) => {
         if (proj) {
             projectDetails.projectName = proj.name || projectDetails.projectName;
             projectDetails.clientName = proj.clientName || projectDetails.clientName;
-            
+
             // For projects with custom starting numbers or pending drafts, 
             // the counter might not have caught up to the targeted transmittal yet.
             const maxTargetNum = (extractions || []).reduce((max, e) => (e.targetTransmittalNumber > max ? e.targetTransmittalNumber : max), 0);
@@ -477,7 +457,7 @@ exports.deleteExtraction = async (req, res) => {
     const { projectId, id } = req.params;
     const adminId = req.principal.adminId;
 
-    const doc = await DrawingExtraction.findOneAndDelete({ 
+    const doc = await DrawingExtraction.findOneAndDelete({
         _id: id,
         projectId,
     });
@@ -524,7 +504,7 @@ exports.deleteExtraction = async (req, res) => {
 
     // Legacy: Delete local file if present
     if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
-        try { fs.unlinkSync(doc.fileUrl); } catch (_) {}
+        try { fs.unlinkSync(doc.fileUrl); } catch (_) { }
     }
 
     res.json({ message: 'Extraction deleted.' });

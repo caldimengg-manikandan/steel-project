@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMessage } from '../../context/MessageContext';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'notifications' | 'ui' | 'branding' | 'audit';
+type TabId = 'access' | 'notifications' | 'email' | 'ui' | 'branding' | 'audit';
 
 interface TabItem {
     id: TabId;
@@ -20,9 +20,9 @@ interface TabItem {
 const TABS: TabItem[] = [
     { id: 'access', label: 'User & Access', icon: <IconUsers />, desc: 'Roles, permissions and user management' },
     { id: 'notifications', label: 'Notifications', icon: <IconNotification />, desc: 'Email alerts and reminder schedules' },
+    { id: 'email', label: 'Email Settings', icon: <IconNotification />, desc: 'SMTP sender config and recipient lists' },
     { id: 'ui', label: 'System Preference', icon: <IconSettings />, desc: 'Theme, timezone and language' },
     { id: 'branding', label: 'Company Profile', icon: <IconSettings />, desc: 'Logo and branding' },
-
     { id: 'audit', label: 'Logs & Audit', icon: <IconActivity />, desc: 'System activity and change history' },
 ];
 
@@ -91,11 +91,95 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [logSearch, setLogSearch] = useState('');
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const { settings, updateSettings, refreshSettings } = useSettings();
     const { showMessage } = useMessage();
     const navigate = useNavigate();
+
+    // Email settings state
+    const [emailForm, setEmailForm] = useState({
+        emailEnabled: false,
+        smtpHost: '',
+        smtpPort: 587,
+        smtpUser: '',
+        smtpPass: '',
+        smtpFromName: 'Steel Project',
+        superAdminEmails: [] as string[],
+        projectManagerEmails: [] as string[],
+        teamLeadEmails: [] as string[],
+    });
+    const [emailInputs, setEmailInputs] = useState({ superAdmin: '', projectManager: '', teamLead: '' });
+    const [savingEmail, setSavingEmail] = useState(false);
+    const [testingEmail, setTestingEmail] = useState(false);
+    const [testEmailAddr, setTestEmailAddr] = useState('');
+    const [loadingTestReport, setLoadingTestReport] = useState(false);
+
+    const handleSendTestReport = async () => {
+        setLoadingTestReport(true);
+        try {
+            const res = await fetch('/steel/api/settings/scheduler/test', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showMessage('Success', 'Project status email triggered successfully. Please check your inbox!', 'success');
+            } else {
+                showMessage('Failed', data.error || 'Failed to trigger test email', 'error');
+            }
+        } catch (e) {
+            showMessage('Error', 'Network error.', 'error');
+        } finally {
+            setLoadingTestReport(false);
+        }
+    };
+
+    useEffect(() => {
+        // Load email settings from existing settings
+        if (settings) {
+            setEmailForm(prev => ({
+                ...prev,
+                emailEnabled: (settings as any).emailEnabled || false,
+                smtpHost: (settings as any).smtpHost || '',
+                smtpPort: (settings as any).smtpPort || 587,
+                smtpUser: (settings as any).smtpUser || '',
+                smtpPass: (settings as any).smtpPass || '',
+                smtpFromName: (settings as any).smtpFromName || 'Steel Project',
+                superAdminEmails: (settings as any).superAdminEmails || [],
+                projectManagerEmails: (settings as any).projectManagerEmails || [],
+                teamLeadEmails: (settings as any).teamLeadEmails || [],
+            }));
+        }
+    }, [settings]);
+
+    useEffect(() => {
+        if (activeTab === 'audit') {
+            fetchLogs();
+        }
+    }, [activeTab]);
+
+    const fetchLogs = async () => {
+        setLoadingLogs(true);
+        try {
+            const res = await fetch('/steel/api/admin/activity-logs', {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setLogs(data.logs || []);
+            } else {
+                showMessage('Error', 'Failed to fetch logs', 'error');
+            }
+        } catch (error) {
+            console.error('Fetch logs error:', error);
+            showMessage('Error', 'An unexpected error occurred while fetching logs', 'error');
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
 
     const handleSettingChange = (key: string, value: any) => {
         updateSettings({ [key]: value });
@@ -108,11 +192,10 @@ export default function AdminSettings() {
             const formData = new FormData();
             formData.append('logo', logoFile);
             
-            const token = sessionStorage.getItem('sdms_user') ? JSON.parse(sessionStorage.getItem('sdms_user')!).token : '';
             const res = await fetch('/steel/api/settings/logo', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
+                body: formData,
+                credentials: 'include'
             });
             
             if (res.ok) {
@@ -280,14 +363,214 @@ export default function AdminSettings() {
 
                     {activeTab === 'notifications' && (
                         <Card title="System Reports">
-                            <SettingRow title="Weekly Summary Reports" desc="Send a project status summary to all managers every Friday at 12:00 PM">
+                            <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email the consolidated Project Status Excel sheet to Project Managers.">
                                 <Toggle 
-                                    enabled={settings.weeklyReports} 
-                                    onChange={(v) => handleSettingChange('weeklyReports', v)} 
+                                    enabled={settings.weeklyProgresss} 
+                                    onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
                                 />
                             </SettingRow>
+                            {settings.weeklyProgresss && (
+                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 16, padding: '16px 20px', background: 'var(--color-bg-page)', borderRadius: 8 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Day</label>
+                                        <select 
+                                            className="form-control" 
+                                            style={{ width: 140 }}
+                                            value={settings.weeklyProgressDay ?? 4}
+                                            onChange={(e) => handleSettingChange('weeklyProgressDay', Number(e.target.value))}
+                                        >
+                                            <option value={0}>Sunday</option>
+                                            <option value={1}>Monday</option>
+                                            <option value={2}>Tuesday</option>
+                                            <option value={3}>Wednesday</option>
+                                            <option value={4}>Thursday</option>
+                                            <option value={5}>Friday</option>
+                                            <option value={6}>Saturday</option>
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Time</label>
+                                        <input 
+                                            type="time" 
+                                            className="form-control" 
+                                            style={{ width: 120 }}
+                                            value={settings.weeklyProgressTime || '11:45'}
+                                            onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto', alignSelf: 'flex-end' }}>
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary" 
+                                            onClick={handleSendTestReport}
+                                            disabled={loadingTestReport}
+                                            style={{ height: 38 }}
+                                        >
+                                            {loadingTestReport ? 'Sending...' : '📧 Send Test Report Now'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </Card>
                     )}
+
+                    {activeTab === 'email' && (() => {
+                        const addEmail = (role: 'superAdmin' | 'projectManager' | 'teamLead') => {
+                            const key = role === 'superAdmin' ? 'superAdminEmails' : role === 'projectManager' ? 'projectManagerEmails' : 'teamLeadEmails';
+                            const val = emailInputs[role].trim();
+                            if (!val || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
+                                showMessage('Invalid', 'Please enter a valid email address.', 'error');
+                                return;
+                            }
+                            if (emailForm[key].includes(val)) {
+                                showMessage('Duplicate', 'This email is already in the list.', 'error');
+                                return;
+                            }
+                            setEmailForm(prev => ({ ...prev, [key]: [...prev[key as keyof typeof prev] as string[], val] }));
+                            setEmailInputs(prev => ({ ...prev, [role]: '' }));
+                        };
+
+                        const removeEmail = (role: string, email: string) => {
+                            setEmailForm(prev => ({ ...prev, [role]: (prev[role as keyof typeof prev] as string[]).filter(e => e !== email) }));
+                        };
+
+                        const handleSaveEmail = async () => {
+                            setSavingEmail(true);
+                            try {
+                                const res = await fetch('/steel/api/settings/email', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify(emailForm)
+                                });
+                                if (res.ok) {
+                                    showMessage('Saved', 'Email settings saved successfully.', 'success');
+                                    refreshSettings();
+                                } else {
+                                    const err = await res.json();
+                                    showMessage('Error', err.error || 'Failed to save.', 'error');
+                                }
+                            } catch (e) {
+                                showMessage('Error', 'Network error.', 'error');
+                            } finally {
+                                setSavingEmail(false);
+                            }
+                        };
+
+                        const handleTestEmail = async () => {
+                            setTestingEmail(true);
+                            try {
+                                const res = await fetch('/steel/api/settings/email/test', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify({ testEmail: testEmailAddr || emailForm.smtpUser })
+                                });
+                                const data = await res.json();
+                                if (res.ok) showMessage('Success', data.message, 'success');
+                                else showMessage('Failed', data.error, 'error');
+                            } catch (e) {
+                                showMessage('Error', 'Network error.', 'error');
+                            } finally {
+                                setTestingEmail(false);
+                            }
+                        };
+
+                        const renderEmailList = (role: 'superAdmin' | 'projectManager' | 'teamLead', label: string, roleKey: string) => (
+                            <div style={{ marginBottom: 28 }}>
+                                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: 'var(--color-text-primary)' }}>{label} Recipients</div>
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        placeholder={`Add ${label} email...`}
+                                        value={emailInputs[role]}
+                                        onChange={e => setEmailInputs(prev => ({ ...prev, [role]: e.target.value }))}
+                                        onKeyDown={e => e.key === 'Enter' && addEmail(role)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button className="btn btn-primary btn-sm" onClick={() => addEmail(role)}>
+                                        <IconPlus /> Add
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {(emailForm[roleKey as keyof typeof emailForm] as string[]).map(email => (
+                                        <div key={email} style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                                            background: 'var(--color-primary-glow)', border: '1px solid var(--color-primary)',
+                                            borderRadius: 20, padding: '4px 12px', fontSize: 13
+                                        }}>
+                                            <span style={{ color: 'var(--color-primary)' }}>{email}</span>
+                                            <span
+                                                onClick={() => removeEmail(roleKey, email)}
+                                                style={{ cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 700, lineHeight: 1 }}
+                                            >×</span>
+                                        </div>
+                                    ))}
+                                    {(emailForm[roleKey as keyof typeof emailForm] as string[]).length === 0 && (
+                                        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No emails added yet.</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+
+                        return (
+                            <>
+                                <Card title="SMTP Sender Configuration" action={
+                                    <SettingRow title="" desc="">
+                                        <Toggle enabled={emailForm.emailEnabled} onChange={v => setEmailForm(prev => ({ ...prev, emailEnabled: v }))} />
+                                    </SettingRow>
+                                }>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                                        <div className="form-group">
+                                            <label className="form-label">SMTP Host</label>
+                                            <input type="text" className="form-control" placeholder="e.g. smtp.gmail.com" value={emailForm.smtpHost} onChange={e => setEmailForm(p => ({ ...p, smtpHost: e.target.value }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>For Gmail: smtp.gmail.com | For Outlook: smtp.office365.com</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">SMTP Port</label>
+                                            <input type="number" className="form-control" value={emailForm.smtpPort} onChange={e => setEmailForm(p => ({ ...p, smtpPort: Number(e.target.value) }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>587 (TLS) or 465 (SSL)</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Sender Email Address</label>
+                                            <input type="email" className="form-control" placeholder="yourapp@gmail.com" value={emailForm.smtpUser} onChange={e => setEmailForm(p => ({ ...p, smtpUser: e.target.value }))} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">App Password / SMTP Password</label>
+                                            <input type="password" className="form-control" placeholder="Enter app password" value={emailForm.smtpPass} onChange={e => setEmailForm(p => ({ ...p, smtpPass: e.target.value }))} />
+                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Use an App Password, not your regular login password</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Display Name (From)</label>
+                                            <input type="text" className="form-control" placeholder="Steel Project" value={emailForm.smtpFromName} onChange={e => setEmailForm(p => ({ ...p, smtpFromName: e.target.value }))} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--color-border-light)' }}>
+                                        <input type="email" className="form-control" placeholder="Send test to..." value={testEmailAddr} onChange={e => setTestEmailAddr(e.target.value)} style={{ maxWidth: 280 }} />
+                                        <button className="btn btn-secondary btn-sm" onClick={handleTestEmail} disabled={testingEmail}>
+                                            {testingEmail ? 'Sending...' : '📧 Send Test Email'}
+                                        </button>
+                                        <button className="btn btn-primary" onClick={handleSaveEmail} disabled={savingEmail}>
+                                            {savingEmail ? 'Saving...' : 'Save Email Settings'}
+                                        </button>
+                                    </div>
+                                </Card>
+
+                                <Card title="Recipient Email Lists">
+                                    {renderEmailList("superAdmin", "Super Admin", "superAdminEmails")}
+                                    {renderEmailList("projectManager", "Project Manager", "projectManagerEmails")}
+                                    {renderEmailList("teamLead", "Team Lead", "teamLeadEmails")}
+                                    <div style={{ paddingTop: 16, borderTop: '1px solid var(--color-border-light)' }}>
+                                        <button className="btn btn-primary" onClick={handleSaveEmail} disabled={savingEmail}>
+                                            {savingEmail ? 'Saving...' : 'Save Recipient Lists'}
+                                        </button>
+                                    </div>
+                                </Card>
+                            </>
+                        );
+                    })()}
 
                     {activeTab === 'ui' && (
                         <Card title="Regional & Appearance">
@@ -400,19 +683,19 @@ export default function AdminSettings() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {[
-                                            { ts: new Date().toISOString(), user: 'System', mod: 'Config', event: 'Settings updated successfully' },
-                                            { ts: new Date(Date.now() - 3600000).toISOString(), user: 'admin1', mod: 'Projects', event: 'Created project: Steel Bridge' },
-                                            { ts: new Date(Date.now() - 7200000).toISOString(), user: 'admin1', mod: 'RFI', event: 'RFIs extracted from PDF' }
-                                        ].filter(l => 
-                                            l.user.toLowerCase().includes(logSearch.toLowerCase()) || 
-                                            l.mod.toLowerCase().includes(logSearch.toLowerCase()) || 
-                                            l.event.toLowerCase().includes(logSearch.toLowerCase())
+                                        {loadingLogs ? (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>Loading logs...</td></tr>
+                                        ) : logs.length === 0 ? (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>No activity logs found.</td></tr>
+                                        ) : logs.filter(l => 
+                                            (l.user && l.user.toLowerCase().includes(logSearch.toLowerCase())) || 
+                                            (l.module && l.module.toLowerCase().includes(logSearch.toLowerCase())) || 
+                                            (l.event && l.event.toLowerCase().includes(logSearch.toLowerCase()))
                                         ).map((l, i) => (
                                             <tr key={i}>
-                                                <td className="font-mono" style={{ fontSize: 12 }}>{new Date(l.ts).toLocaleString()}</td>
+                                                <td className="font-mono" style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleString()}</td>
                                                 <td><span style={{ fontWeight: 600 }}>{l.user}</span></td>
-                                                <td><span style={{ color: 'var(--color-text-muted)' }}>{l.mod}</span></td>
+                                                <td><span style={{ color: 'var(--color-text-muted)' }}>{l.module}</span></td>
                                                 <td>{l.event}</td>
                                             </tr>
                                         ))}

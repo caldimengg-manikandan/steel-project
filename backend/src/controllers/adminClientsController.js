@@ -12,7 +12,8 @@ const Project = require('../models/Project');
  */
 async function listClients(req, res) {
     const adminId = req.principal.adminId;
-    const clients = await Client.find({}).sort({ name: 1 }); // GLOBAL ADMIN VISIBILITY: FETCH ALL CLIENTS
+    const query = req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId };
+    const clients = await Client.find(query).sort({ name: 1 });
     res.json({ count: clients.length, clients });
 }
 
@@ -52,7 +53,8 @@ async function updateClient(req, res) {
     const { clientId } = req.params;
     const { name, contacts, status } = req.body;
 
-    const client = await Client.findOne({ _id: clientId });
+    const query = req.principal.role === 'superadmin' ? { _id: clientId } : { _id: clientId, createdByAdminId: adminId };
+    const client = await Client.findOne(query);
     if (!client) {
         return res.status(404).json({ error: 'Client not found.' });
     }
@@ -72,7 +74,8 @@ async function deleteClient(req, res) {
     const adminId = req.principal.adminId;
     const { clientId } = req.params;
 
-    const client = await Client.findOne({ _id: clientId });
+    const query = req.principal.role === 'superadmin' ? { _id: clientId } : { _id: clientId, createdByAdminId: adminId };
+    const client = await Client.findOne(query);
     if (!client) {
         return res.status(404).json({ error: 'Client not found.' });
     }
@@ -171,8 +174,8 @@ async function bulkCreateClients(req, res) {
             const contactName = contactNameValue ? String(contactNameValue).trim() : name; 
             const phone = phoneValue ? String(phoneValue).trim() : '';
 
-            // Check duplicate client name (GLOBAL ADMIN VISIBILITY: SEARCH ALL CLIENTS)
-            const exists = await Client.findOne({ name: name });
+            const query = req.principal.role === 'superadmin' ? { name: name } : { name: name, createdByAdminId: adminId };
+            const exists = await Client.findOne(query);
             if (exists) {
                 errorList.push(`Row ${rowNumber}: Client "${name}" already exists.`);
                 skippedCount++;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminListProjects } from '../../services/projectApi';
+import { formatDate } from '../../utils/dateUtils';
 import {
     listRfiExtractions,
     uploadRfiDrawing,
@@ -72,7 +73,6 @@ export default function AdminRfi() {
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
     const isAdmin = user?.role && FULL_ACCESS_ROLES.includes(user.role);
     const { showMessage, showConfirm } = useMessage();
-    const [folderUrl, setFolderUrl] = useState('');  // base URL for 'Link to Source' in Excel
 
     // response editing: key = `${extractionId}_${rfiIndex}`, value = draft text
     const [responseEdits, setResponseEdits] = useState<Record<string, string>>({});
@@ -367,32 +367,10 @@ export default function AdminRfi() {
                 </div>
                 {completedCount > 0 && projectId && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                        {/* Folder URL input */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                                Folder URL (optional)
-                            </label>
-                            <input
-                                type="text"
-                                value={folderUrl}
-                                onChange={e => setFolderUrl(e.target.value)}
-                                placeholder="https://drive.google.com/drive/folders/..."
-                                style={{
-                                    fontSize: 12,
-                                    padding: '6px 10px',
-                                    borderRadius: 7,
-                                    border: '1px solid var(--color-border)',
-                                    background: 'var(--color-background)',
-                                    color: 'var(--color-text-primary)',
-                                    width: 310,
-                                    outline: 'none',
-                                    fontFamily: 'inherit',
-                                }}
-                            />
-                        </div>
+
                         <div style={{ display: 'flex', gap: 8 }}>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl)}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'))}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -406,7 +384,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download RFI Excel
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'OPEN')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'OPEN')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -419,7 +397,7 @@ export default function AdminRfi() {
                                 <IconDownload /> Download Open RFI
                             </a>
                             <a
-                                href={getRfiExcelDownloadUrl(projectId, undefined, folderUrl, 'CLOSED')}
+                                href={getRfiExcelDownloadUrl(projectId, undefined, window.location.origin + (import.meta.env.VITE_API_URL || '/steel/api'), 'CLOSED')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -791,7 +769,7 @@ export default function AdminRfi() {
                                                                             <span title={parent.originalFileName}>{parent.originalFileName.split('_').pop()?.replace('.pdf', '') || 'Drawing'}</span>
                                                                         </div>
                                                                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{parent.uploadedBy}</span>
-                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{new Date(parent.createdAt).toLocaleDateString()}</span>
+                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{formatDate(parent.createdAt)}</span>
                                                                         <span />
                                                                     </div>
                                                                     {isExp && (
@@ -869,7 +847,7 @@ export default function AdminRfi() {
                                                                 <StatusChip status={ext.status} />
                                                                 <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: rfiCount > 0 ? '#2563eb' : '#94a3b8' }}>{rfiCount}</span>
                                                                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{ext.uploadedBy}</span>
-                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{new Date(ext.createdAt).toLocaleDateString()}</span>
+                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{formatDate(ext.createdAt)}</span>
                                                                 {isAdmin && (
                                                                     <button onClick={(e) => handleDelete(ext._id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, opacity: 0.7 }} title="Delete"><IconDelete /></button>
                                                                 )}

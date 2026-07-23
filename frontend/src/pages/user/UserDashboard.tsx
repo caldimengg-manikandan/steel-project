@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { userListProjects } from '../../services/projectApi';
+import { formatDate } from '../../utils/dateUtils';
 import type { Project, ProjectPermission } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -191,7 +192,7 @@ export default function UserDashboard() {
                                                         </span>
                                                     </td>
                                                     <td className="text-muted" style={{ fontSize: 12.5 }}>
-                                                        {new Date(p.updatedAt).toLocaleDateString()}
+                                                        {formatDate(p.updatedAt)}
                                                     </td>
                                                 </tr>
                                             );

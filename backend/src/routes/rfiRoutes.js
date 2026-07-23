@@ -27,6 +27,10 @@ const upload = multer({
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF allowed'), false);
     },
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50 MB
+        files: 50
+    }
 });
 
 const uploadResponse = multer({
@@ -36,6 +40,10 @@ const uploadResponse = multer({
         if (allowed.includes(file.mimetype)) cb(null, true);
         else cb(new Error('File type not allowed'), false);
     },
+    limits: {
+        fileSize: 20 * 1024 * 1024, // 20 MB
+        files: 10
+    }
 });
 
 // All routes here are scoped under /api/rfis/:projectId
@@ -61,7 +69,8 @@ router.patch('/:id/status/:rfiIndex', requirePermission('editor'), updateRfiStat
 // Upload attachment for an RFI response (editor + admin)
 router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), uploadResponse.single('file'), uploadRfiResponseAttachment);
 
-// Stream PDF for viewing
+// Stream PDF for viewing (supports both /view and /view.pdf for compatibility with existing Excel files)
+router.get('/:id/view.pdf', viewRfiPdf);
 router.get('/:id/view', viewRfiPdf);
 
 // Delete single Extraction (editor + admin)

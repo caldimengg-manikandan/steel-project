@@ -8,6 +8,9 @@ import {
     IconFolder, IconTrendingUp
 } from '../../components/Icons';
 import { adminGetReportsData } from '../../services/adminUserApi';
+import { adminListClients } from '../../services/adminClientApi';
+import { formatDate } from '../../utils/dateUtils';
+import type { Client } from '../../types';
 
 // ─── Simple Sub-components ───
 
@@ -49,6 +52,7 @@ const ChartCard = ({ title, children }: { title: string, children: React.ReactNo
 export default function AdminReports() {
     const [days, setDays] = useState(30);
     const [data, setData] = useState<any>(null);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -56,8 +60,12 @@ export default function AdminReports() {
     const fetchData = useCallback(async (d: number) => {
         try {
             setLoading(true);
-            const res = await adminGetReportsData(d);
+            const [res, clientsData] = await Promise.all([
+                adminGetReportsData(d),
+                adminListClients()
+            ]);
             setData(res);
+            setClients(clientsData.clients || []);
         } catch (err: any) {
             setError(err.message || 'Failed to fetch reports');
         } finally {
@@ -90,10 +98,10 @@ export default function AdminReports() {
         }, 0), icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
-    const uniqueClients = Array.from(new Set(projects.map((p: any) => p.clientName))).sort();
+    const uniqueClients = clients.map(c => c.name).sort();
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', transition: 'opacity 0.2s ease', opacity: loading ? 0.6 : 1, pointerEvents: loading ? 'none' : 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: '24px', fontWeight: 750 }}>Analytics</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -157,6 +165,7 @@ export default function AdminReports() {
                                 <th style={{ textAlign: 'center' }}>RFIs</th>
                                 <th style={{ width: '150px' }}>Approval</th>
                                 <th style={{ width: '150px' }}>Fabrication</th>
+                                <th>Date Created</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -180,6 +189,9 @@ export default function AdminReports() {
                                             </div>
                                             <span style={{ fontSize: '11px', fontWeight: 700 }}>{p.fabricationPercentage || 0}%</span>
                                         </div>
+                                    </td>
+                                    <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                                        {p.createdAt ? formatDate(p.createdAt) : 'N/A'}
                                     </td>
                                 </tr>
                             ))}

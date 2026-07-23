@@ -3,34 +3,53 @@ import {
     useContext,
     useState,
     useCallback,
+    useEffect,
     type ReactNode,
 } from 'react';
 import type { AuthUser } from '../types';
 
 interface AuthContextValue {
     user: AuthUser | null;
-    login: (username: string, password: string) => Promise<boolean>;
+    login: (username: string, password: string) => Promise<AuthUser | null>;
     logout: () => void;
     isAuthenticated: boolean;
+    isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Mock credential database — replace with real API calls
-// Mock credential database — replaced with real API calls
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<AuthUser | null>(() => {
-        try {
-            const stored = sessionStorage.getItem('sdms_user');
-            return stored ? JSON.parse(stored) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [user, setUser] = useState<AuthUser | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    useEffect(() => {
+        const checkAuth = async () => {
+            const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+            const localToken = localStorage.getItem('token');
+            try {
+                const res = await fetch(`${BASE}/auth/me`, {
+                    credentials: 'include',
+                    headers: {
+                        ...(localToken ? { 'Authorization': `Bearer ${localToken}` } : {})
+                    }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setUser(data.user);
+                } else {
+                    localStorage.removeItem('token');
+                    setUser(null);
+                }
+            } catch {
+                setUser(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        checkAuth();
+    }, []);
+
+    const login = useCallback(async (username: string, password: string): Promise<AuthUser | null> => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
         try {
@@ -38,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             let res = await fetch(`${BASE}/auth/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ username, password }),
             });
 
@@ -46,39 +66,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 res = await fetch(`${BASE}/auth/user/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ username, password }),
                 });
             }
 
             if (res.ok) {
                 const data = await res.json();
+                
+                // Store token backup in localStorage
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
+
                 const authUser: AuthUser = {
                     id: data.user.id || data.user._id,
                     username: data.user.username,
                     email: data.user.email,
                     role: data.user.role,
                     adminId: data.user.adminId,
-                    token: data.token,
                 };
                 setUser(authUser);
-                sessionStorage.setItem('sdms_user', JSON.stringify(authUser));
-                return true;
+                return authUser;
             }
         } catch (err) {
             console.error('[Auth] Real API login failed:', err);
         }
 
-        return false;
+        return null;
     }, []);
 
-    const logout = useCallback(() => {
+    const logout = useCallback(async () => {
+        const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+        const localToken = localStorage.getItem('token');
+        try {
+            await fetch(`${BASE}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    ...(localToken ? { 'Authorization': `Bearer ${localToken}` } : {})
+                }
+            });
+        } catch (e) {
+            console.error('Logout failed:', e);
+        }
+        localStorage.removeItem('token');
         setUser(null);
-        sessionStorage.removeItem('sdms_user');
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
-            {children}
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
+            {isLoading ? <div>Loading...</div> : children}
         </AuthContext.Provider>
     );
 }

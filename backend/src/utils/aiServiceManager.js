@@ -22,7 +22,7 @@ function startAiService() {
 
     const aiDir = path.join(__dirname, '../../AiExtraction');
     const apiScript = path.join(aiDir, 'api.py');
-    
+
     // Check if script exists
     if (!fs.existsSync(apiScript)) {
         console.warn(`[AI_SERVICE] ✗ Warning: api.py not found at ${apiScript}`);
@@ -71,8 +71,14 @@ function startAiService() {
 
     // Cleanup on parent exit
     process.on('exit', stopAiService);
-    process.on('SIGINT', stopAiService);
-    process.on('SIGTERM', stopAiService);
+    process.on('SIGINT', () => {
+        stopAiService();
+        process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+        stopAiService();
+        process.exit(0);
+    });
 }
 
 /**

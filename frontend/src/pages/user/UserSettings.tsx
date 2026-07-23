@@ -160,7 +160,7 @@ export default function UserSettings() {
                                 <Toggle enabled={true} onChange={() => {}} />
                             </SettingRow>
                             <SettingRow title="Weekly Dashboard Summary" desc="A summarized overview of your project progress">
-                                <Toggle enabled={settings.weeklyReports} onChange={(v) => handleSettingChange('weeklyReports', v)} />
+                                <Toggle enabled={settings.weeklyProgresss} onChange={(v) => handleSettingChange('weeklyProgresss', v)} />
                             </SettingRow>
                         </Card>
                     )}

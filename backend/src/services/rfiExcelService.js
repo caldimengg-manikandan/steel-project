@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const storageGateway = require('../utils/storageGateway');
 
 const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
@@ -90,6 +91,18 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     const today = new Date();
     const updatedOn = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
+    let storageRoot = '';
+    if (storageGateway.isEnabled()) {
+        try {
+            const rootInfo = await storageGateway.validateRoot();
+            if (rootInfo.ok && rootInfo.storageRoot) {
+                storageRoot = rootInfo.storageRoot;
+            }
+        } catch (e) {
+            console.error('[RfiExcel] Failed to get storage root', e);
+        }
+    }
+
     // ── Flatten all RFIs & Check for Client RFI Numbers ───────
     let allRfis = [];
     rfiExtractions.forEach(doc => {
@@ -105,6 +118,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 skNumber: computedSk,
                 sentOn: rfi.sentOn || doc.sentOn || '',
                 fileUrl: doc.fileUrl,
+                storageGatewayPath: doc.storageGatewayPath,
                 projectId: doc.projectId,
                 extractionId: doc._id
             });
@@ -143,7 +157,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     };
 
     // ════════════════════════════════════════════════════════
-    // ROW 1 — Caldim Logo image
+    // ROW 1 — Logo (spans all columns)
     // ════════════════════════════════════════════════════════
     const logoRow = sheet.getRow(1);
     logoRow.height = 55; // enough height to display the logo clearly
@@ -168,9 +182,8 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 extension: 'png',
             });
             sheet.addImage(logoImageId, {
-                tl: { col: 0, row: 0 },       // top-left: column A, row 1
-                br: { col: TOTAL_COLS, row: 1 }, // bottom-right: last column, row 2
-                editAs: 'oneCell',
+                tl: { col: 0, row: 0 },
+                ext: { width: 350, height: 50 }
             });
         }
     } catch (e) { console.error('[RfiExcel] Logo error:', e.message); }
@@ -286,7 +299,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         
         let href = '';
         if (item.extractionId && item.projectId) {
-            href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view?token=${token}`;
+            href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view.pdf?token=${token}`;
         }
 
         if (href) {

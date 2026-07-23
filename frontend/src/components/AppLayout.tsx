@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { formatDate } from '../utils/dateUtils';
 import { useMessage } from '../context/MessageContext';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -56,7 +57,7 @@ function NotificationBell() {
                         ...n,
                         id: n._id,
                         icon: n.type === 'assignment' ? <IconFolder /> : <IconActivity />,
-                        time: new Date(n.createdAt).toLocaleDateString() === new Date().toLocaleDateString() ? 'Today' : new Date(n.createdAt).toLocaleDateString()
+                        time: formatDate(n.createdAt) === formatDate(new Date()) ? 'Today' : formatDate(n.createdAt)
                     }));
                     setNotifications(mapped);
                 }

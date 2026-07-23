@@ -13,6 +13,7 @@
  *  • Full admin-scoped isolation (only shows this project's data)
  */
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { formatDate } from '../utils/dateUtils';
 import { useMessage } from '../context/MessageContext';
 import type { DrawingExtraction, ExtractionStatus } from '../types';
 import {
@@ -231,9 +232,6 @@ export default function DrawingExtractionPanel({
     const [dupList, setDupList] = useState<Array<{ filename: string; sheetNumber: string; revision: string }>>([]);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
-    // Feature 6 state
-    const [localSavePath, setLocalSavePath] = useState('');
-
     // ── Transmittal selection modal state ──────────────────
     const [transmittalModal, setTransmittalModal] = useState(false);
     const [existingTransmittals, setExistingTransmittals] = useState<any[]>([]);
@@ -361,7 +359,7 @@ export default function DrawingExtractionPanel({
             const normalizedAllowed = ALLOWED_FOLDERS.map(a => a.replace(/[^a-z0-9]/g, ''));
             return parts.some((part: string) => {
                 const normalizedPart = part.replace(/[^a-z0-9]/g, '');
-                return normalizedAllowed.includes(normalizedPart);
+                return normalizedAllowed.some(allowed => normalizedPart.includes(allowed));
             });
         });
 
@@ -502,7 +500,7 @@ export default function DrawingExtractionPanel({
                 const executing = new Set<Promise<any>>();
 
                 for (const chunk of chunks) {
-                    const p = uploadDrawing(projectId, chunk, localSavePath, transmittalNumberToUse, selectedSequences, uploadPurpose).then(() => fetchExtractions(true));
+                    const p = uploadDrawing(projectId, chunk, '', transmittalNumberToUse, selectedSequences, uploadPurpose).then(() => fetchExtractions(true));
                     results.push(p);
                     executing.add(p);
                     p.finally(() => executing.delete(p));
@@ -772,17 +770,7 @@ export default function DrawingExtractionPanel({
 
                     {!uploading && (
                         <div style={{ marginTop: 15, paddingTop: 15, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 400 }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Optional: Local folder path for Excel (e.g. C:\Drawings)"
-                                    value={localSavePath}
-                                    onChange={(e) => setLocalSavePath(e.target.value)}
-                                    style={{ flex: 1, fontSize: 12, padding: '6px 10px' }}
-                                    title="If provided, the downloaded Excel log will also be saved to this folder on your computer."
-                                />
-                            </div>
+
                             <button
                                 className="btn btn-secondary btn-sm"
                                 disabled={loadingTransmittals}
@@ -993,7 +981,7 @@ export default function DrawingExtractionPanel({
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                                                Created: {new Date(t.createdAt).toLocaleDateString()}
+                                                Created: {formatDate(t.createdAt)}
                                             </div>
                                         </div>
                                         {selectedTransmittalNumber === t.transmittalNumber && (

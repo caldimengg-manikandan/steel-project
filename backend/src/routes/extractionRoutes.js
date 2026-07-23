@@ -33,6 +33,10 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     fileFilter,
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50 MB
+        files: 1000
+    }
 });
 
 // ── Apply unified scope to all extraction routes ──────────
@@ -63,6 +67,7 @@ router.get('/', requirePermission('viewer'), ctrl.listExtractions);
 router.get('/excel/download', requirePermission('viewer'), ctrl.downloadExcel);
 
 // View PDF stream (Requires Viewer)
+router.get('/:id/view.pdf', requirePermission('viewer'), ctrl.viewPdf);
 router.get('/:id/view', requirePermission('viewer'), ctrl.viewPdf);
 
 // Get a single extraction (Requires Viewer)

@@ -18,8 +18,8 @@ function createStorageAgentSync(folderPrefix) {
     return {
         _handleFile: async function (req, file, cb) {
             try {
-                // 1. Save locally first
-                const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
+                // 1. Save locally first (make it persistent in case storage gateway is disabled)
+                const tempDir = path.join(__dirname, '../../uploads', 'steel-dms-uploads');
                 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
                 const uniqueFilename = `${crypto.randomUUID()}${path.extname(file.originalname)}`;
@@ -63,6 +63,29 @@ function createStorageAgentSync(folderPrefix) {
                             // Let's fail the upload if storage gateway is enabled but fails.
                             return cb(new Error(`Storage Gateway Error: ${err.message}`));
                         }
+                    }
+                    // 3. Always save to GridFS as a guaranteed backup for HTTP viewing
+                    try {
+                        const gridfs = require('./gridfs');
+                        const bucket = gridfs.getBucket();
+                        if (bucket) {
+                            const uploadStream = bucket.openUploadStream(uniqueFilename, {
+                                contentType: file.mimetype,
+                                metadata: { originalName: file.originalname }
+                            });
+                            fs.createReadStream(localPath).pipe(uploadStream);
+                            
+                            await new Promise((resolve, reject) => {
+                                uploadStream.on('finish', () => {
+                                    fileInfo.gridFsFileId = uploadStream.id.toString();
+                                    resolve();
+                                });
+                                uploadStream.on('error', reject);
+                            });
+                            console.log(`[StorageSync] Uploaded to GridFS as fallback backup: ${fileInfo.gridFsFileId}`);
+                        }
+                    } catch (err) {
+                        console.error('[StorageSync] Failed to upload to GridFS:', err);
                     }
 
                     cb(null, fileInfo);

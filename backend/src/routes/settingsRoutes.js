@@ -36,5 +36,8 @@ const upload = multer({
 router.get('/', verifyToken, settingsController.getSettings);
 router.patch('/', verifyToken, isAdmin, settingsController.updateSettings);
 router.post('/logo', verifyToken, isAdmin, upload.single('logo'), settingsController.uploadLogo);
+router.patch('/email', verifyToken, isAdmin, settingsController.updateEmailSettings);
+router.post('/email/test', verifyToken, isAdmin, settingsController.testEmailSettings);
+router.post('/scheduler/test', verifyToken, isAdmin, settingsController.testSchedulerEmail);
 
 module.exports = router;

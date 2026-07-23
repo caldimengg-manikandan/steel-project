@@ -16,6 +16,14 @@
  */
 const storageGateway = require('../utils/storageGateway');
 
+function getErrorStatus(err) {
+    const msg = err.message || '';
+    if (msg.includes('Access denied')) return 403;
+    if (msg.includes('not found')) return 404;
+    if (msg.includes('Cannot reach Storage Agent') || msg.includes('fetch failed') || msg.includes('timeout')) return 504;
+    return 400;
+}
+
 /**
  * GET /api/files/browse?path=<relativePath>
  * ──────────────────────────────────────────
@@ -33,9 +41,7 @@ exports.browse = async (req, res) => {
         });
     } catch (err) {
         console.error('[FileGateway] Browse error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -54,9 +60,7 @@ exports.info = async (req, res) => {
         res.json(fileInfo);
     } catch (err) {
         console.error('[FileGateway] Info error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -89,9 +93,7 @@ exports.download = async (req, res) => {
         stream.pipe(res);
     } catch (err) {
         console.error('[FileGateway] Download error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -139,20 +141,21 @@ exports.upload = async (req, res) => {
         const successCount = results.filter(r => r.status === 'saved').length;
         const failCount = results.filter(r => r.status === 'failed').length;
 
-        res.status(failCount === results.length ? 502 : 201).json({
+        res.status(failCount === results.length ? getErrorStatus(new Error(results[0]?.error || 'Upload failed')) : 201).json({
             message: `${successCount} file(s) saved, ${failCount} failed.`,
             results,
         });
     } catch (err) {
         console.error('[FileGateway] Upload error:', err.message);
-        res.status(502).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
 /**
  * DELETE /api/files/remove?path=<relativePath>
  * ──────────────────────────────────────────────
- * Delete a file from the storage drive. Admin-only.
+ * Delete a file or folder from the storage drive. Admin-only.
+ * Also cleans up any matching DrawingExtraction records in the DB.
  */
 exports.remove = async (req, res) => {
     try {
@@ -160,17 +163,39 @@ exports.remove = async (req, res) => {
             return res.status(400).json({ error: 'path query parameter is required.' });
         }
 
-        await storageGateway.deleteFile(req.query.path);
+        const deletedPath = req.query.path;
+
+        // Delete from remote storage server
+        await storageGateway.deleteFile(deletedPath);
+
+        // Clean up matching DrawingExtraction records from the database
+        // This covers both single-file deletes and recursive folder deletes
+        try {
+            const DrawingExtraction = require('../models/DrawingExtraction');
+            const cleanPath = deletedPath.replace(/\\/g, '/');
+
+            // Match extractions whose storageGatewayPath equals or starts with the deleted path
+            const deleteResult = await DrawingExtraction.deleteMany({
+                $or: [
+                    { storageGatewayPath: cleanPath },
+                    { storageGatewayPath: { $regex: `^${cleanPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/` } }
+                ]
+            });
+
+            if (deleteResult.deletedCount > 0) {
+                console.log(`[FileGateway] Also removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
+            }
+        } catch (dbErr) {
+            console.error('[FileGateway] DB cleanup warning:', dbErr.message);
+        }
 
         res.json({
             message: 'File deleted successfully.',
-            path: req.query.path,
+            path: deletedPath,
         });
     } catch (err) {
         console.error('[FileGateway] Delete error:', err.message);
-        const status = err.message.includes('Access denied') ? 403
-            : err.message.includes('not found') ? 404 : 502;
-        res.status(status).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };
 
@@ -192,6 +217,6 @@ exports.search = async (req, res) => {
         res.json(result);
     } catch (err) {
         console.error('[FileGateway] Search error:', err.message);
-        res.status(502).json({ error: err.message });
+        res.status(getErrorStatus(err)).json({ error: err.message });
     }
 };

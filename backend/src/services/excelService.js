@@ -491,8 +491,12 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
                 const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
                 const imageId = workbook.addImage({ filename: finalLogo, extension });
-                // Scale logo to top left, roughly spanning A and C columns
-                logSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 5 } });
+                // Merge all top cells to create a completely plain background banner
+                logSheet.mergeCells('A1:Z5');
+                // Fill the merged area with solid white to ensure no gridlines are shown at all
+                logSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                // Scale logo to span C to H columns
+                logSheet.addImage(imageId, { tl: { col: 2, row: 0 }, br: { col: 8, row: 5 } });
             }
         } catch (err) { console.error('[ExcelService] Log logo error:', err.message); }
 
@@ -602,8 +606,8 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
         }
 
         if (numRevs.length > 0) {
-            // Removed top-level 'Sent for Fabrication' header; keep numeric revision sub‑headings only
-            // No merge of cells needed for these columns
+            gHead.getCell(curCol).value = 'Sent for Fabrication';
+            if (numRevs.length > 1) logSheet.mergeCells(L_START + 2, curCol, L_START + 2, curCol + numRevs.length - 1);
             for (let i = 0; i < numRevs.length; i++) gHead.getCell(curCol + i).style = { ...cHeadStyle, fill: fabricFill };
             numRevs.forEach(r => {
                 subHead.getCell(curCol).value = `Rev ${r}`;

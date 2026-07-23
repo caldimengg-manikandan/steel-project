@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="24" uniqueCount="16"><si><t>RFI LOG</t></si><si><t>S.NO</t></si><si><t>RFI #</t></si><si><t>CLIENT RFI #</t></si><si><t>STATUS</t></si><si><t>PRIORITY</t></si><si><t>SENT DATE</t></si><si><t>SEQ/AREA</t></si><si><t>RFI TYPE</t></si><si><t>DESCRIPTION</t></si><si><t>RECVD DATE</t></si><si><t>REMARKS</t></si><si><t>CDRFI LOG</t></si><si><t>CALDIM CDRFI #</t></si><si><t>CLIENT CDRFI #</t></si><si><t>CDRFI TYPE</t></si></sst>
