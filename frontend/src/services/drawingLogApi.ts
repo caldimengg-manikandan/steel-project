@@ -1,7 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || '';
+const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
 export const fetchDrawingLogProjects = async () => {
-    const res = await fetch(`${API_URL}/api/drawing-log/projects`, {
+    const res = await fetch(`${BASE}/drawing-log/projects`, {
         credentials: 'include'
     });
     if (!res.ok) throw new Error('Failed to fetch drawing log projects');
@@ -9,7 +9,7 @@ export const fetchDrawingLogProjects = async () => {
 };
 
 export const fetchDrawingLog = async (projectId: string) => {
-    const res = await fetch(`${API_URL}/api/drawing-log/${projectId}`, {
+    const res = await fetch(`${BASE}/drawing-log/${projectId}`, {
         credentials: 'include'
     });
     if (!res.ok) {
@@ -23,5 +23,5 @@ export const fetchDrawingLog = async (projectId: string) => {
 
 export const getDrawingLogDownloadUrl = (projectId: string) => {
     // Rely on the browser passing the cookie automatically for standard anchor tag downloads.
-    return `${API_URL}/api/drawing-log/${projectId}/download`;
+    return `${BASE}/drawing-log/${projectId}/download`;
 };
