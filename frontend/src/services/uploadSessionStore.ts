@@ -13,6 +13,7 @@ export interface SessionFile {
 export interface UploadSession {
     projectId: string;
     folderName: string;
+    targetPath?: string;
     files: SessionFile[];
     rawFiles: File[];
     active: boolean;
@@ -40,11 +41,12 @@ export const uploadSessionStore = {
         return currentSession;
     },
     
-    startSession(projectId: string, folderName: string, files: SessionFile[], rawFiles: File[]) {
+    startSession(projectId: string, folderName: string, targetPath: string | undefined, files: SessionFile[], rawFiles: File[]) {
         this.clearPolling();
         currentSession = {
             projectId,
             folderName,
+            targetPath,
             files,
             rawFiles,
             active: true,
@@ -78,6 +80,7 @@ export const uploadSessionStore = {
                 [rawFile],
                 currentSession.resultDetails?.transmittalNumber || null,
                 sequences,
+                currentSession.targetPath,
                 (prog: any) => {
                     let speedStr = '0 B/s';
                     if (prog.speed > 1024 * 1024) {

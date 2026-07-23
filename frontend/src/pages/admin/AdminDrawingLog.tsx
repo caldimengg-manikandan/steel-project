@@ -1,30 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminListProjects } from '../../services/projectApi';
-import RfiReportPanel from '../../components/RfiReportPanel';
-import { IconSearch, IconFolder, IconBack } from '../../components/Icons';
-import { getRfiReportDownloadUrl } from '../../services/rfiReportApi';
+import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
+import { IconSearch, IconFolder, IconBack, IconChart } from '../../components/Icons';
+import { fetchDrawingLogProjects, getDrawingLogDownloadUrl } from '../../services/drawingLogApi';
 
-export default function AdminRfiReport() {
-    // mode is read directly from the URL: /admin/rfi-report/:projectId/view OR /admin/rfi-report/:projectId/edit
+export default function AdminDrawingLog() {
     const { projectId: urlProjectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
-
-    // Determine mode from the URL path itself
-    const currentPath = window.location.pathname;
-    const urlMode: 'view' | 'edit' = currentPath.endsWith('/edit') ? 'edit' : 'view';
 
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [error, setError] = useState('');
 
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const res = await adminListProjects();
+                const res = await fetchDrawingLogProjects();
                 setProjects(res.projects || []);
-            } catch (err) {
-                console.error('Failed to load projects', err);
+            } catch (err: any) {
+                console.error('Failed to load drawing log projects', err);
+                setError(err.message || 'Failed to load projects');
             } finally {
                 setLoading(false);
             }
@@ -39,16 +35,16 @@ export default function AdminRfiReport() {
         (p.clientName && p.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    const handleSelectProject = (projectId: string, mode: 'view' | 'edit') => {
-        navigate(`/admin/rfi-report/${projectId}/${mode}`);
+    const handleSelectProject = (projectId: string) => {
+        navigate(`/admin/drawing-log/${projectId}/view`);
     };
 
     const handleBack = () => {
-        navigate('/admin/rfi-report');
+        navigate('/admin/drawing-log');
     };
 
     return (
-        <div className="admin-clients" style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="admin-clients">
             {urlProjectId ? (
                 loading ? (
                     <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading project...</div>
@@ -59,18 +55,14 @@ export default function AdminRfiReport() {
                                 <IconBack />
                             </button>
                             <div>
-                                <h2 className="page-title">{selectedProject.name} - RFI Module</h2>
-                                <p className="page-subtitle">
-                                    {urlMode === 'edit' ? 'Editing RFI report' : 'Viewing RFI report'}
-                                </p>
+                                <h2 className="page-title">{selectedProject.name} - Drawing Log</h2>
+                                <p className="page-subtitle">Viewing Drawing Log</p>
                             </div>
                         </div>
-                        <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 24, minWidth: 0 }}>
-                            <RfiReportPanel
+                        <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 24 }}>
+                            <DrawingExtractionPanel
                                 projectId={urlProjectId}
-                                projectName={selectedProject.name}
-                                initialMode={urlMode}
-                                onModeChange={(mode) => navigate(`/admin/rfi-report/${urlProjectId}/${mode}`)}
+                                canUpload={true}
                             />
                         </div>
                     </>
@@ -83,10 +75,16 @@ export default function AdminRfiReport() {
                 <>
                     <div className="page-header">
                         <div className="page-header-left">
-                            <h2 className="page-title">RFI Module</h2>
-                            <p className="page-subtitle">Select a project to manage its RFIs and CD-RFIs</p>
+                            <h2 className="page-title">Drawing Log Module</h2>
+                            <p className="page-subtitle">Select a project to view and download its drawing log</p>
                         </div>
                     </div>
+
+                    {error && (
+                        <div style={{ background: 'var(--color-danger)', color: 'white', padding: '12px 16px', borderRadius: 8, marginBottom: 24 }}>
+                            {error}
+                        </div>
+                    )}
 
                     <div className="toolbar">
                         <div className="toolbar-left">
@@ -132,39 +130,29 @@ export default function AdminRfiReport() {
                                         <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                                             <strong>Client:</strong> {project.clientName || 'N/A'}
                                         </div>
-                                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                                            <strong>Updated:</strong> {new Date(project.updatedAt).toLocaleDateString()}
-                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="client-card-footer" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                     <button
                                         className="btn btn-secondary btn-sm"
-                                        onClick={() => handleSelectProject(project._id || project.id, 'view')}
+                                        onClick={() => handleSelectProject(project._id || project.id)}
                                         style={{ flex: 1, justifyContent: 'center' }}
                                     >
-                                        View
+                                        View Log
                                     </button>
                                     <button
                                         className="btn btn-primary btn-sm"
-                                        onClick={() => handleSelectProject(project._id || project.id, 'edit')}
+                                        onClick={() => window.open(getDrawingLogDownloadUrl(project._id || project.id), '_blank')}
                                         style={{ flex: 1, justifyContent: 'center' }}
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        className="btn btn-ghost btn-sm"
-                                        onClick={() => window.open(getRfiReportDownloadUrl(project._id || project.id, 'latest'), '_blank')}
-                                        style={{ flex: '1 1 100%', justifyContent: 'center', marginTop: 4 }}
-                                        title="Download Latest RFI Log"
+                                        title="Download Drawing Log Excel"
                                     >
                                         <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" style={{ marginRight: 6 }}>
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                             <polyline points="7 10 12 15 17 10"></polyline>
                                             <line x1="12" y1="15" x2="12" y2="3"></line>
                                         </svg>
-                                        Download Log
+                                        Download
                                     </button>
                                 </div>
                             </div>
@@ -174,10 +162,10 @@ export default function AdminRfiReport() {
                     {filteredProjects.length === 0 && !loading && (
                         <div style={{ textAlign: 'center', padding: 100, background: 'var(--color-bg-card)', borderRadius: 12, border: '1px dashed var(--color-border)' }}>
                             <div style={{ opacity: 0.2, margin: '0 auto 16px', width: 64, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <IconFolder />
+                                <IconChart />
                             </div>
                             <h3 style={{ color: 'var(--color-text-primary)' }}>No projects found</h3>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Try adjusting your search criteria</p>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Only projects with drawing extractions will appear here.</p>
                         </div>
                     )}
                 </>

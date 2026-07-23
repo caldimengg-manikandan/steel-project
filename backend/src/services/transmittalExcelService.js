@@ -52,10 +52,14 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
 
         // ── Logo (top-left, A1:A3 area — free space alongside B2:F2 title) ──
         try {
-            const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+            if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
+                finalLogo = LOGO_DEFAULT;
+            }
             console.log('[TransmittalExcel-SteelFab] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
             if (fs.existsSync(finalLogo)) {
-                const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
+                const extension = finalLogo.toLowerCase().endsWith('.png') ? 'png' : finalLogo.toLowerCase().endsWith('.jpeg') || finalLogo.toLowerCase().endsWith('.jpg') ? 'jpeg' : 'png';
+                const imageId = workbook.addImage({ filename: finalLogo, extension });
                 trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 } });
             }
         } catch (err) { console.error('[TransmittalExcel-SteelFab] Logo error:', err.message); }
@@ -372,10 +376,14 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     // ── Logo ────────────────────────────────────────────────
     try {
-        const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
+            finalLogo = LOGO_DEFAULT;
+        }
         console.log('[DrawingLogExcel] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
         if (fs.existsSync(finalLogo)) {
-            const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
+            const extension = finalLogo.toLowerCase().endsWith('.png') ? 'png' : finalLogo.toLowerCase().endsWith('.jpeg') || finalLogo.toLowerCase().endsWith('.jpg') ? 'jpeg' : 'png';
+            const imageId = workbook.addImage({ filename: finalLogo, extension });
             // Scale logo to span C to H columns
             logSheet.addImage(imageId, { tl: { col: 2, row: 0 }, br: { col: 8, row: 5 } });
             // Merge all top cells to create a completely plain background banner
@@ -403,12 +411,8 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     const alphaRevs = allRevsArr.filter(r => /^[A-Za-z]/.test(r));
     let numRevs = allRevsArr.filter(r => !/^[A-Za-z]/.test(r));
 
-    // Ensure at least Rev A exists for Approval
-    ['A'].forEach(r => { if (!alphaRevs.includes(r)) alphaRevs.push(r); });
     alphaRevs.sort();
 
-    // Ensure at least Rev 0 exists for Fabrication
-    ['0'].forEach(n => { if (!numRevs.includes(n)) numRevs.push(n); });
     numRevs.sort((a, b) => {
         const numA = parseInt(a, 10);
         const numB = parseInt(b, 10);
@@ -544,6 +548,14 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                 allRemarks.add(rh.remarks.toUpperCase().trim());
             }
         });
+
+        // Also include the current latest revision if not already in history
+        if (d.currentRevision) {
+            const curRevKey = String(d.currentRevision).toUpperCase().trim();
+            if (!revMap[curRevKey] && d.date) {
+                revMap[curRevKey] = d.date;
+            }
+        }
 
         // Fallback description from root drawing if remarks are empty
         if (allRemarks.size === 0 && d.description) {

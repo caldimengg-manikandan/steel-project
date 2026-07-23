@@ -79,7 +79,8 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
                 if (savedRfis.length === 0 && res.autoFetch && res.autoFetch.rfis && res.autoFetch.rfis.length > 0) {
                     savedRfis = res.autoFetch.rfis.map((r: any) => ({
                         isCustomRow: false,
-                        rfiNumber: r.rfiNumber,
+                        rfiNumber: r.skNumber || '',
+                        questionNumber: r.rfiNumber || '',
                         clientRfiNumber: r.clientRfiNumber || '',
                         status: r.status,
                         priority: r.priority || '',
@@ -114,7 +115,8 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
             } else if (reportId === 'new' && res.autoFetch) {
                 const initialRfis = res.autoFetch.rfis.map((r: any) => ({
                     isCustomRow: false,
-                    rfiNumber: r.rfiNumber,
+                    rfiNumber: r.skNumber || '',
+                    questionNumber: r.rfiNumber || '',
                     clientRfiNumber: r.clientRfiNumber || '',
                     status: r.status,
                     priority: r.priority || '',
@@ -195,7 +197,20 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
     }
 
     return (
-        <div className="weekly-progress-panel">
+        <div className="weekly-progress-panel" style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+            <style>{`
+                /* Global overrides to prevent the main page from scrolling horizontally */
+                .page-content {
+                    max-width: 100% !important;
+                    overflow-x: hidden !important;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .main-content {
+                    max-width: 100% !important;
+                    overflow-x: hidden !important;
+                }
+            `}</style>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h3 style={{ fontSize: 18, color: 'var(--color-text-primary)' }}>RFI Module - {projectName}</h3>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -234,22 +249,24 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
                 </div>
             </div>
 
-            <div className="card">
+            <div className="card" style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
                 <div className="tabs">
                     {['RFI LOG', 'CDRFI LOG'].map(tab => (
                         <button key={tab} className={`tab-item ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>{tab}</button>
                     ))}
                 </div>
                 
-                <div className="tab-content" style={{ padding: 20, overflowX: 'auto', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                <div className="tab-content" style={{ padding: 20, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
                     {activeTab === 'RFI LOG' && (
-                        <div className="table-wrapper" style={{ minWidth: 0 }}>
-                            <table className="excel-table" style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse' }}>
+                        <>
+                            <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                                <table className="excel-table" style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
                                         <th style={{ width: 50, minWidth: 50, position: 'sticky', left: 0, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>S.NO</th>
                                         <th style={{ width: 120, minWidth: 120, position: 'sticky', left: 50, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>RFI #</th>
-                                        <th style={{ width: 120, minWidth: 120, position: 'sticky', left: 170, zIndex: 10, background: 'var(--color-bg-card, #1e2533)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}>CLIENT RFI #</th>
+                                        <th style={{ width: 120, minWidth: 120, position: 'sticky', left: 170, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>QUESTION NUMBER</th>
+                                        <th style={{ width: 120, minWidth: 120, position: 'sticky', left: 290, zIndex: 10, background: 'var(--color-bg-card, #1e2533)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}>CLIENT RFI #</th>
                                         <th style={{ minWidth: 110 }}>STATUS</th>
                                         <th style={{ minWidth: 110 }}>PRIORITY</th>
                                         <th style={{ minWidth: 130 }}>SENT DATE</th>
@@ -265,7 +282,8 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
                                         <tr key={idx}>
                                             <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'var(--color-bg-card, #fff)' }}><input type="text" className="form-control" style={{ padding: 4, width: '100%', background: 'transparent' }} value={idx + 1} disabled /></td>
                                             <td style={{ position: 'sticky', left: 50, zIndex: 5, background: 'var(--color-bg-card, #fff)' }}><input type="text" className="form-control" style={{ padding: 4, width: '100%', background: 'transparent' }} value={row.rfiNumber} onChange={e => { const nd = [...rfiData]; nd[idx].rfiNumber = e.target.value; setRfiData(nd); }} disabled={!editMode} /></td>
-                                            <td style={{ position: 'sticky', left: 170, zIndex: 5, background: 'var(--color-bg-card, #fff)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}><input type="text" className="form-control" style={{ padding: 4, width: '100%', background: 'transparent' }} value={row.clientRfiNumber} onChange={e => { const nd = [...rfiData]; nd[idx].clientRfiNumber = e.target.value; setRfiData(nd); }} disabled={!editMode} /></td>
+                                            <td style={{ position: 'sticky', left: 170, zIndex: 5, background: 'var(--color-bg-card, #fff)' }}><input type="text" className="form-control" style={{ padding: 4, width: '100%', background: 'transparent' }} value={row.questionNumber} onChange={e => { const nd = [...rfiData]; nd[idx].questionNumber = e.target.value; setRfiData(nd); }} disabled={!editMode} /></td>
+                                            <td style={{ position: 'sticky', left: 290, zIndex: 5, background: 'var(--color-bg-card, #fff)', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.3)' }}><input type="text" className="form-control" style={{ padding: 4, width: '100%', background: 'transparent' }} value={row.clientRfiNumber} onChange={e => { const nd = [...rfiData]; nd[idx].clientRfiNumber = e.target.value; setRfiData(nd); }} disabled={!editMode} /></td>
                                             <td>
                                                 <select className="form-control" style={{ padding: '4px 24px 4px 8px', width: '100%', minWidth: 100 }} value={row.status} onChange={e => { const nd = [...rfiData]; nd[idx].status = e.target.value; setRfiData(nd); }} disabled={!editMode}>
                                                     <option value="OPEN">OPEN</option>
@@ -295,13 +313,15 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
                                     )}
                                 </tbody>
                             </table>
-                            <div style={{ margin: 16 }}><button className="btn btn-primary btn-sm" onClick={() => { setRfiData([...rfiData, { isCustomRow: true, rfiNumber: '', clientRfiNumber: '', status: '', priority: '', sentDate: '', seqArea: '', rfiType: '', description: '', receivedDate: '', remarks: '' }]); if (!editMode) { setEditMode(true); if (onModeChange) onModeChange('edit'); } }}>+ Add Custom RFI</button></div>
                         </div>
+                        <div style={{ margin: 16, marginTop: 16 }}><button className="btn btn-primary btn-sm" onClick={() => { setRfiData([...rfiData, { isCustomRow: true, rfiNumber: '', questionNumber: '', clientRfiNumber: '', status: '', priority: '', sentDate: '', seqArea: '', rfiType: '', description: '', receivedDate: '', remarks: '' }]); if (!editMode) { setEditMode(true); if (onModeChange) onModeChange('edit'); } }}>+ Add Custom RFI</button></div>
+                        </>
                     )}
 
                     {activeTab === 'CDRFI LOG' && (
-                        <div className="table-wrapper" style={{ minWidth: 0 }}>
-                            <table className="excel-table" style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse' }}>
+                        <>
+                            <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                                <table className="excel-table" style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
                                         <th style={{ width: 50, minWidth: 50, position: 'sticky', left: 0, zIndex: 10, background: 'var(--color-bg-card, #1e2533)' }}>S.NO</th>
@@ -352,8 +372,9 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
                                     )}
                                 </tbody>
                             </table>
-                            <div style={{ margin: 16 }}><button className="btn btn-primary btn-sm" onClick={() => { setCdrfiData([...cdrfiData, { isCustomRow: true, caldimCdrfiNo: '', clientCdrfiNo: '', status: '', priority: '', sentDate: '', seqArea: '', cdrfiType: '', description: '', receivedDate: '', remarks: '' }]); if (!editMode) { setEditMode(true); if (onModeChange) onModeChange('edit'); } }}>+ Add Custom CDRFI</button></div>
                         </div>
+                        <div style={{ margin: 16, marginTop: 16 }}><button className="btn btn-primary btn-sm" onClick={() => { setCdrfiData([...cdrfiData, { isCustomRow: true, caldimCdrfiNo: '', clientCdrfiNo: '', status: '', priority: '', sentDate: '', seqArea: '', cdrfiType: '', description: '', receivedDate: '', remarks: '' }]); if (!editMode) { setEditMode(true); if (onModeChange) onModeChange('edit'); } }}>+ Add Custom CDRFI</button></div>
+                        </>
                     )}
                 </div>
             </div>

@@ -151,6 +151,7 @@ export async function uploadFolder(
     files: File[],
     transmittalNumber: number | null | undefined,
     sequences: string[] | undefined,
+    targetPath: string | undefined,
     onProgress?: (progress: { loaded: number; total: number; percentage: number; speed: number }) => void
 ): Promise<{
     message: string;
@@ -178,6 +179,9 @@ export async function uploadFolder(
         }
         if (sequences && sequences.length > 0) {
             sequences.forEach(s => formData.append('sequences', s));
+        }
+        if (targetPath) {
+            formData.append('targetPath', targetPath);
         }
 
         const xhr = new XMLHttpRequest();

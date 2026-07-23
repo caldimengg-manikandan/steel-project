@@ -621,14 +621,17 @@ async function uploadFolder(req, res) {
         const file = req.files[i];
         const relativePath = pathArray[i] || file.originalname;
 
-        // Determine storage path: Projects/<project>/Folder Upload/<relativePath>
-        // Use the top-level folder name from the relative path
-        const targetDir = `Projects/${projectName}/Folder Upload/${path.dirname(relativePath).replace(/\\/g, '/')}`;
-        const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '');
+        // Get the optional base target path (from Storage UI), otherwise default to root project folder
+        const baseTarget = req.body.targetPath || `Projects/${projectName}`;
+        
+        // Determine storage path, preserving the relative upload structure
+        const targetDir = `${baseTarget}/${path.dirname(relativePath).replace(/\\/g, '/')}`;
+        const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '').replace(/\/\.$/, '');
 
         let storageGatewayPath = null;
+        let uploadedToGateway = false;
+
         if (storageGateway.isEnabled()) {
-            let uploaded = false;
             let lastError = null;
             const maxRetries = 5;
             const baseDelay = 1000; // 1 second base delay
@@ -639,7 +642,7 @@ async function uploadFolder(req, res) {
                     await storageGateway.uploadFile(cleanTargetDir, file.originalname, fileBuffer);
                     storageGatewayPath = `${cleanTargetDir}/${file.originalname}`;
                     console.log(`[FolderUpload] Stored: ${storageGatewayPath} (Attempt ${attempt})`);
-                    uploaded = true;
+                    uploadedToGateway = true;
                     break;
                 } catch (err) {
                     lastError = err;
@@ -651,12 +654,32 @@ async function uploadFolder(req, res) {
                 }
             }
 
-            if (!uploaded) {
-                console.error(`[FolderUpload] Failed to store ${relativePath} after ${maxRetries} attempts:`, lastError?.message);
-                uploadResults.push({ name: file.originalname, path: relativePath, status: 'failed', error: lastError?.message || 'Upload failed' });
-                // Cleanup local temp file if upload to storage gateway failed
-                try { fs.unlinkSync(file.path); } catch (_) {}
-                continue;
+            if (!uploadedToGateway) {
+                console.error(`[FolderUpload] Failed to store ${relativePath} to Storage Gateway after ${maxRetries} attempts:`, lastError?.message);
+                uploadResults.push({ name: file.originalname, path: relativePath, status: 'failed_gateway', error: lastError?.message || 'Gateway Upload failed' });
+                console.warn(`[FolderUpload] Continuing without Storage Gateway sync for ${file.originalname}. Falling back to GridFS/Local.`);
+            }
+        }
+
+        // 3. Fallback to GridFS if Storage Gateway is not enabled or if it failed
+        if (!uploadedToGateway) {
+            try {
+                const gridfs = require('../utils/gridfs');
+                const bucket = gridfs.getBucket();
+                if (bucket) {
+                    const uploadStream = bucket.openUploadStream(file.originalname, {
+                        contentType: file.mimetype,
+                        metadata: { originalName: file.originalname, path: cleanTargetDir }
+                    });
+                    fs.createReadStream(file.path).pipe(uploadStream);
+                    await new Promise((resolve, reject) => {
+                        uploadStream.on('finish', resolve);
+                        uploadStream.on('error', reject);
+                    });
+                    console.log(`[FolderUpload] Uploaded to GridFS as fallback: ${file.originalname}`);
+                }
+            } catch (err) {
+                console.error('[FolderUpload] Failed to upload to GridFS:', err.message);
             }
         }
 
