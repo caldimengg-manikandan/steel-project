@@ -244,7 +244,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         }));
 
         // Start global session in store
-        uploadSessionStore.startSession(projectId, topFolderName, initialSessionFiles, fileArray);
+        uploadSessionStore.startSession(projectId, topFolderName, currentPath || undefined, initialSessionFiles, fileArray);
 
         // Step 1: Pre-reserve a single transmittal number if this upload contains drawing PDFs
         let reservedTransmittalNum: number | null = null;
@@ -292,6 +292,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                         [file], // Send ONLY this single file in the request
                         reservedTransmittalNum,
                         sequences || [],
+                        currentPath || undefined,
                         (prog) => {
                             // Calculate global progress
                             const loadedSoFar = totalUploadedBytes + prog.loaded;

@@ -593,10 +593,12 @@ async function uploadFolder(req, res) {
         const file = req.files[i];
         const relativePath = pathArray[i] || file.originalname;
 
-        // Determine storage path: Projects/<project>/Folder Upload/<relativePath>
-        // Use the top-level folder name from the relative path
-        const targetDir = `Projects/${projectName}/Folder Upload/${path.dirname(relativePath).replace(/\\/g, '/')}`;
-        const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '');
+        // Get the optional base target path (from Storage UI), otherwise default to root project folder
+        const baseTarget = req.body.targetPath || `Projects/${projectName}`;
+        
+        // Determine storage path, preserving the relative upload structure
+        const targetDir = `${baseTarget}/${path.dirname(relativePath).replace(/\\/g, '/')}`;
+        const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '').replace(/\/\.$/, '');
 
         let storageGatewayPath = null;
         let uploadedToGateway = false;
