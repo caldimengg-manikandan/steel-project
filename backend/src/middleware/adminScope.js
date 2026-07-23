@@ -16,6 +16,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Project = require('../models/Project');
+const { getExternalProjects } = require('../services/externalProjectService');
 
 /**
  * scopeUserToAdmin
@@ -60,14 +61,23 @@ async function scopeProjectToAdmin(req, res, next) {
 
     if (typeof projectId === 'string') projectId = projectId.trim().replace(/\/$/, "");
 
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        console.error(`[Admin Guard] Blocked invalid projectId: "${projectId}"`);
-        return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
+    let project = null;
+    if (mongoose.Types.ObjectId.isValid(projectId)) {
+        // GLOBAL ADMIN VISIBILITY: Admins can see any project.
+        project = await Project.findOne({ _id: projectId });
     }
 
-    // GLOBAL ADMIN VISIBILITY: Admins can see any project.
-    const project = await Project.findOne({ _id: projectId });
     if (!project) {
+        // Fallback: Check if it's an external project
+        const externalResult = await getExternalProjects();
+        const found = externalResult.projects.find(p => p.id === projectId);
+        if (found) {
+            if (req.method !== 'GET') {
+                return res.status(403).json({ error: 'External projects are read-only.' });
+            }
+            req.scopedProject = found;
+            return next();
+        }
         return res.status(404).json({ error: 'Project not found.' });
     }
 
@@ -129,16 +139,21 @@ async function scopeProjectToUser(req, res, next) {
     const { projectId } = req.params;
     const userId = req.principal.id;
 
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        return res.status(400).json({ error: 'Invalid projectId.' });
+    let project = null;
+    if (mongoose.Types.ObjectId.isValid(projectId)) {
+        project = await Project.findOne({
+            _id: projectId,
+            'assignments.userId': userId,
+        });
     }
 
-    const project = await Project.findOne({
-        _id: projectId,
-        'assignments.userId': userId,
-    });
-
     if (!project) {
+        // Users cannot access external projects
+        const externalResult = await getExternalProjects();
+        const found = externalResult.projects.find(p => p.id === projectId);
+        if (found) {
+            return res.status(403).json({ error: 'External projects are not accessible to users.' });
+        }
         return res.status(404).json({ error: 'Project not found or you are not assigned to it.' });
     }
 
@@ -184,23 +199,31 @@ async function scopeProjectAccess(req, res, next) {
         });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-        console.error(`[Guard] Blocked invalid MongoDB ID: "${projectId}"`);
-        return res.status(400).json({ error: `Invalid projectId format: "${projectId}"` });
-    }
-
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'pm', 'tl'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
-    let project;
-    if (isFullAccess) {
-        // GLOBAL VISIBILITY: Full access roles see all projects
-        project = await Project.findOne({ _id: projectId });
-    } else {
-        project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
+    let project = null;
+    if (mongoose.Types.ObjectId.isValid(projectId)) {
+        if (isFullAccess) {
+            // GLOBAL VISIBILITY: Full access roles see all projects
+            project = await Project.findOne({ _id: projectId });
+        } else {
+            project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
+        }
     }
 
     if (!project) {
+        // Fallback: Check if it's an external project
+        const externalResult = await getExternalProjects();
+        const found = externalResult.projects.find(p => p.id === projectId);
+        if (found) {
+            if (req.method !== 'GET') {
+                return res.status(403).json({ error: 'External projects are read-only.' });
+            }
+            req.scopedProject = found;
+            req.userPermission = 'viewer';
+            return next();
+        }
         return res.status(404).json({ error: 'Project not found or access denied.' });
     }
 

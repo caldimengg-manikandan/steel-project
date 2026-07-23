@@ -101,7 +101,12 @@ export default function UserProjects() {
                                 projects.map((p: Project, i: number) => (
                                     <tr key={p.id}>
                                         <td className="text-muted font-mono" style={{ fontSize: 12 }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>{p.name}</td>
+                                        <td 
+                                            style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                            onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                        >
+                                            {p.name}
+                                        </td>
                                         <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
                                         <td>
                                             <span className={`role-chip ${p.permission || 'viewer'}`}>

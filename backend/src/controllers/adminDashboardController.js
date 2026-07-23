@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Client = require('../models/Client');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { attachProjectStats } = require('../services/projectStatsService');
+const { getExternalProjects } = require('../services/externalProjectService');
 
 /**
  * GET /api/admin/stats
@@ -11,19 +12,43 @@ const { attachProjectStats } = require('../services/projectStatsService');
 async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
 
-    const [projects, users, totalClients] = await Promise.all([
+    const [localProjects, users, totalClients, externalResult] = await Promise.all([
         Project.find({}).sort({ updatedAt: -1 }), // GLOBAL ADMIN VISIBILITY: ALL PROJECTS
         User.find({}).sort({ createdAt: -1 }),    // GLOBAL ADMIN VISIBILITY: ALL USERS
-        Client.countDocuments({})                  // GLOBAL ADMIN VISIBILITY: ALL CLIENTS
+        Client.countDocuments({}),                  // GLOBAL ADMIN VISIBILITY: ALL CLIENTS
+        getExternalProjects()
     ]);
 
-    const projectIds = projects.map(p => p._id);
+    const externalProjects = externalResult.projects || [];
+
+    // Get local projects with their stats first
+    const localProjectsWithStats = await attachProjectStats(localProjects);
+    
+    // Map local projects to a consistent schema structure
+    const mappedLocal = localProjectsWithStats.map(p => ({
+        ...p,
+        id: p._id.toString(),
+        approvalPercentage: p.approvalPercentage,
+        fabricationPercentage: p.fabricationPercentage,
+        isExternal: false
+    }));
+
+    // Combine local and external projects
+    const combinedAll = [
+        ...mappedLocal,
+        ...externalProjects.map(p => ({
+            ...p,
+            isExternal: true,
+            _id: p.id,
+            updatedAt: p.createdAt
+        }))
+    ];
+
+    // Sort combined projects by updatedAt / createdAt descending
+    combinedAll.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
     const totalDrawings = await DrawingExtraction.countDocuments({ status: 'completed' });
-
-    // Use common service for stats to ensure consistency
-    const recentProjectsWithStats = await attachProjectStats(projects.slice(0, 10));
-    const recentProjects = recentProjectsWithStats;
+    const recentProjects = combinedAll.slice(0, 10);
 
     const totalUsers = users.length;
     const activeUsers = users.filter(u => u.status === 'active').length;
@@ -32,7 +57,7 @@ async function getAdminStats(req, res) {
     let totalSequences = 0;
     let completedSequences = 0;
 
-    projects.forEach(p => {
+    combinedAll.forEach(p => {
         if (p.sequences && Array.isArray(p.sequences)) {
             totalSequences += p.sequences.length;
             completedSequences += p.sequences.filter(s => s.status === 'Completed').length;
@@ -40,13 +65,13 @@ async function getAdminStats(req, res) {
     });
 
     const delayedTasks = [];
-    projects.forEach(p => {
+    combinedAll.forEach(p => {
         if (p.sequences && Array.isArray(p.sequences)) {
             p.sequences.forEach(s => {
                 const targetDate = s.approvalDate || s.deadline;
                 if (s.status !== 'Completed' && targetDate && new Date(targetDate) < new Date()) {
-                        delayedTasks.push({
-                            projId: p._id.toString(),
+                    delayedTasks.push({
+                        projId: (p._id || p.id).toString(),
                         projName: p.name,
                         seqName: s.name,
                         deadline: targetDate,
@@ -59,9 +84,9 @@ async function getAdminStats(req, res) {
 
     res.json({
         totalClients,
-        totalProjects: projects.length,
-        activeProjects: projects.filter(p => p.status === 'active').length,
-        onHoldProjects: projects.filter(p => p.status === 'on_hold').length,
+        totalProjects: combinedAll.length,
+        activeProjects: combinedAll.filter(p => p.status === 'active').length,
+        onHoldProjects: combinedAll.filter(p => p.status === 'on_hold').length,
         totalUsers,
         activeUsers,
         totalDrawings,

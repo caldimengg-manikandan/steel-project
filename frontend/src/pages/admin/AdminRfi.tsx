@@ -456,7 +456,7 @@ export default function AdminRfi() {
                         <div style={{ maxHeight: 460, overflowY: 'auto' }}>
                             {projects.map((p: any) => {
                                 const pid = String(p._id || p.id);
-                                const active = pid === projectId;
+                                const active = selectedProject && pid === String(selectedProject._id || selectedProject.id);
                                 return (
                                     <button
                                         key={pid}

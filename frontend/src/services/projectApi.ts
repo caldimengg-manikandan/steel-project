@@ -254,3 +254,17 @@ export async function downloadProjectStatusExcel(): Promise<void> {
     URL.revokeObjectURL(url);
 }
 
+/**
+ * List external projects from App A (via proxy)
+ */
+export async function adminListExternalProjects(): Promise<{
+    count: number;
+    projects: any[];
+    error?: string;
+}> {
+    const res = await fetch(`${BASE}/admin/projects/external`, {
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+

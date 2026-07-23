@@ -56,6 +56,13 @@ export default function AdminDashboard() {
 
     const today = new Date().toISOString().split('T')[0];
 
+    const handleProjectNavigation = (project: any) => {
+        const projectId = String(project?._id || project?.id || '').trim();
+        if (!projectId || projectId === 'undefined') return;
+
+        navigate(`/admin/projects/${projectId}`);
+    };
+
     return (
         <div>
             <div className="page-header">
@@ -237,8 +244,14 @@ export default function AdminDashboard() {
                                                 <tr key={p._id || p.id}>
                                                     <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
                                                 <td 
-                                                    style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
-                                                    onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
+                                                    style={{ 
+                                                        fontWeight: 600, 
+                                                        color: p.isExternal ? 'var(--color-text-primary)' : 'var(--color-primary)', 
+                                                        cursor: 'pointer',
+                                                        textDecoration: 'underline',
+                                                        textUnderlineOffset: '2px'
+                                                    }}
+                                                    onClick={() => handleProjectNavigation(p)}
                                                 >
                                                     {p.name}
                                                 </td>

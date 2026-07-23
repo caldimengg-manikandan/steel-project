@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject } from '../../services/projectApi';
+import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject, adminListExternalProjects } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import type { Project, ProjectStatus, Client, ClientContact } from '../../types';
@@ -65,10 +65,15 @@ export default function AdminProjects() {
     const [sequenceNames, setSequenceNames] = useState<Array<{ name: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>>([]);
     const [seqInput, setSeqInput] = useState<string>('');
     const { logout } = useAuth();
+    const [externalProjects, setExternalProjects] = useState<any[]>([]);
+    const [externalError, setExternalError] = useState('');
 
     const fetchProjects = useCallback(async () => {
         try {
             setLoading(true);
+            setError('');
+            setExternalError('');
+            
             const [projData, clientData] = await Promise.all([
                 adminListProjects(),
                 adminListClients()
@@ -85,6 +90,17 @@ export default function AdminProjects() {
                 id: String(p._id || p.id),
             }));
             setProjects(mapped);
+
+            try {
+                const extData = await adminListExternalProjects();
+                setExternalProjects(extData.projects || []);
+                if (extData.error) {
+                    setExternalError(extData.error);
+                }
+            } catch (extErr: any) {
+                console.error('Failed to load external projects:', extErr);
+                setExternalError(extErr.message || 'External server unreachable');
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -103,7 +119,12 @@ export default function AdminProjects() {
         }
     }, [error, logout, navigate]);
 
-    const filtered = projects.filter(
+    const allProjects = [
+        ...projects.map(p => ({ ...p, isExternal: false })),
+        ...externalProjects.map(p => ({ ...p, isExternal: true }))
+    ];
+
+    const filtered = allProjects.filter(
         (p) =>
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.clientName.toLowerCase().includes(search.toLowerCase())
@@ -222,6 +243,13 @@ export default function AdminProjects() {
         </svg>
     );
 
+    const handleProjectNavigation = (project: Project | any) => {
+        const projectId = String(project?.id || project?._id || '').trim();
+        if (!projectId || projectId === 'undefined') return;
+
+        navigate(`/admin/projects/${projectId}`);
+    };
+
     return (
         <div>
             <div className="page-header">
@@ -237,10 +265,10 @@ export default function AdminProjects() {
             {/* Quick stats row */}
             <div className="stats-grid mb-lg" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                 {[
-                    { label: 'Total', value: projects.length, cls: 'accent-blue' },
-                    { label: 'Active', value: projects.filter((p) => p.status === 'active').length, cls: 'accent-green' },
-                    { label: 'On Hold', value: projects.filter((p) => p.status === 'on_hold').length, cls: 'accent-amber' },
-                    { label: 'Completed', value: projects.filter((p) => p.status === 'completed').length, cls: 'accent-slate' },
+                    { label: 'Total Projects', value: allProjects.length, cls: 'accent-blue' },
+                    { label: 'Active', value: allProjects.filter((p) => p.status === 'active').length, cls: 'accent-green' },
+                    { label: 'On Hold', value: allProjects.filter((p) => p.status === 'on_hold').length, cls: 'accent-amber' },
+                    { label: 'Completed', value: allProjects.filter((p) => p.status === 'completed').length, cls: 'accent-slate' },
                 ].map(({ label, value, cls }) => (
                     <div className={`stat-card ${cls}`} key={label}>
                         <div className="stat-card-label">{label}</div>
@@ -264,13 +292,20 @@ export default function AdminProjects() {
                     />
                 </div>
                 <span style={{ fontSize: 13, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
-                    {filtered.length} of {projects.length} projects
+                    {filtered.length} of {allProjects.length} projects
                 </span>
             </div>
 
             {error && (
                 <div className="info-box danger mb-md" style={{ padding: '12px 16px', borderRadius: 8 }}>
                     <strong>Error:</strong> {error}
+                    <button onClick={fetchProjects} className="btn btn-ghost btn-sm" style={{ marginLeft: 12 }}>Retry</button>
+                </div>
+            )}
+
+            {externalError && (
+                <div className="info-box danger mb-md" style={{ padding: '12px 16px', borderRadius: 8 }}>
+                    <strong>External Projects Info:</strong> {externalError}
                     <button onClick={fetchProjects} className="btn btn-ghost btn-sm" style={{ marginLeft: 12 }}>Retry</button>
                 </div>
             )}
@@ -294,20 +329,31 @@ export default function AdminProjects() {
                                 <th>Approval %</th>
                                 <th>Fabrication %</th>
                                 <th>Sequence</th>
+                                <th>Origin</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={10} className="table-empty">No projects match your search.</td></tr>
+                                <tr><td colSpan={11} className="table-empty">No projects match your search.</td></tr>
                             ) : (
                                 filtered.map((p, i) => (
                                     <tr key={p.id}>
                                         <td className="text-muted font-mono" style={{ fontSize: 12 }}>{i + 1}</td>
                                         <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
                                         <td>
-                                            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>
+                                            <span
+                                                onClick={() => handleProjectNavigation(p)}
+                                                style={{
+                                                    fontWeight: 700,
+                                                    fontSize: 14,
+                                                    color: 'var(--color-text-primary)',
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline',
+                                                    textUnderlineOffset: '2px'
+                                                }}
+                                            >
                                                 {p.name}
                                             </span>
                                         </td>
@@ -332,33 +378,48 @@ export default function AdminProjects() {
                                             </div>
                                         </td>
                                         <td>
-                                            <div 
-                                                onClick={() => {
-                                                    setEditTarget({ ...p });
-                                                    setEditMode('sequences');
-                                                    setSeqInput((p.sequences?.length || 0).toString());
-                                                }}
-                                                title="Manage Sequences"
-                                                style={{ 
-                                                    cursor: 'pointer', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    gap: 6, 
-                                                    background: '#f8fafc', 
-                                                    padding: '4px 12px', 
-                                                    borderRadius: '8px', 
-                                                    border: '1px solid #e2e8f0',
-                                                    width: 'fit-content'
-                                                }}
-                                            >
-                                                <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
-                                                <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
-                                                <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
-                                            </div>
+                                            {p.isExternal ? (
+                                                <span className="text-muted">—</span>
+                                            ) : (
+                                                <div 
+                                                    onClick={() => {
+                                                        setEditTarget({ ...p });
+                                                        setEditMode('sequences');
+                                                        setSeqInput((p.sequences?.length || 0).toString());
+                                                    }}
+                                                    title="Manage Sequences"
+                                                    style={{ 
+                                                        cursor: 'pointer', 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        gap: 6, 
+                                                        background: '#f8fafc', 
+                                                        padding: '4px 12px', 
+                                                        borderRadius: '8px', 
+                                                        border: '1px solid #e2e8f0',
+                                                        width: 'fit-content'
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
+                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
+                                                    <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
-                                            <span className={`badge ${STATUS_CLS[p.status]}`}>
-                                                {STATUS_LABEL[p.status]}
+                                            {p.isExternal ? (
+                                                <span className="badge badge-neutral" style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>
+                                                    Project Management
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-neutral" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                                                    Local
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${STATUS_CLS[p.status as ProjectStatus] || 'badge-neutral'}`}>
+                                                {p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status}
                                             </span>
                                         </td>
                                         <td>
@@ -371,33 +432,39 @@ export default function AdminProjects() {
                                                 >
                                                     <IconOpen /> Open
                                                 </button>
-                                                <button
-                                                    className="btn btn-ghost btn-sm btn-icon"
-                                                    onClick={() => {
-                                                        setEditTarget({ ...p });
-                                                        setEditMode('full');
-                                                        setSeqInput((p.sequences?.length || 0).toString());
-                                                    }}
-                                                    title="Edit"
-                                                >
-                                                    <IconEdit />
-                                                </button>
-                                                <button
-                                                    className="btn btn-danger btn-sm btn-icon"
-                                                    onClick={() => setDeleteTarget(p)}
-                                                    title="Delete"
-                                                >
-                                                    <IconTrash />
-                                                </button>
+                                                {p.isExternal ? (
+                                                    <span className="text-muted" style={{ fontSize: 11.5, fontStyle: 'italic', marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>Read-Only</span>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            className="btn btn-ghost btn-sm btn-icon"
+                                                            onClick={() => {
+                                                                setEditTarget({ ...p });
+                                                                setEditMode('full');
+                                                                setSeqInput((p.sequences?.length || 0).toString());
+                                                            }}
+                                                            title="Edit"
+                                                        >
+                                                            <IconEdit />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-danger btn-sm btn-icon"
+                                                            onClick={() => setDeleteTarget(p)}
+                                                            title="Delete"
+                                                        >
+                                                            <IconTrash />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
                                 ))
                             )}
                         </tbody>
-                        </table>
-                    )}
-                </div>
+                    </table>
+                )}
+            </div>
 
             {/* ── Create Modal ── */}
             {showCreate && (

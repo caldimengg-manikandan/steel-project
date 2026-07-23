@@ -126,6 +126,10 @@ exports.listTransmittals = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
+    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
+        return res.json({ transmittals: [] });
+    }
+
     let transmittals = await getTransmittals(projectId);
 
     // ── Include In-Flight Transmittals ────────────────────

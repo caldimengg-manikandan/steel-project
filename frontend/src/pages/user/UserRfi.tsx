@@ -427,7 +427,7 @@ export default function UserRfi() {
                         <div style={{ maxHeight: 460, overflowY: 'auto' }}>
                             {projects.map((p: any) => {
                                 const pid = p._id || p.id;
-                                const active = pid === projectId;
+                                const active = selectedProject && String(pid) === String(selectedProject._id || selectedProject.id);
                                 return (
                                     <button
                                         key={pid}

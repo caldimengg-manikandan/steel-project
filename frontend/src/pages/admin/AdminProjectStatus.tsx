@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminListProjects, downloadProjectStatusExcel } from '../../services/projectApi';
+import { adminListProjects, downloadProjectStatusExcel, adminListExternalProjects } from '../../services/projectApi';
 import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
 
@@ -51,6 +51,8 @@ function IconChevron({ open }: { open: boolean }) {
 export default function AdminProjectStatus() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
+    const [externalProjects, setExternalProjects] = useState<any[]>([]);
+    const [externalError, setExternalError] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [downloading, setDownloading] = useState(false);
@@ -66,12 +68,52 @@ export default function AdminProjectStatus() {
         try {
             setLoading(true);
             setError('');
+            setExternalError('');
+
             const data = await adminListProjects();
             const mapped = data.projects.map((p: any) => ({
                 ...p,
                 id: p._id || p.id,
+                isExternal: false
             }));
             setProjects(mapped);
+
+            try {
+                const extData = await adminListExternalProjects();
+                const mappedExt = (extData.projects || []).map((p: any) => {
+                    const drawingCount = p.approximateDrawingsCount || 0;
+                    const approvalCount = Math.round(((p.approvalPercentage || 0) * drawingCount) / 100);
+                    const fabricationCount = Math.round(((p.fabricationPercentage || 0) * drawingCount) / 100);
+                    
+                    const totalCO = p.corStatus?.totalCORItems || 0;
+                    const approvedCO = p.corStatus?.statusSummary?.Approved || 0;
+                    const workCompletedCO = p.corStatus?.statusSummary?.Completed || 0;
+                    const pendingCO = p.corStatus?.statusSummary?.Submitted || 0;
+
+                    return {
+                        ...p,
+                        id: p.id || p._id,
+                        drawingCount,
+                        approvalCount,
+                        fabricationCount,
+                        openRfiCount: 0,
+                        closedRfiCount: 0,
+                        sequences: [],
+                        totalCO,
+                        approvedCO,
+                        workCompletedCO,
+                        pendingCO,
+                        isExternal: true
+                    };
+                });
+                setExternalProjects(mappedExt);
+                if (extData.error) {
+                    setExternalError(extData.error);
+                }
+            } catch (extErr: any) {
+                console.error('Failed to load external projects:', extErr);
+                setExternalError(extErr.message || 'External server unreachable');
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -118,8 +160,13 @@ export default function AdminProjectStatus() {
         }
     };
 
-    const totalProjects = projects.length;
-    const activeProjects = projects.filter((p) => p.status === 'active').length;
+    const allProjects = [
+        ...projects,
+        ...externalProjects
+    ];
+
+    const totalProjects = allProjects.length;
+    const activeProjects = allProjects.filter((p) => p.status === 'active').length;
 
     async function handleDownloadStatusExcel() {
         try {
@@ -161,7 +208,7 @@ export default function AdminProjectStatus() {
                 <div className="stat-card accent-green">
                     <div className="stat-card-label">Overall Completion</div>
                     <div className="stat-card-value text-green">
-                        {totalProjects > 0 ? Math.round(projects.reduce((sum, p) => sum + (p.fabricationPercentage || 0), 0) / totalProjects) : 0}%
+                        {totalProjects > 0 ? Math.round(allProjects.reduce((sum, p) => sum + (p.fabricationPercentage || 0), 0) / totalProjects) : 0}%
                     </div>
                     <div className="stat-card-meta">Average fabrication progress</div>
                 </div>
@@ -181,13 +228,13 @@ export default function AdminProjectStatus() {
                     <div className="spinner mb-md"></div>
                     <p className="text-muted">Loading project status...</p>
                 </div>
-            ) : projects.length === 0 ? (
+            ) : allProjects.length === 0 ? (
                 <div className="table-empty" style={{ padding: '60px 0', background: 'var(--color-bg-card)', borderRadius: 10, border: '1px solid var(--color-border)' }}>
                     <p>No projects found. Create a project first.</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                    {projects.map((project, index) => {
+                    {allProjects.map((project, index) => {
                         const fabricationCount = (project as any).fabricationCount || 0;
                         const approvedCount = (project as any).approvalCount || 0;
                         const openRfiCount = project.openRfiCount || 0;
@@ -225,8 +272,8 @@ export default function AdminProjectStatus() {
                                         <div className="project-status-client">{project.clientName}</div>
                                     </div>
                                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
-                                        <span className={`badge ${STATUS_CLS[project.status]}`} style={{ padding: '6px 12px' }}>
-                                            {STATUS_LABEL[project.status]}
+                                        <span className={`badge ${STATUS_CLS[project.status as TypeProjectStatus]}`} style={{ padding: '6px 12px' }}>
+                                            {STATUS_LABEL[project.status as TypeProjectStatus]}
                                         </span>
                                     </div>
                                 </div>

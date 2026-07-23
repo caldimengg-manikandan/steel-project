@@ -223,6 +223,10 @@ exports.checkDuplicates = async (req, res) => {
 exports.listExtractions = async (req, res) => {
     const { projectId } = req.params;
 
+    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
+        return res.json({ extractions: [], hasExcel: false, excelDownloadUrl: null });
+    }
+
     const extractions = await DrawingExtraction.find({
         projectId,
     })

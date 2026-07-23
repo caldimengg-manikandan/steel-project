@@ -67,6 +67,10 @@ exports.listRfiExtractions = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
 
+    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
+        return res.json({ extractions: [] });
+    }
+
     try {
         const extractions = await RfiExtraction.find({ projectId }) // GLOBAL ADMIN VISIBILITY: REMOVE createdByAdminId FILTER
             .sort({ createdAt: -1 })

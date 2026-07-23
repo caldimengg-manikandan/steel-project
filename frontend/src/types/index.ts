@@ -106,6 +106,11 @@ export interface Project {
     permission?: ProjectPermission;
     /** User-specific permission (injected for user dashboard) */
     myPermission?: ProjectPermission;
+    corStatus?: {
+        hasCOR: boolean;
+        totalCORItems: number;
+        statusSummary: Record<string, number>;
+    } | null;
 }
 
 export interface AuthUser {

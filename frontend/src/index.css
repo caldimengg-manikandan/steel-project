@@ -2154,4 +2154,9 @@ textarea.form-control {
 
 .sidebar.collapsed .sidebar-toggle-btn {
   transform: rotate(180deg);
+}
+
+/* Accent purple for external projects */
+.stat-card.accent-purple {
+  border-left: 4px solid #a855f7;
 }

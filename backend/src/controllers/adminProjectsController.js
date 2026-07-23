@@ -22,6 +22,7 @@ const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
 const { attachProjectStats } = require('../services/projectStatsService');
+const { getExternalProjects } = require('../services/externalProjectService');
 
 /**
  * GET /api/admin/projects
@@ -107,6 +108,24 @@ async function createProject(req, res) {
  * req.scopedProject is pre-loaded by scopeProjectToAdmin.
  */
 async function getProject(req, res) {
+    if (req.scopedProject && req.scopedProject.isExternal) {
+        const p = req.scopedProject;
+        const drawingCount = p.approximateDrawingsCount || 0;
+        const approvalCount = Math.round(((p.approvalPercentage || 0) * drawingCount) / 100);
+        const fabricationCount = Math.round(((p.fabricationPercentage || 0) * drawingCount) / 100);
+        const projectWithStats = {
+            ...p,
+            _id: p.id,
+            drawingCount,
+            approvalCount,
+            fabricationCount,
+            openRfiCount: 0,
+            closedRfiCount: 0,
+            sequences: [],
+            assignments: []
+        };
+        return res.json({ project: projectWithStats });
+    }
     const projectWithStats = await attachProjectStats(req.scopedProject);
     res.json({ project: projectWithStats });
 }
@@ -495,6 +514,15 @@ async function reserveTransmittalNumber(req, res) {
     res.json({ transmittalNumber: updated.transmittalCount });
 }
 
+/**
+ * GET /api/admin/projects/external
+ * Retrieves projects and metadata from external App A.
+ */
+async function listExternalProjects(req, res) {
+    const result = await getExternalProjects();
+    res.json(result);
+}
+
 module.exports = {
     listProjects,
     createProject,
@@ -506,4 +534,5 @@ module.exports = {
     downloadAllProjectsStatusExcel,
     uploadCOR,
     reserveTransmittalNumber,
+    listExternalProjects,
 };

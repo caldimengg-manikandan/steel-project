@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { userListProjects } from '../../services/projectApi';
 import type { Project, ProjectPermission } from '../../types';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function UserDashboard() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -128,7 +131,12 @@ export default function UserDashboard() {
                                             return (
                                                 <tr key={p.id}>
                                                     <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
-                                                    <td style={{ fontWeight: 700 }}>{p.name}</td>
+                                                    <td 
+                                                        style={{ fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                                        onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                                    >
+                                                        {p.name}
+                                                    </td>
                                                     <td>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                             <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>

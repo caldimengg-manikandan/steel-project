@@ -18,7 +18,7 @@ const {
     listProjects, createProject, getProject,
     updateProject, deleteProject, assignUser, removeAssignment,
     downloadAllProjectsStatusExcel, uploadCOR,
-    reserveTransmittalNumber,
+    reserveTransmittalNumber, listExternalProjects,
 } = require('../controllers/adminProjectsController');
 const multer = require('multer');
 const path = require('path');
@@ -42,6 +42,9 @@ router.use(verifyToken, requireAdmin);
 
 // ── Project Status Excel (Must be before /:projectId to avoid route collision) ──
 router.get('/status/excel', downloadAllProjectsStatusExcel);
+
+// External Projects (Must be before /:projectId to avoid collision)
+router.get('/external', listExternalProjects);
 
 // Project CRUD
 router.get('/', listProjects);
