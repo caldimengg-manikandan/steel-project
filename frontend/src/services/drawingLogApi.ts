@@ -1,22 +1,16 @@
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const fetchDrawingLogProjects = async () => {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/drawing-log/projects`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
     });
     if (!res.ok) throw new Error('Failed to fetch drawing log projects');
     return res.json();
 };
 
 export const fetchDrawingLog = async (projectId: string) => {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/drawing-log/${projectId}`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
     });
     if (!res.ok) {
         if (res.status === 404) {
@@ -28,5 +22,6 @@ export const fetchDrawingLog = async (projectId: string) => {
 };
 
 export const getDrawingLogDownloadUrl = (projectId: string) => {
-    return `${API_URL}/api/drawing-log/${projectId}/download?token=${localStorage.getItem('token')}`;
+    // Rely on the browser passing the cookie automatically for standard anchor tag downloads.
+    return `${API_URL}/api/drawing-log/${projectId}/download`;
 };
