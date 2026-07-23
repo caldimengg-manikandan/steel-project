@@ -63,18 +63,12 @@ async function scopeProjectToAdmin(req, res, next) {
 
     let project = null;
     if (mongoose.Types.ObjectId.isValid(projectId)) {
-        // GLOBAL ADMIN VISIBILITY: Admins can see any project.
-        project = await Project.findOne({ _id: projectId });
+        const query = { _id: projectId };
+        if (req.principal.role !== 'superadmin') {
+            query.createdByAdminId = adminId;
+        }
+        project = await Project.findOne(query);
     }
-
-<<<<<<< HEAD
-=======
-    const query = { _id: projectId };
-    if (req.principal.role !== 'superadmin') {
-        query.createdByAdminId = adminId;
-    }
-    const project = await Project.findOne(query);
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
     if (!project) {
         // Fallback: Check if it's an external project
         const externalResult = await getExternalProjects();
@@ -213,26 +207,15 @@ async function scopeProjectAccess(req, res, next) {
     const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'pm', 'tl'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
-<<<<<<< HEAD
     let project = null;
-    if (mongoose.Types.ObjectId.isValid(projectId)) {
-        if (isFullAccess) {
-            // GLOBAL VISIBILITY: Full access roles see all projects
-            project = await Project.findOne({ _id: projectId });
-        } else {
-            project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
-        }
-=======
-    let project;
-    if (isFullAccess) {
+    if (isFullAccess && mongoose.Types.ObjectId.isValid(projectId)) {
         const query = { _id: projectId };
         if (role !== 'superadmin') {
-             query.createdByAdminId = adminId;
+            query.createdByAdminId = adminId;
         }
         project = await Project.findOne(query);
     } else {
         project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
     }
 
     if (!project) {

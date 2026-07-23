@@ -26,12 +26,9 @@ const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
 const { attachProjectStats } = require('../services/projectStatsService');
-<<<<<<< HEAD
 const { getExternalProjects } = require('../services/externalProjectService');
-=======
 const storageGateway = require('../utils/storageGateway');
 const { runExtractionPipeline } = require('../services/extractionService');
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
 
 /**
  * GET /api/admin/projects
@@ -568,14 +565,15 @@ async function reserveTransmittalNumber(req, res) {
 }
 
 /**
-<<<<<<< HEAD
  * GET /api/admin/projects/external
  * Retrieves projects and metadata from external App A.
  */
 async function listExternalProjects(req, res) {
     const result = await getExternalProjects();
     res.json(result);
-=======
+}
+
+/**
  * POST /api/admin/projects/:projectId/upload-folder
  *
  * Accepts: multipart/form-data with:
@@ -740,7 +738,6 @@ async function uploadFolder(req, res) {
         results: uploadResults,
         drawings: savedDocs.map(d => ({ name: d.originalFileName, folder: d.folderName, id: d._id.toString() })),
     });
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
 }
 
 module.exports = {
@@ -754,9 +751,6 @@ module.exports = {
     downloadAllProjectsStatusExcel,
     uploadCOR,
     reserveTransmittalNumber,
-<<<<<<< HEAD
     listExternalProjects,
-=======
     uploadFolder,
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
 };

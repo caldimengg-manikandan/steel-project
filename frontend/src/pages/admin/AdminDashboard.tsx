@@ -245,51 +245,6 @@ export default function AdminDashboard() {
                                         (stats.recentProjects || [])
                                             .filter((p: any) => clientFilter === 'ALL' || p.clientName === clientFilter)
                                             .map((p: any) => {
-<<<<<<< HEAD
-                                            const hasDelayed = (p.sequences || []).some((s: any) => {
-                                                const targetDate = s.approvalDate || s.deadline;
-                                                return s.status !== 'Completed' && targetDate && targetDate < today;
-                                            });
-                                            return (
-                                                <tr key={p._id || p.id}>
-                                                    <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
-                                                <td 
-                                                    style={{ 
-                                                        fontWeight: 600, 
-                                                        color: p.isExternal ? 'var(--color-text-primary)' : 'var(--color-primary)', 
-                                                        cursor: 'pointer',
-                                                        textDecoration: 'underline',
-                                                        textUnderlineOffset: '2px'
-                                                    }}
-                                                    onClick={() => handleProjectNavigation(p)}
-                                                >
-                                                    {p.name}
-                                                </td>
-                                                <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
-                                                            <div style={{width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)'}} />
-                                                        </div>
-                                                        <span style={{fontSize: 11, fontWeight: 700}}>{p.approvalPercentage || 0}%</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
-                                                            <div style={{width: `${p.fabricationPercentage || 0}%`, height: '100%', background: 'var(--color-success-mid)'}} />
-                                                        </div>
-                                                        <span style={{fontSize: 11, fontWeight: 700}}>{p.fabricationPercentage || 0}%</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    {(() => {
-                                                        const s = p.sequences || [];
-                                                        const total = s.length;
-                                                        const done = s.filter((seq: any) => seq.status === 'Completed').length;
-                                                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                                                        return (
-=======
                                                 const hasDelayed = (p.sequences || []).some((s: any) => {
                                                     const targetDate = s.approvalDate || s.deadline;
                                                     return s.status !== 'Completed' && targetDate && targetDate < today;
@@ -297,28 +252,33 @@ export default function AdminDashboard() {
                                                 return (
                                                     <tr key={p._id || p.id}>
                                                         <td style={{ color: 'var(--color-text-secondary)' }}>{p.clientName}</td>
-                                                        <td
-                                                            style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
-                                                            onClick={() => navigate(`/admin/projects/${String(p._id || p.id)}`)}
+                                                        <td 
+                                                            style={{ 
+                                                                fontWeight: 600, 
+                                                                color: p.isExternal ? 'var(--color-text-primary)' : 'var(--color-primary)', 
+                                                                cursor: 'pointer',
+                                                                textDecoration: 'underline',
+                                                                textUnderlineOffset: '2px'
+                                                            }}
+                                                            onClick={() => handleProjectNavigation(p)}
                                                         >
                                                             {p.name}
                                                         </td>
                                                         <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
                                                         <td>
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
-                                                                    <div style={{ width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)' }} />
+                                                                <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
+                                                                    <div style={{width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)'}} />
                                                                 </div>
-                                                                <span style={{ fontSize: 11, fontWeight: 700 }}>{p.approvalPercentage || 0}%</span>
+                                                                <span style={{fontSize: 11, fontWeight: 700}}>{p.approvalPercentage || 0}%</span>
                                                             </div>
                                                         </td>
                                                         <td>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
-                                                                    <div style={{ width: `${p.fabricationPercentage || 0}%`, height: '100%', background: 'var(--color-success-mid)' }} />
+                                                                <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>
+                                                                    <div style={{width: `${p.fabricationPercentage || 0}%`, height: '100%', background: 'var(--color-success-mid)'}} />
                                                                 </div>
-                                                                <span style={{ fontSize: 11, fontWeight: 700 }}>{p.fabricationPercentage || 0}%</span>
+                                                                <span style={{fontSize: 11, fontWeight: 700}}>{p.fabricationPercentage || 0}%</span>
                                                             </div>
                                                         </td>
                                                         <td>

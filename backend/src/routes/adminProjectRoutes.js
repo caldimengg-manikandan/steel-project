@@ -18,11 +18,7 @@ const {
     listProjects, createProject, getProject,
     updateProject, deleteProject, assignUser, removeAssignment,
     downloadAllProjectsStatusExcel, uploadCOR,
-<<<<<<< HEAD
-    reserveTransmittalNumber, listExternalProjects,
-=======
-    reserveTransmittalNumber, uploadFolder,
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
+    reserveTransmittalNumber, listExternalProjects, uploadFolder,
 } = require('../controllers/adminProjectsController');
 const multer = require('multer');
 const path = require('path');

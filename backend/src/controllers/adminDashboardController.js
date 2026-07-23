@@ -20,20 +20,12 @@ async function getAdminStats(req, res) {
         userFilter.adminId = adminId;
     }
 
-<<<<<<< HEAD
     const [localProjects, users, totalClients, externalResult] = await Promise.all([
-        Project.find({}).sort({ updatedAt: -1 }), // GLOBAL ADMIN VISIBILITY: ALL PROJECTS
-        User.find({}).sort({ createdAt: -1 }),    // GLOBAL ADMIN VISIBILITY: ALL USERS
-        Client.countDocuments({}),                  // GLOBAL ADMIN VISIBILITY: ALL CLIENTS
+        Project.find(filter).sort({ updatedAt: -1 }),
+        User.find(userFilter).sort({ createdAt: -1 }),
+        Client.countDocuments(req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId }),
         getExternalProjects()
     ]);
-=======
-    const [projects, users, totalClients] = await Promise.all([
-            Project.find(filter).sort({ updatedAt: -1 }), 
-            User.find(userFilter).sort({ createdAt: -1 }),    
-            Client.countDocuments(req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId })
-        ]);
->>>>>>> 0731e08587a2cb9280215662a0f6fb608d4e16f3
 
     const externalProjects = externalResult.projects || [];
 
