@@ -549,6 +549,14 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
             }
         });
 
+        // Also include the current latest revision if not already in history
+        if (d.currentRevision) {
+            const curRevKey = String(d.currentRevision).toUpperCase().trim();
+            if (!revMap[curRevKey] && d.date) {
+                revMap[curRevKey] = d.date;
+            }
+        }
+
         // Fallback description from root drawing if remarks are empty
         if (allRemarks.size === 0 && d.description) {
             allRemarks.add(d.description.toUpperCase().trim());
