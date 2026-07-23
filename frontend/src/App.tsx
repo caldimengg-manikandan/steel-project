@@ -14,6 +14,7 @@ import AdminRfi from './pages/admin/AdminRfi';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReports from './pages/admin/AdminReports';
 import AdminClients from './pages/admin/AdminClients';
+import AdminDrawingLog from './pages/admin/AdminDrawingLog';
 import AdminWeeklyProgress from './pages/admin/AdminWeeklyProgress';
 import AdminRfiReport from './pages/admin/AdminRfiReport';
 import AdminErrorLog from './pages/admin/AdminErrorLog';
@@ -52,6 +53,8 @@ export default function App() {
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="permissions" element={<AdminPermissions />} />
                 <Route path="clients" element={<AdminClients />} />
+                <Route path="drawing-log" element={<AdminDrawingLog />} />
+                <Route path="drawing-log/:projectId/:mode" element={<AdminDrawingLog />} />
                 <Route path="rfi" element={<AdminRfi />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="reports" element={<AdminReports />} />

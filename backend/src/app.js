@@ -124,6 +124,7 @@ app.use('/api/admin/activity-logs', activityLogRoutes);
 app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
 app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));
 app.use('/api/error-log', require('./routes/errorLogRoutes'));
+app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

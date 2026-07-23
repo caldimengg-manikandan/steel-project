@@ -19,6 +19,7 @@ const rfiReportSchema = new mongoose.Schema({
     rfiData: [{
         isCustomRow: Boolean,
         rfiNumber: String,
+        questionNumber: String,
         clientRfiNumber: String,
         status: String,
         priority: String,

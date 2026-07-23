@@ -259,40 +259,28 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
     const summarySheet = workbook.getWorksheet('SUMMARY');
     if (summarySheet && report.summaryData) {
         const data = report.summaryData;
-        if (data.date) summarySheet.getCell('C3').value = data.date;
-        if (data.projectName) summarySheet.getCell('C4').value = data.projectName;
-        if (data.projectNo) summarySheet.getCell('L4').value = data.projectNo;
-        if (data.clientName) summarySheet.getCell('C5').value = data.clientName;
-        if (data.clientProjectNo) summarySheet.getCell('L5').value = data.clientProjectNo;
-        if (data.clientAddress) summarySheet.getCell('C6').value = data.clientAddress;
-        if (data.clientProjectManager) summarySheet.getCell('C8').value = data.clientProjectManager;
-        if (data.reportCirculatedTo1) summarySheet.getCell('C9').value = data.reportCirculatedTo1;
-        if (data.caldimProjectManager) summarySheet.getCell('C10').value = data.caldimProjectManager;
-        if (data.reportCirculatedTo2) summarySheet.getCell('C11').value = data.reportCirculatedTo2;
-        if (data.projectType) summarySheet.getCell('E16').value = data.projectType;
+        if (data.date) summarySheet.getCell('D3').value = data.date;
+        if (data.projectName) summarySheet.getCell('D4').value = data.projectName;
+        if (data.projectNo) summarySheet.getCell('M4').value = data.projectNo;
+        if (data.clientName) summarySheet.getCell('D5').value = data.clientName;
+        if (data.clientProjectNo) summarySheet.getCell('M5').value = data.clientProjectNo;
+        if (data.clientAddress) summarySheet.getCell('D6').value = data.clientAddress;
+        if (data.clientProjectManager) summarySheet.getCell('D8').value = data.clientProjectManager;
+        if (data.reportCirculatedTo1) summarySheet.getCell('D9').value = data.reportCirculatedTo1;
+        if (data.caldimProjectManager) summarySheet.getCell('D10').value = data.caldimProjectManager;
+        if (data.reportCirculatedTo2) summarySheet.getCell('D11').value = data.reportCirculatedTo2;
+        if (data.projectType) summarySheet.getCell('F14').value = data.projectType;
         if (data.projectDescription) {
-            const lines = data.projectDescription.split('\n');
-            for (let i = 0; i < Math.min(lines.length, 3); i++) {
-                summarySheet.getCell(`B${17 + i}`).value = lines[i];
-            }
+            summarySheet.getCell('B15').value = data.projectDescription;
         }
         if (data.projectStatusLastWeek) {
-            const lines = data.projectStatusLastWeek.split('\n');
-            for (let i = 0; i < Math.min(lines.length, 3); i++) {
-                summarySheet.getCell(`B${22 + i}`).value = lines[i];
-            }
+            summarySheet.getCell('B20').value = data.projectStatusLastWeek;
         }
         if (data.overallApprovalStatus) {
-            const lines = data.overallApprovalStatus.split('\n');
-            for (let i = 0; i < Math.min(lines.length, 2); i++) {
-                summarySheet.getCell(`B${27 + i}`).value = lines[i];
-            }
+            summarySheet.getCell('B25').value = data.overallApprovalStatus;
         }
         if (data.overallFabricationStatus) {
-            const lines = data.overallFabricationStatus.split('\n');
-            for (let i = 0; i < Math.min(lines.length, 2); i++) {
-                summarySheet.getCell(`B${31 + i}`).value = lines[i];
-            }
+            summarySheet.getCell('B29').value = data.overallFabricationStatus;
         }
 
         // Handle Logo insertion if available

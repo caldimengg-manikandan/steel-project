@@ -17,6 +17,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/admin/status': 'Project Status',
     '/admin/settings': 'System Settings',
     '/admin/reports': 'Reports & Analytics',
+    '/admin/drawing-log': 'Drawing Log',
     '/dashboard': 'My Dashboard',
     '/dashboard/projects': 'My Projects',
     '/dashboard/rfi': 'My RFIs',
