@@ -298,12 +298,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         const resolvedBase = (baseUrl || '').toString().replace(/\/$/, '');
         
         let href = '';
-        if (item.storageGatewayPath && storageRoot) {
-            let baseWinPath = storageRoot.replace(/\//g, '\\');
-            if (!baseWinPath.endsWith('\\')) baseWinPath += '\\';
-            const relativeWinPath = item.storageGatewayPath.replace(/\//g, '\\');
-            href = baseWinPath + relativeWinPath;
-        } else if (item.extractionId && item.projectId) {
+        if (item.extractionId && item.projectId) {
             href = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/view.pdf?token=${token}`;
         }
 
