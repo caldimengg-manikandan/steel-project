@@ -3,10 +3,9 @@ import { fetchDrawingLog } from '../services/drawingLogApi';
 
 interface DrawingLogPanelProps {
     projectId: string;
-    projectName: string;
 }
 
-export default function DrawingLogPanel({ projectId, projectName }: DrawingLogPanelProps) {
+export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
     const [logData, setLogData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');

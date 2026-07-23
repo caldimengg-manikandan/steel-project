@@ -8,9 +8,6 @@ export default function AdminDrawingLog() {
     const { projectId: urlProjectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
 
-    const currentPath = window.location.pathname;
-    const urlMode: 'view' = 'view';
-
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,7 +62,7 @@ export default function AdminDrawingLog() {
                         <div className="card" style={{ padding: 'var(--space-lg)', marginTop: 24 }}>
                             <DrawingExtractionPanel
                                 projectId={urlProjectId}
-                                projectName={selectedProject.name}
+                                canUpload={true}
                             />
                         </div>
                     </>
