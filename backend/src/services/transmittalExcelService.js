@@ -411,12 +411,8 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     const alphaRevs = allRevsArr.filter(r => /^[A-Za-z]/.test(r));
     let numRevs = allRevsArr.filter(r => !/^[A-Za-z]/.test(r));
 
-    // Ensure at least Rev A exists for Approval
-    ['A'].forEach(r => { if (!alphaRevs.includes(r)) alphaRevs.push(r); });
     alphaRevs.sort();
 
-    // Ensure at least Rev 0 exists for Fabrication
-    ['0'].forEach(n => { if (!numRevs.includes(n)) numRevs.push(n); });
     numRevs.sort((a, b) => {
         const numA = parseInt(a, 10);
         const numB = parseInt(b, 10);
