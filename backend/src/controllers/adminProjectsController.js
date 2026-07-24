@@ -582,7 +582,8 @@ async function uploadFolder(req, res) {
     const projectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
 
     // Patterns that indicate a drawing PDF worth extracting
-    const DRAWING_FOLDER_PATTERN = /[\\/](detail[\s_-]*sheets?|d[\s_-]*sheets?|e[\s_-]*sheets?|erection[\s_-]*sheets?|gather[\s_-]*sheets?|g[\s_-]*sheets?|shop[\s_-]*drawings?|connection[\s_-]*drawings?|fabrication[\s_-]*drawings?)[\s\\/]/i;
+    // Made more permissive to support simple "Drawings" folders, "Erection Drawings", etc.
+    const DRAWING_FOLDER_PATTERN = /[\\/](detail|d|e|erection|gather|g|shop|connection|fabrication|part|structural)?[\s_-]*(sheets?|drawings?|plans?)[\s\\/]/i;
     const BINDER_PATTERN = /[\/ ](binders?|binder[_\s-]?sheet)[\/ ]/i;
 
     // ── Step 1: Upload all files to storage gateway ───────
@@ -659,7 +660,8 @@ async function uploadFolder(req, res) {
         uploadResults.push({ name: file.originalname, path: relativePath, status: 'stored' });
 
         // ── Step 2: Check if this file is a drawing PDF ───
-        const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+        const originalName = file.originalname.trim();
+        const isPdf = file.mimetype === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
         const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
         const isBinderFolder = BINDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
 

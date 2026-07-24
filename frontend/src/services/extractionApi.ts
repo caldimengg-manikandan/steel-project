@@ -31,9 +31,11 @@ export async function uploadDrawing(
 ): Promise<{ message: string; extractionIds: string[]; status: string }> {
     const form = new FormData();
     files.forEach(file => {
-        form.append('drawings', file);
         // If webkitRelativePath is available (from folder upload), keep it so backend sees the folder structure
         form.append('paths', (file as any).customRelativePath || file.webkitRelativePath || file.name);
+    });
+    files.forEach(file => {
+        form.append('drawings', file);
     });
 
     if (localSavePath) {
