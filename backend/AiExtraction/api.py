@@ -58,7 +58,7 @@ def verify_internal_api_key(x_internal_api_key: str):
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid internal API key")
 
 @app.post("/upload")
-async def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(None), x_internal_api_key: str = Header(None)):
+def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(None), x_internal_api_key: str = Header(None)):
     verify_internal_api_key(x_internal_api_key)
     results = {}
     

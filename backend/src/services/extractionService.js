@@ -57,8 +57,8 @@ function _downloadFromGridFS(fileId, destPath) {
  * @param {string} pdfPath       - Absolute path to uploaded PDF
  * @param {string} projectId     - MongoDB project _id (string)
  */
-// ── Concurrent Background Worker (10 drawings at once) ───────
-const MAX_CONCURRENCY = 10; // Lowered from 25 for better stability on 16-core systems
+// ── Concurrent Background Worker (2 drawings at once) ───────
+const MAX_CONCURRENCY = 2; // Lowered from 10 to prevent AI model from choking on local CPU
 let activeCount = 0;
 const extractionQueue = [];
 const excelBatchBuffer = new Map(); // projectId -> Array of rows
@@ -92,13 +92,13 @@ async function resumeExtractions() {
 
 async function cleanupStuckProcesses() {
     try {
-        // Items in 'processing' for more than 15 minutes are likely hung
-        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+        // Items in 'processing' for more than 30 minutes are likely hung
+        const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
         const results = await DrawingExtraction.updateMany(
-            { status: 'processing', updatedAt: { $lt: fifteenMinsAgo } },
+            { status: 'processing', updatedAt: { $lt: thirtyMinsAgo } },
             {
                 status: 'failed',
-                errorMessage: 'Processing timed out after 15 minutes of inactivity.'
+                errorMessage: 'Processing timed out after 30 minutes of inactivity.'
             }
         );
         if (results.modifiedCount > 0) {

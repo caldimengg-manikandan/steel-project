@@ -44,10 +44,20 @@ function createStorageAgentSync(folderPrefix) {
                     // 2. Upload to Storage Gateway
                     if (storageGateway.isEnabled()) {
                         try {
+                            if (req.fileIndex === undefined) req.fileIndex = 0;
+                            const currentIndex = req.fileIndex++;
+                            const pathArray = Array.isArray(req.body.paths) ? req.body.paths : (req.body.paths ? [req.body.paths] : []);
+                            const relativePath = pathArray[currentIndex] || file.originalname;
+
                             const projectName = req.scopedProject?.name || 'UnknownProject';
                             const safeProjectName = projectName.replace(/[^a-zA-Z0-9 _-]/g, '_');
-                            // e.g. Projects/MyProject/Extraction
-                            const targetDir = `Projects/${safeProjectName}/${folderPrefix}`;
+                            // e.g. Projects/MyProject/Extraction/SubFolder
+                            let targetDir = `Projects/${safeProjectName}/${folderPrefix}`;
+                            const subDir = path.dirname(relativePath).replace(/\\\\/g, '/');
+                            if (subDir && subDir !== '.') {
+                                targetDir = `${targetDir}/${subDir}`;
+                            }
+                            targetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '').replace(/\/\.$/, '');
                             
                             console.log(`[StorageSync] Uploading ${file.originalname} to Windows Server -> ${targetDir}`);
                             
