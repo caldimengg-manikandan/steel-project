@@ -612,7 +612,8 @@ async function uploadFolder(req, res) {
     // Patterns that indicate a drawing PDF worth extracting
     // Made more permissive to support simple "Drawings" folders, "Erection Drawings", etc.
     const DRAWING_FOLDER_PATTERN = /[\\/](detail|d|e|erection|gather|g|shop|connection|fabrication|part|structural)?[\s_-]*(sheets?|drawings?|plans?)[\s\\/]/i;
-    const BINDER_PATTERN = /[\/ ](binders?|binder[_\s-]?sheet)[\/ ]/i;
+    const BINDER_PATTERN = /binder/i;
+    const GATHER_SHEET_PATTERN = /gather[\s_-]*sheets?/i;
 
     // ── Step 1: Upload all files to storage gateway ───────
     const uploadResults = [];
@@ -692,11 +693,25 @@ async function uploadFolder(req, res) {
         const isPdf = file.mimetype === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
         const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
         const isBinderFolder = BINDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
+        const isGatherSheetFolder = GATHER_SHEET_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
 
-        if (isPdf && isDrawingFolder && !isBinderFolder) {
-            // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets")
+        if (isPdf && isDrawingFolder && !isBinderFolder && !isGatherSheetFolder) {
+            // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets", ignoring subfolders)
             const parts = relativePath.replace(/\\/g, '/').split('/');
-            let folderName = parts.length >= 2 ? parts[parts.length - 2] : 'DRAWINGS';
+            let folderName = 'DRAWINGS';
+            for (let j = 0; j < parts.length - 1; j++) {
+                const p = parts[j].trim();
+                if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?)$/i.test(p)) {
+                    folderName = 'DETAIL SHEET';
+                    break;
+                } else if (/^(e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(p)) {
+                    folderName = 'ERECTION SHEET';
+                    break;
+                } else if (DRAWING_FOLDER_PATTERN.test('/' + p + '/')) {
+                    folderName = p.toUpperCase();
+                    break;
+                }
+            }
 
             drawingFiles.push({
                 file,

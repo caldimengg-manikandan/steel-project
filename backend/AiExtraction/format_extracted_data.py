@@ -256,7 +256,7 @@ def main():
                 det["rows"] = process_simple_field(rows, ["Contract", "#", "Contract #"])
                 det["rows"] = process_simple_field(det["rows"], ["Drawing", "Title", "Drawing Title:"])
             elif label == "DRAWING_DESCRIPTION":
-                cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:"])
+                cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:", "Sheet", "Sheet No.", "Sheet No", "Sheet No:", "SHEET", "SHEET NO."])
                 if cleaned_rows:
                     concatenated_text = " \n ".join([" ".join(r) for r in cleaned_rows]).strip()
                     det["rows"] = [[concatenated_text]]
