@@ -168,21 +168,24 @@ export async function uploadFolder(
         const token = stored ? JSON.parse(stored).token : '';
 
         const formData = new FormData();
-        files.forEach(file => {
-            formData.append('files', file, file.name);
-            const relativePath = (file as any).webkitRelativePath || file.name;
-            formData.append('paths', relativePath);
-        });
-
+        if (targetPath) {
+            formData.append('targetPath', targetPath);
+        }
         if (transmittalNumber != null) {
             formData.append('transmittalNumber', String(transmittalNumber));
         }
         if (sequences && sequences.length > 0) {
             sequences.forEach(s => formData.append('sequences', s));
         }
-        if (targetPath) {
-            formData.append('targetPath', targetPath);
-        }
+
+        files.forEach(file => {
+            const relativePath = (file as any).webkitRelativePath || file.name;
+            formData.append('paths', relativePath);
+        });
+
+        files.forEach(file => {
+            formData.append('files', file, file.name);
+        });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${BASE}/admin/projects/${String(projectId)}/upload-folder`);

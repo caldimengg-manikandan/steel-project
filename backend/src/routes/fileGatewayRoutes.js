@@ -36,11 +36,8 @@ const upload = multer({
 
 // ── Guard: reject requests if storage gateway is disabled ──
 function requireStorageEnabled(req, res, next) {
-    if (!storageGateway.isEnabled()) {
-        return res.status(503).json({
-            error: 'File storage gateway is not enabled. Set STORAGE_ENABLED=true in .env.'
-        });
-    }
+    // If not enabled, we let the controller handle it gracefully 
+    // (e.g. listDirectory returns empty array instead of 503 crash)
     next();
 }
 

@@ -106,6 +106,11 @@ async function agentFetch(endpoint, options = {}) {
  * @returns {Promise<Array<{ name, type, size, modified }>>}
  */
 async function listDirectory(relativePath = '') {
+    if (!isEnabled()) {
+        // Return an empty array instead of crashing the UI when disabled
+        return [];
+    }
+
     const response = await agentFetch(`/browse?path=${encodeURIComponent(relativePath)}`);
 
     if (!response.ok) {

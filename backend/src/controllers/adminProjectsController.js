@@ -655,7 +655,8 @@ async function uploadFolder(req, res) {
             }
 
             if (!uploadedToGateway) {
-                console.error(`[FolderUpload] Failed to store ${relativePath} to Storage Gateway after ${maxRetries} attempts:`, lastError?.message);
+                console.error(`[FolderUpload] CRITICAL: Failed to store ${relativePath} to Storage Gateway after ${maxRetries} attempts. Error:`, lastError?.message);
+                console.error(`[FolderUpload] Target Path was: ${cleanTargetDir}`);
                 uploadResults.push({ name: file.originalname, path: relativePath, status: 'failed_gateway', error: lastError?.message || 'Gateway Upload failed' });
                 console.warn(`[FolderUpload] Continuing without Storage Gateway sync for ${file.originalname}. Falling back to GridFS/Local.`);
             }
