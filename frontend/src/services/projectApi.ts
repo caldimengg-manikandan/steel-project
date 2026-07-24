@@ -257,7 +257,7 @@ export async function adminListExternalProjects(): Promise<{
     error?: string;
 }> {
     const res = await fetch(`${BASE}/admin/projects/external`, {
-        headers: authHeaders(),
+        credentials: 'include',
     });
     return handleResponse(res);
 }

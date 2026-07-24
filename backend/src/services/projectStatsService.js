@@ -96,9 +96,13 @@ async function attachProjectStats(projects) {
             $group: {
                 _id: '$projectId',
                 totalCO: { $sum: 1 },
+                totalAmount: { $sum: '$amount' },
                 approvedCO: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, 1, 0] } },
+                approvedAmount: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, '$amount', 0] } },
                 workCompletedCO: { $sum: { $cond: [{ $eq: ['$status', 'WORK_COMPLETED'] }, 1, 0] } },
-                pendingCO: { $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, 1, 0] } }
+                workCompletedAmount: { $sum: { $cond: [{ $eq: ['$status', 'WORK_COMPLETED'] }, '$amount', 0] } },
+                pendingCO: { $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, 1, 0] } },
+                pendingAmount: { $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, '$amount', 0] } }
             }
         }
     ]);
@@ -113,7 +117,16 @@ async function attachProjectStats(projects) {
         const pObj = typeof p.toObject === 'function' ? p.toObject() : p;
         const stats = drawingMap[p._id.toString()] || { total: 0, completed: 0, approvalCount: 0, fabricationCount: 0 };
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
-        const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
+        const coStats = coMap[p._id.toString()] || { 
+            totalCO: 0, 
+            totalAmount: 0,
+            approvedCO: 0, 
+            approvedAmount: 0,
+            workCompletedCO: 0, 
+            workCompletedAmount: 0,
+            pendingCO: 0,
+            pendingAmount: 0 
+        };
         const approx = pObj.approximateDrawingsCount || 0;
         
         let approvalPercentage = 0;
@@ -135,8 +148,27 @@ async function attachProjectStats(projects) {
             approvedCO: coStats.approvedCO,
             workCompletedCO: coStats.workCompletedCO,
             pendingCO: coStats.pendingCO,
+            totalAmount: coStats.totalAmount,
+            approvedAmount: coStats.approvedAmount,
+            workCompletedAmount: coStats.workCompletedAmount,
+            pendingAmount: coStats.pendingAmount,
             approvalPercentage,
             fabricationPercentage,
+            corStatus: {
+                hasCOR: true,
+                totalCORItems: coStats.totalCO || 0,
+                totalAmount: coStats.totalAmount || 0,
+                statusSummary: {
+                    Approved: coStats.approvedCO || 0,
+                    Completed: coStats.workCompletedCO || 0,
+                    Submitted: coStats.pendingCO || 0,
+                },
+                statusAmounts: {
+                    Approved: coStats.approvedAmount || 0,
+                    Completed: coStats.workCompletedAmount || 0,
+                    Submitted: coStats.pendingAmount || 0,
+                }
+            }
         };
     });
 

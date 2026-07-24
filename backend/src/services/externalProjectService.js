@@ -15,9 +15,14 @@ async function getExternalProjects() {
         };
     }
 
+    const headers = {};
+    if (process.env.APP_A_API_KEY) {
+        headers['x-api-key'] = process.env.APP_A_API_KEY;
+    }
+
     try {
         // Fetch projects list first
-        const projectsRes = await fetch(projectsUrl);
+        const projectsRes = await fetch(projectsUrl, { headers });
         if (!projectsRes.ok) {
             throw new Error(`Projects API failed with status ${projectsRes.status}`);
         }
@@ -42,7 +47,7 @@ async function getExternalProjects() {
         let totalCount = totalItemsFromList;
         if (countUrl) {
             try {
-                const countRes = await fetch(countUrl);
+                const countRes = await fetch(countUrl, { headers });
                 if (countRes.ok) {
                     const countData = await countRes.json();
                     if (typeof countData === 'number') {
@@ -84,7 +89,10 @@ async function getExternalProjects() {
                 approvalPercentage: p.approvalPercentage ?? p.approval_percentage ?? 0,
                 fabricationPercentage: p.fabricationPercentage ?? p.fabrication_percentage ?? 0,
                 isExternal: true,
-                corStatus: p.corStatus || null
+                corStatus: p.corStatus ? {
+                    ...p.corStatus,
+                    totalAmount: p.coCost || 0
+                } : null
             };
         });
 

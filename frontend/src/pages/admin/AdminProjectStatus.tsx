@@ -223,6 +223,12 @@ export default function AdminProjectStatus() {
                 </div>
             )}
 
+            {externalError && (
+                <div className="info-box warning mb-md" style={{ padding: '12px 16px', borderRadius: 8 }}>
+                    <strong>Warning (External Projects):</strong> {externalError}
+                </div>
+            )}
+
             {loading ? (
                 <div className="text-center py-xl">
                     <div className="spinner mb-md"></div>

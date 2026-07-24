@@ -438,11 +438,13 @@ export default function ProjectView() {
                                 {/* COR placeholder or External COR Status */}
                                 <div className="card" style={{ border: project.corStatus ? '1px solid var(--color-border)' : '1.5px dashed var(--color-border)', flexShrink: 0 }}>
                                     <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px var(--space-lg)' }}>
-                                        <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: project.corStatus ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={project.corStatus ? 'var(--color-success-mid)' : 'var(--color-warning-mid)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                                        </div>
-                                        <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: project.corStatus ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={project.corStatus ? 'var(--color-success-mid)' : 'var(--color-warning-mid)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                            </div>
+                                            <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning-mid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
+                                            </div>
                                         </div>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 3 }}>Change Orders (COR)</div>
@@ -450,13 +452,24 @@ export default function ProjectView() {
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                     <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                                                         Total COR Items: <strong style={{ color: 'var(--color-text-primary)' }}>{project.corStatus.totalCORItems || 0}</strong>
+                                                        {project.corStatus.totalAmount !== undefined && (
+                                                            <span style={{ marginLeft: 10, color: 'var(--color-text-muted)' }}>
+                                                                Total Amount: <strong style={{ color: 'var(--color-text-primary)' }}>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(project.corStatus.totalAmount)}</strong>
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                                                         {Object.entries(project.corStatus.statusSummary || {}).map(([status, val]) => {
                                                             if ((val as number) === 0) return null;
+                                                            const amt = project.corStatus?.statusAmounts?.[status];
                                                             return (
-                                                                <span key={status} className="badge badge-neutral" style={{ fontSize: 10, padding: '2px 8px', background: 'var(--color-bg-page)', border: '1px solid var(--color-border-light)' }}>
-                                                                    {status}: {val as number}
+                                                                <span key={status} className="badge badge-neutral" style={{ fontSize: 10, padding: '3px 8px', background: 'var(--color-bg-page)', border: '1px solid var(--color-border-light)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                                    <span style={{ fontWeight: 600 }}>{status}: {val as number}</span>
+                                                                    {amt !== undefined && (
+                                                                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                                                                            ({new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amt)})
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                             );
                                                         })}

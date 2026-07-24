@@ -110,6 +110,8 @@ export interface Project {
         hasCOR: boolean;
         totalCORItems: number;
         statusSummary: Record<string, number>;
+        totalAmount?: number;
+        statusAmounts?: Record<string, number>;
     } | null;
 }
 
