@@ -126,7 +126,7 @@ def process_extracted_data(detections):
             
         elif label == "DRAWING_DESCRIPTION":
             # Exclude static title block keywords like Drawing Title:, Dwg, Description
-            exclude_kws = ["DRAWING", "TITLE", "DWG", "DESCRIPTION", "NO.", "Contract Item:", "contract item:","contract","item"]
+            exclude_kws = ["DRAWING", "TITLE", "DWG", "DESCRIPTION", "NO.", "Contract Item:", "contract item:","contract","item", "SHEET", "SHEET NO.", "SHEET NO", "SHEET NO:"]
             lines = []
             for l in text.split('\n'):
                 l_strip = l.strip()

@@ -146,7 +146,7 @@ def process_extracted_data(detections):
             if cleaned_rows:
                 project_no = " ".join(cleaned_rows[0])
         elif label == "DRAWING_DESCRIPTION":
-            cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:"])
+            cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:", "Sheet", "Sheet No.", "Sheet No", "Sheet No:", "SHEET", "SHEET NO."])
             if cleaned_rows:
                 drawing_description = " \n ".join([" ".join(r) for r in cleaned_rows]).strip()
         elif label == "REVISION_TABLE":
