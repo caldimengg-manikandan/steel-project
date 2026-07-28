@@ -249,5 +249,11 @@ def process_extracted_data(detections):
             "date": "",
             "remarks": "ISSUED FOR CONSTRUCTION"
         }
+        
+    drawing_no = result.get("drawing_no", "")
+    drawing_description = result.get("drawing_description", "")
+    if drawing_no and drawing_description:
+        drawing_description = drawing_description.replace(drawing_no, "").strip()
+        result["drawing_description"] = " \n ".join([line.strip() for line in drawing_description.split('\n') if line.strip()])
 
     return result

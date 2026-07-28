@@ -173,6 +173,11 @@ def process_extracted_data(detections):
             "remarks": "ISSUED FOR FABRICATION"
         }
         
+    if drawing_no and drawing_description:
+        drawing_description = drawing_description.replace(drawing_no, "").strip()
+        # Clean up any leftover duplicate spaces or newlines that might occur after replacement
+        drawing_description = " \n ".join([line.strip() for line in drawing_description.split('\n') if line.strip()])
+
     return {
         "project_no": project_no,
         "drawing_no": drawing_no,

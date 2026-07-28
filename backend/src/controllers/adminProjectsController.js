@@ -698,7 +698,7 @@ async function uploadFolder(req, res) {
         if (isPdf && isDrawingFolder && !isBinderFolder && !isGatherSheetFolder) {
             // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets", ignoring subfolders)
             const parts = relativePath.replace(/\\/g, '/').split('/');
-            let folderName = 'DRAWINGS';
+            let folderName = parts.length > 1 ? parts[parts.length - 2].trim().toUpperCase() : 'DRAWINGS';
             for (let j = 0; j < parts.length - 1; j++) {
                 const p = parts[j].trim();
                 if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?)$/i.test(p)) {
@@ -706,9 +706,6 @@ async function uploadFolder(req, res) {
                     break;
                 } else if (/^(e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(p)) {
                     folderName = 'ERECTION SHEET';
-                    break;
-                } else if (DRAWING_FOLDER_PATTERN.test('/' + p + '/')) {
-                    folderName = p.toUpperCase();
                     break;
                 }
             }

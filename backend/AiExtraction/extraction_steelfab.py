@@ -208,7 +208,10 @@ def process_extracted_data(detections):
             "date": "",
             "remarks": "ISSUED FOR FABRICATION"
         }
-        
+    if drawing_no and drawing_description:
+        drawing_description = drawing_description.replace(drawing_no, "").strip()
+        drawing_description = " \n ".join([line.strip() for line in drawing_description.split('\n') if line.strip()])
+
     return {
         "project_no": project_no,
         "drawing_no": drawing_no,

@@ -261,12 +261,8 @@ export default function ProjectView() {
                         </div>
                     </div>
                 </div>
-                {canUpload && (
-                    <button className="btn btn-primary" onClick={handleUploadButtonClick} disabled={loadingTransmittals}>
-                        <IconUpload /> {loadingTransmittals ? 'Loading…' : 'Upload Drawing'}
-                    </button>
-                )}
             </div>
+
 
             {/* Tabs */}
             <div className="tab-bar">

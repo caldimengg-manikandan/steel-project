@@ -87,7 +87,8 @@ exports.uploadAndExtract = async (req, res) => {
                 folderName = matchedTitle.toUpperCase();
             }
         } else {
-            folderName = 'DRAWINGS';
+            const parts = fullPath.replace(/\\/g, '/').split('/');
+            folderName = parts.length > 1 ? parts[parts.length - 2].trim().toUpperCase() : 'DRAWINGS';
         }
 
         validFiles.push({ file, folderName });

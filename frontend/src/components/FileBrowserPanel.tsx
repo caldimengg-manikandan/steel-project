@@ -7,7 +7,7 @@ import {
     uploadFolder,
     type FileEntry 
 } from '../services/fileApi';
-import { reserveTransmittalNumber } from '../services/extractionApi';
+import { reserveTransmittalNumber, getExcelDownloadUrl } from '../services/extractionApi';
 import { uploadSessionStore, type SessionFile, type UploadSession } from '../services/uploadSessionStore';
 import { useMessage } from '../context/MessageContext';
 import { 
@@ -17,6 +17,13 @@ import {
     IconTrash, 
     IconUpload
 } from './Icons';
+
+const ExcelIcon = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+        <rect x="2" y="2" width="20" height="20" rx="3" fill="#1D6F42" opacity="0.15" />
+        <path d="M8 7l4 5-4 5h2.5l2.5-3.2L15.5 17H18l-4-5 4-5h-2.5L13.5 9.8 11 7H8z" fill="#1D6F42" />
+    </svg>
+);
 
 interface FileBrowserPanelProps {
     projectId?: string;
@@ -423,6 +430,38 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    {projectId && (
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <a
+                                href={getExcelDownloadUrl(projectId, 'transmittal')}
+                                download
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    padding: '7px 14px',
+                                    background: '#f0fdf4', color: '#16a34a',
+                                    border: '1px solid #86efac', borderRadius: 6,
+                                    fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                                    transition: 'background 0.2s',
+                                }}
+                            >
+                                <ExcelIcon /> Download Transmittal
+                            </a>
+                            <a
+                                href={getExcelDownloadUrl(projectId, 'log')}
+                                download
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    padding: '7px 14px',
+                                    background: '#f0fdf4', color: '#16a34a',
+                                    border: '1px solid #86efac', borderRadius: 6,
+                                    fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                                    transition: 'background 0.2s',
+                                }}
+                            >
+                                <ExcelIcon /> Download Drawing Log
+                            </a>
+                        </div>
+                    )}
                     {/* Live Upload Progress Text & Stats beside upload buttons */}
                     {uploadingFolder && (
                         <div style={{

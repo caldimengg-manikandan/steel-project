@@ -215,6 +215,10 @@ def generate_excel(data, output_excel="extraction_results.xlsx"):
         if not drawing_no and not drawing_desc:
             continue
             
+        if drawing_no and drawing_desc:
+            drawing_desc = drawing_desc.replace(drawing_no, "").strip()
+            drawing_desc = " \n ".join([line.strip() for line in drawing_desc.split('\n') if line.strip()])
+
         row_data = [sl_no, drawing_no, drawing_desc, rev, date_str, remarks]
         for col_index, val in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_index)
