@@ -89,10 +89,21 @@ async function getExternalProjects() {
                 approvalPercentage: p.approvalPercentage ?? p.approval_percentage ?? 0,
                 fabricationPercentage: p.fabricationPercentage ?? p.fabrication_percentage ?? 0,
                 isExternal: true,
-                corStatus: p.corStatus ? {
-                    ...p.corStatus,
-                    totalAmount: p.coCost || 0
-                } : null
+                corStatus: {
+                    hasCOR: true,
+                    totalCORItems: p.corStatus?.totalCORItems || 0,
+                    totalAmount: p.coCost || p.corStatus?.totalAmount || 0,
+                    statusSummary: p.corStatus?.statusSummary || {
+                        Approved: p.corStatus?.statusSummary?.Approved || 0,
+                        Completed: p.corStatus?.statusSummary?.Completed || 0,
+                        Submitted: p.corStatus?.statusSummary?.Submitted || 0
+                    },
+                    statusAmounts: p.corStatus?.statusAmounts || {
+                        Approved: p.corStatus?.statusAmounts?.Approved || 0,
+                        Completed: p.corStatus?.statusAmounts?.Completed || 0,
+                        Submitted: p.corStatus?.statusAmounts?.Submitted || 0
+                    }
+                }
             };
         });
 
