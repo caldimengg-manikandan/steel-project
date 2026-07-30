@@ -120,6 +120,7 @@ exports.getReportDraft = async (req, res) => {
 
         let fabricationStats = '';
         let approvalStats = '';
+        let corStats = { total: 0, approved: 0, completed: 0, pending: 0 };
         let projectDetails = null;
         try {
             const project = await Project.findById(projectId);
@@ -137,6 +138,12 @@ exports.getReportDraft = async (req, res) => {
                     const seqDone = s.sequences ? s.sequences.filter(seq => seq.status === 'Completed').length : 0;
                     fabricationStats = `Fabrication: ${s.fabricationCount || 0} drawings (${s.fabricationPercentage || 0}%)\nSequences: ${seqDone}/${seqTotal} done`;
                     approvalStats = `Approval: ${s.approvalCount || 0} drawings (${s.approvalPercentage || 0}%)`;
+                    corStats = {
+                        total: s.corStatus?.totalCORItems ?? s.totalCO ?? 0,
+                        approved: s.corStatus?.statusSummary?.Approved ?? s.approvedCO ?? 0,
+                        completed: s.corStatus?.statusSummary?.Completed ?? s.workCompletedCO ?? 0,
+                        pending: s.corStatus?.statusSummary?.Submitted ?? s.pendingCO ?? 0
+                    };
                 }
             }
         } catch (e) {
@@ -152,6 +159,7 @@ exports.getReportDraft = async (req, res) => {
                 cdrfis,
                 fabricationStats,
                 approvalStats,
+                corStats,
                 projectDetails
             }
         });
@@ -171,6 +179,7 @@ exports.saveReportDraft = async (req, res) => {
             sowData, 
             scheduleData, 
             transmittalData, 
+            corStats,
             status 
         } = req.body;
 
@@ -179,14 +188,14 @@ exports.saveReportDraft = async (req, res) => {
         if (reportId) {
             report = await WeeklyProgress.findByIdAndUpdate(
                 reportId,
-                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, status },
+                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, corStats, status },
                 { new: true }
             );
         } else {
             // Check if one exists for the week
             report = await WeeklyProgress.findOneAndUpdate(
                 { projectId, weekStartDate },
-                { summaryData, sowData, scheduleData, transmittalData, status: status || 'Draft' },
+                { summaryData, sowData, scheduleData, transmittalData, corStats, status: status || 'Draft' },
                 { new: true, upsert: true }
             );
         }
@@ -375,6 +384,50 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
                 });
             }
         });
+    }
+
+    // --- COR TAB ---
+    const corSheet = workbook.getWorksheet('COR');
+    if (corSheet) {
+        let startRow = 3;
+        const styleRow = corSheet.getRow(startRow);
+        const row = corSheet.getRow(startRow);
+        
+        let cStats = { total: 0, approved: 0, completed: 0, pending: 0 };
+        if (report && report.corStats && (report.corStats.total > 0 || report.corStats.approved > 0 || report.corStats.completed > 0 || report.corStats.pending > 0)) {
+            cStats = report.corStats;
+        } else {
+            try {
+                const proj = await Project.findById(projectId);
+                if (proj) {
+                    const sArr = await attachProjectStats([proj.toObject()]);
+                    if (sArr && sArr.length > 0) {
+                        const s = sArr[0];
+                        cStats = { 
+                            total: s.corStatus?.totalCORItems ?? s.totalCO ?? 0, 
+                            approved: s.corStatus?.statusSummary?.Approved ?? s.approvedCO ?? 0, 
+                            completed: s.corStatus?.statusSummary?.Completed ?? s.workCompletedCO ?? 0, 
+                            pending: s.corStatus?.statusSummary?.Submitted ?? s.pendingCO ?? 0 
+                        };
+                    }
+                }
+            } catch(e) {}
+        }
+        
+        row.getCell(1).value = cStats.total;
+        row.getCell(2).value = cStats.approved;
+        row.getCell(3).value = cStats.completed;
+        row.getCell(4).value = cStats.pending;
+        
+        if (styleRow) {
+            row.eachCell((cell, colNumber) => {
+                const styleCell = styleRow.getCell(colNumber);
+                if (styleCell) {
+                    cell.border = styleCell.border;
+                    cell.alignment = styleCell.alignment;
+                }
+            });
+        }
     }
 
     // --- TRANSMITTAL LOG TAB ---

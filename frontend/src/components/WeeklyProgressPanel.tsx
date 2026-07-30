@@ -48,6 +48,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
     const [sowData, setSowData] = useState<any[]>(DEFAULT_SOW);
     const [scheduleData, setScheduleData] = useState<any[]>(DEFAULT_SCHEDULE);
     const [transmittalData, setTransmittalData] = useState<any[]>([]);
+    const [corStats, setCorStats] = useState({ total: 0, approved: 0, completed: 0, pending: 0 });
 
     useEffect(() => {
         loadAndInitialize();
@@ -102,6 +103,11 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
             if (reportId !== 'new' && res.report) {
                 setWeekStartDate(res.report.weekStartDate);
                 setSummaryData(res.report.summaryData || {});
+                if (res.report.corStats && (res.report.corStats.total > 0 || res.report.corStats.approved > 0 || res.report.corStats.completed > 0 || res.report.corStats.pending > 0)) {
+                    setCorStats(res.report.corStats);
+                } else if (res.autoFetch?.corStats) {
+                    setCorStats(res.autoFetch.corStats);
+                }
 
                 let savedSow = res.report.sowData || [];
                 if (savedSow.length === 0 || (savedSow.length === 1 && !savedSow[0].description)) {
@@ -136,6 +142,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                 setTransmittalData(initialTransmittals);
 
                 const pDetails = res.autoFetch.projectDetails || {};
+                if (res.autoFetch.corStats) setCorStats(res.autoFetch.corStats);
                 setSummaryData((prev: any) => ({
                     ...prev,
                     projectName: prev.projectName || pDetails.projectName || '',
@@ -153,7 +160,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
     const handleSaveDraft = async () => {
         try {
-            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, status: 'Draft' };
+            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corStats, status: 'Draft' };
             const res = await saveWeeklyProgressDraft(projectId, data);
             showMessage('Success', 'Draft saved.', 'success');
             setCurrentReportId(res.report._id);
@@ -164,7 +171,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
     const handleSubmitReport = async () => {
         try {
-            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, status: 'Submitted' };
+            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corStats, status: 'Submitted' };
             const res = await saveWeeklyProgressDraft(projectId, data);
             showMessage('Success', 'Report submitted. You can now download the Excel.', 'success');
             setCurrentReportId(res.report._id);
@@ -220,7 +227,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                 </div>
 
                 <div className="tab-bar" style={{ marginBottom: 24 }}>
-                    {['SUMMARY', 'SOW', 'SCHEDULE', 'TRANSMITTAL LOG'].map(tab => (
+                    {['SUMMARY', 'SOW', 'SCHEDULE', 'COR', 'TRANSMITTAL LOG'].map(tab => (
                         <button key={tab} className={`tab-item ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>{tab}</button>
                     ))}
                 </div>
@@ -382,6 +389,56 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                 </tbody>
                             </table>
                             {editMode && <div style={{ margin: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setScheduleData([...scheduleData, { sNo: String(scheduleData.length + 1), seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' }])}>+ Add Schedule Row</button></div>}
+                        </div>
+                    )}
+
+                    {activeTab === 'COR' && (
+                        <div style={{ padding: 20 }}>
+                            <h3 style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 24, textTransform: 'uppercase', letterSpacing: 0.5 }}>CHANGE ORDERS (CO)</h3>
+                            <div className="table-wrapper">
+                                <table className="excel-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Total</th>
+                                            <th>Approved</th>
+                                            <th>Completed</th>
+                                            <th>Pending</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                {editMode ? (
+                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.total} onChange={e => setCorStats({...corStats, total: Number(e.target.value)})} />
+                                                ) : (
+                                                    corStats.total
+                                                )}
+                                            </td>
+                                            <td>
+                                                {editMode ? (
+                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.approved} onChange={e => setCorStats({...corStats, approved: Number(e.target.value)})} />
+                                                ) : (
+                                                    corStats.approved
+                                                )}
+                                            </td>
+                                            <td>
+                                                {editMode ? (
+                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.completed} onChange={e => setCorStats({...corStats, completed: Number(e.target.value)})} />
+                                                ) : (
+                                                    corStats.completed
+                                                )}
+                                            </td>
+                                            <td>
+                                                {editMode ? (
+                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.pending} onChange={e => setCorStats({...corStats, pending: Number(e.target.value)})} />
+                                                ) : (
+                                                    corStats.pending
+                                                )}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 
