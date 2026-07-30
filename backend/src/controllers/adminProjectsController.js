@@ -567,10 +567,14 @@ async function reserveTransmittalNumber(req, res) {
 /**
  * GET /api/admin/projects/external
  * Retrieves projects and metadata from external App A.
+ * Modified to return empty as external projects are now merged with local projects.
  */
 async function listExternalProjects(req, res) {
-    const result = await getExternalProjects();
-    res.json(result);
+    res.json({
+        count: 0,
+        projects: [],
+        error: null
+    });
 }
 
 /**

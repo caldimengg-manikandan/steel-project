@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminListProjects, downloadProjectStatusExcel, adminListExternalProjects } from '../../services/projectApi';
+import { adminListProjects, downloadProjectStatusExcel } from '../../services/projectApi';
 import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
 
@@ -51,8 +51,6 @@ function IconChevron({ open }: { open: boolean }) {
 export default function AdminProjectStatus() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
-    const [externalProjects, setExternalProjects] = useState<any[]>([]);
-    const [externalError, setExternalError] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [downloading, setDownloading] = useState(false);
@@ -68,7 +66,6 @@ export default function AdminProjectStatus() {
         try {
             setLoading(true);
             setError('');
-            setExternalError('');
 
             const data = await adminListProjects();
             const mapped = data.projects.map((p: any) => ({
@@ -77,43 +74,6 @@ export default function AdminProjectStatus() {
                 isExternal: false
             }));
             setProjects(mapped);
-
-            try {
-                const extData = await adminListExternalProjects();
-                const mappedExt = (extData.projects || []).map((p: any) => {
-                    const drawingCount = p.approximateDrawingsCount || 0;
-                    const approvalCount = Math.round(((p.approvalPercentage || 0) * drawingCount) / 100);
-                    const fabricationCount = Math.round(((p.fabricationPercentage || 0) * drawingCount) / 100);
-                    
-                    const totalCO = p.corStatus?.totalCORItems || 0;
-                    const approvedCO = p.corStatus?.statusSummary?.Approved || 0;
-                    const workCompletedCO = p.corStatus?.statusSummary?.Completed || 0;
-                    const pendingCO = p.corStatus?.statusSummary?.Submitted || 0;
-
-                    return {
-                        ...p,
-                        id: p.id || p._id,
-                        drawingCount,
-                        approvalCount,
-                        fabricationCount,
-                        openRfiCount: 0,
-                        closedRfiCount: 0,
-                        sequences: [],
-                        totalCO,
-                        approvedCO,
-                        workCompletedCO,
-                        pendingCO,
-                        isExternal: true
-                    };
-                });
-                setExternalProjects(mappedExt);
-                if (extData.error) {
-                    setExternalError(extData.error);
-                }
-            } catch (extErr: any) {
-                console.error('Failed to load external projects:', extErr);
-                setExternalError(extErr.message || 'External server unreachable');
-            }
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -160,10 +120,7 @@ export default function AdminProjectStatus() {
         }
     };
 
-    const allProjects = [
-        ...projects,
-        ...externalProjects
-    ];
+    const allProjects = projects;
 
     const totalProjects = allProjects.length;
     const activeProjects = allProjects.filter((p) => p.status === 'active').length;
@@ -220,12 +177,6 @@ export default function AdminProjectStatus() {
                     <button onClick={fetchProjects} className="btn btn-ghost btn-sm" style={{ marginLeft: 12 }}>
                         Retry
                     </button>
-                </div>
-            )}
-
-            {externalError && (
-                <div className="info-box warning mb-md" style={{ padding: '12px 16px', borderRadius: 8 }}>
-                    <strong>Warning (External Projects):</strong> {externalError}
                 </div>
             )}
 

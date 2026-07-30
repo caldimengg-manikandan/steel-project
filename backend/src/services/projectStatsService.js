@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
+const { getExternalProjects } = require('./externalProjectService');
 
 /**
  * Calculates aggregated statistics for a list of projects.
@@ -112,6 +113,17 @@ async function attachProjectStats(projects) {
         coMap[c._id.toString()] = c;
     });
 
+    // Fetch external projects to see if any match the local projects by name
+    let externalProjects = [];
+    try {
+        const extResult = await getExternalProjects();
+        if (extResult && Array.isArray(extResult.projects)) {
+            externalProjects = extResult.projects;
+        }
+    } catch (err) {
+        console.warn('[projectStatsService] Failed to load external projects:', err.message);
+    }
+
     // ── 4. Merge Stats with Projects ─────────────────────────
     const results = projectsArray.map((p) => {
         const pObj = typeof p.toObject === 'function' ? p.toObject() : p;
@@ -137,6 +149,42 @@ async function attachProjectStats(projects) {
             fabricationPercentage = Math.round((stats.fabricationCount / approx) * 100);
         }
 
+        const nameLower = (pObj.name || '').toLowerCase().trim();
+        const matchingExt = externalProjects.find(ext => (ext.name || '').toLowerCase().trim() === nameLower);
+
+        let mergedCorStatus = {
+            hasCOR: true,
+            totalCORItems: coStats.totalCO || 0,
+            totalAmount: coStats.totalAmount || 0,
+            statusSummary: {
+                Approved: coStats.approvedCO || 0,
+                Completed: coStats.workCompletedCO || 0,
+                Submitted: coStats.pendingCO || 0,
+            },
+            statusAmounts: {
+                Approved: coStats.approvedAmount || 0,
+                Completed: coStats.workCompletedAmount || 0,
+                Submitted: coStats.pendingAmount || 0,
+            }
+        };
+
+        let mergedApproximateDrawingsCount = approx;
+        let mergedApprovalPercentage = approvalPercentage;
+        let mergedFabricationPercentage = fabricationPercentage;
+
+        if (matchingExt) {
+            // Overwrite/merge COR status from the project management system (App A)
+            if (matchingExt.corStatus) {
+                mergedCorStatus = matchingExt.corStatus;
+            }
+            // Fallback for drawings count & percentages if local has no drawings
+            if (stats.total === 0) {
+                mergedApproximateDrawingsCount = matchingExt.approximateDrawingsCount || approx;
+                mergedApprovalPercentage = matchingExt.approvalPercentage || 0;
+                mergedFabricationPercentage = matchingExt.fabricationPercentage || 0;
+            }
+        }
+
         return {
             ...pObj,
             drawingCount: stats.total,
@@ -152,23 +200,11 @@ async function attachProjectStats(projects) {
             approvedAmount: coStats.approvedAmount,
             workCompletedAmount: coStats.workCompletedAmount,
             pendingAmount: coStats.pendingAmount,
-            approvalPercentage,
-            fabricationPercentage,
-            corStatus: {
-                hasCOR: true,
-                totalCORItems: coStats.totalCO || 0,
-                totalAmount: coStats.totalAmount || 0,
-                statusSummary: {
-                    Approved: coStats.approvedCO || 0,
-                    Completed: coStats.workCompletedCO || 0,
-                    Submitted: coStats.pendingCO || 0,
-                },
-                statusAmounts: {
-                    Approved: coStats.approvedAmount || 0,
-                    Completed: coStats.workCompletedAmount || 0,
-                    Submitted: coStats.pendingAmount || 0,
-                }
-            }
+            approximateDrawingsCount: mergedApproximateDrawingsCount,
+            approvalPercentage: mergedApprovalPercentage,
+            fabricationPercentage: mergedFabricationPercentage,
+            corStatus: mergedCorStatus,
+            rawStatus: matchingExt?.rawStatus
         };
     });
 

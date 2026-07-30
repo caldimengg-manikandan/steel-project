@@ -255,7 +255,7 @@ export default function AdminDashboard() {
                                                         <td 
                                                             style={{ 
                                                                 fontWeight: 600, 
-                                                                color: p.isExternal ? 'var(--color-text-primary)' : 'var(--color-primary)', 
+                                                                color: 'var(--color-primary)', 
                                                                 cursor: 'pointer',
                                                                 textDecoration: 'underline',
                                                                 textUnderlineOffset: '2px'

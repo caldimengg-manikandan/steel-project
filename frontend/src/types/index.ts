@@ -72,6 +72,7 @@ export interface Project {
     contactPerson?: ClientContact;
     description: string;
     status: ProjectStatus;
+    rawStatus?: string;
     location: string;
     createdAt: string;
     updatedAt: string;

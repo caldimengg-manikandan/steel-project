@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject, adminListExternalProjects } from '../../services/projectApi';
+import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import { formatDate } from '../../utils/dateUtils';
@@ -66,14 +66,10 @@ export default function AdminProjects() {
     const [sequenceNames, setSequenceNames] = useState<Array<{ name: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>>([]);
     const [seqInput, setSeqInput] = useState<string>('');
     const { logout } = useAuth();
-    const [externalProjects, setExternalProjects] = useState<any[]>([]);
-    const [externalError, setExternalError] = useState('');
-
     const fetchProjects = useCallback(async () => {
         try {
             setLoading(true);
             setError('');
-            setExternalError('');
             
             const [projData, clientData] = await Promise.all([
                 adminListProjects(),
@@ -91,17 +87,6 @@ export default function AdminProjects() {
                 id: String(p._id || p.id),
             }));
             setProjects(mapped);
-
-            try {
-                const extData = await adminListExternalProjects();
-                setExternalProjects(extData.projects || []);
-                if (extData.error) {
-                    setExternalError(extData.error);
-                }
-            } catch (extErr: any) {
-                console.error('Failed to load external projects:', extErr);
-                setExternalError(extErr.message || 'External server unreachable');
-            }
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -120,10 +105,7 @@ export default function AdminProjects() {
         }
     }, [error, logout, navigate]);
 
-    const allProjects = [
-        ...projects.map(p => ({ ...p, isExternal: false })),
-        ...externalProjects.map(p => ({ ...p, isExternal: true }))
-    ];
+    const allProjects = projects.map(p => ({ ...p, isExternal: false }));
 
     const filtered = allProjects.filter(
         (p) =>
@@ -306,13 +288,6 @@ export default function AdminProjects() {
                 </div>
             )}
 
-            {externalError && (
-                <div className="info-box danger mb-md" style={{ padding: '12px 16px', borderRadius: 8 }}>
-                    <strong>External Projects Info:</strong> {externalError}
-                    <button onClick={fetchProjects} className="btn btn-ghost btn-sm" style={{ marginLeft: 12 }}>Retry</button>
-                </div>
-            )}
-
             {/* Table */}
             <div className="table-wrapper">
                 {loading ? (
@@ -332,7 +307,6 @@ export default function AdminProjects() {
                                 <th>Approval %</th>
                                 <th>Fabrication %</th>
                                 <th>Sequence</th>
-                                <th>Origin</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -381,44 +355,29 @@ export default function AdminProjects() {
                                             </div>
                                         </td>
                                         <td>
-                                            {p.isExternal ? (
-                                                <span className="text-muted">—</span>
-                                            ) : (
-                                                <div 
-                                                    onClick={() => {
-                                                        setEditTarget({ ...p });
-                                                        setEditMode('sequences');
-                                                        setSeqInput((p.sequences?.length || 0).toString());
-                                                    }}
-                                                    title="Manage Sequences"
-                                                    style={{ 
-                                                        cursor: 'pointer', 
-                                                        display: 'flex', 
-                                                        alignItems: 'center', 
-                                                        gap: 6, 
-                                                        background: '#f8fafc', 
-                                                        padding: '4px 12px', 
-                                                        borderRadius: '8px', 
-                                                        border: '1px solid #e2e8f0',
-                                                        width: 'fit-content'
-                                                    }}
-                                                >
-                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
-                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
-                                                    <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {p.isExternal ? (
-                                                <span className="badge badge-neutral" style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>
-                                                    Project Management
-                                                </span>
-                                            ) : (
-                                                <span className="badge badge-neutral" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                                                    Local
-                                                </span>
-                                            )}
+                                            <div 
+                                                onClick={() => {
+                                                    setEditTarget({ ...p });
+                                                    setEditMode('sequences');
+                                                    setSeqInput((p.sequences?.length || 0).toString());
+                                                }}
+                                                title="Manage Sequences"
+                                                style={{ 
+                                                    cursor: 'pointer', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: 6, 
+                                                    background: '#f8fafc', 
+                                                    padding: '4px 12px', 
+                                                    borderRadius: '8px', 
+                                                    border: '1px solid #e2e8f0',
+                                                    width: 'fit-content'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
+                                                <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
+                                                <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
+                                            </div>
                                         </td>
                                         <td>
                                             <span className={`badge ${STATUS_CLS[p.status as ProjectStatus] || 'badge-neutral'}`}>
@@ -435,30 +394,24 @@ export default function AdminProjects() {
                                                 >
                                                     <IconOpen /> Open
                                                 </button>
-                                                {p.isExternal ? (
-                                                    <span className="text-muted" style={{ fontSize: 11.5, fontStyle: 'italic', marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>Read-Only</span>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            className="btn btn-ghost btn-sm btn-icon"
-                                                            onClick={() => {
-                                                                setEditTarget({ ...p });
-                                                                setEditMode('full');
-                                                                setSeqInput((p.sequences?.length || 0).toString());
-                                                            }}
-                                                            title="Edit"
-                                                        >
-                                                            <IconEdit />
-                                                        </button>
-                                                        <button
-                                                            className="btn btn-danger btn-sm btn-icon"
-                                                            onClick={() => setDeleteTarget(p)}
-                                                            title="Delete"
-                                                        >
-                                                            <IconTrash />
-                                                        </button>
-                                                    </>
-                                                )}
+                                                <button
+                                                    className="btn btn-ghost btn-sm btn-icon"
+                                                    onClick={() => {
+                                                        setEditTarget({ ...p });
+                                                        setEditMode('full');
+                                                        setSeqInput((p.sequences?.length || 0).toString());
+                                                    }}
+                                                    title="Edit"
+                                                >
+                                                    <IconEdit />
+                                                </button>
+                                                <button
+                                                    className="btn btn-danger btn-sm btn-icon"
+                                                    onClick={() => setDeleteTarget(p)}
+                                                    title="Delete"
+                                                >
+                                                    <IconTrash />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

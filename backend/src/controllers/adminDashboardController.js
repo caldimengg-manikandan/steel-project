@@ -41,16 +41,8 @@ async function getAdminStats(req, res) {
         isExternal: false
     }));
 
-    // Combine local and external projects
-    const combinedAll = [
-        ...mappedLocal,
-        ...externalProjects.map(p => ({
-            ...p,
-            isExternal: true,
-            _id: p.id,
-            updatedAt: p.createdAt
-        }))
-    ];
+    // Only include local projects (which now have external data merged when name matches)
+    const combinedAll = mappedLocal;
 
     // Sort combined projects by updatedAt / createdAt descending
     combinedAll.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
