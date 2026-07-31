@@ -23,7 +23,7 @@ const DEFAULT_SCHEDULE: any[] = Array.from({ length: 10 }, (_, i) => ({
     bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: ''
 }));
 
-export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onModeChange }: {
+export default function WeeklyProgressPanel({ projectId, projectName, initialMode = 'view', onModeChange, onClose }: {
     projectId: string, projectName?: string, initialMode?: 'view' | 'edit', onClose?: () => void, onModeChange?: (mode: 'view' | 'edit') => void
 }) {
     const { showMessage } = useMessage();
@@ -49,6 +49,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
     const [scheduleData, setScheduleData] = useState<any[]>(DEFAULT_SCHEDULE);
     const [transmittalData, setTransmittalData] = useState<any[]>([]);
     const [corStats, setCorStats] = useState({ total: 0, approved: 0, completed: 0, pending: 0 });
+    const [corData, setCorData] = useState<any[]>([]);
 
     useEffect(() => {
         loadAndInitialize();
@@ -83,7 +84,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
         setCurrentReportId(null);
         setWeekStartDate(new Date().toISOString().split('T')[0]);
         setSummaryData({
-            date: new Date().toLocaleDateString(), projectName: projectName || '', projectNo: '',
+            date: new Date().toISOString().split('T')[0], projectName: projectName || '', projectNo: '',
             clientName: '', clientProjectNo: '', clientAddress: '', clientProjectManager: '',
             caldimProjectManager: '', reportCirculatedTo1: '', reportCirculatedTo2: '',
             projectType: '', projectDescription: '', projectStatusLastWeek: '',
@@ -92,6 +93,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
         setSowData(DEFAULT_SOW);
         setScheduleData(DEFAULT_SCHEDULE);
         setTransmittalData([]);
+        setCorData([]);
         setActiveTab('SUMMARY');
         fetchLiveAutoData('new');
     };
@@ -117,6 +119,9 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
                 const savedSchedule = res.report.scheduleData || [];
                 setScheduleData(savedSchedule.length > 0 ? savedSchedule : DEFAULT_SCHEDULE);
+
+                let savedCorData = res.report.corData || [];
+                setCorData(savedCorData);
 
                 let savedTransmittals = res.report.transmittalData || [];
                 if (savedTransmittals.length === 0 && res.autoFetch?.transmittals?.length > 0) {
@@ -160,7 +165,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
     const handleSaveDraft = async () => {
         try {
-            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corStats, status: 'Draft' };
+            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corData, corStats, status: 'Draft' };
             const res = await saveWeeklyProgressDraft(projectId, data);
             showMessage('Success', 'Draft saved.', 'success');
             setCurrentReportId(res.report._id);
@@ -171,7 +176,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
     const handleSubmitReport = async () => {
         try {
-            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corStats, status: 'Submitted' };
+            const data = { reportId: currentReportId, weekStartDate, summaryData, sowData, scheduleData, transmittalData, corData, corStats, status: 'Submitted' };
             const res = await saveWeeklyProgressDraft(projectId, data);
             showMessage('Success', 'Report submitted. You can now download the Excel.', 'success');
             setCurrentReportId(res.report._id);
@@ -265,7 +270,8 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                     )}
 
                     {activeTab === 'SOW' && (
-                        <div className="table-wrapper">
+                        <>
+                            <div className="table-wrapper">
                             <table className="excel-table">
                                 <thead>
                                     <tr>
@@ -341,25 +347,25 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                             return renderedElements;
                                         });
                                     })()}
-                                    {editMode && (
-                                        <tr style={{ background: 'transparent' }}>
-                                            <td colSpan={editMode ? 6 : 5} style={{ border: 'none', textAlign: 'left', padding: '8px 16px' }}>
-                                                <button 
-                                                    className="btn btn-primary btn-sm"
-                                                    onClick={() => setSowData([...sowData, { sNo: '', description: '', change: '', receivedDate: '', remarks: '' }])}
-                                                >
-                                                    + Add Row
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
                         </div>
+                        {editMode && (
+                            <div style={{ marginTop: 16 }}>
+                                <button 
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => setSowData([...sowData, { sNo: '', description: '', change: '', receivedDate: '', remarks: '' }])}
+                                >
+                                    + Add Row
+                                </button>
+                            </div>
+                        )}
+                        </>
                     )}
 
                     {activeTab === 'SCHEDULE' && (
-                        <div className="table-wrapper">
+                        <>
+                            <div className="table-wrapper">
                             <table className="excel-table">
                                 <thead>
                                     <tr>
@@ -388,8 +394,9 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                     ))}
                                 </tbody>
                             </table>
-                            {editMode && <div style={{ margin: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setScheduleData([...scheduleData, { sNo: String(scheduleData.length + 1), seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' }])}>+ Add Schedule Row</button></div>}
                         </div>
+                        {editMode && <div style={{ marginTop: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setScheduleData([...scheduleData, { sNo: String(scheduleData.length + 1), seqArea: '', status: '', plannedIfaDate: '', actualIfaDate: '', bfaReceivedDate: '', plannedFabDate: '', actualFabDate: '', remarks: '' }])}>+ Add Schedule Row</button></div>}
+                        </>
                     )}
 
                     {activeTab === 'COR' && (
@@ -399,51 +406,47 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                 <table className="excel-table">
                                     <thead>
                                         <tr>
-                                            <th>Total</th>
-                                            <th>Approved</th>
-                                            <th>Completed</th>
-                                            <th>Pending</th>
+                                            <th style={{ width: 80 }}>COR</th>
+                                            <th style={{ width: 120 }}>DATE</th>
+                                            <th>CHANGE REFERENCE</th>
+                                            <th style={{ width: 150 }}>COR AMOUNT</th>
+                                            <th style={{ width: 120 }}>STATUS</th>
+                                            <th>DESCRIPTION</th>
+                                            {editMode && <th style={{ width: 30, border: 'none' }}></th>}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>
-                                                {editMode ? (
-                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.total} onChange={e => setCorStats({...corStats, total: Number(e.target.value)})} />
-                                                ) : (
-                                                    corStats.total
+                                        {corData.map((row, idx) => (
+                                            <tr key={idx}>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.cor} onChange={e => { const nd = [...corData]; nd[idx].cor = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="date" className="form-control" style={{ padding: 4, width: '100%' }} value={row.date} onChange={e => { const nd = [...corData]; nd[idx].date = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.changeReference} onChange={e => { const nd = [...corData]; nd[idx].changeReference = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.corAmount} onChange={e => { const nd = [...corData]; nd[idx].corAmount = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.status} onChange={e => { const nd = [...corData]; nd[idx].status = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.description} onChange={e => { const nd = [...corData]; nd[idx].description = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                {editMode && (
+                                                    <td style={{ width: 30, padding: 0, textAlign: 'center', border: 'none' }}>
+                                                        <button 
+                                                            onClick={() => { const nd = [...corData]; nd.splice(idx, 1); setCorData(nd); }}
+                                                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#dc2626' }}
+                                                            title="Delete Row"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </td>
                                                 )}
-                                            </td>
-                                            <td>
-                                                {editMode ? (
-                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.approved} onChange={e => setCorStats({...corStats, approved: Number(e.target.value)})} />
-                                                ) : (
-                                                    corStats.approved
-                                                )}
-                                            </td>
-                                            <td>
-                                                {editMode ? (
-                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.completed} onChange={e => setCorStats({...corStats, completed: Number(e.target.value)})} />
-                                                ) : (
-                                                    corStats.completed
-                                                )}
-                                            </td>
-                                            <td>
-                                                {editMode ? (
-                                                    <input type="number" className="form-control" style={{ padding: 4, width: '100%' }} value={corStats.pending} onChange={e => setCorStats({...corStats, pending: Number(e.target.value)})} />
-                                                ) : (
-                                                    corStats.pending
-                                                )}
-                                            </td>
-                                        </tr>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
+                            {editMode && <div style={{ marginTop: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setCorData([...corData, { cor: '', date: '', changeReference: '', corAmount: '', status: '', description: '' }])}>+ Add COR Row</button></div>}
                         </div>
                     )}
 
                     {activeTab === 'TRANSMITTAL LOG' && (
-                        <div className="table-wrapper">
+                        <>
+                            <div className="table-wrapper">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                 <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Fields auto-fetched from Transmittal Log. Overwrite manually as needed.</p>
                             </div>
@@ -478,8 +481,9 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                     )}
                                 </tbody>
                             </table>
-                            {editMode && <div style={{ margin: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setTransmittalData([...transmittalData, { isCustomRow: true, transmittalNo: '', date: '', appFab: '', numberOfSheets: '', seqArea: '', remarks: '' }])}>+ Add Transmittal Row</button></div>}
                         </div>
+                        {editMode && <div style={{ marginTop: 16 }}><button className="btn btn-primary btn-sm" onClick={() => setTransmittalData([...transmittalData, { isCustomRow: true, transmittalNo: '', date: '', appFab: '', numberOfSheets: '', seqArea: '', remarks: '' }])}>+ Add Transmittal Row</button></div>}
+                        </>
                     )}
                 </div>
             </div>

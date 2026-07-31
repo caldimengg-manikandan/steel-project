@@ -100,6 +100,14 @@ const weeklyProgressSchema = new mongoose.Schema({
         seqArea: String,
         remarks: String
     }],
+    corData: [{
+        cor: String,
+        date: String,
+        changeReference: String,
+        corAmount: String,
+        status: String,
+        description: String
+    }],
     corStats: {
         total: { type: Number, default: 0 },
         approved: { type: Number, default: 0 },

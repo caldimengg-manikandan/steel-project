@@ -7,9 +7,10 @@ interface RfiReportPanelProps {
     projectName?: string;
     initialMode?: 'view' | 'edit';
     onModeChange?: (mode: 'view' | 'edit') => void;
+    onClose?: () => void;
 }
 
-export default function RfiReportPanel({ projectId, projectName, initialMode = 'view', onModeChange }: RfiReportPanelProps) {
+export default function RfiReportPanel({ projectId, projectName, initialMode = 'view', onModeChange, onClose }: RfiReportPanelProps) {
     const { showMessage } = useMessage();
     const [loading, setLoading] = useState(false);
     

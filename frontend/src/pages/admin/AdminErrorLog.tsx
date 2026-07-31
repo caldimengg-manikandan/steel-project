@@ -236,9 +236,14 @@ export default function AdminErrorLog() {
             `}</style>
 
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <h2 className="page-title">Global Error Log</h2>
-                    <p className="page-subtitle">Track and manage project errors</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => window.history.back()} title="Back">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div>
+                        <h2 className="page-title">Global Error Log</h2>
+                        <p className="page-subtitle">Track and manage project errors</p>
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     {editMode ? (
