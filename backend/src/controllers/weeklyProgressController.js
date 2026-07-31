@@ -102,7 +102,13 @@ exports.getReportDraft = async (req, res) => {
         const rfiExtractions = rfisResult.status === 'fulfilled' ? rfisResult.value : [];
         const rawCdrfis = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
         
-        const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
+        const cdrfis = rawCdrfis.map(co => ({
+            id: co.coNumber,
+            status: co.status,
+            description: co.description,
+            amount: co.amount,
+            createdAt: co.createdAt
+        }));
         
         // Flatten RFIs from extractions
         const rfis = [];
@@ -390,10 +396,87 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
     // --- COR TAB ---
     const corSheet = workbook.getWorksheet('COR');
     if (corSheet) {
+        // Set proper column widths so text isn't cut off
+        corSheet.getColumn(1).width = 15;
+        corSheet.getColumn(2).width = 15;
+        corSheet.getColumn(3).width = 25;
+        corSheet.getColumn(4).width = 15;
+        corSheet.getColumn(5).width = 15;
+        corSheet.getColumn(6).width = 35;
+
+        // Merge row 1 to span A to F so the header background and border extends fully
+        try {
+            if (corSheet.getCell('A1').isMerged) {
+                // If A1 is merged, unmerge it first
+                // ExcelJS unMergeCells takes the top-left cell address of the merge
+                const mergeRange = corSheet.getCell('A1')._mergeCount ? 'A1' : null;
+                // It's safer to just merge on top or unmerge the specific known range A1:D1
+                corSheet.unMergeCells('A1:D1');
+            }
+        } catch(e) {}
+        
+        try {
+            corSheet.mergeCells('A1:F1');
+            corSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            // Copy bottom border from A1
+            corSheet.getCell('A1').border = { bottom: { style: 'medium', color: { argb: 'FF1F4E78' } } };
+        } catch(e) {}
+
+        // Center the logo image if possible
+        try {
+            const images = corSheet.getImages();
+            if (images && images.length > 0) {
+                const img = images[0];
+                if (img.range && img.range.tl && img.range.br) {
+                    // C is index 2, E is index 4. To span C to E, tl is 2, br is 5
+                    img.range.tl.nativeCol = 2;
+                    img.range.br.nativeCol = 5;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to reposition logo', e);
+        }
+
+        // Rewrite headers to match the UI
+        corSheet.getCell('A2').value = 'COR';
+        corSheet.getCell('B2').value = 'DATE';
+        corSheet.getCell('C2').value = 'CHANGE REFERENCE';
+        corSheet.getCell('D2').value = 'COR AMOUNT';
+        corSheet.getCell('E2').value = 'STATUS';
+        corSheet.getCell('F2').value = 'DESCRIPTION';
+
+        // Apply style to headers
+        for (let i = 1; i <= 6; i++) {
+            const cell = corSheet.getRow(2).getCell(i);
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        }
+
         let startRow = 3;
         const styleRow = corSheet.getRow(startRow);
         
-        const corDataToUse = report.corData || [];
+        let corDataToUse = report.corData || [];
+        
+        if (corDataToUse.length === 0) {
+            try {
+                const ChangeOrder = require('../models/ChangeOrder');
+                const rawCdrfis = await ChangeOrder.find({ projectId });
+                corDataToUse = rawCdrfis.map(co => ({
+                    cor: co.coNumber || '',
+                    date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
+                    changeReference: '',
+                    corAmount: co.amount || '',
+                    status: co.status || '',
+                    description: co.description || ''
+                }));
+            } catch (e) {
+                console.warn('Could not auto-fetch Change Orders for COR tab', e);
+            }
+        }
+        
+        let dataCount = corDataToUse.length;
         
         corDataToUse.forEach((corRow, index) => {
             const row = corSheet.getRow(startRow + index);
@@ -404,16 +487,23 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
             row.getCell(5).value = corRow.status || '';
             row.getCell(6).value = corRow.description || '';
             
-            if (styleRow) {
-                row.eachCell((cell, colNumber) => {
-                    const styleCell = styleRow.getCell(colNumber);
-                    if (styleCell) {
-                        cell.border = styleCell.border;
-                        cell.alignment = styleCell.alignment;
-                    }
-                });
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.getCell(i);
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             }
         });
+
+        // Ensure there are at least 10 empty rows with borders if data is less than 10
+        const minRows = Math.max(10, dataCount);
+        for (let r = 0; r < minRows; r++) {
+            const row = corSheet.getRow(startRow + r);
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.getCell(i);
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            }
+        }
     }
 
     // --- TRANSMITTAL LOG TAB ---

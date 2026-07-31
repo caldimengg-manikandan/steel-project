@@ -121,6 +121,16 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                 setScheduleData(savedSchedule.length > 0 ? savedSchedule : DEFAULT_SCHEDULE);
 
                 let savedCorData = res.report.corData || [];
+                if (savedCorData.length === 0 && res.autoFetch?.cdrfis?.length > 0) {
+                    savedCorData = res.autoFetch.cdrfis.map((co: any) => ({
+                        cor: co.id || '',
+                        date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
+                        changeReference: '',
+                        corAmount: co.amount || '',
+                        status: co.status || '',
+                        description: co.description || ''
+                    }));
+                }
                 setCorData(savedCorData);
 
                 let savedTransmittals = res.report.transmittalData || [];
@@ -148,6 +158,20 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
 
                 const pDetails = res.autoFetch.projectDetails || {};
                 if (res.autoFetch.corStats) setCorStats(res.autoFetch.corStats);
+                
+                let initialCorData = [];
+                if (res.autoFetch.cdrfis && res.autoFetch.cdrfis.length > 0) {
+                    initialCorData = res.autoFetch.cdrfis.map((co: any) => ({
+                        cor: co.id || '',
+                        date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
+                        changeReference: '',
+                        corAmount: co.amount || '',
+                        status: co.status || '',
+                        description: co.description || ''
+                    }));
+                }
+                setCorData(initialCorData);
+
                 setSummaryData((prev: any) => ({
                     ...prev,
                     projectName: prev.projectName || pDetails.projectName || '',
