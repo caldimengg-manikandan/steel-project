@@ -451,6 +451,11 @@ export default function ProjectView() {
                                                             </span>
                                                         )}
                                                     </div>
+                                                    {project.updatedAtFromAppA && (
+                                                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                                                             <strong style={{ color: 'var(--color-text-secondary)' }}>{new Date(project.updatedAtFromAppA).toLocaleDateString(undefined, { dateStyle: 'medium' })} {new Date(project.updatedAtFromAppA).toLocaleTimeString(undefined, { timeStyle: 'short' })}</strong>
+                                                        </div>
+                                                    )}
                                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                                                         {Object.entries(project.corStatus.statusSummary || {}).map(([status, val]) => {
                                                             if ((val as number) === 0) return null;

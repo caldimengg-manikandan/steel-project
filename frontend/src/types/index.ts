@@ -114,6 +114,7 @@ export interface Project {
         totalAmount?: number;
         statusAmounts?: Record<string, number>;
     } | null;
+    updatedAtFromAppA?: string;
 }
 
 export interface AuthUser {

@@ -85,6 +85,7 @@ async function getExternalProjects() {
                 status: mappedStatus,
                 rawStatus: p.projectStatus || p.status || 'active',
                 createdAt: p.createdAt || p.projectStartDate || p.created_at || new Date().toISOString(),
+                updatedAt: p.updatedAt || p.updated_at || null,
                 approximateDrawingsCount: p.approximateDrawingsCount || p.drawingsCount || 0,
                 approvalPercentage: p.approvalPercentage ?? p.approval_percentage ?? 0,
                 fabricationPercentage: p.fabricationPercentage ?? p.fabrication_percentage ?? 0,

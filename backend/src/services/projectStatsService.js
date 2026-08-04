@@ -204,7 +204,8 @@ async function attachProjectStats(projects) {
             approvalPercentage: mergedApprovalPercentage,
             fabricationPercentage: mergedFabricationPercentage,
             corStatus: mergedCorStatus,
-            rawStatus: matchingExt?.rawStatus
+            rawStatus: matchingExt?.rawStatus,
+            updatedAtFromAppA: matchingExt?.updatedAt || null
         };
     });
 
