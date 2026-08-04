@@ -882,9 +882,9 @@ async function generateProjectStatusExcel(projectsData) {
             approvalStatus: `${approvalPercentage}%`,
             rfiStatus: `Open: ${proj.openRfiCount || 0}, Closed: ${proj.closedRfiCount || 0}`,
             fabStatus: STATUS_LABEL[proj.status] || proj.status || '',
-            approvedCo: proj.approvedCO || 0,
-            pendingCo: proj.pendingCO || 0,
-            declinedCo: 0,
+            approvedCo: proj.corStatus?.statusSummary?.Approved ?? proj.approvedCO ?? 0,
+            pendingCo: proj.corStatus?.statusSummary?.Submitted ?? proj.pendingCO ?? 0,
+            declinedCo: proj.corStatus?.statusSummary?.Declined ?? 0,
         });
         dataRow.height = 25; // Increased height to fit wrapped text if any
         dataRow.eachCell((cell, colNum) => {

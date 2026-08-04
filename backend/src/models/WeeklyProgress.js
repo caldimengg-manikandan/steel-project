@@ -99,7 +99,21 @@ const weeklyProgressSchema = new mongoose.Schema({
         numberOfSheets: String,
         seqArea: String,
         remarks: String
-    }]
+    }],
+    corData: [{
+        cor: String,
+        date: String,
+        changeReference: String,
+        corAmount: String,
+        status: String,
+        description: String
+    }],
+    corStats: {
+        total: { type: Number, default: 0 },
+        approved: { type: Number, default: 0 },
+        completed: { type: Number, default: 0 },
+        pending: { type: Number, default: 0 }
+    }
 }, { timestamps: true });
 
 // Ensure one report per project per week

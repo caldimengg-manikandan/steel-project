@@ -102,7 +102,13 @@ exports.getReportDraft = async (req, res) => {
         const rfiExtractions = rfisResult.status === 'fulfilled' ? rfisResult.value : [];
         const rawCdrfis = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
         
-        const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
+        const cdrfis = rawCdrfis.map(co => ({
+            id: co.coNumber,
+            status: co.status,
+            description: co.description,
+            amount: co.amount,
+            createdAt: co.createdAt
+        }));
         
         // Flatten RFIs from extractions
         const rfis = [];
@@ -120,6 +126,7 @@ exports.getReportDraft = async (req, res) => {
 
         let fabricationStats = '';
         let approvalStats = '';
+        let corStats = { total: 0, approved: 0, completed: 0, pending: 0 };
         let projectDetails = null;
         try {
             const project = await Project.findById(projectId);
@@ -137,6 +144,12 @@ exports.getReportDraft = async (req, res) => {
                     const seqDone = s.sequences ? s.sequences.filter(seq => seq.status === 'Completed').length : 0;
                     fabricationStats = `Fabrication: ${s.fabricationCount || 0} drawings (${s.fabricationPercentage || 0}%)\nSequences: ${seqDone}/${seqTotal} done`;
                     approvalStats = `Approval: ${s.approvalCount || 0} drawings (${s.approvalPercentage || 0}%)`;
+                    corStats = {
+                        total: s.corStatus?.totalCORItems ?? s.totalCO ?? 0,
+                        approved: s.corStatus?.statusSummary?.Approved ?? s.approvedCO ?? 0,
+                        completed: s.corStatus?.statusSummary?.Completed ?? s.workCompletedCO ?? 0,
+                        pending: s.corStatus?.statusSummary?.Submitted ?? s.pendingCO ?? 0
+                    };
                 }
             }
         } catch (e) {
@@ -152,6 +165,7 @@ exports.getReportDraft = async (req, res) => {
                 cdrfis,
                 fabricationStats,
                 approvalStats,
+                corStats,
                 projectDetails
             }
         });
@@ -171,6 +185,8 @@ exports.saveReportDraft = async (req, res) => {
             sowData, 
             scheduleData, 
             transmittalData, 
+            corData,
+            corStats,
             status 
         } = req.body;
 
@@ -179,14 +195,14 @@ exports.saveReportDraft = async (req, res) => {
         if (reportId) {
             report = await WeeklyProgress.findByIdAndUpdate(
                 reportId,
-                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, status },
+                { weekStartDate, summaryData, sowData, scheduleData, transmittalData, corData, corStats, status },
                 { new: true }
             );
         } else {
             // Check if one exists for the week
             report = await WeeklyProgress.findOneAndUpdate(
                 { projectId, weekStartDate },
-                { summaryData, sowData, scheduleData, transmittalData, status: status || 'Draft' },
+                { summaryData, sowData, scheduleData, transmittalData, corData, corStats, status: status || 'Draft' },
                 { new: true, upsert: true }
             );
         }
@@ -375,6 +391,119 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
                 });
             }
         });
+    }
+
+    // --- COR TAB ---
+    const corSheet = workbook.getWorksheet('COR');
+    if (corSheet) {
+        // Set proper column widths so text isn't cut off
+        corSheet.getColumn(1).width = 15;
+        corSheet.getColumn(2).width = 15;
+        corSheet.getColumn(3).width = 25;
+        corSheet.getColumn(4).width = 15;
+        corSheet.getColumn(5).width = 15;
+        corSheet.getColumn(6).width = 35;
+
+        // Merge row 1 to span A to F so the header background and border extends fully
+        try {
+            if (corSheet.getCell('A1').isMerged) {
+                // If A1 is merged, unmerge it first
+                // ExcelJS unMergeCells takes the top-left cell address of the merge
+                const mergeRange = corSheet.getCell('A1')._mergeCount ? 'A1' : null;
+                // It's safer to just merge on top or unmerge the specific known range A1:D1
+                corSheet.unMergeCells('A1:D1');
+            }
+        } catch(e) {}
+        
+        try {
+            corSheet.mergeCells('A1:F1');
+            corSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            // Copy bottom border from A1
+            corSheet.getCell('A1').border = { bottom: { style: 'medium', color: { argb: 'FF1F4E78' } } };
+        } catch(e) {}
+
+        // Center the logo image if possible
+        try {
+            const images = corSheet.getImages();
+            if (images && images.length > 0) {
+                const img = images[0];
+                if (img.range && img.range.tl && img.range.br) {
+                    // C is index 2, E is index 4. To span C to E, tl is 2, br is 5
+                    img.range.tl.nativeCol = 2;
+                    img.range.br.nativeCol = 5;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to reposition logo', e);
+        }
+
+        // Rewrite headers to match the UI
+        corSheet.getCell('A2').value = 'COR';
+        corSheet.getCell('B2').value = 'DATE';
+        corSheet.getCell('C2').value = 'CHANGE REFERENCE';
+        corSheet.getCell('D2').value = 'COR AMOUNT';
+        corSheet.getCell('E2').value = 'STATUS';
+        corSheet.getCell('F2').value = 'DESCRIPTION';
+
+        // Apply style to headers
+        for (let i = 1; i <= 6; i++) {
+            const cell = corSheet.getRow(2).getCell(i);
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        }
+
+        let startRow = 3;
+        const styleRow = corSheet.getRow(startRow);
+        
+        let corDataToUse = report.corData || [];
+        
+        if (corDataToUse.length === 0) {
+            try {
+                const ChangeOrder = require('../models/ChangeOrder');
+                const rawCdrfis = await ChangeOrder.find({ projectId });
+                corDataToUse = rawCdrfis.map(co => ({
+                    cor: co.coNumber || '',
+                    date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
+                    changeReference: '',
+                    corAmount: co.amount || '',
+                    status: co.status || '',
+                    description: co.description || ''
+                }));
+            } catch (e) {
+                console.warn('Could not auto-fetch Change Orders for COR tab', e);
+            }
+        }
+        
+        let dataCount = corDataToUse.length;
+        
+        corDataToUse.forEach((corRow, index) => {
+            const row = corSheet.getRow(startRow + index);
+            row.getCell(1).value = corRow.cor || '';
+            row.getCell(2).value = corRow.date || '';
+            row.getCell(3).value = corRow.changeReference || '';
+            row.getCell(4).value = corRow.corAmount || '';
+            row.getCell(5).value = corRow.status || '';
+            row.getCell(6).value = corRow.description || '';
+            
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.getCell(i);
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            }
+        });
+
+        // Ensure there are at least 10 empty rows with borders if data is less than 10
+        const minRows = Math.max(10, dataCount);
+        for (let r = 0; r < minRows; r++) {
+            const row = corSheet.getRow(startRow + r);
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.getCell(i);
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            }
+        }
     }
 
     // --- TRANSMITTAL LOG TAB ---

@@ -437,11 +437,20 @@ async function downloadAllProjectsStatusExcel(req, res) {
         coMap[c._id.toString()] = c;
     });
 
+    let externalProjects = [];
+    try {
+        const extResult = await getExternalProjects();
+        if (extResult && Array.isArray(extResult.projects)) {
+            externalProjects = extResult.projects;
+        }
+    } catch (err) {}
+
     // Merge project data with aggregated stats
     const projectsData = projects.map(p => {
         const stats = countMap[p._id.toString()] || {};
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
         const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
+        const matchingExt = externalProjects.find(ext => ext.name === p.name);
         return {
             ...p,
             totalDrawings: stats.totalDrawings || 0,
@@ -456,6 +465,7 @@ async function downloadAllProjectsStatusExcel(req, res) {
             approvedCO: coStats.approvedCO,
             workCompletedCO: coStats.workCompletedCO,
             pendingCO: coStats.pendingCO,
+            corStatus: matchingExt ? matchingExt.corStatus : null,
         };
     });
 

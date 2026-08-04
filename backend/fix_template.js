@@ -208,6 +208,14 @@ schedule.columns = [
 ];
 styleHeaders(schedule, ['S.No', 'Seq/Area', 'Status', 'Planned IFA', 'Actual IFA', 'BFA Received', 'Planned Fab', 'Actual Fab', 'Remarks']);
 
+// --------------------- COR ---------------------
+const cor = wb.addWorksheet('COR');
+addLogoToSheet(cor, 'D', 3);
+cor.columns = [
+  { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }
+];
+styleHeaders(cor, ['Total', 'Approved', 'Completed', 'Pending']);
+
 // --------------------- TRANSMITTAL LOG ---------------------
 const transmittal = wb.addWorksheet('TRANSMITTAL LOG');
 addLogoToSheet(transmittal, 'G', 6);

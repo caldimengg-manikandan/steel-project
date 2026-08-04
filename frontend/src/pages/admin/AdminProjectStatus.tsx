@@ -300,19 +300,19 @@ export default function AdminProjectStatus() {
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 15px', marginTop: 8 }}>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Total</div>
-                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text-primary)' }}>{project.totalCO || 0}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text-primary)' }}>{project.corStatus?.totalCORItems ?? project.totalCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontSize: 10, color: 'var(--color-success-mid)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Approved</div>
-                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-success-mid)' }}>{project.approvedCO || 0}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-success-mid)' }}>{project.corStatus?.statusSummary?.Approved ?? project.approvedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Completed</div>
-                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)' }}>{project.workCompletedCO || 0}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)' }}>{project.corStatus?.statusSummary?.Completed ?? project.workCompletedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontSize: 10, color: 'var(--color-warning-mid)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Pending</div>
-                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-warning-mid)' }}>{project.pendingCO || 0}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-warning-mid)' }}>{project.corStatus?.statusSummary?.Submitted ?? project.pendingCO ?? 0}</div>
                                             </div>
                                         </div>
                                     </div>
