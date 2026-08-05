@@ -102,7 +102,7 @@ exports.getReportDraft = async (req, res) => {
         const rfiExtractions = rfisResult.status === 'fulfilled' ? rfisResult.value : [];
         const rawCdrfis = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
         
-        const cdrfis = rawCdrfis.map(co => ({
+        let cdrfis = rawCdrfis.map(co => ({
             id: co.coNumber,
             status: co.status,
             description: co.description,
@@ -150,6 +150,15 @@ exports.getReportDraft = async (req, res) => {
                         completed: s.corStatus?.statusSummary?.Completed ?? s.workCompletedCO ?? 0,
                         pending: s.corStatus?.statusSummary?.Submitted ?? s.pendingCO ?? 0
                     };
+                    if (s.corStatus && s.corStatus.items && s.corStatus.items.length > 0) {
+                        cdrfis = s.corStatus.items.map(item => ({
+                            id: item.corNumber,
+                            status: item.status,
+                            description: '',
+                            amount: item.amount,
+                            createdAt: item.date
+                        }));
+                    }
                 }
             }
         } catch (e) {
@@ -461,16 +470,38 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
         
         if (corDataToUse.length === 0) {
             try {
-                const ChangeOrder = require('../models/ChangeOrder');
-                const rawCdrfis = await ChangeOrder.find({ projectId });
-                corDataToUse = rawCdrfis.map(co => ({
-                    cor: co.coNumber || '',
-                    date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
-                    changeReference: '',
-                    corAmount: co.amount || '',
-                    status: co.status || '',
-                    description: co.description || ''
-                }));
+                const Project = require('../models/Project');
+                const { attachProjectStats } = require('../services/projectStatsService');
+                const project = await Project.findById(projectId);
+                if (project) {
+                    const statsArr = await attachProjectStats([project.toObject()]);
+                    if (statsArr && statsArr.length > 0) {
+                        const s = statsArr[0];
+                        if (s.corStatus && s.corStatus.items && s.corStatus.items.length > 0) {
+                            corDataToUse = s.corStatus.items.map(item => ({
+                                cor: item.corNumber || '',
+                                date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+                                changeReference: '',
+                                corAmount: item.amount || '',
+                                status: item.status || '',
+                                description: ''
+                            }));
+                        }
+                    }
+                }
+                
+                if (corDataToUse.length === 0) {
+                    const ChangeOrder = require('../models/ChangeOrder');
+                    const rawCdrfis = await ChangeOrder.find({ projectId });
+                    corDataToUse = rawCdrfis.map(co => ({
+                        cor: co.coNumber || '',
+                        date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
+                        changeReference: '',
+                        corAmount: co.amount || '',
+                        status: co.status || '',
+                        description: co.description || ''
+                    }));
+                }
             } catch (e) {
                 console.warn('Could not auto-fetch Change Orders for COR tab', e);
             }
