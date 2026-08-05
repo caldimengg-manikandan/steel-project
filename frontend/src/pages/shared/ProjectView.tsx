@@ -451,11 +451,6 @@ export default function ProjectView() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {project.updatedAtFromAppA && (
-                                                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
-                                                            Acceptence Date: <strong style={{ color: 'var(--color-text-secondary)' }}>{new Date(project.updatedAtFromAppA).toLocaleDateString(undefined, { dateStyle: 'medium' })} {new Date(project.updatedAtFromAppA).toLocaleTimeString(undefined, { timeStyle: 'short' })}</strong>
-                                                        </div>
-                                                    )}
                                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                                                         {Object.entries(project.corStatus.statusSummary || {}).map(([status, val]) => {
                                                             if ((val as number) === 0) return null;
@@ -463,15 +458,49 @@ export default function ProjectView() {
                                                             return (
                                                                 <span key={status} className="badge badge-neutral" style={{ fontSize: 10, padding: '3px 8px', background: 'var(--color-bg-page)', border: '1px solid var(--color-border-light)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                                                     <span style={{ fontWeight: 600 }}>{status}: {val as number}</span>
-                                                                    {amt !== undefined && (
-                                                                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                                                                            ({new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amt)})
-                                                                        </span>
-                                                                    )}
                                                                 </span>
                                                             );
                                                         })}
                                                     </div>
+                                                    {project.corStatus.items && project.corStatus.items.length > 0 && (
+                                                        <div style={{ marginTop: 12, borderTop: '1px solid var(--color-border-light)', paddingTop: 10 }}>
+                                                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6, letterSpacing: '0.5px' }}>Individual Change Orders</div>
+                                                            <div className="table-wrapper" style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)' }}>
+                                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                                                    <thead>
+                                                                        <tr style={{ background: 'var(--color-bg-alt)', textAlign: 'left', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                                            <th style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>COR #</th>
+                                                                            <th style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Amount</th>
+                                                                            <th style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Status</th>
+                                                                            <th style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Acceptance Date</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {project.corStatus.items.map((item, idx) => (
+                                                                            <tr key={idx} style={{ borderBottom: idx === project.corStatus!.items!.length - 1 ? 'none' : '1px solid var(--color-border-light)' }}>
+                                                                                <td style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--color-primary)' }}>{item.corNumber}</td>
+                                                                                <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>
+                                                                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(item.amount)}
+                                                                                </td>
+                                                                                <td style={{ padding: '6px 10px' }}>
+                                                                                    <span className={`badge ${
+                                                                                        item.status.toLowerCase() === 'approved' ? 'badge-success' : 
+                                                                                        item.status.toLowerCase() === 'pending' || item.status.toLowerCase() === 'submitted' ? 'badge-info' : 
+                                                                                        'badge-neutral'
+                                                                                    }`} style={{ fontSize: 10, padding: '2px 6px' }}>
+                                                                                        {item.status}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td style={{ padding: '6px 10px', color: 'var(--color-text-muted)' }}>
+                                                                                    {item.date ? new Date(item.date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '-'}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.55 }}>COR tracking coming soon — requirements will be configured here.</div>

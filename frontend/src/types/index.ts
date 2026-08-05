@@ -113,6 +113,12 @@ export interface Project {
         statusSummary: Record<string, number>;
         totalAmount?: number;
         statusAmounts?: Record<string, number>;
+        items?: Array<{
+            corNumber: string;
+            amount: number;
+            status: string;
+            date: string | null;
+        }>;
     } | null;
     updatedAtFromAppA?: string;
 }
