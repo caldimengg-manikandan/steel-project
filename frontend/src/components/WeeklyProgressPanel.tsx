@@ -121,7 +121,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                 setScheduleData(savedSchedule.length > 0 ? savedSchedule : DEFAULT_SCHEDULE);
 
                 let savedCorData = res.report.corData || [];
-                if (savedCorData.length === 0 && res.autoFetch?.cdrfis?.length > 0) {
+                if ((savedCorData.length === 0 || (savedCorData.length === 1 && !savedCorData[0].cor)) && res.autoFetch?.cdrfis?.length > 0) {
                     savedCorData = res.autoFetch.cdrfis.map((co: any) => ({
                         cor: co.id || '',
                         date: co.createdAt ? new Date(co.createdAt).toISOString().split('T')[0] : '',
@@ -445,7 +445,18 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                                 <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.cor} onChange={e => { const nd = [...corData]; nd[idx].cor = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
                                                 <td><input type="date" className="form-control" style={{ padding: 4, width: '100%' }} value={row.date} onChange={e => { const nd = [...corData]; nd[idx].date = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
                                                 <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.changeReference} onChange={e => { const nd = [...corData]; nd[idx].changeReference = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
-                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.corAmount} onChange={e => { const nd = [...corData]; nd[idx].corAmount = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
+                                                <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={(() => {
+                                                    const val = String(row.corAmount || '');
+                                                    const clean = val.replace(/,/g, '');
+                                                    if (clean && !isNaN(Number(clean)) && clean.trim() !== '') {
+                                                        const parts = clean.split('.');
+                                                        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                                                        // if it starts with $ keep it, else we can just show number. 
+                                                        // The user just requested "make commas so that it shouldbe shown as amount"
+                                                        return (val.startsWith('$') ? '$' : '') + parts.join('.').replace(/^\$/, '');
+                                                    }
+                                                    return val;
+                                                })()} onChange={e => { const nd = [...corData]; nd[idx].corAmount = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
                                                 <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.status} onChange={e => { const nd = [...corData]; nd[idx].status = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
                                                 <td><input type="text" className="form-control" style={{ padding: 4, width: '100%' }} value={row.description} onChange={e => { const nd = [...corData]; nd[idx].description = e.target.value; setCorData(nd); }} disabled={!editMode} /></td>
                                                 {editMode && (

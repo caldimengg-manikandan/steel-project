@@ -158,6 +158,14 @@ exports.getReportDraft = async (req, res) => {
                             amount: item.amount,
                             createdAt: item.date
                         }));
+                    } else if (s.corStatus && s.corStatus.totalAmount) {
+                        cdrfis = [{
+                            id: '',
+                            status: '',
+                            description: '',
+                            amount: s.corStatus.totalAmount,
+                            createdAt: ''
+                        }];
                     }
                 }
             }
@@ -468,7 +476,7 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
         
         let corDataToUse = report.corData || [];
         
-        if (corDataToUse.length === 0) {
+        if (corDataToUse.length === 0 || (corDataToUse.length === 1 && !corDataToUse[0].cor)) {
             try {
                 const Project = require('../models/Project');
                 const { attachProjectStats } = require('../services/projectStatsService');
@@ -486,6 +494,15 @@ exports.buildWeeklyReportWorkbook = async (projectId, report) => {
                                 status: item.status || '',
                                 description: ''
                             }));
+                        } else if (s.corStatus && s.corStatus.totalAmount) {
+                            corDataToUse = [{
+                                cor: '',
+                                date: '',
+                                changeReference: '',
+                                corAmount: s.corStatus.totalAmount || '',
+                                status: '',
+                                description: ''
+                            }];
                         }
                     }
                 }
