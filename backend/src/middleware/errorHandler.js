@@ -21,7 +21,7 @@ function errorHandler(err, req, res, next) {
     // Mongoose validation errors
     if (err.name === 'ValidationError') {
         const messages = Object.values(err.errors).map((e) => e.message);
-        return res.status(400).json({ error: 'Validation failed.', details: messages });
+        return res.status(400).json({ error: 'Validation failed: ' + messages.join(', '), details: messages });
     }
 
     // Mongoose duplicate key (unique index violation)

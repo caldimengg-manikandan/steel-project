@@ -426,6 +426,8 @@ export default function AdminUsers() {
                                         className="form-control" 
                                         placeholder="e.g. john@example.com"
                                         autoComplete="new-email"
+                                        pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                                        title="Please enter a valid email address."
                                         value={form.email} 
                                         onChange={e => setForm({ ...form, email: e.target.value })} 
                                     />
@@ -436,19 +438,6 @@ export default function AdminUsers() {
                                     )}
                                 </div>
 
-                                {/* Display Name */}
-                                <div className="form-group">
-                                    <label className="form-label">Display Name</label>
-                                    <input 
-                                        type="text"
-                                        name="portal-new-displayname"
-                                        className="form-control" 
-                                        placeholder="e.g. John Doe"
-                                        autoComplete="new-displayname"
-                                        value={form.displayName} 
-                                        onChange={e => setForm({ ...form, displayName: e.target.value })} 
-                                    />
-                                </div>
 
                                 {/* Temporary Password */}
                                 <div className="form-group">

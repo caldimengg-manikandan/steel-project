@@ -326,17 +326,25 @@ export default function AdminClients() {
                                                     className="form-control" 
                                                     value={contact.email}
                                                     placeholder="john@example.com"
+                                                    pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                                                    title="Please enter a valid email address."
                                                     onChange={e => updateContact(index, 'email', e.target.value)}
                                                 />
                                             </div>
                                             <div className="form-group" style={{ marginBottom: 0 }}>
                                                 <label className="form-label">Phone</label>
                                                 <input 
-                                                    type="text" 
+                                                    type="tel" 
                                                     className="form-control" 
                                                     value={contact.phone}
-                                                    placeholder="+1..."
-                                                    onChange={e => updateContact(index, 'phone', e.target.value)}
+                                                    placeholder="e.g., 9876543210"
+                                                    pattern="^[0-9]{10}$"
+                                                    maxLength={10}
+                                                    title="Please enter exactly 10 digits."
+                                                    onChange={e => {
+                                                        const onlyDigits = e.target.value.replace(/\D/g, '');
+                                                        updateContact(index, 'phone', onlyDigits);
+                                                    }}
                                                 />
                                             </div>
                                             <div className="form-group" style={{ marginBottom: 0 }}>

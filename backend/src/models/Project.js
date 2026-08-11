@@ -59,8 +59,8 @@ const projectSchema = new mongoose.Schema(
         contactPerson: {
             type: {
                 name: String,
-                email: String,
-                phone: String,
+                email: { type: String, match: [/(^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$)/, 'Invalid email format'] },
+                phone: { type: String, match: [/(^$|^[0-9]{10}$)/, 'Contact number must be exactly 10 digits'] },
                 designation: String
             },
             default: null
@@ -74,8 +74,8 @@ const projectSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['active', 'on_hold', 'completed', 'archived'],
-            default: 'active',
+            enum: ['in_progress', 'on_hold', 'completed', 'archived'],
+            default: 'in_progress',
         },
 
         location: {
@@ -162,10 +162,12 @@ const projectSchema = new mongoose.Schema(
         connectionDesignContact: {
             type: String,
             default: '',
+            match: [/(^$|^[0-9]{10}$)/, 'Contact number must be exactly 10 digits']
         },
         connectionDesignEmail: {
             type: String,
             default: '',
+            match: [/(^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$)/, 'Invalid email format']
         },
     },
     {

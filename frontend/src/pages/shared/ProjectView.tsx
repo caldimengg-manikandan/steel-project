@@ -203,7 +203,22 @@ export default function ProjectView() {
     const canUpload = permission === 'editor' || permission === 'admin';
 
     const STATUS_LABEL: Record<string, string> = { active: 'Active', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived' };
-    const STATUS_CLS: Record<string, string> = { active: 'badge-success', on_hold: 'badge-warning', completed: 'badge-info', archived: 'badge-neutral' };
+    const STATUS_CLS: Record<string, string> = { active: 'badge-success', in_progress: 'badge-success', on_hold: 'badge-danger', completed: 'badge-info', archived: 'badge-warning' };
+
+    const getBadgeClass = (text: string) => {
+        const s = (text || '').toLowerCase();
+        if (s.includes('hold')) return 'badge-danger';
+        if (s.includes('complete')) return 'badge-info';
+        if (s.includes('archiv')) return 'badge-warning';
+        return 'badge-success';
+    };
+
+    const formatBadgeText = (text: string) => {
+        if (!text) return text;
+        let formatted = text.replace(/_/g, ' ');
+        if (formatted.toLowerCase() === 'in progress') return 'In-progress';
+        return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    };
 
     /** Format any ISO/UTC date string to IST (Asia/Kolkata) */
     function toIST(raw: string) {
@@ -238,10 +253,12 @@ export default function ProjectView() {
                         >
                             <IconBack />
                         </button>
-                        <h2 className="project-name-heading">{project.name}</h2>
-                        <span className={`badge ${STATUS_CLS[project.status]}`}>
-                            {STATUS_LABEL[project.status]}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <h2 className="project-name-heading">{project.name}</h2>
+                            <span className={`badge ${getBadgeClass(project.rawStatus || STATUS_LABEL[project.status] || project.status)}`}>
+                                {formatBadgeText(project.rawStatus || STATUS_LABEL[project.status] || project.status)}
+                            </span>
+                        </div>
                     </div>
                     <div className="project-meta-row">
                         <div className="project-meta-item">
@@ -266,7 +283,7 @@ export default function ProjectView() {
 
             {/* Tabs */}
             <div className="tab-bar">
-                {(['dashboard', 'storage', 'transmittals', 'revisions', 'extraction', 'rfi', 'info'] as const).map((tab) => (
+                {(['dashboard', 'storage', 'transmittals', 'revisions', 'extraction', 'info'] as const).map((tab) => (
                     <button
                         key={tab}
                         className={`tab-item${activeTab === tab ? ' active' : ''}`}
@@ -277,7 +294,6 @@ export default function ProjectView() {
                         {tab === 'transmittals' && 'Transmittals & Log'}
                         {tab === 'revisions' && `Revision History (${allRevisions.length})`}
                         {tab === 'extraction' && 'Extraction'}
-                        {tab === 'rfi' && 'RFI'}
                         {tab === 'info' && 'Project Info'}
                     </button>
                 ))}
@@ -614,8 +630,10 @@ export default function ProjectView() {
                         </div>
                         <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
                             <div>
-                                <div className="form-label" style={{ marginBottom: 4 }}>Status</div>
-                                <span className={`badge ${STATUS_CLS[project.status]}`}>{STATUS_LABEL[project.status]}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="font-mono text-xs font-bold" style={{ color: 'var(--color-text-secondary)' }}>STATUS</span>
+                                    <span className={`badge ${getBadgeClass(project.rawStatus || STATUS_LABEL[project.status] || project.status)}`}>{formatBadgeText(project.rawStatus || STATUS_LABEL[project.status] || project.status)}</span>
+                                </div>
                             </div>
                             <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Created</div>

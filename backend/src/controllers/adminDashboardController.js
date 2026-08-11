@@ -20,10 +20,9 @@ async function getAdminStats(req, res) {
         userFilter.adminId = adminId;
     }
 
-    const [localProjects, users, totalClients, externalResult] = await Promise.all([
+    const [localProjects, users, externalResult] = await Promise.all([
         Project.find(filter).sort({ updatedAt: -1 }),
         User.find(userFilter).sort({ createdAt: -1 }),
-        Client.countDocuments(req.principal.role === 'superadmin' ? {} : { createdByAdminId: adminId }),
         getExternalProjects()
     ]);
 
@@ -31,7 +30,7 @@ async function getAdminStats(req, res) {
 
     // Get local projects with their stats first
     const localProjectsWithStats = await attachProjectStats(localProjects);
-    
+
     // Map local projects to a consistent schema structure
     const mappedLocal = localProjectsWithStats.map(p => ({
         ...p,
@@ -82,11 +81,26 @@ async function getAdminStats(req, res) {
         }
     });
 
+    const getOriginalCategory = (p) => {
+        if (!p.rawStatus) return p.status || 'active';
+        const s = p.rawStatus.toLowerCase();
+        if (s.includes('hold') || s.includes('pause') || s.includes('stop')) return 'on_hold';
+        if (s.includes('complete') || s.includes('finish') && !s.includes('not')) return 'completed';
+        if (s.includes('archiv')) return 'archived';
+        return 'in_progress';
+    };
+
+    const uniqueClients = new Set(
+        combinedAll.map(p => (p.clientName || '').trim()).filter(Boolean)
+    );
+    const totalClients = uniqueClients.size;
+
     res.json({
         totalClients,
         totalProjects: combinedAll.length,
-        activeProjects: combinedAll.filter(p => p.status === 'active').length,
-        onHoldProjects: combinedAll.filter(p => p.status === 'on_hold').length,
+        activeProjects: combinedAll.filter(p => getOriginalCategory(p) === 'in_progress').length,
+        onHoldProjects: combinedAll.filter(p => getOriginalCategory(p) === 'on_hold').length,
+        completedProjects: combinedAll.filter(p => getOriginalCategory(p) === 'completed').length,
         totalUsers,
         activeUsers,
         totalDrawings,

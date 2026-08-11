@@ -26,7 +26,7 @@ const adminSchema = new mongoose.Schema(
             unique: true,
             trim: true,
             lowercase: true,
-            match: [/.+@.+\..+/, 'Invalid email format'],
+            match: [/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid email format'],
         },
 
         password_hash: {

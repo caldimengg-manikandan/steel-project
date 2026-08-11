@@ -92,14 +92,17 @@ async function fetchAndCache(projectsUrl, countUrl) {
             // Map external status values to local options ('active', 'on_hold', 'completed', 'archived')
             let mappedStatus = 'active';
             const rawStatus = (p.projectStatus || p.status || '').toLowerCase();
-            if (rawStatus.includes('complete') || rawStatus.includes('finish')) {
+            const rawStatusLower = rawStatus.toLowerCase();
+            if (rawStatusLower.includes('not complete') || rawStatusLower.includes('incomplete')) {
+                mappedStatus = 'in_progress';
+            } else if (rawStatusLower.includes('complete') || rawStatusLower.includes('finish')) {
                 mappedStatus = 'completed';
-            } else if (rawStatus.includes('hold') || rawStatus.includes('pause') || rawStatus.includes('stop')) {
+            } else if (rawStatusLower.includes('hold') || rawStatusLower.includes('pause') || rawStatusLower.includes('stop')) {
                 mappedStatus = 'on_hold';
-            } else if (rawStatus.includes('archive')) {
+            } else if (rawStatusLower.includes('archive')) {
                 mappedStatus = 'archived';
             } else {
-                mappedStatus = 'active';
+                mappedStatus = 'in_progress';
             }
 
             return {
@@ -107,7 +110,7 @@ async function fetchAndCache(projectsUrl, countUrl) {
                 name: p.name || p.projectName || p.title || 'Unnamed External Project',
                 clientName: p.clientName || p.customerName || p.client || p.client_name || 'N/A',
                 status: mappedStatus,
-                rawStatus: p.projectStatus || p.status || 'active',
+                rawStatus: p.projectStatus || p.status || '',
                 createdAt: p.createdAt || p.projectStartDate || p.created_at || new Date().toISOString(),
                 updatedAt: p.updatedAt || p.updated_at || null,
                 approximateDrawingsCount: p.approximateDrawingsCount || p.drawingsCount || 0,

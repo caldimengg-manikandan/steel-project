@@ -25,7 +25,7 @@ function addLogoToSheet(sheet, lastColLetter, lastColIndex, imgStartCol, imgEndC
   }
 }
 
-function styleHeaders(sheet, headers) {
+function styleHeaders(sheet, headers, maxDataRow = 30) {
   const headerRow = sheet.getRow(2);
   headerRow.height = 30;
   headerRow.values = headers;
@@ -44,8 +44,8 @@ function styleHeaders(sheet, headers) {
     }
   });
 
-  // Style data rows (3 to 30) so they have borders by default
-  for (let i = 3; i <= 30; i++) {
+  // Style data rows so they have borders by default
+  for (let i = 3; i <= maxDataRow; i++) {
     const dataRow = sheet.getRow(i);
     dataRow.height = 20;
     for (let c = 1; c <= headers.length; c++) {
@@ -144,7 +144,7 @@ summary.mergeCells('A18:N18');
 summary.getCell('A18').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
 
 summary.mergeCells('B19:E19');
-summary.getCell('B19').value = 'Project Status as of Last Week';
+summary.getCell('B19').value = 'Project Status as of Current Week';
 summary.getCell('B19').font = { name: 'Calibri', size: 11, color: { argb: 'FF595959' }, italic: true };
 summary.getCell('B19').border = { bottom: { style: 'thin', color: { argb: 'FF000000' } } };
 
@@ -193,7 +193,7 @@ for (let c = 1; c <= 14; c++) {
 
 // --------------------- SOW ---------------------
 const sow = wb.addWorksheet('SOW');
-addLogoToSheet(sow, 'E', 4);
+addLogoToSheet(sow, 'E', 4, 1, 4.5);
 sow.columns = [
   { width: 10 }, { width: 40 }, { width: 15 }, { width: 20 }, { width: 30 }
 ];
@@ -201,7 +201,7 @@ styleHeaders(sow, ['S.No', 'Description', 'Change', 'Received Date', 'Remarks'])
 
 // --------------------- SCHEDULE ---------------------
 const schedule = wb.addWorksheet('SCHEDULE');
-addLogoToSheet(schedule, 'I', 8);
+addLogoToSheet(schedule, 'I', 8, 2, 8);
 schedule.columns = [
   { width: 10 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, 
   { width: 15 }, { width: 15 }, { width: 15 }, { width: 30 }
@@ -212,13 +212,13 @@ styleHeaders(schedule, ['S.No', 'Seq/Area', 'Status', 'Planned IFA', 'Actual IFA
 const cor = wb.addWorksheet('COR');
 addLogoToSheet(cor, 'D', 3);
 cor.columns = [
-  { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }
+  { width: 10 }, { width: 15 }, { width: 25 }, { width: 15 }, { width: 15 }, { width: 30 }
 ];
-styleHeaders(cor, ['Total', 'Approved', 'Completed', 'Pending']);
+styleHeaders(cor, ['COR', 'DATE', 'CHANGE REFERENCE', 'COR AMOUNT', 'STATUS', 'DESCRIPTION'], 12);
 
 // --------------------- TRANSMITTAL LOG ---------------------
 const transmittal = wb.addWorksheet('TRANSMITTAL LOG');
-addLogoToSheet(transmittal, 'G', 6);
+addLogoToSheet(transmittal, 'G', 6, 1, 6.5);
 transmittal.columns = [
   { width: 10 }, { width: 20 }, { width: 15 }, { width: 15 }, { width: 10 }, { width: 15 }, { width: 30 }
 ];

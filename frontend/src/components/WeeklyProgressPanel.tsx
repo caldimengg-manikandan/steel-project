@@ -286,7 +286,7 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 24 }}>
                                 <h3 style={{ fontSize: 14, marginBottom: 16, color: 'var(--color-primary)' }}>Status & Descriptions</h3>
                                 {renderSummaryInput('projectDescription', 'Project Description', true)}
-                                {renderSummaryInput('projectStatusLastWeek', 'Project Status Last Week', true)}
+                                {renderSummaryInput('projectStatusLastWeek', 'Project Status as of Current Week', true)}
                                 {renderSummaryInput('overallApprovalStatus', 'Overall Approval Status', true)}
                                 {renderSummaryInput('overallFabricationStatus', 'Overall Fabrication Status', true)}
                             </div>

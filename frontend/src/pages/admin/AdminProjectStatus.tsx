@@ -5,17 +5,26 @@ import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
 
 const STATUS_LABEL: Record<TypeProjectStatus, string> = {
-    active: 'Active',
-    on_hold: 'On Hold',
-    completed: 'Completed',
-    archived: 'Archived',
+    in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
 };
 
 const STATUS_CLS: Record<TypeProjectStatus, string> = {
-    active: 'badge-success',
-    on_hold: 'badge-warning',
-    completed: 'badge-info',
-    archived: 'badge-neutral',
+    in_progress: 'badge-success', on_hold: 'badge-danger', completed: 'badge-info', archived: 'badge-warning',
+};
+
+const getBadgeClass = (text: string) => {
+    const s = (text || '').toLowerCase();
+    if (s.includes('hold')) return 'badge-danger';
+    if (s.includes('complete')) return 'badge-info';
+    if (s.includes('archiv')) return 'badge-warning';
+    return 'badge-success';
+};
+
+const formatBadgeText = (text: string) => {
+    if (!text) return text;
+    let formatted = text.replace(/_/g, ' ');
+    if (formatted.toLowerCase() === 'in progress') return 'In-progress';
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
 function IconDownload() {
@@ -50,7 +59,8 @@ function IconChevron({ open }: { open: boolean }) {
 
 export default function AdminProjectStatus() {
     const navigate = useNavigate();
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [projects, setProjects] = useState<any[]>([]);
+    const [totalProjectsCount, setTotalProjectsCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [downloading, setDownloading] = useState(false);
@@ -74,6 +84,7 @@ export default function AdminProjectStatus() {
                 isExternal: false
             }));
             setProjects(mapped);
+            setTotalProjectsCount(data.count || mapped.length);
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -120,10 +131,19 @@ export default function AdminProjectStatus() {
         }
     };
 
+    const getOriginalCategory = (p: any) => {
+        if (!p.rawStatus) return p.status || 'active';
+        const s = p.rawStatus.toLowerCase();
+        if (s.includes('hold') || s.includes('pause') || s.includes('stop')) return 'on_hold';
+        if (s.includes('complete') || s.includes('finish') && !s.includes('not')) return 'completed';
+        if (s.includes('archiv')) return 'archived';
+        return 'in_progress';
+    };
+
     const allProjects = projects;
 
-    const totalProjects = allProjects.length;
-    const activeProjects = allProjects.filter((p) => p.status === 'active').length;
+    const totalProjects = Math.max(totalProjectsCount, allProjects.length);
+    const activeProjects = allProjects.filter((p) => getOriginalCategory(p) === 'in_progress').length;
 
     async function handleDownloadStatusExcel() {
         try {
@@ -145,8 +165,8 @@ export default function AdminProjectStatus() {
                     <p className="page-subtitle">Real-time overview of fabrication, approval, RFI, and Change Order progress across all projects.</p>
                 </div>
                 <div className="page-header-actions">
-                    <button 
-                        className={`btn ${downloading ? 'btn-disabled' : 'btn-primary'}`} 
+                    <button
+                        className={`btn ${downloading ? 'btn-disabled' : 'btn-primary'}`}
                         onClick={handleDownloadStatusExcel}
                         disabled={downloading}
                     >
@@ -196,10 +216,10 @@ export default function AdminProjectStatus() {
                         const approvedCount = (project as any).approvalCount || 0;
                         const openRfiCount = project.openRfiCount || 0;
                         const closedRfiCount = project.closedRfiCount || 0;
-                        
+
                         const isSectionExpanded = expandedProjectId === project.id;
-                        
-                        const filteredRfis = (projectRfis[project.id] || []).filter(r => 
+
+                        const filteredRfis = (projectRfis[project.id] || []).filter(r =>
                             expandedRfiFilter === 'ALL' ? true : r.status === expandedRfiFilter
                         );
 
@@ -211,13 +231,13 @@ export default function AdminProjectStatus() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                             <div className="project-status-name">{project.name}</div>
                                             {project.location && (
-                                                <div style={{ 
-                                                    fontSize: 10, 
-                                                    fontWeight: 800, 
-                                                    color: 'var(--color-primary)', 
-                                                    background: 'var(--color-primary-light)', 
-                                                    padding: '2px 8px', 
-                                                    borderRadius: 12, 
+                                                <div style={{
+                                                    fontSize: 10,
+                                                    fontWeight: 800,
+                                                    color: 'var(--color-primary)',
+                                                    background: 'var(--color-primary-light)',
+                                                    padding: '2px 8px',
+                                                    borderRadius: 12,
                                                     textTransform: 'uppercase',
                                                     letterSpacing: '0.5px',
                                                     border: '1px solid rgba(30, 79, 216, 0.1)'
@@ -229,8 +249,8 @@ export default function AdminProjectStatus() {
                                         <div className="project-status-client">{project.clientName}</div>
                                     </div>
                                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
-                                        <span className={`badge ${STATUS_CLS[project.status as TypeProjectStatus]}`} style={{ padding: '6px 12px' }}>
-                                            {STATUS_LABEL[project.status as TypeProjectStatus]}
+                                        <span className={`badge ${getBadgeClass(project.rawStatus || STATUS_LABEL[project.status as TypeProjectStatus] || project.status)}`} style={{ padding: '6px 12px' }}>
+                                            {formatBadgeText(project.rawStatus || STATUS_LABEL[project.status as TypeProjectStatus] || project.status)}
                                         </span>
                                     </div>
                                 </div>
@@ -253,18 +273,18 @@ export default function AdminProjectStatus() {
                                         <div className="project-status-stat-value">{project.approvalPercentage || 0}%</div>
                                         <div className="project-status-stat-sub">{approvedCount} drawings approved</div>
                                     </div>
-                                    <div 
-                                        className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'OPEN' ? 'active-stat-selection' : ''}`} 
+                                    <div
+                                        className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'OPEN' ? 'active-stat-selection' : ''}`}
                                         style={{ transition: 'all 0.2s' }}
                                     >
-                                        <div 
-                                            className="project-status-stat-label" 
+                                        <div
+                                            className="project-status-stat-label"
                                             style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                                             onClick={(e) => { e.stopPropagation(); handleToggleRfis(project.id, 'OPEN'); }}
                                         >
                                             Open RFIs <IconChevron open={isSectionExpanded && expandedRfiFilter === 'OPEN'} />
                                         </div>
-                                        <div 
+                                        <div
                                             onClick={() => navigate('/admin/rfi', { state: { projectId: project.id } })}
                                             style={{ cursor: 'pointer' }}
                                         >
@@ -274,18 +294,18 @@ export default function AdminProjectStatus() {
                                             <div className="project-status-stat-sub">unresolved questions</div>
                                         </div>
                                     </div>
-                                    <div 
+                                    <div
                                         className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'CLOSED' ? 'active-stat-selection' : ''}`}
                                         style={{ transition: 'all 0.2s' }}
                                     >
-                                        <div 
-                                            className="project-status-stat-label" 
+                                        <div
+                                            className="project-status-stat-label"
                                             style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                                             onClick={(e) => { e.stopPropagation(); handleToggleRfis(project.id, 'CLOSED'); }}
                                         >
                                             Closed RFIs <IconChevron open={isSectionExpanded && expandedRfiFilter === 'CLOSED'} />
                                         </div>
-                                        <div 
+                                        <div
                                             onClick={() => navigate('/admin/rfi', { state: { projectId: project.id } })}
                                             style={{ cursor: 'pointer' }}
                                         >
@@ -307,7 +327,7 @@ export default function AdminProjectStatus() {
                                                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-success-mid)' }}>{project.corStatus?.statusSummary?.Approved ?? project.approvedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
-                                                <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Completed</div>
+                                                <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Completed COs</div>
                                                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)' }}>{project.corStatus?.statusSummary?.Completed ?? project.workCompletedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
@@ -356,7 +376,7 @@ export default function AdminProjectStatus() {
                                                 Close Dropdown
                                             </div>
                                         </div>
-                                        
+
                                         {loadingRfis[project.id] ? (
                                             <div style={{ padding: '20px 0', textAlign: 'center' }}>
                                                 <div className="spinner spinner-sm"></div>

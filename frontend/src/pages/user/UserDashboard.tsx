@@ -34,7 +34,7 @@ export default function UserDashboard() {
         fetchData();
     }, [fetchData]);
 
-    const activeCount = projects.filter((p) => p.status === 'active').length;
+    const activeCount = projects.filter((p) => p.status === 'in_progress').length;
     const drawingCount = projects.reduce((s, p) => s + (p.drawingCount || 0), 0);
     const clientCount = new Set(projects.map(p => p.clientName)).size;
     const highestPerm =
@@ -184,11 +184,20 @@ export default function UserDashboard() {
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <span className={`badge ${p.status === 'active' ? 'badge-success' :
-                                                            p.status === 'on_hold' ? 'badge-warning' :
-                                                                p.status === 'completed' ? 'badge-info' : 'badge-neutral'
-                                                            }`}>
-                                                            {p.status.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                                        <span className={`badge ${(() => {
+                                                            const text = p.rawStatus || (p.status === 'in_progress' ? 'In-progress' : p.status === 'on_hold' ? 'On Hold' : p.status === 'completed' ? 'Completed' : 'Archived');
+                                                            const s = text.toLowerCase();
+                                                            if (s.includes('hold')) return 'badge-danger';
+                                                            if (s.includes('complete')) return 'badge-info';
+                                                            if (s.includes('archiv')) return 'badge-warning';
+                                                            return 'badge-success';
+                                                        })()}`}>
+                                                            {(() => {
+                                                                const raw = p.rawStatus || (p.status === 'in_progress' ? 'In-progress' : p.status === 'on_hold' ? 'On Hold' : p.status === 'completed' ? 'Completed' : 'Archived');
+                                                                let formatted = raw.replace(/_/g, ' ');
+                                                                if (formatted.toLowerCase() === 'in progress') return 'In-progress';
+                                                                return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                                                            })()}
                                                         </span>
                                                     </td>
                                                     <td className="text-muted" style={{ fontSize: 12.5 }}>

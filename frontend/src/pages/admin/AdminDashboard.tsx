@@ -6,14 +6,28 @@ import { useSettings } from '../../context/SettingsContext';
 import { formatDate } from '../../utils/dateUtils';
 import type { Client } from '../../types';
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, rawStatus }: { status: string, rawStatus?: string }) {
     const map: Record<string, string> = {
-        active: 'badge-success', on_hold: 'badge-warning', completed: 'badge-info', archived: 'badge-neutral',
+        in_progress: 'badge-success', on_hold: 'badge-danger', completed: 'badge-info', archived: 'badge-warning',
     };
     const labels: Record<string, string> = {
-        active: 'Active', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
+        in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
     };
-    return <span className={`badge ${map[status] ?? 'badge-neutral'}`}>{labels[status] ?? status}</span>;
+    
+    const displayStatus = rawStatus || labels[status] || status;
+    const s = (displayStatus || '').toLowerCase();
+    
+    let cls = map[status] ?? 'badge-success';
+    if (s.includes('hold')) cls = 'badge-danger';
+    else if (s.includes('complete')) cls = 'badge-info';
+    else if (s.includes('archiv')) cls = 'badge-warning';
+    else if (s.includes('progress')) cls = 'badge-success';
+
+    let formatted = displayStatus.replace(/_/g, ' ');
+    if (formatted.toLowerCase() === 'in progress') formatted = 'In-progress';
+    else formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+
+    return <span className={`badge ${cls}`}>{formatted}</span>;
 }
 
 export default function AdminDashboard() {
@@ -298,7 +312,7 @@ export default function AdminDashboard() {
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td><StatusBadge status={p.status} /></td>
+                                                        <td><StatusBadge status={p.status} rawStatus={p.rawStatus} /></td>
                                                         <td style={{ color: 'var(--color-text-muted)', fontSize: 12.5 }}>
                                                             {new Date(p.updatedAt).toLocaleDateString('en-US', {
                                                                 day: '2-digit', month: 'short', year: 'numeric',

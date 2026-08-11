@@ -4,7 +4,7 @@
 
 export type UserRole = 'admin' | 'user' | 'superadmin' | 'project_manager' | 'team_lead' | 'team_member';
 export type ProjectPermission = 'viewer' | 'editor' | 'admin';
-export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+export type ProjectStatus = 'in_progress' | 'on_hold' | 'completed' | 'archived';
 export type UserStatus = 'active' | 'inactive';
 
 export interface ClientContact {

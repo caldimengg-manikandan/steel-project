@@ -34,7 +34,22 @@ export default function UserProjects() {
     }, [fetchProjects]);
 
     const STATUS_LABEL: Record<string, string> = { active: 'Active', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived' };
-    const STATUS_CLS: Record<string, string> = { active: 'badge-success', on_hold: 'badge-warning', completed: 'badge-info', archived: 'badge-neutral' };
+    const STATUS_CLS: Record<string, string> = { active: 'badge-success', in_progress: 'badge-success', on_hold: 'badge-danger', completed: 'badge-info', archived: 'badge-warning' };
+
+    const getBadgeClass = (text: string) => {
+        const s = (text || '').toLowerCase();
+        if (s.includes('hold')) return 'badge-danger';
+        if (s.includes('complete')) return 'badge-info';
+        if (s.includes('archiv')) return 'badge-warning';
+        return 'badge-success';
+    };
+
+    const formatBadgeText = (text: string) => {
+        if (!text) return text;
+        let formatted = text.replace(/_/g, ' ');
+        if (formatted.toLowerCase() === 'in progress') return 'In-progress';
+        return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    };
 
     return (
         <div>
@@ -151,8 +166,8 @@ export default function UserProjects() {
                                             })()}
                                         </td>
                                         <td>
-                                            <span className={`badge ${STATUS_CLS[p.status]}`}>
-                                                {STATUS_LABEL[p.status]}
+                                            <span className={`badge ${getBadgeClass(p.rawStatus || STATUS_LABEL[p.status] || p.status)}`}>
+                                                {formatBadgeText(p.rawStatus || STATUS_LABEL[p.status] || p.status)}
                                             </span>
                                         </td>
                                         <td className="font-mono" style={{ fontWeight: 600 }}>{p.drawingCount}</td>

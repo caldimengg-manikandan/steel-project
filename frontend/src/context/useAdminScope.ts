@@ -49,7 +49,7 @@ export function useAdminScope(): AdminScopeData {
 
     const myStats = useMemo(() => ({
         totalProjects: myProjects.length,
-        activeProjects: myProjects.filter((p) => p.status === 'active').length,
+        activeProjects: myProjects.filter((p) => p.status === 'in_progress').length,
         onHoldProjects: myProjects.filter((p) => p.status === 'on_hold').length,
         totalUsers: myUsers.length,
         activeUsers: myUsers.filter((u) => u.status === 'active').length,

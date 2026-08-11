@@ -109,6 +109,18 @@ async function createProject(req, res) {
         drawingCount: 0,
     });
 
+    const Notification = require('../models/Notification');
+    try {
+        await Notification.create({
+            user: req.principal.id,
+            title: 'New Project Assigned',
+            body: `Project "${project.name}" has been assigned to you.`,
+            type: 'assignment'
+        });
+    } catch (err) {
+        console.error('Failed to create assignment notification:', err);
+    }
+
     res.status(201).json({ project });
 }
 
@@ -197,7 +209,7 @@ async function deleteProject(req, res) {
     const extractions = await DrawingExtraction.find({ projectId: project._id }).lean();
     for (const doc of extractions) {
         if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
-            try { fs.unlinkSync(doc.fileUrl); } catch (_) {}
+            try { fs.unlinkSync(doc.fileUrl); } catch (_) { }
         }
     }
 
@@ -211,13 +223,13 @@ async function deleteProject(req, res) {
     try {
         const Transmittal = require('../models/Transmittal');
         await Transmittal.deleteMany({ projectId: project._id });
-    } catch (_) {}
+    } catch (_) { }
 
     // Clean up DrawingLogs if the model exists
     try {
         const DrawingLog = require('../models/DrawingLog');
         await DrawingLog.deleteMany({ projectId: project._id });
-    } catch (_) {}
+    } catch (_) { }
 
     // 4. Delete project itself
     await project.deleteOne();
@@ -259,7 +271,7 @@ async function assignUser(req, res) {
         });
     }
 
-    await project.save();
+    await project.save({ validateModifiedOnly: true });
 
     // Create Notification
     try {
@@ -305,7 +317,7 @@ async function removeAssignment(req, res) {
         return res.status(404).json({ error: 'Assignment not found.' });
     }
 
-    await project.save();
+    await project.save({ validateModifiedOnly: true });
     res.json({ message: 'Assignment removed.', project });
 }
 
@@ -443,7 +455,7 @@ async function downloadAllProjectsStatusExcel(req, res) {
         if (extResult && Array.isArray(extResult.projects)) {
             externalProjects = extResult.projects;
         }
-    } catch (err) {}
+    } catch (err) { }
 
     // Merge project data with aggregated stats
     const projectsData = projects.map(p => {
@@ -466,6 +478,11 @@ async function downloadAllProjectsStatusExcel(req, res) {
             workCompletedCO: coStats.workCompletedCO,
             pendingCO: coStats.pendingCO,
             corStatus: matchingExt ? matchingExt.corStatus : null,
+            fabricationPercentage: matchingExt ? matchingExt.fabricationPercentage : 0,
+            approvalPercentage: matchingExt ? matchingExt.approvalPercentage : 0,
+            rawStatus: matchingExt ? matchingExt.rawStatus : '',
+            // If the local status is just "in_progress", but external has a more specific mapping, we can provide it,
+            // but usually we rely on rawStatus for UI.
         };
     });
 
@@ -639,7 +656,7 @@ async function uploadFolder(req, res) {
 
         // Get the optional base target path (from Storage UI), otherwise default to root project folder
         const baseTarget = req.body.targetPath || `Projects/${projectName}`;
-        
+
         // Determine storage path, preserving the relative upload structure
         const targetDir = `${baseTarget}/${path.dirname(relativePath).replace(/\\/g, '/')}`;
         const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '').replace(/\/\.$/, '');
@@ -664,7 +681,7 @@ async function uploadFolder(req, res) {
                     lastError = err;
                     const isRateLimit = err.message.includes('Too many requests') || err.message.includes('429');
                     const waitTime = isRateLimit ? baseDelay * attempt * 2 : baseDelay * attempt;
-                    
+
                     console.warn(`[FolderUpload] Attempt ${attempt} failed for ${file.originalname}. Error: ${err.message}. Retrying in ${waitTime}ms...`);
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 }
@@ -732,7 +749,7 @@ async function uploadFolder(req, res) {
             });
         } else {
             // Not a drawing PDF, clean up from local disk since it was successfully uploaded to gateway
-            try { fs.unlinkSync(file.path); } catch (_) {}
+            try { fs.unlinkSync(file.path); } catch (_) { }
         }
     }
 

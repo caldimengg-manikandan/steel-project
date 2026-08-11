@@ -7,21 +7,45 @@ import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../compon
 import { formatDate } from '../../utils/dateUtils';
 import type { Project, ProjectStatus, Client, ClientContact } from '../../types';
 
-const STATUS_OPTIONS: ProjectStatus[] = ['active', 'on_hold', 'completed', 'archived'];
+const STATUS_OPTIONS: ProjectStatus[] = ['in_progress', 'on_hold', 'completed', 'archived'];
 const STATUS_LABEL: Record<ProjectStatus, string> = {
-    active: 'Active', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
+    in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
 };
 
 const STATUS_CLS: Record<ProjectStatus, string> = {
-    active: 'badge-success', on_hold: 'badge-warning', completed: 'badge-info', archived: 'badge-neutral',
+    in_progress: 'badge-success', on_hold: 'badge-danger', completed: 'badge-info', archived: 'badge-warning',
+};
+
+const getBadgeClass = (text: string) => {
+    const s = (text || '').toLowerCase();
+    if (s.includes('hold')) return 'badge-danger';
+    if (s.includes('complete')) return 'badge-info';
+    if (s.includes('archiv')) return 'badge-warning';
+    return 'badge-success';
+};
+
+const formatBadgeText = (text: string) => {
+    if (!text) return text;
+    let formatted = text.replace(/_/g, ' ');
+    if (formatted.toLowerCase() === 'in progress') return 'In-progress';
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
+const getOriginalCategory = (p: any) => {
+    if (!p.rawStatus) return p.status || 'active';
+    const s = p.rawStatus.toLowerCase();
+    if (s.includes('hold') || s.includes('pause') || s.includes('stop')) return 'on_hold';
+    if (s.includes('complete') || s.includes('finish') && !s.includes('not')) return 'completed';
+    if (s.includes('archiv')) return 'archived';
+    return 'in_progress';
 };
 
 interface CreateProjectForm {
-    name: string; 
-    clientName: string; 
+    name: string;
+    clientName: string;
     clientId: string;
     contactPerson: ClientContact | null;
-    description: string; 
+    description: string;
     status: ProjectStatus;
     approximateDrawingsCount: string;
     location: string;
@@ -32,15 +56,15 @@ interface CreateProjectForm {
     year: string;
     startingTransmittalNumber: string;
 }
-const DEFAULT_FORM: CreateProjectForm = { 
-    name: '', 
-    clientName: '', 
+const DEFAULT_FORM: CreateProjectForm = {
+    name: '',
+    clientName: '',
     clientId: '',
     contactPerson: null,
-    description: '', 
-    status: 'active', 
-    approximateDrawingsCount: '0', 
-    location: '', 
+    description: '',
+    status: 'in_progress',
+    approximateDrawingsCount: '0',
+    location: '',
     sequenceCount: '0',
     connectionDesignVendor: '',
     connectionDesignContact: '',
@@ -52,6 +76,7 @@ const DEFAULT_FORM: CreateProjectForm = {
 export default function AdminProjects() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
+    const [totalProjectsCount, setTotalProjectsCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalError, setModalError] = useState('');
@@ -70,16 +95,16 @@ export default function AdminProjects() {
         try {
             setLoading(true);
             setError('');
-            
+
             const [projData, clientData] = await Promise.all([
                 adminListProjects(),
                 adminListClients()
             ]);
-            
+
             if (!projData || !Array.isArray(projData.projects)) {
                 throw new Error('Invalid project data received from server');
             }
-            
+
             setClients(clientData.clients || []);
 
             const mapped = projData.projects.map((p: any) => ({
@@ -87,6 +112,7 @@ export default function AdminProjects() {
                 id: String(p._id || p.id),
             }));
             setProjects(mapped);
+            setTotalProjectsCount(projData.count || mapped.length);
         } catch (err: any) {
             setError(err.message || 'Failed to load projects');
         } finally {
@@ -123,7 +149,7 @@ export default function AdminProjects() {
 
     async function handleCreate() {
         if (!form.name.trim() || !form.clientId) return;
-        
+
         const selectedClient = clients.find(c => (c.id || c._id) === form.clientId);
         if (!selectedClient) return;
 
@@ -139,9 +165,9 @@ export default function AdminProjects() {
                 status: form.status,
                 approximateDrawingsCount: Number(form.approximateDrawingsCount) || 0,
                 location: form.location,
-                sequences: sequenceNames.map(s => ({ 
-                    name: s.name, 
-                    status: 'Not Completed', 
+                sequences: sequenceNames.map(s => ({
+                    name: s.name,
+                    status: 'Not Completed',
                     deadline: s.deadline,
                     approvalDate: s.approvalDate,
                     fabricationDate: s.fabricationDate
@@ -250,10 +276,10 @@ export default function AdminProjects() {
             {/* Quick stats row */}
             <div className="stats-grid mb-lg" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                 {[
-                    { label: 'Total Projects', value: allProjects.length, cls: 'accent-blue' },
-                    { label: 'Active', value: allProjects.filter((p) => p.status === 'active').length, cls: 'accent-green' },
-                    { label: 'On Hold', value: allProjects.filter((p) => p.status === 'on_hold').length, cls: 'accent-amber' },
-                    { label: 'Completed', value: allProjects.filter((p) => p.status === 'completed').length, cls: 'accent-slate' },
+                    { label: 'Total Projects', value: Math.max(totalProjectsCount, allProjects.length), cls: 'accent-blue' },
+                    { label: 'In-progress', value: allProjects.filter((p) => getOriginalCategory(p) === 'in_progress').length, cls: 'accent-green' },
+                    { label: 'On Hold', value: allProjects.filter((p) => getOriginalCategory(p) === 'on_hold').length, cls: 'accent-amber' },
+                    { label: 'Completed', value: allProjects.filter((p) => getOriginalCategory(p) === 'completed').length, cls: 'accent-slate' },
                 ].map(({ label, value, cls }) => (
                     <div className={`stat-card ${cls}`} key={label}>
                         <div className="stat-card-label">{label}</div>
@@ -340,36 +366,36 @@ export default function AdminProjects() {
                                         <td className="font-mono" style={{ fontWeight: 600 }}>{p.approximateDrawingsCount || 0}</td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
-                                                <div style={{flex: 1, height: 3, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden'}}>
-                                                    <div style={{width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)', opacity: 0.8}} />
+                                                <div style={{ flex: 1, height: 3, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${p.approvalPercentage || 0}%`, height: '100%', background: 'var(--color-primary)', opacity: 0.8 }} />
                                                 </div>
-                                                <span className="font-mono" style={{fontSize: 12, fontWeight: 750, color: '#1e293b'}}>{p.approvalPercentage || 0}%</span>
+                                                <span className="font-mono" style={{ fontSize: 12, fontWeight: 750, color: '#1e293b' }}>{p.approvalPercentage || 0}%</span>
                                             </div>
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
-                                                <div style={{flex: 1, height: 3, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden'}}>
-                                                    <div style={{width: `${p.fabricationPercentage || 0}%`, height: '100%', background: '#10b981', opacity: 0.8}} />
+                                                <div style={{ flex: 1, height: 3, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${p.fabricationPercentage || 0}%`, height: '100%', background: '#10b981', opacity: 0.8 }} />
                                                 </div>
-                                                <span className="font-mono" style={{fontSize: 12, fontWeight: 750, color: '#1e293b'}}>{p.fabricationPercentage || 0}%</span>
+                                                <span className="font-mono" style={{ fontSize: 12, fontWeight: 750, color: '#1e293b' }}>{p.fabricationPercentage || 0}%</span>
                                             </div>
                                         </td>
                                         <td>
-                                            <div 
+                                            <div
                                                 onClick={() => {
                                                     setEditTarget({ ...p });
                                                     setEditMode('sequences');
                                                     setSeqInput((p.sequences?.length || 0).toString());
                                                 }}
                                                 title="Manage Sequences"
-                                                style={{ 
-                                                    cursor: 'pointer', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    gap: 6, 
-                                                    background: '#f8fafc', 
-                                                    padding: '4px 12px', 
-                                                    borderRadius: '8px', 
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    background: '#f8fafc',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '8px',
                                                     border: '1px solid #e2e8f0',
                                                     width: 'fit-content'
                                                 }}
@@ -380,8 +406,8 @@ export default function AdminProjects() {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`badge ${STATUS_CLS[p.status as ProjectStatus] || 'badge-neutral'}`}>
-                                                {p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status}
+                                            <span className={`badge ${getBadgeClass(p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status)}`}>
+                                                {formatBadgeText(p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status)}
                                             </span>
                                         </td>
                                         <td>
@@ -433,7 +459,7 @@ export default function AdminProjects() {
                         <div className="modal-body">
                             <div className="form-group">
                                 <label className="form-label required">Client / Organization</label>
-                                <select 
+                                <select
                                     className="form-control"
                                     value={form.clientId}
                                     onChange={(e) => {
@@ -455,17 +481,17 @@ export default function AdminProjects() {
                                         {clients.find(c => (c.id || c._id) === form.clientId)?.contacts.map((con, idx) => {
                                             const isSelected = form.contactPerson?.email === con.email;
                                             return (
-                                                <label 
-                                                    key={idx} 
-                                                    style={{ 
-                                                        display: 'flex', alignItems: 'flex-start', gap: 10, 
-                                                        padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, 
+                                                <label
+                                                    key={idx}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                                                        padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
                                                         borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
                                                         transition: 'all 0.2s', margin: 0
                                                     }}
                                                 >
-                                                    <input 
-                                                        type="radio" 
+                                                    <input
+                                                        type="radio"
                                                         name="contactPersonRadio"
                                                         checked={isSelected}
                                                         onChange={() => setForm({ ...form, contactPerson: con })}
@@ -489,14 +515,14 @@ export default function AdminProjects() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label required">Project Year</label>
-                                <input 
-                                    className="form-control" 
-                                    type="number" 
+                                <input
+                                    className="form-control"
+                                    type="number"
                                     placeholder="e.g. 2025"
                                     min="2000"
                                     max="2100"
-                                    value={form.year} 
-                                    onChange={(e) => setForm({ ...form, year: e.target.value, startingTransmittalNumber: '1' })} 
+                                    value={form.year}
+                                    onChange={(e) => setForm({ ...form, year: e.target.value, startingTransmittalNumber: '1' })}
                                 />
                             </div>
 
@@ -506,13 +532,13 @@ export default function AdminProjects() {
                                     <p style={{ fontSize: 12, color: '#9a3412', marginBottom: 8, marginTop: 2 }}>
                                         Since this is a {form.year} project, enter the first transmittal number to use (e.g. if previous transmittals went up to 12, enter 13).
                                     </p>
-                                    <input 
-                                        className="form-control" 
-                                        type="number" 
+                                    <input
+                                        className="form-control"
+                                        type="number"
                                         placeholder="e.g. 1"
                                         min="1"
-                                        value={form.startingTransmittalNumber} 
-                                        onChange={(e) => setForm({ ...form, startingTransmittalNumber: e.target.value })} 
+                                        value={form.startingTransmittalNumber}
+                                        onChange={(e) => setForm({ ...form, startingTransmittalNumber: e.target.value })}
                                     />
                                 </div>
                             )}
@@ -544,18 +570,18 @@ export default function AdminProjects() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Number of Sequences <span style={{color: 'red'}}>*</span></label>
-                                <input 
-                                    className="form-control" 
-                                    type="number" 
+                                <label className="form-label">Number of Sequences <span style={{ color: 'red' }}>*</span></label>
+                                <input
+                                    className="form-control"
+                                    type="number"
                                     placeholder="e.g. 10"
-                                    value={seqInput} 
+                                    value={seqInput}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setSeqInput(val);
                                         const count = parseInt(val);
                                         if (isNaN(count)) return;
-                                        
+
                                         const effectiveCount = Math.max(0, count);
                                         setForm(f => ({ ...f, sequenceCount: val }));
 
@@ -564,8 +590,8 @@ export default function AdminProjects() {
                                                 const next = [...prev];
                                                 const today = new Date().toISOString().split('T')[0];
                                                 for (let i = prev.length; i < effectiveCount; i++) {
-                                                    next.push({ 
-                                                        name: '', 
+                                                    next.push({
+                                                        name: '',
                                                         approvalDate: today,
                                                         fabricationDate: ''
                                                     });
@@ -575,7 +601,7 @@ export default function AdminProjects() {
                                                 return prev.slice(0, effectiveCount);
                                             }
                                         });
-                                    }} 
+                                    }}
                                 />
                             </div>
                             {sequenceNames.length > 0 && (
@@ -584,8 +610,8 @@ export default function AdminProjects() {
                                         <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
                                             <div style={{ flex: 1 }}>
                                                 <label className="form-label" style={{ fontSize: 10 }}>Seq {idx + 1} Name</label>
-                                                <input 
-                                                    className="form-control form-control-sm" 
+                                                <input
+                                                    className="form-control form-control-sm"
                                                     placeholder={`Seq ${idx + 1}`}
                                                     value={s.name}
                                                     onChange={(e) => {
@@ -597,8 +623,8 @@ export default function AdminProjects() {
                                             </div>
                                             <div style={{ width: 140 }}>
                                                 <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                <input 
-                                                    className="form-control form-control-sm" 
+                                                <input
+                                                    className="form-control form-control-sm"
                                                     type="date"
                                                     value={s.approvalDate ? s.approvalDate.split('T')[0] : ''}
                                                     onChange={(e) => {
@@ -610,8 +636,8 @@ export default function AdminProjects() {
                                             </div>
                                             <div style={{ width: 140 }}>
                                                 <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
-                                                <input 
-                                                    className="form-control form-control-sm" 
+                                                <input
+                                                    className="form-control form-control-sm"
                                                     type="date"
                                                     value={s.fabricationDate ? s.fabricationDate.split('T')[0] : ''}
                                                     onChange={(e) => {
@@ -632,12 +658,12 @@ export default function AdminProjects() {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Vendor / Client Name</label>
-                                    <input 
-                                        className="form-control" 
-                                        placeholder="Enter vendor details" 
+                                    <input
+                                        className="form-control"
+                                        placeholder="Enter vendor details"
                                         list="client-list-create"
                                         value={form.connectionDesignVendor}
-                                        onChange={(e) => setForm({ ...form, connectionDesignVendor: e.target.value })} 
+                                        onChange={(e) => setForm({ ...form, connectionDesignVendor: e.target.value })}
                                     />
                                     <datalist id="client-list-create">
                                         {distinctVendors.map((v, i) => <option key={`vendor-${i}`} value={v} />)}
@@ -645,21 +671,30 @@ export default function AdminProjects() {
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Contact Number</label>
-                                    <input 
-                                        className="form-control" 
-                                        placeholder="Phone number" 
+                                    <input
+                                        type="tel"
+                                        className="form-control"
+                                        placeholder="e.g., 9876543210"
+                                        pattern="^[0-9]{10}$"
+                                        maxLength={10}
+                                        title="Please enter exactly 10 digits."
                                         value={form.connectionDesignContact}
-                                        onChange={(e) => setForm({ ...form, connectionDesignContact: e.target.value })} 
+                                        onChange={(e) => {
+                                            const onlyDigits = e.target.value.replace(/\D/g, '');
+                                            setForm({ ...form, connectionDesignContact: onlyDigits });
+                                        }}
                                     />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Email Address</label>
-                                    <textarea 
-                                        className="form-control" 
-                                        placeholder="Email address" 
-                                        rows={2}
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        placeholder="john@example.com"
+                                        pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                                        title="Please enter a valid email address."
                                         value={form.connectionDesignEmail}
-                                        onChange={(e) => setForm({ ...form, connectionDesignEmail: e.target.value })} 
+                                        onChange={(e) => setForm({ ...form, connectionDesignEmail: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -723,14 +758,14 @@ export default function AdminProjects() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label required">Client Name</label>
-                                        <select 
+                                        <select
                                             className="form-control"
                                             value={editTarget.clientName}
                                             onChange={(e) => {
                                                 const selectedName = e.target.value;
                                                 const selectedClient = clients.find(c => c.name === selectedName);
-                                                setEditTarget({ 
-                                                    ...editTarget, 
+                                                setEditTarget({
+                                                    ...editTarget,
                                                     clientName: selectedName,
                                                     clientId: selectedClient ? (selectedClient.id || selectedClient._id) : editTarget.clientId,
                                                     contactPerson: undefined
@@ -751,17 +786,17 @@ export default function AdminProjects() {
                                                 {clients.find(c => (c.id || c._id) === editTarget.clientId)?.contacts.map((con, idx) => {
                                                     const isSelected = editTarget.contactPerson?.email === con.email;
                                                     return (
-                                                        <label 
-                                                            key={idx} 
-                                                            style={{ 
-                                                                display: 'flex', alignItems: 'flex-start', gap: 10, 
-                                                                padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, 
+                                                        <label
+                                                            key={idx}
+                                                            style={{
+                                                                display: 'flex', alignItems: 'flex-start', gap: 10,
+                                                                padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
                                                                 borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
                                                                 transition: 'all 0.2s', margin: 0
                                                             }}
                                                         >
-                                                            <input 
-                                                                type="radio" 
+                                                            <input
+                                                                type="radio"
                                                                 name="editContactPersonRadio"
                                                                 checked={isSelected}
                                                                 onChange={() => setEditTarget({ ...editTarget, contactPerson: con })}
@@ -810,12 +845,12 @@ export default function AdminProjects() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Vendor / Client Name</label>
-                                            <input 
-                                                className="form-control" 
-                                                placeholder="Enter vendor details" 
+                                            <input
+                                                className="form-control"
+                                                placeholder="Enter vendor details"
                                                 list="client-list-edit"
                                                 value={editTarget.connectionDesignVendor || ''}
-                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignVendor: e.target.value })} 
+                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignVendor: e.target.value })}
                                             />
                                             <datalist id="client-list-edit">
                                                 {distinctVendors.map((v, i) => <option key={`edit-vendor-${i}`} value={v} />)}
@@ -823,21 +858,30 @@ export default function AdminProjects() {
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 0 }}>
                                             <label className="form-label">Contact Number</label>
-                                            <input 
-                                                className="form-control" 
-                                                placeholder="Phone number" 
+                                            <input
+                                                type="tel"
+                                                className="form-control"
+                                                placeholder="e.g., 9876543210"
+                                                pattern="^[0-9]{10}$"
+                                                maxLength={10}
+                                                title="Please enter exactly 10 digits."
                                                 value={editTarget.connectionDesignContact || ''}
-                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignContact: e.target.value })} 
+                                                onChange={(e) => {
+                                                    const onlyDigits = e.target.value.replace(/\D/g, '');
+                                                    setEditTarget({ ...editTarget, connectionDesignContact: onlyDigits });
+                                                }}
                                             />
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 0 }}>
                                             <label className="form-label">Email Address</label>
-                                            <textarea 
-                                                className="form-control" 
-                                                placeholder="Email address" 
-                                                rows={2}
+                                            <input
+                                                type="email"
+                                                className="form-control"
+                                                placeholder="john@example.com"
+                                                pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                                                title="Please enter a valid email address."
                                                 value={editTarget.connectionDesignEmail || ''}
-                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignEmail: e.target.value })} 
+                                                onChange={(e) => setEditTarget({ ...editTarget, connectionDesignEmail: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -846,31 +890,31 @@ export default function AdminProjects() {
 
                             <div className="form-group">
                                 <label className="form-label">Number of Sequences</label>
-                                <input 
-                                    className="form-control" 
-                                    type="number" 
+                                <input
+                                    className="form-control"
+                                    type="number"
                                     value={seqInput}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         setSeqInput(val);
-                                        if (val === '') return; 
-                                        
+                                        if (val === '') return;
+
                                         const count = parseInt(val);
                                         if (isNaN(count)) return;
 
                                         const current = editTarget.sequences || [];
                                         const orig = projects.find(p => p.id === editTarget.id)?.sequences || [];
                                         const originalCount = orig.length;
-                                        
+
                                         // Lock the original sequences while allowing growth
                                         const effectiveCount = Math.max(count, originalCount);
-                                        
+
                                         if (effectiveCount > current.length) {
                                             const newSeqs = [...current];
                                             const today = new Date().toISOString().split('T')[0];
                                             for (let i = current.length; i < effectiveCount; i++) {
-                                                newSeqs.push({ 
-                                                    name: '', 
+                                                newSeqs.push({
+                                                    name: '',
                                                     status: 'Not Completed',
                                                     deadline: today,
                                                     approvalDate: '',
@@ -881,7 +925,7 @@ export default function AdminProjects() {
                                         } else if (effectiveCount < current.length) {
                                             setEditTarget({ ...editTarget, sequences: current.slice(0, effectiveCount) });
                                         }
-                                    }} 
+                                    }}
                                 />
                             </div>
 
@@ -895,8 +939,8 @@ export default function AdminProjects() {
                                             <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingBottom: 10, borderBottom: '1px dashed #f1f5f9' }}>
                                                 <div style={{ flex: 1 }}>
                                                     <label className="form-label" style={{ fontSize: 10 }}>Sequence {idx + 1} Name</label>
-                                                    <input 
-                                                        className="form-control form-control-sm" 
+                                                    <input
+                                                        className="form-control form-control-sm"
                                                         value={seq.name}
                                                         onChange={(e) => {
                                                             const newSeqs = [...editTarget.sequences];
@@ -907,8 +951,8 @@ export default function AdminProjects() {
                                                 </div>
                                                 <div style={{ width: 140 }}>
                                                     <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                    <input 
-                                                        className="form-control form-control-sm" 
+                                                    <input
+                                                        className="form-control form-control-sm"
                                                         type="date"
                                                         value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
                                                         onChange={(e) => {
@@ -920,8 +964,8 @@ export default function AdminProjects() {
                                                 </div>
                                                 <div style={{ width: 140 }}>
                                                     <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
-                                                    <input 
-                                                        className="form-control form-control-sm" 
+                                                    <input
+                                                        className="form-control form-control-sm"
                                                         type="date"
                                                         value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
                                                         onChange={(e) => {
@@ -938,9 +982,9 @@ export default function AdminProjects() {
                             )}
                             <div className="form-actions">
                                 <button className="btn btn-secondary" disabled={actionLoading} onClick={() => setEditTarget(null)}>Cancel</button>
-                                <button 
-                                    className="btn btn-primary" 
-                                    disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === editTarget.id)?.sequences?.length || 0)} 
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === editTarget.id)?.sequences?.length || 0)}
                                     onClick={handleEditSave}
                                 >
                                     {actionLoading ? 'Saving...' : 'Save Changes'}
