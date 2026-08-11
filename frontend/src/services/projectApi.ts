@@ -23,7 +23,7 @@ async function handleResponse(res: Response) {
 /**
  * List all projects for the admin
  */
-export async function adminListProjects(status?: string, search?: string): Promise<{ projects: Project[] }> {
+export async function adminListProjects(status?: string, search?: string): Promise<{ count?: number; projects: Project[] }> {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
     if (search) params.append('search', search);
