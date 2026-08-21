@@ -22,10 +22,9 @@ jobs:
              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
              cd /var/www/steel-project && echo "=== CD successful ==="
-             git reset --hard && echo "=== Git reset successful ==="
-             
-             # Use GITHUB_TOKEN for authentication if origin uses HTTPS
-             git pull https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git main && echo "=== Git pull successful ==="
+             git fetch https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git main && echo "=== Git fetch successful ==="
+             git reset --hard FETCH_HEAD && echo "=== Git reset to FETCH_HEAD successful ==="
+             git clean -fd && echo "=== Git clean successful ==="
              
              # ── Update Backend ──────────────────────────────────────
              cd backend && echo "=== CD backend successful ==="
