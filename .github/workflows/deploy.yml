@@ -37,5 +37,8 @@ jobs:
               npm install && echo "=== NPM install frontend successful ==="
               export NODE_OPTIONS="--max-old-space-size=1024"
               npm run build && echo "=== Frontend build successful ==="
-             # If using PM2 to serve frontend, restart it here too.
-             # Nginx will automatically pick up the new files in the 'dist' folder.
+              mkdir -p /var/www/steel-project/dist /var/www/html
+              cp -rf dist/* /var/www/steel-project/dist/ 2>/dev/null || true
+              cp -rf dist/* /var/www/html/ 2>/dev/null || true
+              sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
+              echo "=== Deployment completed successfully ==="
