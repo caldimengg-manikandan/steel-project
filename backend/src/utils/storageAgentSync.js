@@ -67,14 +67,12 @@ function createStorageAgentSync(folderPrefix) {
                             fileInfo.storageGatewayPath = `${targetDir}/${file.originalname}`;
                             console.log(`[StorageSync] Upload complete: ${fileInfo.storageGatewayPath}`);
                         } catch (err) {
-                            console.error('[StorageSync] Failed to upload to Storage Gateway:', err.message);
-                            // If we fail, we could cb(err) to fail the whole request,
-                            // or proceed so local AI works but it won't be on Windows drive.
-                            // Let's fail the upload if storage gateway is enabled but fails.
-                            return cb(new Error(`Storage Gateway Error: ${err.message}`));
+                            console.warn('[StorageSync] Storage Gateway upload notice:', err.message);
+                            // Keep upload alive on persistent disk storage if gateway agent is offline
                         }
                     }
-                    // 3. Always save to GridFS as a guaranteed backup for HTTP viewing
+
+                    // 3. Fail-safe GridFS backup for HTTP viewing (never blocks upload if DB quota locked)
                     try {
                         const gridfs = require('./gridfs');
                         const bucket = gridfs.getBucket();
@@ -83,19 +81,23 @@ function createStorageAgentSync(folderPrefix) {
                                 contentType: file.mimetype,
                                 metadata: { originalName: file.originalname }
                             });
-                            fs.createReadStream(localPath).pipe(uploadStream);
+                            const readStream = fs.createReadStream(localPath);
+                            readStream.pipe(uploadStream);
                             
-                            await new Promise((resolve, reject) => {
+                            await new Promise((resolve) => {
                                 uploadStream.on('finish', () => {
                                     fileInfo.gridFsFileId = uploadStream.id.toString();
                                     resolve();
                                 });
-                                uploadStream.on('error', reject);
+                                uploadStream.on('error', (gerr) => {
+                                    console.warn('[StorageSync] Non-fatal GridFS upload skipped:', gerr.message);
+                                    resolve();
+                                });
                             });
-                            console.log(`[StorageSync] Uploaded to GridFS as fallback backup: ${fileInfo.gridFsFileId}`);
+                            console.log(`[StorageSync] Uploaded to GridFS as fallback backup: ${fileInfo.gridFsFileId || 'skipped'}`);
                         }
                     } catch (err) {
-                        console.error('[StorageSync] Failed to upload to GridFS:', err);
+                        console.warn('[StorageSync] GridFS backup skipped:', err.message);
                     }
 
                     cb(null, fileInfo);
