@@ -134,20 +134,39 @@ async function getProjectDrawings(req, res) {
  */
 async function updateProjectSequences(req, res) {
     const project = req.scopedProject;
-    const { sequences } = req.body;
+    const { sequences, scopeOfWork } = req.body;
 
-    if (!sequences || !Array.isArray(sequences)) {
-        return res.status(400).json({ error: 'Sequences array is required in request body.' });
+    if (!sequences && !scopeOfWork) {
+        return res.status(400).json({ error: 'Sequences or scopeOfWork array is required in request body.' });
     }
 
-    // Update sequences
-    project.sequences = sequences;
+    if (sequences && Array.isArray(sequences)) {
+        project.sequences = sequences.map((s, idx) => ({
+            name: (s.name || '').trim() || `Seq ${idx + 1}`,
+            status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
+            deadline: s.deadline || null,
+            approvalDate: s.approvalDate || null,
+            fabricationDate: s.fabricationDate || null
+        }));
+    }
+    if (scopeOfWork && Array.isArray(scopeOfWork)) {
+        project.scopeOfWork = scopeOfWork.map((s, idx) => ({
+            name: (s.name || '').trim() || `SOW ${String(idx + 1).padStart(2, '0')}`,
+            percentage: Number(s.percentage) || 0,
+            approval: Number(s.approval) || 0,
+            fabrication: Number(s.fabrication) || 0,
+            status: s.status || 'Yet to Start'
+        }));
+    }
     await project.save();
 
+    const { attachProjectStats } = require('../services/projectStatsService');
+    const projectWithStats = await attachProjectStats(project);
+
     res.json({ 
-        message: 'Project sequences updated successfully.',
+        message: 'Project updated successfully.',
         project: {
-            ...project.toObject(),
+            ...projectWithStats,
             id: project._id,
             myPermission: req.userPermission
         }

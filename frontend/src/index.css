@@ -963,6 +963,10 @@ textarea.form-control {
   overflow-y: auto;
 }
 
+.modal.modal-lg {
+  max-width: 780px;
+}
+
 .modal-header {
   padding: 16px var(--space-lg);
   border-bottom: 1px solid var(--color-border-light);
@@ -3121,6 +3125,10 @@ textarea.form-control {
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.modal.modal-lg {
+  max-width: 780px;
 }
 
 .modal-header {

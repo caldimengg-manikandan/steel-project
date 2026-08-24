@@ -223,8 +223,8 @@ export const IconFilter = () => (
     </svg>
 );
 
-export const IconDownload = () => (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+export const IconDownload = ({ width = 16, height = 16, style }: { width?: number; height?: number; style?: React.CSSProperties }) => (
+    <svg viewBox="0 0 16 16" width={width} height={height} style={{ width, height, minWidth: width, flexShrink: 0, ...style }} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 10v3a1 1 0 01-1 1H3a1 1 0 01-1-1v-3" />
         <polyline points="5 7 8 10 11 7" />
         <line x1="8" y1="1" x2="8" y2="10" />

@@ -152,7 +152,8 @@ export async function uploadFolder(
     transmittalNumber: number | null | undefined,
     sequences: string[] | undefined,
     targetPath: string | undefined,
-    onProgress?: (progress: { loaded: number; total: number; percentage: number; speed: number }) => void
+    onProgress?: (progress: { loaded: number; total: number; percentage: number; speed: number }) => void,
+    uploadPurpose?: 'Fabrication' | 'Approval'
 ): Promise<{
     message: string;
     storedCount: number;
@@ -173,6 +174,9 @@ export async function uploadFolder(
         }
         if (transmittalNumber != null) {
             formData.append('transmittalNumber', String(transmittalNumber));
+        }
+        if (uploadPurpose) {
+            formData.append('uploadPurpose', uploadPurpose);
         }
         if (sequences && sequences.length > 0) {
             sequences.forEach(s => formData.append('sequences', s));

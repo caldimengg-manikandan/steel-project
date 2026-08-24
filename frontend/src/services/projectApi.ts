@@ -182,6 +182,36 @@ export async function updateProjectSequences(projectId: string, sequences: Array
     return handleResponse(res);
 }
 
+/**
+ * Update project scope of work (Unified Admin/User)
+ */
+export async function updateProjectScopeOfWork(projectId: string, scopeOfWork: Array<{ 
+    name: string; 
+    percentage?: number; 
+    approval?: number; 
+    fabrication?: number; 
+    status?: string; 
+}>): Promise<{ project: Project }> {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scopeOfWork }),
+    });
+
+    if (res.status === 403) {
+        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scopeOfWork }),
+        });
+        return handleResponse(resUser);
+    }
+    
+    return handleResponse(res);
+}
+
 interface CreateProjectForm {
     name: string;
     clientName: string;
@@ -189,8 +219,15 @@ interface CreateProjectForm {
     contactPerson?: any;
     description: string;
     status: ProjectStatus;
-    approximateDrawingsCount: number;
+    approximateDrawingsCount?: number;
     location: string;
+    scopeOfWork?: Array<{
+        name: string;
+        percentage?: number;
+        approval?: number;
+        fabrication?: number;
+        status?: string;
+    }>;
     sequences?: Array<{ 
         name: string; 
         status: 'Completed' | 'Not Completed';

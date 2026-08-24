@@ -78,9 +78,17 @@ export interface Project {
     updatedAt: string;
     assignments: ProjectAssignment[];
     drawingCount: number;
-    approximateDrawingsCount: number;
+    approximateDrawingsCount?: number;
     approvalPercentage?: number;
     fabricationPercentage?: number;
+    overallPercentage?: number;
+    scopeOfWork?: Array<{ 
+        name: string; 
+        percentage?: number; 
+        approval?: number; 
+        fabrication?: number; 
+        status?: string; 
+    }>;
     openRfiCount?: number;
     closedRfiCount?: number;
     totalCO?: number;

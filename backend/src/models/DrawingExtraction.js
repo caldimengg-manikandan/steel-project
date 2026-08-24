@@ -81,6 +81,7 @@ const drawingExtractionSchema = new mongoose.Schema(
 
         // Target sequences for the transmittal mapping
         sequences: { type: [String], default: [] },
+        uploadPurpose: { type: String, enum: ['Fabrication', 'Approval'], default: 'Fabrication' },
         category: { type: String, default: '' },
 
         // ── Extraction metadata ──

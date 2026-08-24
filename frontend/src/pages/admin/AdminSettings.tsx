@@ -8,7 +8,7 @@ import {
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'notifications' | 'email' | 'ui' | 'branding' | 'audit';
+type TabId = 'access' | 'email' | 'ui' | 'branding' | 'audit';
 
 interface TabItem {
     id: TabId;
@@ -19,7 +19,6 @@ interface TabItem {
 
 const TABS: TabItem[] = [
     { id: 'access', label: 'User & Access', icon: <IconUsers />, desc: 'Roles, permissions and user management' },
-    { id: 'notifications', label: 'Notifications', icon: <IconNotification />, desc: 'Email alerts and reminder schedules' },
     { id: 'email', label: 'Email Settings', icon: <IconNotification />, desc: 'SMTP sender config and recipient lists' },
     { id: 'ui', label: 'System Preference', icon: <IconSettings />, desc: 'Theme, timezone and language' },
     { id: 'branding', label: 'Company Profile', icon: <IconSettings />, desc: 'Logo and branding' },
@@ -169,7 +168,12 @@ export default function AdminSettings() {
             });
             if (res.ok) {
                 const data = await res.json();
-                setLogs(data.logs || []);
+                const rawLogs = data.logs || [];
+                const settingsLogs = rawLogs.filter((l: any) => {
+                    const text = `${l.event || ''} ${l.module || ''} ${l.action || ''}`.toLowerCase();
+                    return !text.includes('login') && !text.includes('logout') && !text.includes('logged in') && !text.includes('logged out');
+                });
+                setLogs(settingsLogs);
             } else {
                 showMessage('Error', 'Failed to fetch logs', 'error');
             }
@@ -361,59 +365,6 @@ export default function AdminSettings() {
                     )}
 
 
-                    {activeTab === 'notifications' && (
-                        <Card title="System Reports">
-                            <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email the consolidated Project Status Excel sheet to Project Managers.">
-                                <Toggle 
-                                    enabled={settings.weeklyProgresss} 
-                                    onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
-                                />
-                            </SettingRow>
-                            {settings.weeklyProgresss && (
-                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 16, padding: '16px 20px', background: 'var(--color-bg-page)', borderRadius: 8 }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Day</label>
-                                        <select 
-                                            className="form-control" 
-                                            style={{ width: 140 }}
-                                            value={settings.weeklyProgressDay ?? 4}
-                                            onChange={(e) => handleSettingChange('weeklyProgressDay', Number(e.target.value))}
-                                        >
-                                            <option value={0}>Sunday</option>
-                                            <option value={1}>Monday</option>
-                                            <option value={2}>Tuesday</option>
-                                            <option value={3}>Wednesday</option>
-                                            <option value={4}>Thursday</option>
-                                            <option value={5}>Friday</option>
-                                            <option value={6}>Saturday</option>
-                                        </select>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Time</label>
-                                        <input 
-                                            type="time" 
-                                            className="form-control" 
-                                            style={{ width: 120 }}
-                                            value={settings.weeklyProgressTime || '11:45'}
-                                            onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto', alignSelf: 'flex-end' }}>
-                                        <button 
-                                            type="button" 
-                                            className="btn btn-secondary" 
-                                            onClick={handleSendTestReport}
-                                            disabled={loadingTestReport}
-                                            style={{ height: 38 }}
-                                        >
-                                            {loadingTestReport ? 'Sending...' : '📧 Send Test Report Now'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </Card>
-                    )}
-
                     {activeTab === 'email' && (() => {
                         const addEmail = (role: 'superAdmin' | 'projectManager' | 'teamLead') => {
                             const key = role === 'superAdmin' ? 'superAdminEmails' : role === 'projectManager' ? 'projectManagerEmails' : 'teamLeadEmails';
@@ -516,6 +467,57 @@ export default function AdminSettings() {
 
                         return (
                             <>
+                                <Card title="System Reports">
+                                    <SettingRow title="Weekly Summary Progress" desc="Automatically compile and email the consolidated Project Status Excel sheet to Project Managers.">
+                                        <Toggle 
+                                            enabled={settings.weeklyProgresss} 
+                                            onChange={(v) => handleSettingChange('weeklyProgresss', v)} 
+                                        />
+                                    </SettingRow>
+                                    {settings.weeklyProgresss && (
+                                        <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 16, padding: '16px 20px', background: 'var(--color-bg-page)', borderRadius: 8 }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Day</label>
+                                                <select 
+                                                    className="form-control" 
+                                                    style={{ width: 140 }}
+                                                    value={settings.weeklyProgressDay ?? 4}
+                                                    onChange={(e) => handleSettingChange('weeklyProgressDay', Number(e.target.value))}
+                                                >
+                                                    <option value={0}>Sunday</option>
+                                                    <option value={1}>Monday</option>
+                                                    <option value={2}>Tuesday</option>
+                                                    <option value={3}>Wednesday</option>
+                                                    <option value={4}>Thursday</option>
+                                                    <option value={5}>Friday</option>
+                                                    <option value={6}>Saturday</option>
+                                                </select>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Trigger Time</label>
+                                                <input 
+                                                    type="time" 
+                                                    className="form-control" 
+                                                    style={{ width: 120 }}
+                                                    value={settings.weeklyProgressTime || '11:45'}
+                                                    onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
+                                                />
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto', alignSelf: 'flex-end' }}>
+                                                <button 
+                                                    type="button" 
+                                                    className="btn btn-secondary" 
+                                                    onClick={handleSendTestReport}
+                                                    disabled={loadingTestReport}
+                                                    style={{ height: 38 }}
+                                                >
+                                                    {loadingTestReport ? 'Sending...' : '📧 Send Test Report Now'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </Card>
+
                                 <Card title="SMTP Sender Configuration" action={
                                     <SettingRow title="" desc="">
                                         <Toggle enabled={emailForm.emailEnabled} onChange={v => setEmailForm(prev => ({ ...prev, emailEnabled: v }))} />

@@ -451,8 +451,6 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                                     if (clean && !isNaN(Number(clean)) && clean.trim() !== '') {
                                                         const parts = clean.split('.');
                                                         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                                                        // if it starts with $ keep it, else we can just show number. 
-                                                        // The user just requested "make commas so that it shouldbe shown as amount"
                                                         return (val.startsWith('$') ? '$' : '') + parts.join('.').replace(/^\$/, '');
                                                     }
                                                     return val;
@@ -472,6 +470,13 @@ export default function WeeklyProgressPanel({ projectId, projectName, initialMod
                                                 )}
                                             </tr>
                                         ))}
+                                        {corData.length === 0 && (
+                                            <tr>
+                                                <td colSpan={editMode ? 7 : 6} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)' }}>
+                                                    No change orders found.
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

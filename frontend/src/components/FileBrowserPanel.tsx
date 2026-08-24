@@ -8,6 +8,7 @@ import {
     type FileEntry 
 } from '../services/fileApi';
 import { reserveTransmittalNumber, getExcelDownloadUrl } from '../services/extractionApi';
+import { listTransmittals } from '../services/transmittalApi';
 import { uploadSessionStore, type SessionFile, type UploadSession } from '../services/uploadSessionStore';
 import { useMessage } from '../context/MessageContext';
 import { 
@@ -19,9 +20,11 @@ import {
 } from './Icons';
 
 const ExcelIcon = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-        <rect x="2" y="2" width="20" height="20" rx="3" fill="#1D6F42" opacity="0.15" />
-        <path d="M8 7l4 5-4 5h2.5l2.5-3.2L15.5 17H18l-4-5 4-5h-2.5L13.5 9.8 11 7H8z" fill="#1D6F42" />
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="8" y1="13" x2="16" y2="13" />
+        <line x1="8" y1="17" x2="16" y2="17" />
     </svg>
 );
 
@@ -71,6 +74,18 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
+
+    // Upload Config Modal States
+    const [uploadModalOpen, setUploadModalOpen] = useState(false);
+    const [pendingUploadFiles, setPendingUploadFiles] = useState<File[] | null>(null);
+    const [pendingUploadMode, setPendingUploadMode] = useState<'files' | 'folder'>('files');
+    const [transmittalChoice, setTransmittalChoice] = useState<'new' | 'existing'>('new');
+    const [existingTransmittals, setExistingTransmittals] = useState<any[]>([]);
+    const [loadingTransmittals, setLoadingTransmittals] = useState(false);
+    const [selectedTransmittalNum, setSelectedTransmittalNum] = useState<number | null>(null);
+    const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
+    const [selectedUploadSequences, setSelectedUploadSequences] = useState<string[]>([]);
+    const [sequenceFilter, setSequenceFilter] = useState<string>('ALL');
 
     const loadFiles = async (path: string) => {
         setLoading(true);
@@ -206,7 +221,8 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         }
     };
 
-    const handleFileUpload = async (filesToUpload: FileList | null) => {
+    // ── Upload Configuration Handlers ─────────────────────────────
+    const handleInitiateUpload = async (filesToUpload: FileList | null, mode: 'files' | 'folder') => {
         if (!filesToUpload || filesToUpload.length === 0) return;
         if (!canUpload) {
             showMessage('Access Denied', 'You do not have permission to upload files.', 'error');
@@ -214,11 +230,73 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         }
 
         const fileArray = Array.from(filesToUpload);
+        setPendingUploadFiles(fileArray);
+        setPendingUploadMode(mode);
+        setTransmittalChoice('new');
+        setUploadPurpose('Fabrication');
+
+        const availableSeqs = sequences && sequences.length > 0 ? sequences : ['Seq 1'];
+        setSelectedUploadSequences([availableSeqs[0]]);
+
+        if (projectId) {
+            setLoadingTransmittals(true);
+            try {
+                const data = await listTransmittals(projectId);
+                setExistingTransmittals(data.transmittals || []);
+                if (data.transmittals && data.transmittals.length > 0) {
+                    setSelectedTransmittalNum(data.transmittals[0].transmittalNumber);
+                } else {
+                    setSelectedTransmittalNum(null);
+                }
+            } catch (err) {
+                console.warn('[FileBrowser] Could not fetch transmittals:', err);
+                setExistingTransmittals([]);
+            } finally {
+                setLoadingTransmittals(false);
+            }
+        }
+
+        setUploadModalOpen(true);
+    };
+
+    const handleConfirmUpload = async () => {
+        if (!pendingUploadFiles || pendingUploadFiles.length === 0) return;
+        if (selectedUploadSequences.length === 0) {
+            showMessage('Required Field', 'Please select at least one Sequence.', 'error');
+            return;
+        }
+        if (transmittalChoice === 'existing' && !selectedTransmittalNum) {
+            showMessage('Required Field', 'Please select an existing transmittal to append to.', 'error');
+            return;
+        }
+
+        setUploadModalOpen(false);
+
+        let finalTransmittalNum: number | null = null;
+        if (transmittalChoice === 'existing') {
+            finalTransmittalNum = selectedTransmittalNum;
+        } else if (projectId) {
+            try {
+                const res = await reserveTransmittalNumber(projectId);
+                finalTransmittalNum = res.transmittalNumber;
+            } catch (err) {
+                console.warn('[FileBrowser] Could not reserve transmittal number:', err);
+            }
+        }
+
+        if (pendingUploadMode === 'folder') {
+            executeFolderUpload(pendingUploadFiles, finalTransmittalNum, uploadPurpose, selectedUploadSequences);
+        } else {
+            executeFilesUpload(pendingUploadFiles, currentPath);
+        }
+    };
+
+    const executeFilesUpload = async (filesToUpload: File[], path: string) => {
         setUploading(true);
         try {
-            const res = await uploadFiles(fileArray, currentPath);
+            const res = await uploadFiles(filesToUpload, path);
             showMessage('Upload Success', res.message, 'success');
-            loadFiles(currentPath);
+            loadFiles(path);
         } catch (err: any) {
             showMessage('Upload Failed', err.message, 'error');
         } finally {
@@ -228,18 +306,17 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     };
 
     // Folder Upload Handler
-    const handleFolderUpload = async (folderFiles: FileList | null) => {
-        if (!folderFiles || folderFiles.length === 0) return;
-        if (!canUpload) {
-            showMessage('Access Denied', 'You do not have permission to upload files.', 'error');
-            return;
-        }
+    const executeFolderUpload = async (
+        fileArray: File[],
+        reservedTransmittalNum: number | null,
+        purpose: 'Fabrication' | 'Approval',
+        chosenSeqs: string[]
+    ) => {
         if (!projectId) {
             showMessage('Error', 'Project ID is missing. Cannot upload folder.', 'error');
             return;
         }
 
-        const fileArray = Array.from(folderFiles);
         const topFolderName = fileArray[0]?.webkitRelativePath?.split('/')?.[0] || 'Folder';
 
         // Initialize session files
@@ -252,26 +329,6 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
 
         // Start global session in store
         uploadSessionStore.startSession(projectId, topFolderName, currentPath || undefined, initialSessionFiles, fileArray);
-
-        // Step 1: Pre-reserve a single transmittal number if this upload contains drawing PDFs
-        let reservedTransmittalNum: number | null = null;
-        const containsDrawings = fileArray.some(f => {
-            const pathLower = ((f as any).webkitRelativePath || f.name).toLowerCase();
-            const isPdf = f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf';
-            const isDrawingFolder = /[\/](detail[\s_-]*sheets?|d[\s_-]*sheets?|e[\s_-]*sheets?|erection[\s_-]*sheets?|gather[\s_-]*sheets?|g[\s_-]*sheets?|shop[\s_-]*drawings?|connection[\s_-]*drawings?|fabrication[\s_-]*drawings?)[\s\/]/i.test('/' + pathLower + '/');
-            const isBinderFolder = /[\\/ ](binders?|binder[_\s-]?sheet)[\\/ ]/i.test('/' + pathLower + '/');
-            return isPdf && isDrawingFolder && !isBinderFolder;
-        });
-
-        if (containsDrawings) {
-            try {
-                const res = await reserveTransmittalNumber(projectId);
-                reservedTransmittalNum = res.transmittalNumber;
-                console.log(`[FolderUpload] Pre-reserved Transmittal #${reservedTransmittalNum} for drawings`);
-            } catch (err) {
-                console.warn('[FolderUpload] Could not reserve transmittal number up-front:', err);
-            }
-        }
 
         const totalFolderSize = fileArray.reduce((acc, f) => acc + f.size, 0);
         let totalUploadedBytes = 0;
@@ -298,14 +355,12 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                         projectId,
                         [file], // Send ONLY this single file in the request
                         reservedTransmittalNum,
-                        sequences || [],
+                        chosenSeqs || [],
                         currentPath || undefined,
                         (prog) => {
-                            // Calculate global progress
                             const loadedSoFar = totalUploadedBytes + prog.loaded;
                             const overallPct = Math.round((loadedSoFar / totalFolderSize) * 100);
                             
-                            // Format upload speed
                             let speedStr = '0 B/s';
                             if (prog.speed > 1024 * 1024) {
                                 speedStr = `${(prog.speed / (1024 * 1024)).toFixed(1)} MB/s`;
@@ -322,7 +377,8 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                 `${formatMB(loadedSoFar)} / ${formatMB(totalFolderSize)}`,
                                 `Uploading [${i + 1}/${fileArray.length}]: ${file.name}`
                             );
-                        }
+                        },
+                        purpose
                     );
 
                     // Add successful upload results
@@ -417,7 +473,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         e.stopPropagation();
         setIsDragging(false);
         if (canUpload && e.dataTransfer.files) {
-            handleFileUpload(e.dataTransfer.files);
+            handleInitiateUpload(e.dataTransfer.files, 'files');
         }
     };
 
@@ -427,6 +483,33 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--color-bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
                     {renderBreadcrumbs()}
+                    {sequences && sequences.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                                Sequence:
+                            </span>
+                            <select
+                                value={sequenceFilter}
+                                onChange={(e) => setSequenceFilter(e.target.value)}
+                                style={{
+                                    padding: '4px 10px',
+                                    borderRadius: 6,
+                                    border: '1px solid var(--color-border)',
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: 'var(--color-text-primary)',
+                                    background: 'var(--color-bg-card)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="ALL">All Sequences</option>
+                                {sequences.map((s: any, idx: number) => {
+                                    const seqName = typeof s === 'string' ? s : (s.name || `Seq ${idx + 1}`);
+                                    return <option key={idx} value={seqName}>{seqName}</option>;
+                                })}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -437,28 +520,32 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 6,
-                                    padding: '7px 14px',
-                                    background: '#f0fdf4', color: '#16a34a',
-                                    border: '1px solid #86efac', borderRadius: 6,
-                                    fontSize: 13, fontWeight: 600, textDecoration: 'none',
-                                    transition: 'background 0.2s',
+                                    padding: '0 14px', height: 36, whiteSpace: 'nowrap',
+                                    background: '#f0fdf4', color: '#15803d',
+                                    border: '1px solid #bbf7d0', borderRadius: 6,
+                                    fontSize: 12.5, fontWeight: 700, textDecoration: 'none',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                                 }}
                             >
-                                <ExcelIcon /> Download Transmittal
+                                <IconDownload width={14} height={14} />
+                                <span>Download Transmittal</span>
                             </a>
                             <a
                                 href={getExcelDownloadUrl(projectId, 'log')}
                                 download
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 6,
-                                    padding: '7px 14px',
-                                    background: '#f0fdf4', color: '#16a34a',
-                                    border: '1px solid #86efac', borderRadius: 6,
-                                    fontSize: 13, fontWeight: 600, textDecoration: 'none',
-                                    transition: 'background 0.2s',
+                                    padding: '0 14px', height: 36, whiteSpace: 'nowrap',
+                                    background: '#f0fdf4', color: '#15803d',
+                                    border: '1px solid #bbf7d0', borderRadius: 6,
+                                    fontSize: 12.5, fontWeight: 700, textDecoration: 'none',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                                 }}
                             >
-                                <ExcelIcon /> Download Drawing Log
+                                <IconDownload width={14} height={14} />
+                                <span>Download Drawing Log</span>
                             </a>
                         </div>
                     )}
@@ -497,7 +584,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                 multiple 
                                 style={{ display: 'none' }} 
                                 ref={fileInputRef} 
-                                onChange={(e) => handleFileUpload(e.target.files)} 
+                                onChange={(e) => handleInitiateUpload(e.target.files, 'files')} 
                             />
                             <button 
                                 className="btn btn-secondary" 
@@ -518,7 +605,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                         // @ts-ignore — webkitdirectory is non-standard but widely supported
                                         webkitdirectory=""
                                         multiple
-                                        onChange={(e) => handleFolderUpload(e.target.files)}
+                                        onChange={(e) => handleInitiateUpload(e.target.files, 'folder')}
                                     />
                                     <button 
                                         className="btn btn-primary" 
@@ -840,6 +927,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                             <tr style={{ background: 'var(--color-bg-page)', borderBottom: '1px solid var(--color-border)' }}>
                                 <th style={{ width: 40, padding: '12px 20px' }}></th>
                                 <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Name</th>
+                                <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600, color: 'var(--color-text-secondary)', width: 140 }}>Revised By</th>
                                 <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600, color: 'var(--color-text-secondary)', width: 150 }}>Modified</th>
                                 <th style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: 'var(--color-text-secondary)', width: 120 }}>Size</th>
                                 <th style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: 'var(--color-text-secondary)', width: 100 }}>Actions</th>
@@ -848,7 +936,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                         <tbody>
                             {!loading && files.length === 0 && !error && (
                                 <tr>
-                                    <td colSpan={5} className="table-empty" style={{ padding: 60 }}>
+                                    <td colSpan={6} className="table-empty" style={{ padding: 60 }}>
                                         {canUpload ? (
                                             <>
                                                 <div style={{ color: 'var(--color-text-muted)', marginBottom: 12 }}>This folder is empty.</div>
@@ -861,7 +949,15 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                 </tr>
                             )}
 
-                            {files.map((file, idx) => (
+                            {files
+                                .filter((file) => {
+                                    if (sequenceFilter === 'ALL') return true;
+                                    if (file.type === 'directory') return true;
+                                    const searchKey = sequenceFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                    const fileKey = file.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                    return fileKey.includes(searchKey);
+                                })
+                                .map((file, idx) => (
                                 <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }} className="table-row-hover">
                                     <td style={{ padding: '12px 20px', color: file.type === 'directory' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
                                         {file.type === 'directory' ? <IconFolder /> : <IconFile />}
@@ -877,6 +973,9 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                         ) : (
                                             <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{file.name}</span>
                                         )}
+                                    </td>
+                                    <td style={{ padding: '12px 20px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+                                        {file.type === 'directory' ? '-' : ((file as any).uploadedBy || 'admin')}
                                     </td>
                                     <td style={{ padding: '12px 20px', color: 'var(--color-text-muted)', fontSize: 13 }}>
                                         {formatDate(file.modified)}
@@ -1162,6 +1261,215 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                 style={{ minWidth: 100 }}
                             >
                                 Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upload Options & Mandatory Constraints Modal */}
+            {uploadModalOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                }}>
+                    <div style={{
+                        background: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 520,
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #e2e8f0',
+                        overflow: 'hidden', display: 'flex', flexDirection: 'column'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '20px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
+                                    Configure Upload & Transmittal
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
+                                    Set mandatory metadata for this drawing batch
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setUploadModalOpen(false)}
+                                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8' }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            
+                            {/* 1. Transmittal Choice (Mandatory) */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                                    Transmittal Assignment <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <label style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                                        borderRadius: 8, border: transmittalChoice === 'new' ? '2px solid var(--color-primary)' : '1px solid #cbd5e1',
+                                        background: transmittalChoice === 'new' ? '#eff6ff' : '#ffffff', cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="transmittalChoice"
+                                            value="new"
+                                            checked={transmittalChoice === 'new'}
+                                            onChange={() => setTransmittalChoice('new')}
+                                        />
+                                        <div>
+                                            <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Create New Transmittal</span>
+                                            <span style={{ display: 'block', fontSize: 12, color: '#64748b' }}>Automatically generates the next sequential transmittal number</span>
+                                        </div>
+                                    </label>
+
+                                    <label style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                                        borderRadius: 8, border: transmittalChoice === 'existing' ? '2px solid var(--color-primary)' : '1px solid #cbd5e1',
+                                        background: transmittalChoice === 'existing' ? '#eff6ff' : '#ffffff', cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="transmittalChoice"
+                                            value="existing"
+                                            checked={transmittalChoice === 'existing'}
+                                            onChange={() => setTransmittalChoice('existing')}
+                                        />
+                                        <div>
+                                            <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Append to Existing Transmittal</span>
+                                            <span style={{ display: 'block', fontSize: 12, color: '#64748b' }}>Add drawings into an existing transmittal batch</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {transmittalChoice === 'existing' && (
+                                    <div style={{ marginTop: 12, paddingLeft: 8 }}>
+                                        {loadingTransmittals ? (
+                                            <span style={{ fontSize: 12, color: '#64748b' }}>Loading project transmittals...</span>
+                                        ) : existingTransmittals.length === 0 ? (
+                                            <span style={{ fontSize: 12, color: '#ef4444' }}>No existing transmittals found for this project. Select 'Create New'.</span>
+                                        ) : (
+                                            <select
+                                                value={selectedTransmittalNum || ''}
+                                                onChange={(e) => setSelectedTransmittalNum(Number(e.target.value))}
+                                                style={{
+                                                    width: '100%', padding: '8px 12px', borderRadius: 6,
+                                                    border: '1px solid #cbd5e1', fontSize: 13, fontWeight: 600, color: '#0f172a'
+                                                }}
+                                            >
+                                                {existingTransmittals.map(t => (
+                                                    <option key={t._id} value={t.transmittalNumber}>
+                                                        TR-{String(t.transmittalNumber).padStart(3, '0')} ({t.drawings?.length || 0} drawings)
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Upload Purpose (Mandatory - Radio Buttons) */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                                    Upload Purpose <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <label style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                                        borderRadius: 8, border: uploadPurpose === 'Fabrication' ? '2px solid var(--color-primary)' : '1px solid #cbd5e1',
+                                        background: uploadPurpose === 'Fabrication' ? '#eff6ff' : '#ffffff', cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurpose"
+                                            value="Fabrication"
+                                            checked={uploadPurpose === 'Fabrication'}
+                                            onChange={() => setUploadPurpose('Fabrication')}
+                                        />
+                                        <div>
+                                            <span style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>Fabrication</span>
+                                            <span style={{ display: 'block', fontSize: 11.5, color: '#64748b' }}>Increments Fab count</span>
+                                        </div>
+                                    </label>
+
+                                    <label style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                                        borderRadius: 8, border: uploadPurpose === 'Approval' ? '2px solid var(--color-primary)' : '1px solid #cbd5e1',
+                                        background: uploadPurpose === 'Approval' ? '#eff6ff' : '#ffffff', cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="uploadPurpose"
+                                            value="Approval"
+                                            checked={uploadPurpose === 'Approval'}
+                                            onChange={() => setUploadPurpose('Approval')}
+                                        />
+                                        <div>
+                                            <span style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>Approval</span>
+                                            <span style={{ display: 'block', fontSize: 11.5, color: '#64748b' }}>Increments App count</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* 3. Sequence Tagging (Mandatory) */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                                    Sequence <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {((sequences && sequences.length > 0) ? sequences : ['Seq 1']).map((seq) => {
+                                        const isSelected = selectedUploadSequences.includes(seq);
+                                        return (
+                                            <button
+                                                key={seq}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        if (selectedUploadSequences.length > 1) {
+                                                            setSelectedUploadSequences(selectedUploadSequences.filter(s => s !== seq));
+                                                        }
+                                                    } else {
+                                                        setSelectedUploadSequences([...selectedUploadSequences, seq]);
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                                                    cursor: 'pointer', transition: 'all 0.15s ease',
+                                                    border: isSelected ? '2px solid var(--color-primary)' : '1px solid #cbd5e1',
+                                                    background: isSelected ? 'var(--color-primary)' : '#ffffff',
+                                                    color: isSelected ? '#ffffff' : '#475569'
+                                                }}
+                                            >
+                                                {isSelected ? '✓ ' : ''}{seq}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{
+                            padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
+                            display: 'flex', justifyContent: 'flex-end', gap: 12
+                        }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setUploadModalOpen(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleConfirmUpload}
+                                disabled={selectedUploadSequences.length === 0 || (transmittalChoice === 'existing' && !selectedTransmittalNum)}
+                            >
+                                Start Upload
                             </button>
                         </div>
                     </div>

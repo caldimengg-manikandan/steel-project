@@ -8,6 +8,7 @@ import {
 } from '../services/transmittalApi';
 import { useMessage } from '../context/MessageContext';
 import { formatDate } from '../utils/dateUtils';
+import { IconDownload } from './Icons';
 
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
     const { showMessage, showConfirm } = useMessage();
@@ -108,14 +109,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                             ))}
                         </div>
                     )}
-                    <a href={getDrawingLogExcelUrl(projectId)} download className="btn btn-secondary btn-sm" style={{ padding: '7px 14px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', flexShrink: 0 }}>
-                        📥 Master Drawing Log
-                    </a>
-                    {canEdit && (
-                        <button className="btn btn-primary btn-sm" onClick={() => handleGenerate()} disabled={generating}>
-                            {generating ? 'Generating...' : '➕ Generate New Transmittal'}
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -134,7 +127,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                 <th>Sequences</th>
                                 <th>Date</th>
                                 <th>New Drawings</th>
-                                <th>Revised Drawings</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -162,7 +154,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                             </td>
                                             <td className="text-muted">{formatDate(t.createdAt)}</td>
                                             <td><span className="badge badge-success">{t.newCount}</span></td>
-                                            <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                             <td>
                                                 {canEdit ? (
                                                     <button className="btn btn-primary btn-sm" onClick={() => handleGenerate(t.transmittalNumber)} disabled={generating}>
@@ -180,7 +171,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                         <td style={{ fontWeight: 600 }}>
                                             <a href={getTransmittalExcelUrl(projectId, t._id)} download style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Click to download Excel">
                                                 TR-{String(t.transmittalNumber).padStart(3, '0')}
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                                <IconDownload width={14} height={14} />
                                             </a>
                                         </td>
                                         <td>
@@ -198,11 +189,10 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                         </td>
                                         <td className="text-muted">{formatDate(t.createdAt)}</td>
                                         <td><span className="badge badge-success">{t.newCount}</span></td>
-                                        <td><span className="badge badge-warning">{t.revisedCount}</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm">
-                                                    📥 Download
+                                                <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                    <IconDownload width={14} height={14} /> Download
                                                 </a>
                                             </div>
                                         </td>

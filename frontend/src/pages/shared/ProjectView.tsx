@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getProjectById, updateProjectSequences } from '../../services/projectApi';
+import { getProjectById, updateProjectSequences, updateProjectScopeOfWork } from '../../services/projectApi';
 import { useMessage } from '../../context/MessageContext';
 import type { Project, ProjectPermission } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
@@ -12,6 +12,7 @@ import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
+import { calculateSowProgress } from '../../utils/sowCalculator';
 
 
 export default function ProjectView() {
@@ -47,7 +48,7 @@ export default function ProjectView() {
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (isSilent = false) => {
         if (!id || id === 'undefined' || id.length < 5) {
             console.error(`[ProjectView] Bailing fetch due to invalid ID:`, id);
             setError(`Project ID is invalid or missing (Received: "${id}").`);
@@ -56,7 +57,7 @@ export default function ProjectView() {
         }
 
         try {
-            setLoading(true);
+            if (!isSilent) setLoading(true);
             const [projData, extData] = await Promise.all([
                 getProjectById(id),
                 listExtractions(id)
@@ -283,7 +284,7 @@ export default function ProjectView() {
 
             {/* Tabs */}
             <div className="tab-bar">
-                {(['dashboard', 'storage', 'transmittals', 'revisions', 'extraction', 'info'] as const).map((tab) => (
+                {(['dashboard', 'storage', 'transmittals', 'extraction', 'info'] as const).map((tab) => (
                     <button
                         key={tab}
                         className={`tab-item${activeTab === tab ? ' active' : ''}`}
@@ -292,7 +293,6 @@ export default function ProjectView() {
                         {tab === 'dashboard' && '📊 Dashboard'}
                         {tab === 'storage' && '📁 Storage'}
                         {tab === 'transmittals' && 'Transmittals & Log'}
-                        {tab === 'revisions' && `Revision History (${allRevisions.length})`}
                         {tab === 'extraction' && 'Extraction'}
                         {tab === 'info' && 'Project Info'}
                     </button>
@@ -309,8 +309,9 @@ export default function ProjectView() {
                 const seqTotal = seqs.length;
                 const seqDone = seqs.filter((s: any) => s.status === 'Completed').length;
                 const seqPct = seqTotal > 0 ? Math.round((seqDone / seqTotal) * 100) : 0;
-                const fabPct = project.fabricationPercentage || 0;
-                const appPct = project.approvalPercentage || 0;
+                const sowProg = calculateSowProgress(project.scopeOfWork);
+                const fabPct = project.fabricationPercentage !== undefined ? project.fabricationPercentage : sowProg.fabricationPercentage;
+                const appPct = project.approvalPercentage !== undefined ? project.approvalPercentage : sowProg.approvalPercentage;
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>
@@ -389,13 +390,12 @@ export default function ProjectView() {
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
                                         <span className="card-header-title">Progress Overview</span>
                                     </div>
-                                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Fabrication · Approval · Sequences</span>
+                                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Fabrication · Approval</span>
                                 </div>
                                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                                     {[
                                         { label: 'Fabrication', pct: fabPct, count: fabCount, color: 'var(--color-success-mid)', bg: 'var(--color-success-bg)', barBg: 'rgba(22,163,74,0.15)' },
                                         { label: 'Approval', pct: appPct, count: appCount, color: 'var(--color-info-mid)', bg: 'var(--color-info-bg)', barBg: 'rgba(37,99,235,0.12)' },
-                                        { label: 'Sequences', pct: seqPct, count: seqDone, color: 'var(--accent-violet)', bg: 'rgba(124,58,237,0.08)', barBg: 'rgba(124,58,237,0.12)' },
                                     ].map(({ label, pct, count, color, bg, barBg }) => (
                                         <div key={label}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -695,7 +695,7 @@ export default function ProjectView() {
                                 Sequence Progress
                             </h3>
 
-                            {!project.sequences || project.sequences.length === 0 ? (
+                                                            {!project.sequences || project.sequences.length === 0 ? (
                                 <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
@@ -703,18 +703,20 @@ export default function ProjectView() {
                                         const isDone = seq.status === 'Completed';
                                         const canEditSequences = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
                                         const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
-                                            if (!id) return;
+                                            if (!id || !project) return;
                                             if (!canEditSequences) {
                                                 showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
                                                 return;
                                             }
+                                            const newSeqs = [...(project.sequences || [])];
+                                            newSeqs[idx] = { ...newSeqs[idx], ...updates };
+                                            setProject({ ...project, sequences: newSeqs });
                                             try {
-                                                const newSeqs = [...project.sequences];
-                                                newSeqs[idx] = { ...newSeqs[idx], ...updates };
                                                 await updateProjectSequences(id, newSeqs);
-                                                await fetchData();
+                                                await fetchData(true);
                                             } catch (err: any) {
                                                 showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
+                                                await fetchData(true);
                                             }
                                         };
                                         return (
@@ -758,6 +760,7 @@ export default function ProjectView() {
                                                         gap: 2,
                                                     }}>
                                                         <button
+                                                            type="button"
                                                             onClick={() => handleUpdateSequence({ status: 'Not Completed' })}
                                                             disabled={!canEditSequences}
                                                             style={{
@@ -778,6 +781,7 @@ export default function ProjectView() {
                                                             Pending
                                                         </button>
                                                         <button
+                                                            type="button"
                                                             onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString() })}
                                                             disabled={!canEditSequences}
                                                             style={{
@@ -829,6 +833,95 @@ export default function ProjectView() {
                                     })}
                                 </div>
                             )}
+
+                        {/* ── Scope of Work Progress Section ── */}
+                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                                Scope of Work Progress
+                            </h3>
+
+                            {(!project.scopeOfWork || project.scopeOfWork.length === 0) ? (
+                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No Scope of Work items defined for this project.</div>
+                            ) : (
+                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {project.scopeOfWork.map((sow: any, idx: number) => {
+                                                const rawStatus = sow.status || 'Yet to Start';
+                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
+
+                                                const sowPct = Number(sow.percentage) || 0;
+                                                const appPctVal = Number(sow.approval) || 0;
+                                                const fabPctVal = Number(sow.fabrication) || 0;
+
+                                                const handleStatusChange = async (newStatus: string) => {
+                                                    if (!id || !project) return;
+                                                    if (!canEditSow) {
+                                                        showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
+                                                        return;
+                                                    }
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    try {
+                                                        await updateProjectScopeOfWork(id, updatedSow);
+                                                        await fetchData(true);
+                                                    } catch (err: any) {
+                                                        showMessage('Error', `Failed to update SOW status: ${err.message}`, 'error');
+                                                        await fetchData(true);
+                                                    }
+                                                };
+
+                                                return (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                            {sow.name}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
+                                                            {sowPct}%
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
+                                                            {appPctVal}%
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                                                            {fabPctVal}%
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                            <select
+                                                                value={rawStatus}
+                                                                onChange={(e) => handleStatusChange(e.target.value)}
+                                                                disabled={!canEditSow}
+                                                                style={{
+                                                                    padding: '5px 10px', borderRadius: 20,
+                                                                    fontSize: 12, fontWeight: 750, cursor: canEditSow ? 'pointer' : 'not-allowed',
+                                                                    border: rawStatus === 'Completed' ? '1px solid #86efac' : rawStatus === 'In Progress' ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                                                                    background: rawStatus === 'Completed' ? '#f0fdf4' : rawStatus === 'In Progress' ? '#eff6ff' : '#f8fafc',
+                                                                    color: rawStatus === 'Completed' ? '#16a34a' : rawStatus === 'In Progress' ? '#2563eb' : '#64748b',
+                                                                }}
+                                                            >
+                                                                <option value="Yet to Start">Yet to Start</option>
+                                                                <option value="In Progress">In Progress</option>
+                                                                <option value="Completed">Completed</option>
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
 
                         </div>
                     </div>

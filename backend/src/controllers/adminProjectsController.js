@@ -29,6 +29,7 @@ const { attachProjectStats } = require('../services/projectStatsService');
 const { getExternalProjects } = require('../services/externalProjectService');
 const storageGateway = require('../utils/storageGateway');
 const { runExtractionPipeline } = require('../services/extractionService');
+const { calculateSowProgress } = require('../utils/sowCalculator');
 
 /**
  * GET /api/admin/projects
@@ -65,7 +66,7 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber } = req.body;
 
     // ---- New validation: sequences is mandatory ----
     if (!Array.isArray(sequences) || sequences.length === 0) {
@@ -87,10 +88,11 @@ async function createProject(req, res) {
         clientId: clientId || null,
         contactPerson: contactPerson || null,
         description: description || '',
-        status: status || 'active',
+        status: status === 'active' ? 'in_progress' : (status || 'in_progress'),
         location: location || '',
         approximateDrawingsCount: Number(approximateDrawingsCount) || 0,
         sequences: sequences || [],
+        scopeOfWork: scopeOfWork || [],
         connectionDesignVendor: connectionDesignVendor || '',
         connectionDesignContact: connectionDesignContact || '',
         connectionDesignEmail: connectionDesignEmail || '',
@@ -121,7 +123,8 @@ async function createProject(req, res) {
         console.error('Failed to create assignment notification:', err);
     }
 
-    res.status(201).json({ project });
+    const projectWithStats = await attachProjectStats(project);
+    res.status(201).json({ project: projectWithStats });
 }
 
 /**
@@ -157,7 +160,7 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, connectionDesignVendor, connectionDesignContact, connectionDesignEmail } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
@@ -165,21 +168,39 @@ async function updateProject(req, res) {
     if (contactPerson !== undefined) project.contactPerson = contactPerson;
     if (description !== undefined) project.description = description;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
-    if (location !== undefined) project.location = location;
-    if (sequences !== undefined) project.sequences = sequences;
+    if (sequences !== undefined && Array.isArray(sequences)) {
+        project.sequences = sequences.map((s, idx) => ({
+            name: (s.name || '').trim() || `Seq ${idx + 1}`,
+            status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
+            deadline: s.deadline || null,
+            approvalDate: s.approvalDate || null,
+            fabricationDate: s.fabricationDate || null
+        }));
+    }
+    if (scopeOfWork !== undefined && Array.isArray(scopeOfWork)) {
+        project.scopeOfWork = scopeOfWork.map((s, idx) => ({
+            name: (s.name || '').trim() || `SOW ${String(idx + 1).padStart(2, '0')}`,
+            percentage: Number(s.percentage) || 0,
+            approval: Number(s.approval) || 0,
+            fabrication: Number(s.fabrication) || 0,
+            status: s.status || 'Yet to Start'
+        }));
+    }
     if (connectionDesignVendor !== undefined) project.connectionDesignVendor = connectionDesignVendor;
     if (connectionDesignContact !== undefined) project.connectionDesignContact = connectionDesignContact;
     if (connectionDesignEmail !== undefined) project.connectionDesignEmail = connectionDesignEmail;
     if (req.body.year !== undefined) project.year = Number(req.body.year);
     if (status !== undefined) {
-        if (!['active', 'on_hold', 'completed', 'archived'].includes(status)) {
+        const normalizedStatus = status === 'active' ? 'in_progress' : status;
+        if (!['active', 'in_progress', 'on_hold', 'completed', 'archived'].includes(normalizedStatus)) {
             return res.status(400).json({ error: 'Invalid status value.' });
         }
-        project.status = status;
+        project.status = normalizedStatus;
     }
 
     await project.save();
-    res.json({ project });
+    const projectWithStats = await attachProjectStats(project);
+    res.json({ project: projectWithStats });
 }
 
 /**
@@ -463,6 +484,11 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
         const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
         const matchingExt = externalProjects.find(ext => ext.name === p.name);
+        const sowProg = calculateSowProgress(p.scopeOfWork || []);
+
+        const appPct = matchingExt?.approvalPercentage ?? (p.approvalPercentage !== undefined ? p.approvalPercentage : sowProg.approvalPercentage);
+        const fabPct = matchingExt?.fabricationPercentage ?? (p.fabricationPercentage !== undefined ? p.fabricationPercentage : sowProg.fabricationPercentage);
+
         return {
             ...p,
             totalDrawings: stats.totalDrawings || 0,
@@ -478,11 +504,9 @@ async function downloadAllProjectsStatusExcel(req, res) {
             workCompletedCO: coStats.workCompletedCO,
             pendingCO: coStats.pendingCO,
             corStatus: matchingExt ? matchingExt.corStatus : null,
-            fabricationPercentage: matchingExt ? matchingExt.fabricationPercentage : 0,
-            approvalPercentage: matchingExt ? matchingExt.approvalPercentage : 0,
+            fabricationPercentage: fabPct,
+            approvalPercentage: appPct,
             rawStatus: matchingExt ? matchingExt.rawStatus : '',
-            // If the local status is just "in_progress", but external has a more specific mapping, we can provide it,
-            // but usually we rely on rawStatus for UI.
         };
     });
 
@@ -633,6 +657,7 @@ async function uploadFolder(req, res) {
 
     const pathArray = Array.isArray(req.body.paths) ? req.body.paths : (req.body.paths ? [req.body.paths] : []);
     const targetTransmittalNumber = req.body.transmittalNumber ? parseInt(req.body.transmittalNumber, 10) : null;
+    const uploadPurpose = req.body.uploadPurpose === 'Approval' ? 'Approval' : 'Fabrication';
     let sequences = [];
     if (req.body.sequences) {
         sequences = Array.isArray(req.body.sequences) ? req.body.sequences : [req.body.sequences];
@@ -767,6 +792,7 @@ async function uploadFolder(req, res) {
             fileSize: file.size,
             uploadedBy,
             targetTransmittalNumber,
+            uploadPurpose,
             sequences,
             status: 'queued',
         });

@@ -3,6 +3,7 @@ const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { getExternalProjects } = require('./externalProjectService');
+const { calculateSowProgress } = require('../utils/sowCalculator');
 
 /**
  * Calculates aggregated statistics for a list of projects.
@@ -34,9 +35,19 @@ async function attachProjectStats(projects) {
                                     { $eq: ['$status', 'completed'] },
                                     {
                                         $or: [
-                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[a-z]", options: "i" } },
-                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } },
-                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.description", ""] }, regex: "approved|approval", options: "i" } }
+                                            { $eq: ['$uploadPurpose', 'Approval'] },
+                                            {
+                                                $and: [
+                                                    { $or: [{ $eq: ['$uploadPurpose', ''] }, { $eq: ['$uploadPurpose', null] }] },
+                                                    {
+                                                        $or: [
+                                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[a-z]", options: "i" } },
+                                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.remarks", ""] }, regex: "approved|approval", options: "i" } },
+                                                            { $regexMatch: { input: { $ifNull: ["$extractedFields.description", ""] }, regex: "approved|approval", options: "i" } }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
                                         ]
                                     }
                                 ]
@@ -51,7 +62,17 @@ async function attachProjectStats(projects) {
                             {
                                 $and: [
                                     { $eq: ['$status', 'completed'] },
-                                    { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } }
+                                    {
+                                        $or: [
+                                            { $eq: ['$uploadPurpose', 'Fabrication'] },
+                                            {
+                                                $and: [
+                                                    { $or: [{ $eq: ['$uploadPurpose', ''] }, { $eq: ['$uploadPurpose', null] }] },
+                                                    { $regexMatch: { input: { $ifNull: ["$extractedFields.revision", ""] }, regex: "^(rev\\s*)?[0-9]", options: "i" } }
+                                                ]
+                                            }
+                                        ]
+                                    }
                                 ]
                             },
                             1, 0
@@ -141,13 +162,7 @@ async function attachProjectStats(projects) {
         };
         const approx = pObj.approximateDrawingsCount || 0;
         
-        let approvalPercentage = 0;
-        let fabricationPercentage = 0;
-        
-        if (approx > 0) {
-            approvalPercentage = Math.round((stats.approvalCount / approx) * 100);
-            fabricationPercentage = Math.round((stats.fabricationCount / approx) * 100);
-        }
+        const sowProgress = calculateSowProgress(pObj.scopeOfWork || []);
 
         const nameLower = (pObj.name || '').toLowerCase().trim();
         const matchingExt = externalProjects.find(ext => (ext.name || '').toLowerCase().trim() === nameLower);
@@ -169,19 +184,12 @@ async function attachProjectStats(projects) {
         };
 
         let mergedApproximateDrawingsCount = approx;
-        let mergedApprovalPercentage = approvalPercentage;
-        let mergedFabricationPercentage = fabricationPercentage;
-
         if (matchingExt) {
-            // Overwrite/merge COR status from the project management system (App A)
             if (matchingExt.corStatus) {
                 mergedCorStatus = matchingExt.corStatus;
             }
-            // Fallback for drawings count & percentages if local has no drawings
             if (stats.total === 0) {
                 mergedApproximateDrawingsCount = matchingExt.approximateDrawingsCount || approx;
-                mergedApprovalPercentage = matchingExt.approvalPercentage || 0;
-                mergedFabricationPercentage = matchingExt.fabricationPercentage || 0;
             }
         }
 
@@ -201,8 +209,10 @@ async function attachProjectStats(projects) {
             workCompletedAmount: coStats.workCompletedAmount,
             pendingAmount: coStats.pendingAmount,
             approximateDrawingsCount: mergedApproximateDrawingsCount,
-            approvalPercentage: mergedApprovalPercentage,
-            fabricationPercentage: mergedFabricationPercentage,
+            approvalPercentage: sowProgress.approvalPercentage,
+            fabricationPercentage: sowProgress.fabricationPercentage,
+            overallPercentage: sowProgress.overallPercentage,
+            sowContributions: sowProgress.sowContributions,
             corStatus: mergedCorStatus,
             rawStatus: matchingExt?.rawStatus,
             updatedAtFromAppA: matchingExt?.updatedAt || null

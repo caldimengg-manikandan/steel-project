@@ -154,6 +154,18 @@ const projectSchema = new mongoose.Schema(
             default: []
         },
 
+        // ── Scope of Work (SOW) ──────────────────────────────
+        scopeOfWork: {
+            type: [{
+                name: { type: String, required: true },
+                percentage: { type: Number, default: 0 },
+                approval: { type: Number, default: 0 },
+                fabrication: { type: Number, default: 0 },
+                status: { type: String, default: 'Yet to Start' }
+            }],
+            default: []
+        },
+
         // ── Connection Design ─────────────────────────────────
         connectionDesignVendor: {
             type: String,

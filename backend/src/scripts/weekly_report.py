@@ -102,9 +102,24 @@ def get_project_stats():
         fabricated = d_stat.get("fabricationCount", 0)
         approx = proj.get("approximateDrawingsCount") or 0
         
-        # Calculate percentages based on approximate count as per UI
-        approval_pct = round((approved / approx * 100), 1) if approx > 0 else 0
-        fab_pct = round((fabricated / approx * 100), 1) if approx > 0 else 0
+        # Calculate percentages based on SOW rules
+        sow_list = proj.get("scopeOfWork") or []
+        app_contrib_total = 0.0
+        fab_contrib_total = 0.0
+
+        for item in sow_list:
+            status = str(item.get("status", "Yet to Start")).strip()
+            if status in ["Pending", "Yet to Start", "Not Started"]:
+                continue
+            sow_pct = float(item.get("percentage") or 0)
+            app_pct_val = float(item.get("approval") or 0)
+            fab_pct_val = float(item.get("fabrication") or 0)
+
+            app_contrib_total += sow_pct * (app_pct_val / 100.0) * 0.80
+            fab_contrib_total += sow_pct * (fab_pct_val / 100.0) * 0.20
+
+        approval_pct = round(app_contrib_total, 1)
+        fab_pct = round(fab_contrib_total, 1)
 
         stats.append({
             "name": proj.get("name", "Unknown"),

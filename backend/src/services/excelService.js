@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 // Shared revision-priority helper (fabrication beats approval)
 const { pickLatestRevision } = require('./transmittalService');
+const { calculateSowProgress } = require('../utils/sowCalculator');
 
 const EXCEL_DIR = path.join(__dirname, '../../uploads/excel');
 
@@ -862,13 +863,9 @@ async function generateProjectStatusExcel(projectsData) {
     };
 
     projectsData.forEach((proj, idx) => {
-        const approx = proj.approximateDrawingsCount || 0;
-        let approvalPercentage = 0;
-        let fabricationPercentage = 0;
-        if (approx > 0) {
-            approvalPercentage = Math.round(((proj.approvalCount || 0) / approx) * 100);
-            fabricationPercentage = Math.round(((proj.fabricationCount || 0) / approx) * 100);
-        }
+        const sowProg = calculateSowProgress(proj.scopeOfWork || []);
+        const approvalPercentage = proj.approvalPercentage !== undefined ? proj.approvalPercentage : sowProg.approvalPercentage;
+        const fabricationPercentage = proj.fabricationPercentage !== undefined ? proj.fabricationPercentage : sowProg.fabricationPercentage;
 
         const dataRow = sheet.addRow({
             cdeNo: '', // Placeholder

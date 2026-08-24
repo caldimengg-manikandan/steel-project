@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminListProjects, downloadProjectStatusExcel } from '../../services/projectApi';
 import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
+import { calculateSowProgress } from '../../utils/sowCalculator';
 
 const STATUS_LABEL: Record<TypeProjectStatus, string> = {
     in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
@@ -216,6 +217,10 @@ export default function AdminProjectStatus() {
                         const approvedCount = (project as any).approvalCount || 0;
                         const openRfiCount = project.openRfiCount || 0;
                         const closedRfiCount = project.closedRfiCount || 0;
+                        const sowProg = calculateSowProgress(project.scopeOfWork);
+                        const fabPercentage = project.fabricationPercentage !== undefined ? project.fabricationPercentage : sowProg.fabricationPercentage;
+                        const appPercentage = project.approvalPercentage !== undefined ? project.approvalPercentage : sowProg.approvalPercentage;
+                        const ovrPercentage = project.overallPercentage !== undefined ? project.overallPercentage : sowProg.overallPercentage;
 
                         const isSectionExpanded = expandedProjectId === project.id;
 
@@ -259,19 +264,26 @@ export default function AdminProjectStatus() {
                                     <div className="project-status-stat">
                                         <div className="project-status-stat-label">Uploaded</div>
                                         <div className="project-status-stat-value" style={{ fontSize: 24 }}>
-                                            {project.drawingCount || 0}<span style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 500, marginLeft: 2 }}>/ {project.approximateDrawingsCount || '?'}</span>
+                                            {project.drawingCount || 0}
                                         </div>
                                         <div className="project-status-stat-sub">drawings uploaded</div>
                                     </div>
                                     <div className="project-status-stat">
                                         <div className="project-status-stat-label">Fabrications</div>
-                                        <div className="project-status-stat-value">{project.fabricationPercentage || 0}%</div>
+                                        <div className="project-status-stat-value">{fabPercentage}%</div>
                                         <div className="project-status-stat-sub">{fabricationCount} drawings fabricated</div>
                                     </div>
                                     <div className="project-status-stat">
                                         <div className="project-status-stat-label">Approvals</div>
-                                        <div className="project-status-stat-value">{project.approvalPercentage || 0}%</div>
+                                        <div className="project-status-stat-value">{appPercentage}%</div>
                                         <div className="project-status-stat-sub">{approvedCount} drawings approved</div>
+                                    </div>
+                                    <div className="project-status-stat">
+                                        <div className="project-status-stat-label">Overall Percentage</div>
+                                        <div className="project-status-stat-value" style={{ color: 'var(--color-primary)' }}>
+                                            {ovrPercentage}%
+                                        </div>
+                                        <div className="project-status-stat-sub">overall completion</div>
                                     </div>
                                     <div
                                         className={`project-status-stat ${isSectionExpanded && expandedRfiFilter === 'OPEN' ? 'active-stat-selection' : ''}`}
@@ -327,7 +339,7 @@ export default function AdminProjectStatus() {
                                                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-success-mid)' }}>{project.corStatus?.statusSummary?.Approved ?? project.approvedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
-                                                <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Completed COs</div>
+                                                <div style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Completed</div>
                                                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)' }}>{project.corStatus?.statusSummary?.Completed ?? project.workCompletedCO ?? 0}</div>
                                             </div>
                                             <div style={{ textAlign: 'left' }}>

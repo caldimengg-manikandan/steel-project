@@ -632,7 +632,64 @@ async function getTransmittals(projectId) {
  * @returns {Promise<object|null>}
  */
 async function getDrawingLog(projectId) {
-    return DrawingLog.findOne({ projectId }).lean();
+    let log = await DrawingLog.findOne({ projectId }).lean();
+    if (log && log.drawings && log.drawings.length > 0) return log;
+
+    // Fallback: Build virtual Drawing Log from completed extractions if no formal transmittal generated yet
+    const extractions = await DrawingExtraction.find({ projectId, status: 'completed' }).lean();
+    if (extractions.length === 0) {
+        return log || null;
+    }
+
+    const drawingsMap = {};
+    extractions.forEach((ex) => {
+        const f = ex.extractedFields || {};
+        const drawingNo = (f.drawingNumber || '').trim() || ex.originalFileName || 'Extracted';
+        const key = drawingNo.toUpperCase();
+
+        const revHist = Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
+            ? f.revisionHistory
+            : [{ mark: f.revision, date: f.date, remarks: f.remarks }];
+
+        const latestRev = pickLatestRevision(revHist);
+        const currentRevMark = normalizeRevision(latestRev.mark || f.revision);
+
+        const normalizedEntries = revHist.map(rh => ({
+            revision: normalizeRevision(rh.mark),
+            date: rh.date || '',
+            transmittalNo: ex.targetTransmittalNumber || 1,
+            remarks: rh.remarks || '',
+            recordedAt: ex.createdAt || new Date()
+        }));
+
+        if (!drawingsMap[key]) {
+            drawingsMap[key] = {
+                drawingNumber: drawingNo,
+                drawingTitle: f.drawingTitle || f.drawingDescription || ex.originalFileName || '',
+                description: f.description || '',
+                folderName: ex.folderName || '',
+                originalFileName: ex.originalFileName || '',
+                currentRevision: currentRevMark,
+                revisionHistory: normalizedEntries,
+                firstTransmittalNo: ex.targetTransmittalNumber || 1,
+                lastUpdated: ex.createdAt || new Date()
+            };
+        } else {
+            const existing = drawingsMap[key];
+            existing.revisionHistory = [...existing.revisionHistory, ...normalizedEntries];
+            if (compareRevisions(currentRevMark, existing.currentRevision) > 0) {
+                existing.currentRevision = currentRevMark;
+            }
+        }
+    });
+
+    return {
+        projectId,
+        lastTransmittalNo: 1,
+        drawings: Object.values(drawingsMap),
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
 }
 
 module.exports = {
