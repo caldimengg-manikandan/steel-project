@@ -240,7 +240,6 @@ export default function AdminDashboard() {
                                     <tr>
                                         <th>Client</th>
                                         <th>Project Name</th>
-                                        <th>Approx. DWGs</th>
                                         <th>Approval %</th>
                                         <th>Fabrication %</th>
                                         <th>Sequence %</th>
@@ -251,7 +250,7 @@ export default function AdminDashboard() {
                                 <tbody>
                                     {!stats.recentProjects || stats.recentProjects.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="table-empty">
+                                            <td colSpan={7} className="table-empty">
                                                 No projects yet. Create your first project.
                                             </td>
                                         </tr>
@@ -278,7 +277,6 @@ export default function AdminDashboard() {
                                                         >
                                                             {p.name}
                                                         </td>
-                                                        <td className="font-mono" style={{ color: 'var(--color-text-muted)' }}>{p.approximateDrawingsCount || 0}</td>
                                                         <td>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                                 <div style={{width: 40, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden'}}>

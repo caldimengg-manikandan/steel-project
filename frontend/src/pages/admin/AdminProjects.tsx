@@ -329,7 +329,6 @@ export default function AdminProjects() {
                                 <th>Client Name</th>
                                 <th>Project Name</th>
                                 <th>Created</th>
-                                <th>Approx. DWGs</th>
                                 <th>Approval %</th>
                                 <th>Fabrication %</th>
                                 <th>Sequence</th>
@@ -339,7 +338,7 @@ export default function AdminProjects() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={11} className="table-empty">No projects match your search.</td></tr>
+                                <tr><td colSpan={9} className="table-empty">No projects match your search.</td></tr>
                             ) : (
                                 filtered.map((p, i) => (
                                     <tr key={p.id}>
@@ -363,7 +362,6 @@ export default function AdminProjects() {
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
                                             {formatDate(p.createdAt)}
                                         </td>
-                                        <td className="font-mono" style={{ fontWeight: 600 }}>{p.approximateDrawingsCount || 0}</td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
                                                 <div style={{ flex: 1, height: 3, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
