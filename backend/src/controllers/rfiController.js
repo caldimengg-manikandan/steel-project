@@ -71,25 +71,30 @@ exports.uploadRfiDrawing = async (req, res) => {
 exports.listRfiExtractions = async (req, res) => {
     const { projectId } = req.params;
 
-    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
+    if (!projectId || (typeof projectId === 'string' && projectId.startsWith('ext-'))) {
         return res.json({ extractions: [] });
     }
 
     try {
-        const adminId = req.principal?.adminId;
-        const query = { projectId };
-        if (adminId) {
-            query.createdByAdminId = adminId;
+        if (!mongoose.Types.ObjectId.isValid(projectId)) {
+            return res.json({ extractions: [] });
         }
+
+        const query = {
+            $or: [
+                { projectId: projectId },
+                { projectId: new mongoose.Types.ObjectId(projectId) }
+            ]
+        };
 
         const extractions = await RfiExtraction.find(query)
             .sort({ createdAt: -1 })
             .lean();
 
-        res.json({ extractions });
+        return res.json({ extractions });
     } catch (err) {
         console.error('[RfiController] list error:', err);
-        res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
+        return res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
     }
 };
 
