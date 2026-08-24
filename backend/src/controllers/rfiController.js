@@ -10,8 +10,8 @@ const { runRfiExtraction } = require('../services/rfiExtractionService');
 // Handle PDF uploads for RFI extraction
 exports.uploadRfiDrawing = async (req, res) => {
     const { projectId } = req.params;
-    const adminId = req.principal?.adminId || null;
-    const uploadedBy = req.principal?.username || 'user';
+    const adminId = req.principal.adminId;
+    const uploadedBy = req.principal.username;
     const { localSavePath, sequences } = req.body;
 
     if (!req.files || req.files.length === 0) {
@@ -20,97 +20,80 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     const createdExtractions = [];
 
-    try {
-        // Process each file
-        for (const file of req.files) {
-            const doc = await RfiExtraction.create({
-                projectId,
-                createdByAdminId: adminId || req.scopedProject?.createdByAdminId || new mongoose.Types.ObjectId(),
-                uploadedBy,
+
+    // Process each file
+    for (const file of req.files) {
+        const doc = await RfiExtraction.create({
+            projectId,
+            createdByAdminId: adminId,
+            uploadedBy,
+            originalFileName: file.originalname,
+            folderName: localSavePath || '',
+            fileUrl: file.path || '', // BRIDGE PATH
+            oneDriveFileId: file.oneDriveFileId || '', 
+            oneDriveUrl: file.webUrl || '', 
+            storageGatewayPath: file.storageGatewayPath || '',
+            gridFsFileId: file.gridFsFileId || null,
+            status: 'queued',
+            sequences: sequences || [],
+        });
+        createdExtractions.push(doc);
+
+        try {
+            const delResult = await RfiExtraction.deleteMany({
+                projectId: new mongoose.Types.ObjectId(projectId),
                 originalFileName: file.originalname,
-                folderName: localSavePath || '',
-                fileUrl: file.path || '', // BRIDGE PATH
-                oneDriveFileId: file.oneDriveFileId || '', 
-                oneDriveUrl: file.webUrl || '', 
-                storageGatewayPath: file.storageGatewayPath || '',
-                gridFsFileId: file.gridFsFileId || null,
-                status: 'queued',
-                sequences: sequences || [],
+                _id: { $ne: doc._id }
             });
-            createdExtractions.push(doc);
-
-            try {
-                const delResult = await RfiExtraction.deleteMany({
-                    projectId: new mongoose.Types.ObjectId(projectId),
-                    originalFileName: file.originalname,
-                    _id: { $ne: doc._id }
-                });
-                if (delResult.deletedCount > 0) {
-                    console.log(`[RfiUpload] Cleaned ${delResult.deletedCount} old RFI records for ${file.originalname}`);
-                }
-            } catch (cleanErr) {
-                console.error('[RfiUpload] Cleanup error:', cleanErr.message);
+            if (delResult.deletedCount > 0) {
+                console.log(`[RfiUpload] Cleaned ${delResult.deletedCount} old RFI records for ${file.originalname}`);
             }
-
-            // process in background using local bridge ref first
-            const fileRef = doc.fileUrl || doc.oneDriveFileId;
-            runRfiExtraction(doc._id, fileRef);
+        } catch (cleanErr) {
+            console.error('[RfiUpload] Cleanup error:', cleanErr.message);
         }
 
-        res.status(202).json({
-            message: `${createdExtractions.length} RFI drawing(s) scheduled for extraction.`,
-            extractions: createdExtractions
-        });
-    } catch (err) {
-        console.error('[RfiUpload] Error creating RFI extraction record:', err);
-        return res.status(500).json({ error: err.message || 'Failed to save RFI extraction document.' });
+        // process in background using local bridge ref first
+        const fileRef = doc.fileUrl || doc.oneDriveFileId;
+        runRfiExtraction(doc._id, fileRef);
     }
+
+    res.status(202).json({
+        message: `${createdExtractions.length} RFI drawing(s) scheduled for extraction.`,
+        extractions: createdExtractions
+    });
 };
 
 // List RFIs for the project
 exports.listRfiExtractions = async (req, res) => {
     const { projectId } = req.params;
+    const adminId = req.principal.adminId;
 
-    if (!projectId || (typeof projectId === 'string' && projectId.startsWith('ext-'))) {
+    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
         return res.json({ extractions: [] });
     }
 
     try {
-        if (!mongoose.Types.ObjectId.isValid(projectId)) {
-            return res.json({ extractions: [] });
-        }
-
-        const query = {
-            $or: [
-                { projectId: projectId },
-                { projectId: new mongoose.Types.ObjectId(projectId) }
-            ]
-        };
-
-        const extractions = await RfiExtraction.find(query)
+        const extractions = await RfiExtraction.find({ projectId, createdByAdminId: adminId })
             .sort({ createdAt: -1 })
             .lean();
 
-        return res.json({ extractions });
+        res.json({ extractions });
     } catch (err) {
         console.error('[RfiController] list error:', err);
-        return res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
+        res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
     }
 };
 
 // Download Excel
 exports.downloadRfiExcel = async (req, res) => {
     const { projectId } = req.params;
+    const adminId = req.principal.adminId;
 
     try {
-        const adminId = req.principal?.adminId;
         const query = {
             projectId,
             status: 'completed'
         };
-        if (adminId) {
-            query.createdByAdminId = adminId;
-        }
 
         if (req.query.extractionId) {
             query._id = req.query.extractionId;
@@ -146,6 +129,10 @@ exports.downloadRfiExcel = async (req, res) => {
 
         const { buffer, filename } = await generateRfiLogExcel(extractions, projectDetails, baseUrl, isExternal, token, rfiStatus);
 
+        // If filtering by status, it's possible the buffer is nearly empty headers-only
+        // But generateRfiLogExcel currently generates a file even if allRfis.length is 0.
+        // We could check if allRfis.length was 0 in the service, but for now this is fine.
+
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.send(buffer);
@@ -158,6 +145,7 @@ exports.downloadRfiExcel = async (req, res) => {
 // Update response/remarks for a single RFI item within an extraction
 exports.updateRfiResponse = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
+    const adminId = req.principal.adminId;
     const { response, remarks } = req.body;
 
     const idx = parseInt(rfiIndex, 10);
@@ -166,18 +154,14 @@ exports.updateRfiResponse = async (req, res) => {
     }
 
     try {
-        const adminId = req.principal?.adminId;
-        const query = { _id: id, projectId };
-        if (adminId) query.createdByAdminId = adminId;
-
-        const extraction = await RfiExtraction.findOne(query);
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
             return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
         }
 
-        const { clientRfiNumber } = req.body;
+        const { response, remarks, clientRfiNumber } = req.body;
         const reqResponse = response !== undefined ? response : extraction.rfis[idx].response;
         const reqRemarks = remarks !== undefined ? remarks : extraction.rfis[idx].remarks;
         const reqClientRfiNumber = clientRfiNumber !== undefined ? clientRfiNumber : extraction.rfis[idx].clientRfiNumber;
@@ -219,6 +203,7 @@ exports.updateRfiResponse = async (req, res) => {
 // Update status (OPEN / CLOSED) for a single RFI item
 exports.updateRfiStatus = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
+    const adminId = req.principal.adminId;
     const { status } = req.body;
 
     const VALID = ['OPEN', 'CLOSED'];
@@ -232,11 +217,7 @@ exports.updateRfiStatus = async (req, res) => {
     }
 
     try {
-        const adminId = req.principal?.adminId;
-        const query = { _id: id, projectId };
-        if (adminId) query.createdByAdminId = adminId;
-
-        const extraction = await RfiExtraction.findOne(query);
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -262,13 +243,10 @@ exports.updateRfiStatus = async (req, res) => {
 // Delete single RFI extraction
 exports.deleteRfiExtraction = async (req, res) => {
     const { projectId, id } = req.params;
+    const adminId = req.principal.adminId;
 
     try {
-        const adminId = req.principal?.adminId;
-        const query = { _id: id, projectId };
-        if (adminId) query.createdByAdminId = adminId;
-
-        const doc = await RfiExtraction.findOneAndDelete(query);
+        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId, createdByAdminId: adminId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // Delete from Storage Gateway if present
@@ -326,6 +304,7 @@ exports.deleteRfiExtraction = async (req, res) => {
 // Upload attachment for an RFI response
 exports.uploadRfiResponseAttachment = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
+    const adminId = req.principal.adminId;
 
     if (!req.file) {
         return res.status(400).json({ error: 'No attachment uploaded.' });
@@ -337,11 +316,7 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     }
 
     try {
-        const adminId = req.principal?.adminId;
-        const query = { _id: id, projectId };
-        if (adminId) query.createdByAdminId = adminId;
-
-        const extraction = await RfiExtraction.findOne(query);
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
