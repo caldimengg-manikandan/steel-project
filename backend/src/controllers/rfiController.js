@@ -20,47 +20,51 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     const createdExtractions = [];
 
-
-    // Process each file
-    for (const file of req.files) {
-        const doc = await RfiExtraction.create({
-            projectId,
-            createdByAdminId: adminId,
-            uploadedBy,
-            originalFileName: file.originalname,
-            folderName: localSavePath || '',
-            fileUrl: file.path || '', // BRIDGE PATH
-            oneDriveFileId: file.oneDriveFileId || '', 
-            oneDriveUrl: file.webUrl || '', 
-            storageGatewayPath: file.storageGatewayPath || '',
-            gridFsFileId: file.gridFsFileId || null,
-            status: 'queued',
-            sequences: sequences || [],
-        });
-        createdExtractions.push(doc);
-
-        try {
-            const delResult = await RfiExtraction.deleteMany({
-                projectId: new mongoose.Types.ObjectId(projectId),
+    try {
+        // Process each file
+        for (const file of req.files) {
+            const doc = await RfiExtraction.create({
+                projectId,
+                createdByAdminId: adminId,
+                uploadedBy,
                 originalFileName: file.originalname,
-                _id: { $ne: doc._id }
+                folderName: localSavePath || '',
+                fileUrl: file.path || '', // BRIDGE PATH
+                oneDriveFileId: file.oneDriveFileId || '', 
+                oneDriveUrl: file.webUrl || '', 
+                storageGatewayPath: file.storageGatewayPath || '',
+                gridFsFileId: file.gridFsFileId || null,
+                status: 'queued',
+                sequences: sequences || [],
             });
-            if (delResult.deletedCount > 0) {
-                console.log(`[RfiUpload] Cleaned ${delResult.deletedCount} old RFI records for ${file.originalname}`);
+            createdExtractions.push(doc);
+
+            try {
+                const delResult = await RfiExtraction.deleteMany({
+                    projectId: new mongoose.Types.ObjectId(projectId),
+                    originalFileName: file.originalname,
+                    _id: { $ne: doc._id }
+                });
+                if (delResult.deletedCount > 0) {
+                    console.log(`[RfiUpload] Cleaned ${delResult.deletedCount} old RFI records for ${file.originalname}`);
+                }
+            } catch (cleanErr) {
+                console.error('[RfiUpload] Cleanup error:', cleanErr.message);
             }
-        } catch (cleanErr) {
-            console.error('[RfiUpload] Cleanup error:', cleanErr.message);
+
+            // process in background using local bridge ref first
+            const fileRef = doc.fileUrl || doc.oneDriveFileId;
+            runRfiExtraction(doc._id, fileRef);
         }
 
-        // process in background using local bridge ref first
-        const fileRef = doc.fileUrl || doc.oneDriveFileId;
-        runRfiExtraction(doc._id, fileRef);
+        res.status(202).json({
+            message: `${createdExtractions.length} RFI drawing(s) scheduled for extraction.`,
+            extractions: createdExtractions
+        });
+    } catch (err) {
+        console.error('[RfiUpload] Error creating RFI extraction record:', err);
+        return res.status(500).json({ error: err.message || 'Failed to save RFI extraction document.' });
     }
-
-    res.status(202).json({
-        message: `${createdExtractions.length} RFI drawing(s) scheduled for extraction.`,
-        extractions: createdExtractions
-    });
 };
 
 // List RFIs for the project
