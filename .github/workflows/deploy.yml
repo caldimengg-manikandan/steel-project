@@ -27,21 +27,9 @@ jobs:
              # Use GITHUB_TOKEN for authentication if origin uses HTTPS
              git pull https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git main && echo "=== Git pull successful ==="
              
-             # ── Update Backend & Python AI Environment ──────────────
+             # ── Update Backend ──────────────────────────────────────
              cd backend && echo "=== CD backend successful ==="
              npm install && echo "=== NPM install backend successful ==="
-
-             # Ensure Python virtual environment and AI dependencies exist
-             cd AiExtraction && echo "=== Setting up Python AI .venv ==="
-             if [ ! -d ".venv" ]; then
-                 python3 -m venv .venv && echo "=== Virtualenv created ==="
-             fi
-             .venv/bin/pip install --upgrade pip setuptools wheel || true
-             if [ -f "requirements.txt" ]; then
-                 .venv/bin/pip install -r requirements.txt && echo "=== Python dependencies installed ==="
-             fi
-             cd ..
-
              pm2 delete all || true
              pm2 start src/app.js --name steel-dms --node-args="--max-old-space-size=2048" --max-memory-restart 2048M && echo "=== PM2 action completed ==="
              
@@ -74,33 +62,22 @@ jobs:
              free -h
 
              echo "=========================================="
-             echo "🐍 3. AI EXTRACTION VENV & PYTHON CHECK"
-             echo "=========================================="
-             ls -la /var/www/steel-project/backend/AiExtraction/ || true
-             if [ -f "/var/www/steel-project/backend/AiExtraction/.venv/bin/python" ]; then
-                 echo "✓ Python .venv binary exists!"
-                 /var/www/steel-project/backend/AiExtraction/.venv/bin/python --version || true
-             else
-                 echo "✗ Warning: .venv/bin/python NOT found!"
-             fi
-
-             echo "=========================================="
-             echo "⚙️ 4. PM2 STATUS & PROCESS SHOW"
+             echo "⚙️ 3. PM2 STATUS & PROCESS SHOW"
              echo "=========================================="
              pm2 status
              pm2 show steel-dms || true
 
              echo "=========================================="
-             echo "🌐 5. NGINX CLIENT MAX BODY SIZE"
+             echo "🌐 4. NGINX CLIENT MAX BODY SIZE"
              echo "=========================================="
              grep -rn "client_max_body_size" /etc/nginx/ || echo "client_max_body_size is UNSET in Nginx (default 1M)"
 
              echo "=========================================="
-             echo "📜 6. PM2 RECENT LOGS (steel-dms)"
+             echo "📜 5. PM2 RECENT LOGS (steel-dms)"
              echo "=========================================="
              pm2 logs steel-dms --lines 100 --nostream || true
 
              echo "=========================================="
-             echo "🚨 7. NGINX RECENT ERROR LOGS"
+             echo "🚨 6. NGINX RECENT ERROR LOGS"
              echo "=========================================="
              sudo tail -n 50 /var/log/nginx/error.log || true
