@@ -10,7 +10,7 @@ const { runRfiExtraction } = require('../services/rfiExtractionService');
 // Handle PDF uploads for RFI extraction
 exports.uploadRfiDrawing = async (req, res) => {
     const { projectId } = req.params;
-    const adminId = req.principal.adminId;
+    const adminId = req.principal.adminId || req.principal.id;
     const uploadedBy = req.principal.username;
     const { localSavePath, sequences } = req.body;
 
@@ -73,11 +73,7 @@ exports.listRfiExtractions = async (req, res) => {
     }
 
     try {
-        const query = { projectId };
-        if (req.principal.role !== 'superadmin' && adminId) {
-            query.createdByAdminId = adminId;
-        }
-        const extractions = await RfiExtraction.find(query)
+        const extractions = await RfiExtraction.find({ projectId })
             .sort({ createdAt: -1 })
             .lean();
 
@@ -158,7 +154,7 @@ exports.updateRfiResponse = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -221,7 +217,7 @@ exports.updateRfiStatus = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -250,7 +246,7 @@ exports.deleteRfiExtraction = async (req, res) => {
     const adminId = req.principal.adminId;
 
     try {
-        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // Delete from Storage Gateway if present
@@ -320,7 +316,7 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -357,7 +353,7 @@ exports.viewRfiPdf = async (req, res) => {
     console.log(`[DEBUG viewRfiPdf] Start. projectId=${projectId}, id=${id}, adminId=${adminId}`);
 
     try {
-        const doc = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOne({ _id: id, projectId });
         if (!doc) {
             console.log('[DEBUG viewRfiPdf] Document not found in DB!');
             return res.status(404).json({ error: 'RFI extraction not found.' });

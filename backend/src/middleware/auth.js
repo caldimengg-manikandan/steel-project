@@ -69,7 +69,7 @@ async function verifyToken(req, res, next) {
                 username: user.username,
                 email: user.email,
                 role: user.role || 'user',
-                adminId: user.adminId.toString(),  // for user: adminId = their admin's id
+                adminId: user.adminId ? user.adminId.toString() : user._id.toString(),  // for user: adminId = their admin's id or own id
             };
         }
         next();
