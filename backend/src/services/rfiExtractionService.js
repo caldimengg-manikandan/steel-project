@@ -4,10 +4,11 @@ const fs = require('fs');
 const RfiExtraction = require('../models/RfiExtraction');
 const { getBucket } = require('../utils/gridfs');
 const { downloadFile: downloadFromOneDrive } = require('../utils/onedrive');
+const storageGateway = require('../utils/storageGateway');
 const mongoose = require('mongoose');
 
 const SCRIPT_PATH = path.join(__dirname, '../scripts/extract_rfi.py');
-const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
 
 function _downloadFromGridFS(fileId, destPath) {
     return new Promise((resolve, reject) => {
@@ -40,12 +41,34 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         doc.status = 'processing';
         await doc.save();
 
-        // ── GridFS/OneDrive Check ────────────────────────────
+        // ── Storage Resolution ────────────────────────────
         const os = require('os');
         const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
 
-        if (mongoose.Types.ObjectId.isValid(fileRef)) {
-            // Likely GridFS (24 hex)
+        if (typeof fileRef === 'string' && fs.existsSync(fileRef)) {
+            // 1. Direct local disk path exists
+            localPath = fileRef;
+            isTemp = false;
+        } else if (typeof fileRef === 'string' && fileRef.startsWith('Projects/')) {
+            // 2. Storage Gateway Path
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+            const tempFileName = `temp_rfi_gateway_${extractionId}_${Date.now()}.pdf`;
+            localPath = path.join(tempDir, tempFileName);
+
+            console.log(`[RfiService] Downloading Storage Gateway file ${fileRef} to ${localPath}`);
+            const { stream } = await storageGateway.getFileStream(fileRef);
+            
+            const dest = fs.createWriteStream(localPath);
+            await new Promise((resolve, reject) => {
+                stream.pipe(dest);
+                dest.on('finish', resolve);
+                dest.on('error', reject);
+                stream.on('error', reject);
+            });
+            isTemp = true;
+        } else if (mongoose.Types.ObjectId.isValid(fileRef)) {
+            // 3. GridFS (24 hex)
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             
             const tempFileName = `temp_rfi_gridfs_${extractionId}_${Date.now()}.pdf`;
@@ -54,8 +77,8 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
             console.log(`[RfiService] Downloading GridFS file ${fileRef} to ${localPath}`);
             await _downloadFromGridFS(fileRef, localPath);
             isTemp = true;
-        } else if (typeof fileRef === 'string' && fileRef.length > 20) {
-            // Likely OneDrive ID
+        } else if (typeof fileRef === 'string' && fileRef.length > 20 && !fs.existsSync(fileRef)) {
+            // 4. Legacy OneDrive ID (only if not a valid local path)
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             
             const tempFileName = `temp_rfi_onedrive_${extractionId}_${Date.now()}.pdf`;

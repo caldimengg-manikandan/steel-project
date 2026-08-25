@@ -53,7 +53,7 @@ exports.uploadRfiDrawing = async (req, res) => {
         }
 
         // process in background using local bridge ref first
-        const fileRef = doc.fileUrl || doc.oneDriveFileId;
+        const fileRef = doc.storageGatewayPath || doc.fileUrl || doc.oneDriveFileId || doc.gridFsFileId;
         runRfiExtraction(doc._id, fileRef);
     }
 
