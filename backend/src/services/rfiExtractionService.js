@@ -100,10 +100,16 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
             let dataOut = '';
             let dataErr = '';
 
+            const timer = setTimeout(() => {
+                try { process.kill(); } catch (_) {}
+                reject(new Error('RFI extraction timed out after 3 minutes'));
+            }, 3 * 60 * 1000);
+
             process.stdout.on('data', (d) => dataOut += d.toString());
             process.stderr.on('data', (d) => dataErr += d.toString());
 
             process.on('close', (code) => {
+                clearTimeout(timer);
                 // Cleanup temp file
                 if (isTemp && fs.existsSync(localPath)) {
                     try { fs.unlinkSync(localPath); } catch (_) {}
@@ -133,20 +139,6 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         if (rfiNumbers.length > 0) {
             try {
                 // Removed global duplicate cleanup to keep Q numbers from each PDF separate.
-                /*
-                // Remove these RFI numbers from ANY other extraction records for this project
-                await RfiExtraction.updateMany(
-                    {
-                        projectId: new mongoose.Types.ObjectId(doc.projectId),
-                        _id: { $ne: extractionId },
-                        'rfis.rfiNumber': { $in: rfiNumbers }
-                    },
-                    {
-                        $pull: { rfis: { rfiNumber: { $in: rfiNumbers } } }
-                    }
-                );
-                console.log(`[RfiService] Cleared duplicate RFIs (${rfiNumbers.join(', ')}) from previous records.`);
-                */
             } catch (rfiDelErr) {
                 console.error('[RfiService] Overwrite cleanup failed:', rfiDelErr.message);
             }
@@ -166,3 +158,47 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         });
     }
 };
+
+/**
+ * Startup Sweep & Periodic Cleanup
+ * Resumes stuck items and recovers from "Ghost" processing states.
+ */
+async function resumeRfiExtractions() {
+    try {
+        const stuck = await RfiExtraction.find({
+            status: { $in: ['queued', 'processing'] }
+        });
+        if (stuck.length > 0) {
+            console.log(`[RfiQueue] Resuming ${stuck.length} unfinished RFI extractions.`);
+            stuck.forEach(doc => {
+                const fileRef = doc.storageGatewayPath || doc.fileUrl || doc.oneDriveFileId || doc.gridFsFileId;
+                exports.runRfiExtraction(doc._id, fileRef);
+            });
+        }
+    } catch (err) {
+        console.error('[RfiQueue] Startup sweep failed:', err.message);
+    }
+}
+
+async function cleanupStuckRfiProcesses() {
+    try {
+        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const results = await RfiExtraction.updateMany(
+            { status: 'processing', updatedAt: { $lt: tenMinsAgo } },
+            {
+                status: 'failed',
+                errorDetails: 'Processing timed out after 10 minutes of inactivity.'
+            }
+        );
+        if (results.modifiedCount > 0) {
+            console.log(`[RfiQueue] Cleaned up ${results.modifiedCount} stuck processing records.`);
+        }
+    } catch (err) {
+        console.error('[RfiQueue] Cleanup failed:', err.message);
+    }
+}
+
+// Start sweep and set interval
+setTimeout(resumeRfiExtractions, 5000);
+setInterval(cleanupStuckRfiProcesses, 60 * 1000);
+
