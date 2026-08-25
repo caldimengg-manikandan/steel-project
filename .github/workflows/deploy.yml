@@ -31,7 +31,7 @@ jobs:
              cd backend && echo "=== CD backend successful ==="
              npm install && echo "=== NPM install backend successful ==="
              pm2 delete all || true
-             pm2 start src/app.js --name steel-dms && echo "=== PM2 action completed ==="
+             pm2 start src/app.js --name steel-dms --node-args="--max-old-space-size=2048" --max-memory-restart 2048M && echo "=== PM2 action completed ==="
              
               # ── Update Frontend ─────────────────────────────────────
               cd ../frontend && echo "=== CD frontend successful ==="
