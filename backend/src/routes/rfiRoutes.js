@@ -55,16 +55,7 @@ router.use(scopeProjectAccess);
 router.get('/', listRfiExtractions);
 
 // Upload and Extract (editor + admin)
-router.post(
-    '/upload',
-    requirePermission('editor'),
-    upload.array('files', 50),
-    (err, req, res, next) => {
-        if (err) return res.status(400).json({ error: err.message });
-        next();
-    },
-    uploadRfiDrawing
-);
+router.post('/upload', requirePermission('editor'), upload.array('files', 50), uploadRfiDrawing);
 
 // Download Excel report
 router.get('/excel/download', downloadRfiExcel);
@@ -76,16 +67,7 @@ router.patch('/:id/response/:rfiIndex', requirePermission('editor'), updateRfiRe
 router.patch('/:id/status/:rfiIndex', requirePermission('editor'), updateRfiStatus);
 
 // Upload attachment for an RFI response (editor + admin)
-router.post(
-    '/:id/response/:rfiIndex/attachment',
-    requirePermission('editor'),
-    uploadResponse.single('file'),
-    (err, req, res, next) => {
-        if (err) return res.status(400).json({ error: err.message });
-        next();
-    },
-    uploadRfiResponseAttachment
-);
+router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), uploadResponse.single('file'), uploadRfiResponseAttachment);
 
 // Stream PDF for viewing (supports both /view and /view.pdf for compatibility with existing Excel files)
 router.get('/:id/view.pdf', viewRfiPdf);

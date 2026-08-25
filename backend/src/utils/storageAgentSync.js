@@ -68,7 +68,10 @@ function createStorageAgentSync(folderPrefix) {
                             console.log(`[StorageSync] Upload complete: ${fileInfo.storageGatewayPath}`);
                         } catch (err) {
                             console.error('[StorageSync] Failed to upload to Storage Gateway:', err.message);
-                            console.warn('[StorageSync] Falling back to local storage and GridFS backup.');
+                            // If we fail, we could cb(err) to fail the whole request,
+                            // or proceed so local AI works but it won't be on Windows drive.
+                            // Let's fail the upload if storage gateway is enabled but fails.
+                            return cb(new Error(`Storage Gateway Error: ${err.message}`));
                         }
                     }
                     // 3. Always save to GridFS as a guaranteed backup for HTTP viewing
