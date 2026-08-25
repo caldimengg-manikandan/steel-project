@@ -149,24 +149,36 @@ const PORT = process.env.PORT || 5000;
 const { startAiService } = require('./utils/aiServiceManager');
 
 connectDB().then(async () => {
-    initGridFS();
+    try {
+        initGridFS();
+    } catch (e) {
+        console.error('[GridFS] Init error:', e.message);
+    }
     
-    // Validate remote Storage Agent connectivity
-    const storageGateway = require('./utils/storageGateway');
-    const storageCheck = await storageGateway.validateRoot();
-    if (storageCheck.skipped) {
-        console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
-    } else if (storageCheck.ok) {
-        console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
-        if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
-        if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
-    } else {
-        console.warn(`[Storage] WARNING: ${storageCheck.error}`);
-        console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+    try {
+        // Validate remote Storage Agent connectivity
+        const storageGateway = require('./utils/storageGateway');
+        const storageCheck = await storageGateway.validateRoot();
+        if (storageCheck.skipped) {
+            console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
+        } else if (storageCheck.ok) {
+            console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
+            if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
+            if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
+        } else {
+            console.warn(`[Storage] WARNING: ${storageCheck.error}`);
+            console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+        }
+    } catch (e) {
+        console.error('[Storage] Validation error:', e.message);
     }
 
-    // Start AI service automatically
-    startAiService();
+    try {
+        // Start AI service automatically
+        startAiService();
+    } catch (e) {
+        console.error('[AI] Start error:', e.message);
+    }
 
     // Start Weekly Progress Summary cron job
     try {
@@ -206,7 +218,10 @@ connectDB().then(async () => {
     server.keepAliveTimeout = 1800000;
 }).catch(err => {
     console.error('Failed to start server:', err);
-    process.exit(1);
+    // Still start Express server even if DB connection fails initially so 502 isn't returned
+    app.listen(PORT, () => {
+        console.error(`[SERVER] Started in fallback mode on port ${PORT} (DB Connection Failed)`);
+    });
 });
 
 module.exports = app; // Trigger restart to reload AI service with dynamic model loading support

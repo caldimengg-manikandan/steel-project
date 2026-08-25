@@ -73,7 +73,11 @@ exports.listRfiExtractions = async (req, res) => {
     }
 
     try {
-        const extractions = await RfiExtraction.find({ projectId, createdByAdminId: adminId })
+        const query = { projectId };
+        if (req.principal.role !== 'superadmin' && adminId) {
+            query.createdByAdminId = adminId;
+        }
+        const extractions = await RfiExtraction.find(query)
             .sort({ createdAt: -1 })
             .lean();
 
