@@ -67,11 +67,8 @@ function createStorageAgentSync(folderPrefix) {
                             fileInfo.storageGatewayPath = `${targetDir}/${file.originalname}`;
                             console.log(`[StorageSync] Upload complete: ${fileInfo.storageGatewayPath}`);
                         } catch (err) {
-                            console.error('[StorageSync] Failed to upload to Storage Gateway:', err.message);
-                            // If we fail, we could cb(err) to fail the whole request,
-                            // or proceed so local AI works but it won't be on Windows drive.
-                            // Let's fail the upload if storage gateway is enabled but fails.
-                            return cb(new Error(`Storage Gateway Error: ${err.message}`));
+                            console.warn('[StorageSync] Storage Gateway upload failed (falling back to local/GridFS):', err.message);
+                            // Fall back gracefully so RFI drawing upload succeeds even if storage agent is down
                         }
                     }
                     // 3. Always save to GridFS as a guaranteed backup for HTTP viewing

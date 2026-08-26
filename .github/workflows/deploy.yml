@@ -33,10 +33,15 @@ jobs:
              pm2 delete all || true
              pm2 start src/app.js --name steel-dms && echo "=== PM2 action completed ==="
              
-              # ── Update Frontend ─────────────────────────────────────
-              cd ../frontend && echo "=== CD frontend successful ==="
-              npm install && echo "=== NPM install frontend successful ==="
-              export NODE_OPTIONS="--max-old-space-size=1024"
-              npm run build && echo "=== Frontend build successful ==="
+             # ── Update Frontend ─────────────────────────────────────
+             cd ../frontend && echo "=== CD frontend successful ==="
+             npm install && echo "=== NPM install frontend successful ==="
+             export NODE_OPTIONS="--max-old-space-size=1024"
+             npm run build && echo "=== Frontend build successful ==="
+             
+             # ── Configure Nginx Body Limit & Reload ────────────────
+             sudo sed -i '/client_max_body_size/d' /etc/nginx/nginx.conf || true
+             sudo sed -i '/http {/a \    client_max_body_size 100M;' /etc/nginx/nginx.conf || true
+             sudo systemctl reload nginx || true && echo "=== Nginx reloaded successfully ==="
              # If using PM2 to serve frontend, restart it here too.
              # Nginx will automatically pick up the new files in the 'dist' folder.
