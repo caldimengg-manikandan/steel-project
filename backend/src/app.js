@@ -151,22 +151,30 @@ const { startAiService } = require('./utils/aiServiceManager');
 connectDB().then(async () => {
     initGridFS();
     
-    // Validate remote Storage Agent connectivity
-    const storageGateway = require('./utils/storageGateway');
-    const storageCheck = await storageGateway.validateRoot();
-    if (storageCheck.skipped) {
-        console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
-    } else if (storageCheck.ok) {
-        console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
-        if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
-        if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
-    } else {
-        console.warn(`[Storage] WARNING: ${storageCheck.error}`);
-        console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+    // Validate remote Storage Agent connectivity safely
+    try {
+        const storageGateway = require('./utils/storageGateway');
+        const storageCheck = await storageGateway.validateRoot();
+        if (storageCheck.skipped) {
+            console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
+        } else if (storageCheck.ok) {
+            console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
+            if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
+            if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
+        } else {
+            console.warn(`[Storage] WARNING: ${storageCheck.error}`);
+            console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+        }
+    } catch (storageErr) {
+        console.warn('[Storage] Gateway check skipped/failed:', storageErr.message);
     }
 
     // Start AI service automatically
-    startAiService();
+    try {
+        startAiService();
+    } catch (aiErr) {
+        console.warn('[AI] Failed to auto-start AI service:', aiErr.message);
+    }
 
     // Start Weekly Progress Summary cron job
     try {

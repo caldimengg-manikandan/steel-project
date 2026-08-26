@@ -32,6 +32,15 @@ function isEnabled() {
     return STORAGE_ENABLED && !!AGENT_URL;
 }
 
+function getTimeoutSignal(ms) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(ms);
+    }
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+}
+
 /**
  * validateRoot
  * ────────────
@@ -56,7 +65,7 @@ async function validateRoot() {
     try {
         const response = await fetch(`${AGENT_URL}/health`, {
             method: 'GET',
-            signal: AbortSignal.timeout(10000), // 10s timeout
+            signal: getTimeoutSignal(10000), // 10s timeout
         });
 
         if (!response.ok) {
@@ -91,7 +100,7 @@ async function agentFetch(endpoint, options = {}) {
     const response = await fetch(url, {
         ...options,
         headers,
-        signal: options.signal || AbortSignal.timeout(30000), // 30s default timeout
+        signal: options.signal || getTimeoutSignal(30000), // 30s default timeout
     });
 
     return response;
@@ -170,7 +179,7 @@ async function getFileInfo(relativePath) {
 async function getFileStream(relativePath) {
     const response = await agentFetch(
         `/download?path=${encodeURIComponent(relativePath)}`,
-        { signal: AbortSignal.timeout(300000) } // 5 min timeout for large files
+        { signal: getTimeoutSignal(300000) } // 5 min timeout for large files
     );
 
     if (!response.ok) {
