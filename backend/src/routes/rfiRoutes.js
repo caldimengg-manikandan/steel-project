@@ -18,11 +18,23 @@ const {
     viewRfiPdf,
 } = require('../controllers/rfiController');
 
-const createStorageAgentSync = require('../utils/storageAgentSync');
-const storage = createStorageAgentSync('RFI');
+const uploadDir = path.join(__dirname, '../../uploads/steel-dms-uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const diskStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'rfi-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
 
 const upload = multer({
-    storage,
+    storage: diskStorage,
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF allowed'), false);
@@ -34,7 +46,7 @@ const upload = multer({
 });
 
 const uploadResponse = multer({
-    storage,
+    storage: diskStorage,
     fileFilter: (req, file, cb) => {
         const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
         if (allowed.includes(file.mimetype)) cb(null, true);

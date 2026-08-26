@@ -23,17 +23,41 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     // Process each file
     for (const file of req.files) {
+        let gridFsFileId = file.gridFsFileId || null;
+        if (!gridFsFileId && file.path && fs.existsSync(file.path)) {
+            try {
+                const { getBucket } = require('../utils/gridfs');
+                const bucket = getBucket();
+                if (bucket) {
+                    const uploadStream = bucket.openUploadStream(path.basename(file.path), {
+                        contentType: file.mimetype || 'application/pdf',
+                        metadata: { originalName: file.originalname, projectId }
+                    });
+                    fs.createReadStream(file.path).pipe(uploadStream);
+                    await new Promise((resolve) => {
+                        uploadStream.on('finish', () => {
+                            gridFsFileId = uploadStream.id.toString();
+                            resolve();
+                        });
+                        uploadStream.on('error', () => resolve());
+                    });
+                }
+            } catch (gfsErr) {
+                console.error('[RfiUpload] GridFS upload failed:', gfsErr.message);
+            }
+        }
+
         const doc = await RfiExtraction.create({
             projectId,
             createdByAdminId: adminId,
             uploadedBy,
             originalFileName: file.originalname,
             folderName: localSavePath || '',
-            fileUrl: file.path || '', // BRIDGE PATH
+            fileUrl: file.path || '',
             oneDriveFileId: file.oneDriveFileId || '', 
             oneDriveUrl: file.webUrl || '', 
             storageGatewayPath: file.storageGatewayPath || '',
-            gridFsFileId: file.gridFsFileId || null,
+            gridFsFileId: gridFsFileId,
             status: 'queued',
             sequences: sequences || [],
         });
