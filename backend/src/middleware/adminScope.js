@@ -209,12 +209,8 @@ async function scopeProjectAccess(req, res, next) {
 
     let project = null;
     if (isFullAccess && mongoose.Types.ObjectId.isValid(projectId)) {
-        const query = { _id: projectId };
-        if (role !== 'superadmin') {
-            query.createdByAdminId = adminId;
-        }
-        project = await Project.findOne(query);
-    } else {
+        project = await Project.findById(projectId);
+    } else if (mongoose.Types.ObjectId.isValid(projectId)) {
         project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
     }
 

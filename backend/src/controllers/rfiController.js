@@ -97,7 +97,7 @@ exports.listRfiExtractions = async (req, res) => {
     }
 
     try {
-        const extractions = await RfiExtraction.find({ projectId, createdByAdminId: adminId })
+        const extractions = await RfiExtraction.find({ projectId })
             .sort({ createdAt: -1 })
             .lean();
 
