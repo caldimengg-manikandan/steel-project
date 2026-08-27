@@ -208,14 +208,32 @@ async function scopeProjectAccess(req, res, next) {
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
     let project = null;
-    if (isFullAccess && mongoose.Types.ObjectId.isValid(projectId)) {
-        project = await Project.findById(projectId);
-    } else if (mongoose.Types.ObjectId.isValid(projectId)) {
-        project = await Project.findOne({ _id: projectId, 'assignments.userId': id });
+    let internalExists = false;
+
+    if (mongoose.Types.ObjectId.isValid(projectId)) {
+        const rawDoc = await Project.findById(projectId);
+        if (rawDoc) {
+            internalExists = true;
+            if (isFullAccess) {
+                project = rawDoc;
+            } else {
+                const assigned = rawDoc.assignments.some(a => a.userId.toString() === String(id));
+                if (assigned) {
+                    project = rawDoc;
+                }
+            }
+        }
     }
 
     if (!project) {
+        // If an internal project with this _id exists in DB, but non-admin user is not assigned:
+        if (internalExists) {
+            console.log(`[Guard] Access denied for internal project ${projectId}. User ${id} (role: ${role}) is not assigned.`);
+            return res.status(403).json({ error: 'Access denied. You are not assigned to this project.' });
+        }
+
         // Fallback: Check if it's an external project
+        console.log(`[Guard] No internal project found for ID=${projectId}. Checking getExternalProjects() fallback... (User ID=${id}, Role=${role}, isFullAccess=${isFullAccess})`);
         const externalResult = await getExternalProjects();
         const found = externalResult.projects.find(p => p.id === projectId);
         if (found) {
