@@ -274,9 +274,18 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         extractionFilter.targetTransmittalNumber = targetTransmittalNumber;
     }
 
-    const extractions = await DrawingExtraction.find(extractionFilter)
+    let extractions = await DrawingExtraction.find(extractionFilter)
         .sort({ createdAt: 1 })
         .lean();
+
+    // Fallback: If no extractions matched the targetTransmittalNumber filter specifically,
+    // fetch all completed extractions for this project
+    if (extractions.length === 0 && targetTransmittalNumber != null) {
+        delete extractionFilter.targetTransmittalNumber;
+        extractions = await DrawingExtraction.find(extractionFilter)
+            .sort({ createdAt: 1 })
+            .lean();
+    }
 
     if (extractions.length === 0) {
         throw new Error('No completed extractions found for this transmittal.');
