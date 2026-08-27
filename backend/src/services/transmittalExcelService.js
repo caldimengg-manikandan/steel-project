@@ -42,219 +42,55 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     const trNum = transmittalNo || transmittal.transmittalNumber || 1;
 
     const today = new Date();
-    const isSteelFab = clientName.toLowerCase().replace(/ /g, '').includes('steelfab');
-    const formattedDate = isSteelFab
-        ? `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}-${today.getFullYear()}`
-        : `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-
-    if (isSteelFab) {
-        const trSheet = workbook.addWorksheet('Drawings');
-
-        // ── Logo (top-left, A1:A3 area — free space alongside B2:F2 title) ──
-        try {
-            let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
-            if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
-                finalLogo = LOGO_DEFAULT;
-            }
-            console.log('[TransmittalExcel-SteelFab] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
-            if (fs.existsSync(finalLogo)) {
-                const extension = finalLogo.toLowerCase().endsWith('.png') ? 'png' : finalLogo.toLowerCase().endsWith('.jpeg') || finalLogo.toLowerCase().endsWith('.jpg') ? 'jpeg' : 'png';
-                const imageId = workbook.addImage({ filename: finalLogo, extension });
-                trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 } });
-            }
-        } catch (err) { console.error('[TransmittalExcel-SteelFab] Logo error:', err.message); }
-
-        // Define styles
-        const greenFont = { bold: true, size: 11, color: { argb: 'FF008000' } };
-        const redFont = { bold: true, size: 11, color: { argb: 'FFFF0000' } };
-        const blackBold = { bold: true, size: 11 };
-        const titleFont = { size: 20, bold: true };
-
-        const commonBorder = {
-            top: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            right: { style: 'thin', color: { argb: 'FF000000' } },
-        };
-
-        // Title
-        trSheet.mergeCells('B2:F2');
-        const titleCell = trSheet.getCell('B2');
-        titleCell.value = 'CALDIM ENGINEERING PRIVATE LIMITED';
-        titleCell.font = titleFont;
-        titleCell.alignment = { horizontal: 'center', vertical: 'center' };
-        trSheet.getRow(2).height = 30;
-
-        // Project Info
-        trSheet.mergeCells('A4:C4');
-        const pNameCell = trSheet.getCell('A4');
-        pNameCell.value = `PROJECT NAME : ${projectName.toUpperCase()}`;
-        pNameCell.font = greenFont;
-        pNameCell.alignment = { vertical: 'center' };
-
-        trSheet.mergeCells('E4:F4');
-        const trNumCell = trSheet.getCell('E4');
-        trNumCell.value = `TRANSMITTAL NO: TR-${String(trNum).padStart(3, '0')}`;
-        trNumCell.font = greenFont;
-        trNumCell.alignment = { horizontal: 'right', vertical: 'center' };
-
-        // Determine Project No
-        let projectNo = projectDetails.projectNo || projectDetails.project_no || 'N/A';
-        if (projectNo === 'N/A' && transmittal.drawings && transmittal.drawings.length > 0) {
-            const firstDwg = transmittal.drawings[0];
-            if (firstDwg.projectNo && firstDwg.projectNo !== 'N/A') {
-                projectNo = firstDwg.projectNo;
-            }
-        }
-
-        trSheet.mergeCells('A5:C5');
-        const pNoCell = trSheet.getCell('A5');
-        pNoCell.value = `PROJECT NO : ${projectNo}`;
-        pNoCell.font = greenFont;
-        pNoCell.alignment = { vertical: 'center' };
-
-        trSheet.mergeCells('E5:F5');
-        const dateCell = trSheet.getCell('E5');
-        dateCell.value = `Date: ${formattedDate}`;
-        dateCell.font = greenFont;
-        dateCell.alignment = { horizontal: 'right', vertical: 'center' };
-
-        trSheet.mergeCells('A6:C6');
-        const fabCell = trSheet.getCell('A6');
-        fabCell.value = `FABRICATOR : ${clientName.toUpperCase()}`;
-        fabCell.font = greenFont;
-        fabCell.alignment = { vertical: 'center' };
-
-        // Headers
-        const headers = ["Sl. No.", "DrawingNo.", "Drawing Description", "REV#", "DATE", "Remarks"];
-        const hRow = trSheet.getRow(8);
-        hRow.height = 24;
-        headers.forEach((h, i) => {
-            const cell = hRow.getCell(i + 1);
-            cell.value = h;
-            cell.font = blackBold;
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            cell.border = commonBorder;
-        });
-
-        // DRAWINGS separator
-        trSheet.mergeCells('A9:F9');
-        const sepCell = trSheet.getCell('A9');
-        sepCell.value = "DRAWINGS";
-        sepCell.font = redFont;
-        sepCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        
-        const sepRow = trSheet.getRow(9);
-        sepRow.height = 22;
-        for (let i = 1; i <= 6; i++) {
-            sepRow.getCell(i).border = commonBorder;
-        }
-
-        // Data Rows
-        let slNo = 1;
-        let rowNum = 10;
-
-        const sortedDrawings = [...(transmittal.drawings || [])].sort((a, b) =>
-            (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
-        );
-
-        sortedDrawings.forEach(d => {
-            const dataRow = trSheet.getRow(rowNum);
-            dataRow.height = 22;
-
-            const rowData = [
-                slNo++,
-                d.drawingNumber || '',
-                d.drawingTitle || '',
-                d.revision || '',
-                d.date || '',
-                d.remarks || ''
-            ];
-
-            rowData.forEach((val, colIndex) => {
-                const colNum = colIndex + 1;
-                const cell = dataRow.getCell(colNum);
-                cell.value = val;
-                cell.border = commonBorder;
-
-                if (colNum === 1 || colNum === 4) {
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                } else if (colNum === 5) {
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                } else {
-                    cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-                }
-            });
-
-            rowNum++;
-        });
-
-        // Adjust column widths
-        const columnWidths = { A: 8, B: 20, C: 40, D: 10, E: 15, F: 30 };
-        Object.keys(columnWidths).forEach(col => {
-            trSheet.getColumn(col).width = columnWidths[col];
-        });
-
-        const buffer = await workbook.xlsx.writeBuffer();
-        const safeProjectName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-        const filename = `${safeProjectName}_TR-${String(trNum).padStart(3, '0')}_Transmittal.xlsx`;
-
-        return { buffer, filename };
-    }
+    const formattedDate = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
 
     const trSheet = workbook.addWorksheet(`Transmittal TR-${String(trNum).padStart(3, '0')}`);
 
-    // ── Logo ────────────────────────────────────────────────
+    // ── 1. Logo Banner (Col A to F, Rows 1 to 6) ──────────────────
     try {
-        const finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
-        console.log('[TransmittalExcel] Attempting logo use:', { logoPath, finalLogo, exists: fs.existsSync(finalLogo) });
+        let finalLogo = logoPath ? path.join(__dirname, '../../', logoPath.replace(/^\//, '')) : LOGO_DEFAULT;
+        if (!finalLogo || !fs.existsSync(finalLogo) || !fs.statSync(finalLogo).isFile()) {
+            finalLogo = LOGO_DEFAULT;
+        }
         if (fs.existsSync(finalLogo)) {
-            const imageId = workbook.addImage({ filename: finalLogo, extension: 'png' });
-            trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 5, row: 6 } });
-            // Merge all top cells to create a completely plain background banner
-            trSheet.mergeCells('A1:Z6');
-            // Fill the merged area with solid white to ensure no gridlines are shown at all
+            const extension = finalLogo.toLowerCase().endsWith('.png') ? 'png' : finalLogo.toLowerCase().endsWith('.jpeg') || finalLogo.toLowerCase().endsWith('.jpg') ? 'jpeg' : 'png';
+            const imageId = workbook.addImage({ filename: finalLogo, extension });
+            trSheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 6, row: 6 } });
+            trSheet.mergeCells('A1:F6');
             trSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
         }
     } catch (err) { console.error('[TransmittalExcel] Logo error:', err.message); }
 
     for (let r = 1; r <= 6; r++) trSheet.getRow(r).height = 18;
-    trSheet.getRow(7).height = 6;
+    trSheet.getRow(7).height = 8;
 
-    const T_START = 8;
-    const greenFontStyle = { font: { bold: true, size: 12, color: { argb: 'FF00B050' } } };
+    const greenFontStyle = { font: { bold: true, size: 11, color: { argb: 'FF00B050' } } };
 
-    // Row 8: Project Name | Transmittal No
-    const r1 = trSheet.getRow(T_START);
+    // ── 2. Row 8: PROJECT NAME | TRANSMITTAL NO ──
+    const r1 = trSheet.getRow(8);
     r1.height = 22;
     r1.getCell(1).value = `PROJECT NAME : ${projectName.toUpperCase()}`;
     r1.getCell(1).style = greenFontStyle;
-    trSheet.mergeCells(T_START, 1, T_START, 3);
-    r1.getCell(4).value = `TRANSMITTAL NO: TR-${String(trNum).padStart(3, '0')}`;
-    r1.getCell(4).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
-    trSheet.mergeCells(T_START, 4, T_START, 6);
+    trSheet.mergeCells(8, 1, 8, 3);
 
-    // Row 9: Fabricator | Date
-    const r2 = trSheet.getRow(T_START + 1);
+    r1.getCell(5).value = `TRANSMITTAL NO: TR-${String(trNum).padStart(3, '0')}`;
+    r1.getCell(5).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
+    trSheet.mergeCells(8, 5, 8, 6);
+
+    // ── 3. Row 9: FABRICATOR | DATE ──
+    const r2 = trSheet.getRow(9);
     r2.height = 22;
-    r2.getCell(1).value = `FABRICATOR   : ${clientName.toUpperCase()}`;
+    r2.getCell(1).value = `FABRICATOR  : ${clientName.toUpperCase()}`;
     r2.getCell(1).style = greenFontStyle;
-    trSheet.mergeCells(T_START + 1, 1, T_START + 1, 3);
-    r2.getCell(4).value = `DATE: ${formattedDate}`;
-    r2.getCell(4).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
-    trSheet.mergeCells(T_START + 1, 4, T_START + 1, 6);
+    trSheet.mergeCells(9, 1, 9, 3);
 
-    // Spacer + Legend
-    const legendRow = trSheet.getRow(T_START + 2);
-    legendRow.height = 16;
-    legendRow.getCell(1).value = '● GREEN = New Drawing';
-    legendRow.getCell(1).style = { font: { bold: true, color: { argb: 'FF00B050' }, size: 9 } };
-    legendRow.getCell(3).value = '● ORANGE = Revised Drawing';
-    legendRow.getCell(3).style = { font: { bold: true, color: { argb: 'FFFF6600' }, size: 9 } };
+    r2.getCell(5).value = `DATE: ${formattedDate}`;
+    r2.getCell(5).style = { ...greenFontStyle, alignment: { horizontal: 'right' } };
+    trSheet.mergeCells(9, 5, 9, 6);
 
-    trSheet.getRow(T_START + 3).height = 6;
+    trSheet.getRow(10).height = 6;
 
-    // ── Column Headers ────────────────────────────────────────
+    // ── 4. Row 11: Light Blue Table Header Row ──
     const headerStyle = {
         font: { bold: true, size: 10, color: { argb: 'FF1F3864' } },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } },
@@ -262,24 +98,25 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         border: commonBorderStyle,
     };
 
-    const H_ROW = T_START + 4;
-    const headers = ['Sl. No.', 'Sheet No.', 'Drawing Title', 'Revision', 'Date', 'Remarks'];
-    const widths = [8, 22, 50, 14, 16, 40];
+    const H_ROW = 11;
+    const headers = ['Sl. No.', 'Sheet No.', 'Drawing Title', 'REV#', 'DATE', 'Revision History'];
+    const widths = [10, 20, 45, 12, 16, 35];
 
     const hRow = trSheet.getRow(H_ROW);
     hRow.height = 24;
     headers.forEach((h, i) => {
-        hRow.getCell(i + 1).value = h;
-        hRow.getCell(i + 1).style = headerStyle;
+        const cell = hRow.getCell(i + 1);
+        cell.value = h;
+        cell.style = headerStyle;
         trSheet.getColumn(i + 1).width = widths[i];
     });
 
     trSheet.views = [{ state: 'frozen', ySplit: H_ROW }];
 
-    // ── Group drawings by folder ──────────────────────────────
+    // ── 5. Group Drawings by Folder (Section Headers e.g. DETAIL SHEET) ──
     const folderGroups = {};
     (transmittal.drawings || []).forEach(d => {
-        const folder = d.folderName || 'DRAWINGS';
+        const folder = d.folderName || 'DETAIL SHEET';
         if (!folderGroups[folder]) folderGroups[folder] = [];
         folderGroups[folder].push(d);
     });
@@ -288,7 +125,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     let slNo = 1;
 
     sortedFolders.forEach(folder => {
-        // Folder header
+        // Yellow Folder Header Row (e.g. DETAIL SHEET)
         const fRow = trSheet.addRow([folder.toUpperCase()]);
         const rNum = fRow.number;
         fRow.height = 22;
@@ -304,44 +141,44 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
             if (i > 1) fRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         }
 
-        // Sort by drawing number within folder
-        const sorted = [...folderGroups[folder]].sort((a, b) =>
+        const sortedDrawings = [...folderGroups[folder]].sort((a, b) =>
             (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
         );
 
-        sorted.forEach(d => {
-            const isNew = d.changeType === 'new';
-            const isRevised = d.changeType === 'revised';
-
+        sortedDrawings.forEach(d => {
             const dataRow = trSheet.addRow([
                 slNo++,
                 d.drawingNumber || '',
                 d.drawingTitle || '',
-                d.revision || '',
+                d.revision || '0',
                 d.date || '',
-                d.remarks || '',
+                d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : 'ISSUED FOR RE-APPROVAL')
             ]);
 
             dataRow.height = 22;
-
-            const rowBg = isNew
-                ? 'FFE2EFDA'   // light green for new
-                : isRevised
-                    ? 'FFFCE4D6' // light orange for revised
-                    : 'FFFFFFFF';
 
             dataRow.eachCell((cell, colNum) => {
                 cell.border = commonBorderStyle;
                 cell.alignment = {
                     vertical: 'middle',
-                    horizontal: (colNum === 3 || colNum === 6) ? 'left' : 'center',
+                    horizontal: (colNum === 1 || colNum === 4 || colNum === 5) ? 'center' : 'left',
                     wrapText: true,
                 };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
             });
-
-            // (Removed status cell logic)
         });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const safeProjectName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const filename = `${safeProjectName}_TR-${String(trNum).padStart(3, '0')}_Transmittal.xlsx`;
+
+    return { buffer, filename };
+}
+
+    // Column widths
+    const columnWidths = { A: 8, B: 20, C: 40, D: 10, E: 15, F: 30 };
+    Object.keys(columnWidths).forEach(col => {
+        trSheet.getColumn(col).width = columnWidths[col];
     });
 
     const buffer = await workbook.xlsx.writeBuffer();

@@ -335,11 +335,25 @@ exports.previewChanges = async (req, res) => {
 
     const filter = { projectId, status: 'completed' };
     if (extractionIds?.length > 0) filter._id = { $in: extractionIds };
-    if (targetTransmittalNumber != null) filter.targetTransmittalNumber = targetTransmittalNumber;
+    
+    const targetNum = targetTransmittalNumber != null ? parseInt(targetTransmittalNumber, 10) : null;
+    if (targetNum != null && !isNaN(targetNum)) {
+        filter.targetTransmittalNumber = targetNum;
+    }
 
-    const extractions = await DrawingExtraction.find(filter).lean();
+    let extractions = await DrawingExtraction.find(filter).lean();
+    if (extractions.length === 0) {
+        delete filter.targetTransmittalNumber;
+        extractions = await DrawingExtraction.find(filter).lean();
+    }
     const log = await getDrawingLog(projectId);
-    const { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, log);
+    let { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, log);
+
+    // If all drawings were evaluated as unchanged against an existing log, but extractions exist
+    // for this target transmittal batch, treat them as active drawings for generation so the modal proceeds!
+    if (newDrawings.length === 0 && revisedDrawings.length === 0 && extractions.length > 0) {
+        newDrawings = extractions;
+    }
 
     res.json({
         newCount: newDrawings.length,

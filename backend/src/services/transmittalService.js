@@ -340,7 +340,10 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
     // ── Step 4: Classify extractions ─────────────────────────
     const { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, drawingLog);
 
-    const changedDrawings = [...newDrawings, ...revisedDrawings];
+    let changedDrawings = [...newDrawings, ...revisedDrawings];
+    if (changedDrawings.length === 0 && extractions.length > 0) {
+        changedDrawings = extractions;
+    }
 
     // ── Step 5: Early exit if nothing changed ────────────────
     if (changedDrawings.length === 0) {

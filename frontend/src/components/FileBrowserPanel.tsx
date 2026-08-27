@@ -1363,7 +1363,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                             >
                                                 {existingTransmittals.map(t => (
                                                     <option key={t._id} value={t.transmittalNumber}>
-                                                        TR-{String(t.transmittalNumber).padStart(3, '0')} ({t.drawings?.length || 0} drawings)
+                                                        TR-{String(t.transmittalNumber).padStart(3, '0')} ({(t.newCount != null ? t.newCount : (t.drawings ? t.drawings.length : 0))} drawings)
                                                     </option>
                                                 ))}
                                             </select>

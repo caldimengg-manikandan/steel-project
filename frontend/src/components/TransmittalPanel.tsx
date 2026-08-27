@@ -38,6 +38,19 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
         try {
             setGenerating(true);
             setError('');
+            
+            // If specific target transmittal number is clicked, proceed directly to generation
+            if (targetTransmittalNumber != null) {
+                const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
+                if (data.transmittal) {
+                    showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
+                    fetchTransmittals();
+                } else {
+                    showMessage('Notice', data.message || 'No drawings found to transmit.', 'info');
+                }
+                return;
+            }
+
             const preview = await previewTransmittal(projectId, undefined, targetTransmittalNumber);
 
             if (preview.newCount === 0 && preview.revisedCount === 0) {
@@ -61,7 +74,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                     setGenerating(false);
                 }
             });
-            return; // Return early because generation continues in callback
+            return;
         } catch (err: any) {
             setError(err.message || 'Failed to generate transmittal');
         } finally {
