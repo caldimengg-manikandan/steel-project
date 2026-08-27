@@ -173,6 +173,11 @@ connectDB().then(async () => {
         console.warn('[Storage] Gateway check error:', storageErr.stack || storageErr.message);
     }
 
+    // Log External Projects API Configuration safely
+    const extUrl = process.env.APP_A_PROJECTS_URL || '(not configured)';
+    const maskedExtUrl = extUrl.replace(/(https?:\/\/)[^@]+@/, '$1***@');
+    console.log(`[ExternalProjects] Resolved APP_A_PROJECTS_URL = "${maskedExtUrl}"`);
+
     // Start AI service automatically
     try {
         startAiService();

@@ -162,13 +162,19 @@ async function fetchAndCache(projectsUrl, countUrl) {
         cache.isFetching = false;
         return cache.data;
     } catch (error) {
-        cache.isFetching = false;
-        console.error('[ExternalProjectService] Failed to retrieve external projects:', error.message);
+        console.error('[ExternalProjectService] Failed to retrieve external projects:', {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
         return {
             count: 0,
             projects: [],
             error: `External App A is currently unreachable: ${error.message}`
         };
+    } finally {
+        cache.isFetching = false;
     }
 }
 
