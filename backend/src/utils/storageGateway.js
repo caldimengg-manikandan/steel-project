@@ -87,23 +87,44 @@ async function validateRoot() {
 }
 
 /**
- * Internal helper: make an authenticated request to the agent.
+ * agentFetch
+ * ──────────
+ * Internal helper: make an authenticated request to the agent with explicit logging and timeout.
  */
 async function agentFetch(endpoint, options = {}) {
     const url = `${AGENT_URL}${endpoint}`;
+    const timeoutMs = options.timeoutMs || 8000; // Hard timeout: 8s default
+    const signal = options.signal || getTimeoutSignal(timeoutMs);
+    const start = Date.now();
+
+    console.log(`[StorageGateway] agentFetch START -> ${options.method || 'GET'} ${url} (timeout: ${timeoutMs}ms)`);
 
     const headers = {
         'X-API-Key': AGENT_API_KEY,
         ...(options.headers || {}),
     };
 
-    const response = await fetch(url, {
-        ...options,
-        headers,
-        signal: options.signal || getTimeoutSignal(30000), // 30s default timeout
-    });
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers,
+            signal,
+        });
 
-    return response;
+        const duration = Date.now() - start;
+        console.log(`[StorageGateway] agentFetch SUCCESS -> ${options.method || 'GET'} ${url} HTTP ${response.status} (${duration}ms)`);
+        return response;
+    } catch (err) {
+        const duration = Date.now() - start;
+        console.error(`[StorageGateway] agentFetch ERROR -> ${options.method || 'GET'} ${url} after ${duration}ms:`, {
+            name: err.name,
+            message: err.message,
+            code: err.code,
+            cause: err.cause,
+            stack: err.stack,
+        });
+        throw err;
+    }
 }
 
 /**
@@ -179,7 +200,7 @@ async function getFileInfo(relativePath) {
 async function getFileStream(relativePath) {
     const response = await agentFetch(
         `/download?path=${encodeURIComponent(relativePath)}`,
-        { signal: getTimeoutSignal(300000) } // 5 min timeout for large files
+        { timeoutMs: 8000 } // 8s hard timeout so reads fail fast and allow GridFS fallback
     );
 
     if (!response.ok) {

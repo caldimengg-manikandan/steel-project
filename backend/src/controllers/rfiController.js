@@ -399,8 +399,8 @@ exports.viewRfiPdf = async (req, res) => {
                     return;
                 }
             } catch (err) {
-                console.error('[ViewRfiPdf] Storage Gateway stream failed:', err.message);
-                return res.status(500).json({ error: 'Failed to stream file from Storage Gateway.' });
+                console.warn('[ViewRfiPdf] Storage Gateway stream failed (falling back to GridFS/Disk):', err.message);
+                // Fallthrough to GridFS / Legacy Disk mode below
             }
         }
 

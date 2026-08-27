@@ -154,19 +154,23 @@ connectDB().then(async () => {
     // Validate remote Storage Agent connectivity safely
     try {
         const storageGateway = require('./utils/storageGateway');
+        const rawUrl = storageGateway.AGENT_URL || '(not set)';
+        const maskedUrl = rawUrl.replace(/(https?:\/\/)[^@]+@/, '$1***@');
+        console.log(`[Storage] Resolved STORAGE_AGENT_URL = "${maskedUrl}" (STORAGE_ENABLED=${process.env.STORAGE_ENABLED !== 'false'})`);
+        
         const storageCheck = await storageGateway.validateRoot();
         if (storageCheck.skipped) {
-            console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false)');
+            console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false or URL missing)');
         } else if (storageCheck.ok) {
-            console.log(`[Storage] Agent connected: ${storageGateway.AGENT_URL}`);
+            console.log(`[Storage] Agent connected successfully to ${maskedUrl}`);
             if (storageCheck.storageRoot) console.log(`[Storage] Remote root: ${storageCheck.storageRoot}`);
             if (storageCheck.readOnly) console.log('[Storage] Agent is in READ-ONLY mode');
         } else {
             console.warn(`[Storage] WARNING: ${storageCheck.error}`);
-            console.warn('[Storage] File gateway API will return errors until the agent is reachable.');
+            console.warn('[Storage] Gateway operations will fall back to local/GridFS until agent is reachable.');
         }
     } catch (storageErr) {
-        console.warn('[Storage] Gateway check skipped/failed:', storageErr.message);
+        console.warn('[Storage] Gateway check error:', storageErr.stack || storageErr.message);
     }
 
     // Start AI service automatically

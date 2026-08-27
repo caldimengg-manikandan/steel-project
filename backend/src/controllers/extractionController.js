@@ -309,9 +309,8 @@ exports.viewPdf = async (req, res) => {
                 return;
             }
         } catch (err) {
-            console.error('[ViewPdf] Storage Gateway stream failed:', err.message);
-            // Fallthrough to other methods if they exist, or fail
-            return res.status(500).json({ error: 'Failed to stream file from Storage Gateway.' });
+            console.warn('[ViewPdf] Storage Gateway stream failed (falling back to GridFS/Disk):', err.message);
+            // Fallthrough to GridFS / Legacy Disk mode below
         }
     }
 
