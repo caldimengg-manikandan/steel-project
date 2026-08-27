@@ -139,12 +139,13 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                 <th>Transmittal No</th>
                                 <th>Sequences</th>
                                 <th>Date</th>
-                                <th>New Drawings</th>
+                                <th>Drawings</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {(selectedFilters.length > 0 ? transmittals.filter(t => t.sequences?.some((seq: string) => selectedFilters.includes(seq))) : transmittals).map(t => {
+                                const drawingCount = t.drawings ? t.drawings.length : (t.newCount || 0);
                                 if (t.isPending) {
                                     return (
                                         <tr key={t._id} style={{ fontStyle: 'normal' }}>
@@ -166,7 +167,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                 )}
                                             </td>
                                             <td className="text-muted">{formatDate(t.createdAt)}</td>
-                                            <td><span className="badge badge-success">{t.newCount}</span></td>
+                                            <td><span className="badge badge-success">{drawingCount}</span></td>
                                             <td>
                                                 {canEdit ? (
                                                     <button className="btn btn-primary btn-sm" onClick={() => handleGenerate(t.transmittalNumber)} disabled={generating}>
@@ -201,7 +202,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                             )}
                                         </td>
                                         <td className="text-muted">{formatDate(t.createdAt)}</td>
-                                        <td><span className="badge badge-success">{t.newCount}</span></td>
+                                        <td><span className="badge badge-success">{drawingCount}</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
