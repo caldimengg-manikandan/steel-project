@@ -89,22 +89,28 @@ exports.uploadRfiDrawing = async (req, res) => {
 
 // List RFIs for the project
 exports.listRfiExtractions = async (req, res) => {
-    const { projectId } = req.params;
-    const adminId = req.principal.adminId;
-
-    if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
-        return res.json({ extractions: [] });
-    }
-
     try {
+        const { projectId } = req.params;
+        const adminId = req.principal.adminId;
+
+        if (typeof projectId === 'string' && projectId.startsWith('ext-')) {
+            return res.json({ extractions: [] });
+        }
+
         const extractions = await RfiExtraction.find({ projectId })
             .sort({ createdAt: -1 })
             .lean();
 
         res.json({ extractions });
     } catch (err) {
+        // TEMP DEBUG - REMOVE AFTER FIX
         console.error('[RfiController] list error:', err);
-        res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
+        res.status(500).json({
+            error: 'Failed to fetch RFI extractions.',
+            debugMessage: err.message,
+            debugName: err.name,
+            debugStack: err.stack
+        });
     }
 };
 
