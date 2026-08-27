@@ -103,14 +103,8 @@ exports.listRfiExtractions = async (req, res) => {
 
         res.json({ extractions });
     } catch (err) {
-        // TEMP DEBUG - REMOVE AFTER FIX
         console.error('[RfiController] list error:', err);
-        res.status(500).json({
-            error: 'Failed to fetch RFI extractions.',
-            debugMessage: err.message,
-            debugName: err.name,
-            debugStack: err.stack
-        });
+        res.status(500).json({ error: 'Failed to fetch RFI extractions.' });
     }
 };
 

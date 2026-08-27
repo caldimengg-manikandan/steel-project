@@ -3,8 +3,39 @@
  * Express Application Entry Point
  * ============================================================
  */
-require('express-async-errors');
 require('dotenv').config();
+
+// ── Sentry Initialization (Must be first) ───────────────────
+const Sentry = require('@sentry/node');
+const SENTRY_DSN = process.env.SENTRY_DSN || '';
+
+if (SENTRY_DSN) {
+    Sentry.init({
+        dsn: SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'production',
+        tracesSampleRate: 1.0,
+    });
+    console.log('[Sentry] Initialized error tracking successfully.');
+} else {
+    console.log('[Sentry] SENTRY_DSN not configured in environment. In-memory error reporting mode active.');
+}
+
+// Process-wide unhandled rejection & exception handlers
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[CRASH_PREVENTED] Unhandled Rejection:', reason);
+    if (SENTRY_DSN) {
+        Sentry.captureException(reason);
+    }
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('[CRASH_PREVENTED] Uncaught Exception:', error);
+    if (SENTRY_DSN) {
+        Sentry.captureException(error);
+    }
+});
+
+require('express-async-errors');
 
 const express = require('express');
 const cors = require('cors');
@@ -174,9 +205,9 @@ connectDB().then(async () => {
     }
 
     // Log External Projects API Configuration safely
-    const extUrl = process.env.APP_A_PROJECTS_URL || '(not configured)';
-    const maskedExtUrl = extUrl.replace(/(https?:\/\/)[^@]+@/, '$1***@');
-    console.log(`[ExternalProjects] Resolved APP_A_PROJECTS_URL = "${maskedExtUrl}"`);
+    if (process.env.APP_A_PROJECTS_URL) {
+        console.log('[ExternalProjects] Configured.');
+    }
 
     // Start AI service automatically
     try {
