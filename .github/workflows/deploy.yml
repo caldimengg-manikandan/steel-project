@@ -18,27 +18,35 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+             export PATH=$PATH:/usr/local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
              export NVM_DIR="$HOME/.nvm"
              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-             cd /var/www/steel-project && echo "=== CD successful ==="
-             git reset --hard && echo "=== Git reset successful ==="
-             
-             # Use GITHUB_TOKEN for authentication if origin uses HTTPS
-             git pull https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git main && echo "=== Git pull successful ==="
-             
+             cd /var/www/steel-project
+             git fetch origin main
+             git reset --hard origin/main && echo "=== Git reset successful ==="
+
              # ── Update Backend ──────────────────────────────────────
-             cd backend && echo "=== CD backend successful ==="
+             cd /var/www/steel-project/backend
              npm install && echo "=== NPM install backend successful ==="
-             pm2 delete all || true
-             pm2 start src/app.js --name steel-dms && echo "=== PM2 action completed ==="
-             
+
+             # Ensure Python virtual environment exists
+             if [ ! -d "AiExtraction/.venv" ]; then
+                 mkdir -p AiExtraction
+                 python3 -m venv AiExtraction/.venv || true
+                 if [ -f "AiExtraction/.venv/bin/pip" ]; then
+                     AiExtraction/.venv/bin/pip install PyMuPDF pdfplumber pandas openpyxl || true
+                 fi
+             fi
+
+             pm2 restart steel-dms --update-env || pm2 start src/app.js --name steel-dms && echo "=== PM2 restart completed ==="
+
              # ── Update Frontend ─────────────────────────────────────
-             cd ../frontend && echo "=== CD frontend successful ==="
+             cd /var/www/steel-project/frontend
              npm install && echo "=== NPM install frontend successful ==="
              export NODE_OPTIONS="--max-old-space-size=1024"
              npm run build && echo "=== Frontend build successful ==="
 
-             # ── Configure Nginx Upload Limit Automatically ──────────
-             echo "client_max_body_size 100M;" | sudo tee /etc/nginx/conf.d/upload_limit.conf || true
-             sudo systemctl reload nginx || true && echo "=== Nginx updated & reloaded successfully ==="
+             # ── Reload Nginx ────────────────────────────────────────
+             sudo systemctl reload nginx && echo "=== Nginx reloaded successfully ==="
+
