@@ -32,40 +32,12 @@ function getErrorStatus(err) {
 exports.browse = async (req, res) => {
     try {
         const requestedPath = req.query.path || '';
-        let entries = await storageGateway.listDirectory(requestedPath);
-
-        // Fallback: If Storage Gateway returns no entries (or is disabled), build virtual file list from MongoDB Atlas
-        if ((!entries || entries.length === 0) && requestedPath.startsWith('Projects/')) {
-            try {
-                const parts = requestedPath.split('/').filter(Boolean);
-                const projectName = parts[1]; // e.g. Projects/clevelan -> clevelan
-                
-                if (projectName) {
-                    const Project = require('../models/Project');
-                    const DrawingExtraction = require('../models/DrawingExtraction');
-                    
-                    const proj = await Project.findOne({ name: { $regex: new RegExp(`^${projectName}$`, 'i') } }).lean();
-                    if (proj) {
-                        const docs = await DrawingExtraction.find({ projectId: proj._id, status: 'completed' }).lean();
-                        entries = docs.map(d => ({
-                            name: d.originalFileName,
-                            type: 'file',
-                            size: d.fileSize || 1024,
-                            modified: d.updatedAt || d.createdAt,
-                            id: d._id.toString(),
-                            storagePath: d.storageGatewayPath || ''
-                        }));
-                    }
-                }
-            } catch (dbErr) {
-                console.error('[FileGateway] DB Fallback error:', dbErr.message);
-            }
-        }
+        const entries = await storageGateway.listDirectory(requestedPath);
 
         res.json({
             path: requestedPath || '/',
-            entries: entries || [],
-            count: (entries || []).length,
+            entries,
+            count: entries.length,
         });
     } catch (err) {
         console.error('[FileGateway] Browse error:', err.message);

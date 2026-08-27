@@ -166,17 +166,12 @@ exports.listTransmittals = async (req, res) => {
 
     let transmittals = await getTransmittals(projectId);
 
-    // ── Include In-Flight & Target Transmittals ────────────────────
-    // Find all targeted transmittal numbers in extractions (including completed extractions)
+    // ── Include In-Flight Transmittals ────────────────────
+    // Find all targeted transmittal numbers in extractions that haven't been generated yet.
     try {
         const pendingTargets = await DrawingExtraction.aggregate([
             { $match: { projectId: new mongoose.Types.ObjectId(projectId), targetTransmittalNumber: { $ne: null } } },
-            { $group: { 
-                _id: '$targetTransmittalNumber', 
-                count: { $sum: 1 }, 
-                completedCount: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
-                sequences: { $push: '$sequences' } 
-            } }
+            { $group: { _id: '$targetTransmittalNumber', count: { $sum: 1 }, sequences: { $push: '$sequences' } } }
         ]);
 
         const existingNumbers = new Set(transmittals.map(t => t.transmittalNumber));
@@ -184,6 +179,7 @@ exports.listTransmittals = async (req, res) => {
         for (const target of pendingTargets) {
             const currentCount = target._id;
             if (!existingNumbers.has(currentCount)) {
+                
                 const pendingSeqs = new Set();
                 target.sequences.forEach(seqArray => {
                     if (seqArray && Array.isArray(seqArray)) {
@@ -191,11 +187,11 @@ exports.listTransmittals = async (req, res) => {
                     }
                 });
 
-                // Add virtual placeholder with real drawing counts
+                // Add virtual placeholder
                 transmittals.unshift({
                     _id: `pending-${currentCount}`,
                     transmittalNumber: currentCount,
-                    newCount: target.completedCount || target.count,
+                    newCount: target.count,
                     revisedCount: 0,
                     createdAt: new Date(),
                     isPending: true,
