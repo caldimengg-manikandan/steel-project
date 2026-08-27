@@ -168,13 +168,6 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         });
     });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const safeProjectName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const filename = `${safeProjectName}_TR-${String(trNum).padStart(3, '0')}_Transmittal.xlsx`;
-
-    return { buffer, filename };
-}
-
     // Column widths
     const columnWidths = { A: 8, B: 20, C: 40, D: 10, E: 15, F: 30 };
     Object.keys(columnWidths).forEach(col => {
