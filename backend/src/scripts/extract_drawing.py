@@ -89,7 +89,11 @@ KEYWORDS = [
     "STIFFENER", "BASE PLATE", "CAP PLATE", "BENT PLATE", "WELDMENT", "FRAME",
     "DETAIL", "RAILING", "STAIR", "HANDRAIL", "HANDRAIL DETAIL", "KICKPLATE",
     "GUARDRAIL", "GUARDRAIL DETAIL", "LADDER", "BRACING", "GIRT", "PURLIN",
-    "MISCELLANEOUS", "EMBED PLATE", "STEEL", "ROUNDBAR", "SAG ROD", "ANCHOR BOLT", "BOLT"
+    "MISCELLANEOUS", "EMBED PLATE", "STEEL", "ROUNDBAR", "SAG ROD", "ANCHOR BOLT", "BOLT",
+    "FIELD WORK", "FOR FIELD WORK", "FIELD WORK DETAIL", "ERECTION", "ERECTION PLAN",
+    "FOUNDATION", "FOUNDATION PLAN", "ANCHOR BOLT PLAN", "ROOF FRAMING", "FLOOR FRAMING",
+    "WALL ELEVATION", "SECTION", "ELEVATION", "GENERAL NOTES", "SCHEDULE", "DOCK STAIR",
+    "MEZZANINE", "PLATFORM", "CANOPY", "COVER SHEET", "LOCATION PLAN"
 ]
 
 BAD_TITLES = {
@@ -98,6 +102,16 @@ BAD_TITLES = {
     "PROJECT ADDRESS", "ADDRESS:", "ROAD", "DRIVE", "VALLEY", "HOWARD", "PA", "CONSENT", "WRITTEN", "WITHOUT", "PROPERTY",
     "COPYRIGHT", "NOTICE", "REPRODUCED", "ALL RE-ENTRANT", "REVISIONS"
 }
+
+def is_filename_string(s: str) -> bool:
+    if not s:
+        return False
+    s_clean = s.strip()
+    if re.search(r'\.(pdf|nc1|dwg|dxf|zip|rar|png|jpg|txt)$', s_clean, re.I):
+        return True
+    if re.search(r'_\d+\.pdf$', s_clean, re.I):
+        return True
+    return False
 
 
 def normalize_date_string(date_str):
@@ -219,6 +233,8 @@ def clean_rem(s):
 def is_valid_title_candidate(s: str) -> bool:
     """Check if string is a plausible drawing title (not a note, status, or date)."""
     if not s or len(s.strip()) < 3:
+        return False
+    if is_filename_string(s):
         return False
     # Avoid purely numeric/date strings
     if re.match(r'^[\d\s\-\./\#]+$', s):
@@ -1149,6 +1165,13 @@ def extract_locally(pdf_path: str, original_filename: str = "") -> dict:
             if "FORCONSTRUCTION" in rem_up: rev_entry["remarks"] = rem.replace("FORCONSTRUCTION", "FOR CONSTRUCTION")
 
     # Final pass: populate description/drawingDescription from title if empty
+    if is_filename_string(fields.get("drawingTitle", "")):
+        fields["drawingTitle"] = ""
+    if is_filename_string(fields.get("drawingDescription", "")):
+        fields["drawingDescription"] = ""
+    if is_filename_string(fields.get("description", "")):
+        fields["description"] = ""
+
     if not fields.get("description") and fields.get("drawingTitle"):
         fields["description"] = fields["drawingTitle"]
     if not fields.get("drawingDescription") and fields.get("drawingTitle"):

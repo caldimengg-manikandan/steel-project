@@ -356,7 +356,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         return {
             extractionId: ext._id,
             drawingNumber: f.drawingNumber || '',
-            drawingTitle: f.drawingTitle || f.drawingDescription || ext.originalFileName || '',
+            drawingTitle: f.drawingTitle || f.drawingDescription || '',
             revision: latestRev.mark || f.revision || '',
             date: latestRev.date || f.date || '',
             remarks: latestRev.remarks || f.remarks || '',
@@ -469,7 +469,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
 
             return {
                 drawingNumber: (f.drawingNumber || '').trim(),
-                drawingTitle: f.drawingTitle || f.drawingDescription || ext.originalFileName || '',
+                drawingTitle: f.drawingTitle || f.drawingDescription || '',
                 description: f.description || '',
                 folderName: ext.folderName || '',
                 originalFileName: ext.originalFileName || '',
@@ -693,7 +693,7 @@ async function getDrawingLog(projectId) {
         if (!drawingsMap[key]) {
             drawingsMap[key] = {
                 drawingNumber: drawingNo,
-                drawingTitle: f.drawingTitle || f.drawingDescription || ex.originalFileName || '',
+                drawingTitle: f.drawingTitle || f.drawingDescription || '',
                 description: f.description || '',
                 folderName: ex.folderName || '',
                 originalFileName: ex.originalFileName || '',

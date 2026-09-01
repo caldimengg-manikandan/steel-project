@@ -134,6 +134,25 @@ def process_simple_field(rows, keywords):
             new_rows.append(row)
     return new_rows
 
+def clean_description_text(rows):
+    if not rows:
+        return ""
+    cleaned_lines = []
+    header_regex = re.compile(
+        r'^(?:DRAWING\s+TITLE|DWG\s+DESCRIPTION|DRAWING\s+DESCRIPTION|DESCRIPTION|TITLE|SHEET\s+TITLE|SHEET\s+NO\.?|DWG\s+NO\.?|DWG\.?|NO\.?)\s*[:.\-]*\s*',
+        re.IGNORECASE
+    )
+    for row in rows:
+        line_str = " ".join(row).strip()
+        if not line_str:
+            continue
+        stripped_line = header_regex.sub('', line_str).strip()
+        if stripped_line.upper() in ["DRAWING TITLE", "DWG DESCRIPTION", "DESCRIPTION", "TITLE", "SHEET", "DRAWING", "DWG"]:
+            continue
+        if stripped_line:
+            cleaned_lines.append(stripped_line)
+    return " \n ".join(cleaned_lines).strip()
+
 def process_extracted_data(detections):
     """
     Processes raw detections into structured data for Steelfab.
@@ -182,9 +201,7 @@ def process_extracted_data(detections):
             if cleaned_rows:
                 project_no = " ".join(cleaned_rows[0])
         elif label == "DRAWING_DESCRIPTION":
-            cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:", "NO.", "DWG", "DESCRIPTION", "Sheet", "Sheet No.", "Sheet No", "Sheet No:", "SHEET", "SHEET NO."])
-            if cleaned_rows:
-                drawing_description = " \n ".join([" ".join(r) for r in cleaned_rows]).strip()
+            drawing_description = clean_description_text(rows)
         elif label == "REVISION_TABLE":
             cleaned_rows = process_revision_table(rows)
             for row in cleaned_rows:
@@ -211,6 +228,9 @@ def process_extracted_data(detections):
     if drawing_no and drawing_description:
         drawing_description = drawing_description.replace(drawing_no, "").strip()
         drawing_description = " \n ".join([line.strip() for line in drawing_description.split('\n') if line.strip()])
+
+    if re.search(r'\.(pdf|nc1|dwg|dxf)$', drawing_description, re.I) or re.search(r'_\d+$', drawing_description, re.I):
+        drawing_description = ""
 
     return {
         "project_no": project_no,

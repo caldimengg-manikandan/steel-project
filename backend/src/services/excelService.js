@@ -414,10 +414,19 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
 
         trSheet.views = [{ state: 'frozen', ySplit: T_START + 3 }];
 
+        function normalizeFolderHeader(fName) {
+            if (!fName) return 'DETAIL SHEET';
+            let s = String(fName).trim().replace(/_/g, ' ').toUpperCase();
+            if (s.includes('DETAIL') || s.startsWith('D SHEET') || s.startsWith('D-SHEET')) return 'DETAIL SHEET';
+            if (s.includes('ERECTION') || s.startsWith('E SHEET') || s.startsWith('E-SHEET')) return 'ERECTION SHEET';
+            if (s.includes('ANCHOR')) return 'ANCHOR BOLT';
+            return s;
+        }
+
         // ── Data rows grouped by folder ───────────────────────
         const folderGroups = {};
         rows.forEach(r => {
-            const fName = r.folderName || 'DETAIL SHEETS';
+            const fName = normalizeFolderHeader(r.folderName);
             if (!folderGroups[fName]) folderGroups[fName] = [];
             folderGroups[fName].push(r);
         });
@@ -458,7 +467,7 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 const rData = trSheet.addRow([
                     tSlno++,
                     f.drawingNumber || '',
-                    f.drawingTitle || f.drawingDescription || r.originalFileName || '',
+                    f.drawingTitle || f.drawingDescription || '',
                     getLatestRev(f),
                     getLatestDate(f),
                     getLatestRemarks(f)
@@ -659,7 +668,7 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
             if (!groupDwg[dNum]) {
                 groupDwg[dNum] = {
                     drawingNumber: dNum,
-                    drawingTitle: f.drawingTitle || f.drawingDescription || r.originalFileName || '',
+                    drawingTitle: f.drawingTitle || f.drawingDescription || '',
                     revisions: [],
                     remarks: []
                 };

@@ -113,10 +113,19 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
 
     trSheet.views = [{ state: 'frozen', ySplit: H_ROW }];
 
+    function normalizeFolderHeader(fName) {
+        if (!fName) return 'DETAIL SHEET';
+        let s = String(fName).trim().replace(/_/g, ' ').toUpperCase();
+        if (s.includes('DETAIL') || s.startsWith('D SHEET') || s.startsWith('D-SHEET')) return 'DETAIL SHEET';
+        if (s.includes('ERECTION') || s.startsWith('E SHEET') || s.startsWith('E-SHEET')) return 'ERECTION SHEET';
+        if (s.includes('ANCHOR')) return 'ANCHOR BOLT';
+        return s;
+    }
+
     // ── 5. Group Drawings by Folder (Section Headers e.g. DETAIL SHEET) ──
     const folderGroups = {};
     (transmittal.drawings || []).forEach(d => {
-        const folder = d.folderName || 'DETAIL SHEET';
+        const folder = normalizeFolderHeader(d.folderName);
         if (!folderGroups[folder]) folderGroups[folder] = [];
         folderGroups[folder].push(d);
     });

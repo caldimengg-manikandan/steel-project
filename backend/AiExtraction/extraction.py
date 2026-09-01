@@ -107,10 +107,28 @@ def process_simple_field(rows, keywords):
             new_rows.append(row)
     return new_rows
 
+def clean_description_text(rows):
+    if not rows:
+        return ""
+    cleaned_lines = []
+    header_regex = re.compile(
+        r'^(?:DRAWING\s+TITLE|DWG\s+DESCRIPTION|DRAWING\s+DESCRIPTION|DESCRIPTION|TITLE|SHEET\s+TITLE|SHEET\s+NO\.?|DWG\s+NO\.?|DWG\.?|NO\.?)\s*[:.\-]*\s*',
+        re.IGNORECASE
+    )
+    for row in rows:
+        line_str = " ".join(row).strip()
+        if not line_str:
+            continue
+        stripped_line = header_regex.sub('', line_str).strip()
+        if stripped_line.upper() in ["DRAWING TITLE", "DWG DESCRIPTION", "DESCRIPTION", "TITLE", "SHEET", "DRAWING", "DWG"]:
+            continue
+        if stripped_line:
+            cleaned_lines.append(stripped_line)
+    return " \n ".join(cleaned_lines).strip()
+
 def process_extracted_data(detections):
     """
-    Processes raw detections from inference.py into structured data
-    using the exact robust algorithms from format_extracted_data.py.
+    Processes raw detections into structured data.
     """
     project_no = "N/A"
     drawing_no = ""
@@ -146,9 +164,7 @@ def process_extracted_data(detections):
             if cleaned_rows:
                 project_no = " ".join(cleaned_rows[0])
         elif label == "DRAWING_DESCRIPTION":
-            cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:", "Sheet", "Sheet No.", "Sheet No", "Sheet No:", "SHEET", "SHEET NO."])
-            if cleaned_rows:
-                drawing_description = " \n ".join([" ".join(r) for r in cleaned_rows]).strip()
+            drawing_description = clean_description_text(rows)
         elif label == "REVISION_TABLE":
             cleaned_rows = process_revision_table(rows)
             for row in cleaned_rows:

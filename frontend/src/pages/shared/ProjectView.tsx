@@ -328,7 +328,6 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                                 <div className="stat-card-value">{fabCount}</div>
-                                <div className="stat-card-meta">{fabPct}% of total drawings</div>
                             </div>
 
                             {/* Approval */}
@@ -340,7 +339,6 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                                 <div className="stat-card-value">{appCount}</div>
-                                <div className="stat-card-meta">{appPct}% of total drawings</div>
                             </div>
 
                             {/* Open RFIs */}
@@ -352,7 +350,6 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: openRfi > 0 ? 'var(--color-danger-mid)' : 'var(--color-text-primary)' }}>{openRfi}</div>
-                                <div className="stat-card-meta">unresolved questions</div>
                             </div>
 
                             {/* Closed RFIs */}
@@ -364,7 +361,6 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: 'var(--color-success-mid)' }}>{closedRfi}</div>
-                                <div className="stat-card-meta">resolved questions</div>
                             </div>
 
                             {/* Sequences */}
@@ -376,7 +372,6 @@ export default function ProjectView() {
                                     </div>
                                 </div>
                                 <div className="stat-card-value" style={{ color: 'var(--accent-violet)' }}>{seqDone}<span style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: 0 }}>/{seqTotal}</span></div>
-                                <div className="stat-card-meta">{seqPct}% complete</div>
                             </div>
                         </div>
 
