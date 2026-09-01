@@ -48,5 +48,5 @@ jobs:
              npm run build && echo "=== Frontend build successful ==="
 
              # ── Reload Nginx ────────────────────────────────────────
-             sudo systemctl reload nginx && echo "=== Nginx reloaded successfully ==="
+             (sudo systemctl reload nginx || sudo service nginx reload || true) && echo "=== Nginx reloaded successfully ==="
 
