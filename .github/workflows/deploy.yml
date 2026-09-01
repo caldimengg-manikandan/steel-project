@@ -39,7 +39,7 @@ jobs:
                  fi
              fi
 
-             pm2 restart steel-dms --update-env || pm2 start src/app.js --name steel-dms && echo "=== PM2 restart completed ==="
+             pm2 restart all --update-env || pm2 restart steel-dms --update-env || pm2 start src/app.js --name steel-dms && echo "=== PM2 restart completed ==="
 
              # ── Update Frontend ─────────────────────────────────────
              cd /var/www/steel-project/frontend
@@ -49,4 +49,5 @@ jobs:
 
              # ── Reload Nginx ────────────────────────────────────────
              (sudo systemctl reload nginx || sudo service nginx reload || true) && echo "=== Nginx reloaded successfully ==="
+
 
