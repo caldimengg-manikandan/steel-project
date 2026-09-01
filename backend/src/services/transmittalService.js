@@ -278,15 +278,6 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         .sort({ createdAt: 1 })
         .lean();
 
-    // Fallback: If no extractions match the specific targetTransmittalNumber filter,
-    // fetch all completed extractions for this project so transmittal generation succeeds!
-    if (extractions.length === 0 && targetTransmittalNumber != null) {
-        delete extractionFilter.targetTransmittalNumber;
-        extractions = await DrawingExtraction.find(extractionFilter)
-            .sort({ createdAt: 1 })
-            .lean();
-    }
-
     if (extractions.length === 0) {
         throw new Error('No completed extractions found for this transmittal.');
     }
@@ -295,14 +286,6 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
     const drawingLog = await DrawingLog.findOne({ projectId }).lean();
 
     // ── Step 3: Determine transmittal number ─────────────────
-    //
-    // Case A — targetTransmittalNumber is set (user chose an existing transmittal):
-    //   Use that number, do NOT increment the project counter.
-    //   We will append drawings to the matching Transmittal record instead of
-    //   creating a brand-new one.
-    //
-    // Case B — targetTransmittalNumber is null ("Create New" or auto):
-    //   Original behaviour: atomically increment Project.transmittalCount.
     let transmittalNumber;
     let appendToExisting = false; // means: update existing record, don't create one
 
@@ -340,13 +323,11 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
     // ── Step 4: Classify extractions ─────────────────────────
     const { newDrawings, revisedDrawings, unchangedDrawings } = detectChanges(extractions, drawingLog);
 
-    let changedDrawings = [...newDrawings, ...revisedDrawings];
-    if (changedDrawings.length === 0 && extractions.length > 0) {
-        changedDrawings = extractions;
-    }
+    // All extractions belonging to this upload batch/transmittal MUST be included
+    const allTransmittalDrawings = [...newDrawings, ...revisedDrawings, ...unchangedDrawings];
 
-    // ── Step 5: Early exit if nothing changed ────────────────
-    if (changedDrawings.length === 0) {
+    // ── Step 5: Early exit if no extractions found ───────────
+    if (allTransmittalDrawings.length === 0) {
         // Only roll back counter if we incremented it (Case B)
         if (!appendToExisting && targetTransmittalNumber == null) {
             await Project.findByIdAndUpdate(projectId, { $inc: { transmittalCount: -1 } });
@@ -357,14 +338,14 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
             summary: {
                 newCount: 0,
                 revisedCount: 0,
-                unchangedCount: unchangedDrawings.length,
-                message: 'No new or revised drawings detected. Transmittal not generated.',
+                unchangedCount: 0,
+                message: 'No drawings found. Transmittal not generated.',
             },
         };
     }
 
     // ── Step 6: Build / Update Transmittal document ──────────
-    const transmittalDrawings = changedDrawings.map(ext => {
+    const transmittalDrawings = allTransmittalDrawings.map(ext => {
         const f = ext.extractedFields || {};
         const revHist = Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
             ? f.revisionHistory
@@ -381,13 +362,13 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
             remarks: latestRev.remarks || f.remarks || '',
             folderName: ext.folderName || '',
             originalFileName: ext.originalFileName || '',
-            changeType: ext._changeType,
+            changeType: ext._changeType || 'new',
             previousRevision: ext._previousRevision || '',
         };
     });
 
     const combinedSequences = new Set();
-    changedDrawings.forEach(ext => {
+    allTransmittalDrawings.forEach(ext => {
         if (Array.isArray(ext.sequences)) {
             ext.sequences.forEach(s => combinedSequences.add(s));
         }
@@ -404,6 +385,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
                 $inc: {
                     newCount: newDrawings.length,
                     revisedCount: revisedDrawings.length,
+                    unchangedCount: unchangedDrawings.length,
                 },
                 $addToSet: { sequences: { $each: uniqueSequences } },
             },
@@ -417,6 +399,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
             drawings: transmittalDrawings,
             newCount: newDrawings.length,
             revisedCount: revisedDrawings.length,
+            unchangedCount: unchangedDrawings.length,
             sequences: uniqueSequences,
         });
     }
@@ -428,6 +411,7 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         existingLog: drawingLog,
         newDrawings,
         revisedDrawings,
+        unchangedDrawings,
         transmittalNumber,
     });
 
@@ -459,13 +443,13 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
  * @param {object} opts
  * @returns {Promise<object>} The updated DrawingLog (lean)
  */
-async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings, revisedDrawings, transmittalNumber }) {
+async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings, revisedDrawings, unchangedDrawings = [], transmittalNumber }) {
     const today = new Date();
 
     if (!existingLog) {
         // ── First transmittal: Create Drawing Log from scratch ──
 
-        const allEntries = [...newDrawings, ...revisedDrawings].map(ext => {
+        const allEntries = [...newDrawings, ...revisedDrawings, ...unchangedDrawings].map(ext => {
             const f = ext.extractedFields || {};
             const revHist = Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
                 ? f.revisionHistory
@@ -552,7 +536,6 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
     }
 
     // Revised drawings → update existing entry using arrayFilters
-    // Guard: only update currentRevision if the new revision is HIGHER
     for (const ext of revisedDrawings) {
         const f = ext.extractedFields || {};
         const revHist = Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
@@ -571,12 +554,7 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
         };
 
         const drawingNumberKey = (f.drawingNumber || '').trim().toUpperCase();
-        const previousRevision = ext._previousRevision || '';
 
-        // Only set currentRevision if incoming rank > stored rank (no downgrade)
-        // compareRevisions(newRevision, previousRevision) > 0 is always true here
-        // because detectChanges already filtered REVISED to only genuinely higher revisions.
-        // The guard is kept for defence-in-depth.
         bulkOps.push({
             updateOne: {
                 filter: { projectId },
@@ -588,6 +566,44 @@ async function _upsertDrawingLog({ projectId, adminId, existingLog, newDrawings,
                     $push: {
                         'drawings.$[elem].revisionHistory': newHistoryEntry,
                     },
+                },
+                arrayFilters: [
+                    {
+                        'elem.drawingNumber': {
+                            $regex: new RegExp(`^${drawingNumberKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+                        },
+                    },
+                ],
+            },
+        });
+    }
+
+    // Unchanged / re-issued drawings → append revisionHistory entry if not already logged for this transmittal
+    for (const ext of unchangedDrawings) {
+        const f = ext.extractedFields || {};
+        const revHist = Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
+            ? f.revisionHistory
+            : [{ mark: f.revision, date: f.date, remarks: f.remarks }];
+
+        const latestRev = ext._latestRevEntry || pickLatestRevision(revHist);
+        const currentRevMark = normalizeRevision(latestRev.mark || f.revision);
+
+        const historyEntry = {
+            revision: currentRevMark,
+            date: latestRev.date || f.date || '',
+            transmittalNo: transmittalNumber,
+            remarks: latestRev.remarks || f.remarks || 'RE-ISSUED',
+            recordedAt: today,
+        };
+
+        const drawingNumberKey = (f.drawingNumber || '').trim().toUpperCase();
+
+        bulkOps.push({
+            updateOne: {
+                filter: { projectId },
+                update: {
+                    $set: { 'drawings.$[elem].lastUpdated': today },
+                    $push: { 'drawings.$[elem].revisionHistory': historyEntry },
                 },
                 arrayFilters: [
                     {

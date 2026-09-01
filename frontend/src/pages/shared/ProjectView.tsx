@@ -390,12 +390,12 @@ export default function ProjectView() {
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
                                         <span className="card-header-title">Progress Overview</span>
                                     </div>
-                                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Fabrication · Approval</span>
+                                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Approval · Fabrication</span>
                                 </div>
                                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                                     {[
-                                        { label: 'Fabrication', pct: fabPct, count: fabCount, color: 'var(--color-success-mid)', bg: 'var(--color-success-bg)', barBg: 'rgba(22,163,74,0.15)' },
                                         { label: 'Approval', pct: appPct, count: appCount, color: 'var(--color-info-mid)', bg: 'var(--color-info-bg)', barBg: 'rgba(37,99,235,0.12)' },
+                                        { label: 'Fabrication', pct: fabPct, count: fabCount, color: 'var(--color-success-mid)', bg: 'var(--color-success-bg)', barBg: 'rgba(22,163,74,0.15)' },
                                     ].map(({ label, pct, count, color, bg, barBg }) => (
                                         <div key={label}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -882,6 +882,21 @@ export default function ProjectView() {
                                                     }
                                                 };
 
+                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
+                                                    if (!id || !project) return;
+                                                    if (!canEditSow) return;
+                                                    const clamped = Math.min(100, Math.max(0, val));
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    try {
+                                                        await updateProjectScopeOfWork(id, updatedSow);
+                                                    } catch (err: any) {
+                                                        showMessage('Error', `Failed to update SOW: ${err.message}`, 'error');
+                                                        await fetchData(true);
+                                                    }
+                                                };
+
                                                 return (
                                                     <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
                                                         <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
@@ -891,10 +906,38 @@ export default function ProjectView() {
                                                             {sowPct}%
                                                         </td>
                                                         <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                                                            {appPctVal}%
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={appPctVal}
+                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
+                                                                        style={{ width: 60, padding: '3px 6px', textAlign: 'center', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 700, color: '#2563eb' }}
+                                                                    />
+                                                                    <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${appPctVal}%`
+                                                            )}
                                                         </td>
                                                         <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
-                                                            {fabPctVal}%
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={fabPctVal}
+                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
+                                                                        style={{ width: 60, padding: '3px 6px', textAlign: 'center', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 700, color: '#16a34a' }}
+                                                                    />
+                                                                    <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${fabPctVal}%`
+                                                            )}
                                                         </td>
                                                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                                             <select

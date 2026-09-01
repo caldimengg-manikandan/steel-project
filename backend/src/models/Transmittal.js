@@ -31,7 +31,7 @@ const transmittalDrawingSchema = new mongoose.Schema(
         // 'revised' = drawing number existed but revision changed
         changeType: {
             type: String,
-            enum: ['new', 'revised'],
+            enum: ['new', 'revised', 'unchanged'],
             default: 'new',
         },
         previousRevision: { type: String, default: '' }, // filled for 'revised' type
@@ -71,6 +71,7 @@ const transmittalSchema = new mongoose.Schema(
         // ── Snapshot counts ──────────────────────────────────────
         newCount: { type: Number, default: 0 },
         revisedCount: { type: Number, default: 0 },
+        unchangedCount: { type: Number, default: 0 },
 
         sequences: { type: [String], default: [] },
 

@@ -152,7 +152,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                 d.drawingTitle || '',
                 d.revision || '0',
                 d.date || '',
-                d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : 'ISSUED FOR RE-APPROVAL')
+                d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED')
             ]);
 
             dataRow.height = 22;
@@ -228,13 +228,21 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     const L_START = 8;
 
+    const { normalizeRevision } = require('./transmittalService');
+
     // ── Collect all unique revision marks across all drawings ─
     const allRevsSet = new Set();
     drawings.forEach(d => {
         (d.revisionHistory || []).forEach(rh => {
-            if (rh.revision) allRevsSet.add(String(rh.revision).toUpperCase().trim());
+            if (rh.revision) {
+                const norm = normalizeRevision(rh.revision);
+                if (norm) allRevsSet.add(norm);
+            }
         });
-        if (d.currentRevision) allRevsSet.add(String(d.currentRevision).toUpperCase().trim());
+        if (d.currentRevision) {
+            const norm = normalizeRevision(d.currentRevision);
+            if (norm) allRevsSet.add(norm);
+        }
     });
 
     const allRevsArr = Array.from(allRevsSet);
@@ -365,14 +373,14 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     );
 
     sorted.forEach(d => {
-        // Build revMap: normalizedRevision → date (from this drawing's revisionHistory)
+        // Build revMap: normalizedRevision → date / transmittalNo (from this drawing's revisionHistory)
         const revMap = {};
         const allRemarks = new Set();
 
         (d.revisionHistory || []).forEach(rh => {
             if (rh.revision) {
-                const revKey = String(rh.revision).toUpperCase().trim();
-                revMap[revKey] = rh.date || '';
+                const revKey = normalizeRevision(rh.revision);
+                revMap[revKey] = rh.date || (rh.transmittalNo ? `TR-${String(rh.transmittalNo).padStart(3, '0')}` : '✓');
             }
             if (rh.remarks) {
                 allRemarks.add(rh.remarks.toUpperCase().trim());
@@ -381,9 +389,9 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
         // Also include the current latest revision if not already in history
         if (d.currentRevision) {
-            const curRevKey = String(d.currentRevision).toUpperCase().trim();
-            if (!revMap[curRevKey] && d.date) {
-                revMap[curRevKey] = d.date;
+            const curRevKey = normalizeRevision(d.currentRevision);
+            if (!revMap[curRevKey]) {
+                revMap[curRevKey] = d.date || '✓';
             }
         }
 

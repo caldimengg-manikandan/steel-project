@@ -156,15 +156,13 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
 
     // Breadcrumbs
     const renderBreadcrumbs = () => {
-        // Only show parts relative to basePath if scoped? 
-        // Actually, let's just show the full path to make it clear where they are on the drive.
-        const parts = currentPath ? currentPath.split('/') : [];
+        const parts = currentPath ? currentPath.split('/').filter(Boolean) : [];
         let runningPath = '';
 
         return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', overflowX: 'auto', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflowX: 'auto', paddingBottom: 2, flex: 1, minWidth: 0 }}>
                 <span 
-                    style={{ cursor: basePath ? 'default' : 'pointer', color: (!basePath && !currentPath) ? 'var(--color-text-primary)' : 'var(--color-primary)' }}
+                    style={{ cursor: basePath ? 'default' : 'pointer', color: (!basePath && !currentPath) ? 'var(--color-text-primary)' : 'var(--color-primary)', whiteSpace: 'nowrap', flexShrink: 0 }}
                     onClick={() => { if (!basePath) setCurrentPath('') }}
                 >
                     Storage Root
@@ -175,17 +173,23 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                     
                     // If we are scoped to a project, prevent clicking breadcrumbs above the project root
                     const isClickable = basePath ? runningPath.startsWith(basePath) : true;
-                    
                     const pathClosure = runningPath; // closure for onClick
 
                     return (
-                        <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ color: 'var(--color-text-muted)' }}>/</span>
+                        <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: isLast ? 1 : 0, minWidth: 0 }}>
+                            <span style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>/</span>
                             <span 
+                                title={part}
                                 style={{ 
                                     cursor: (isClickable && !isLast) ? 'pointer' : 'default', 
                                     color: isLast ? 'var(--color-text-primary)' : (isClickable ? 'var(--color-primary)' : 'var(--color-text-muted)'),
-                                    textDecoration: (isClickable && !isLast) ? 'underline' : 'none'
+                                    textDecoration: (isClickable && !isLast) ? 'underline' : 'none',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: isLast ? 240 : 160,
+                                    display: 'inline-block',
+                                    verticalAlign: 'bottom'
                                 }}
                                 onClick={() => { if (isClickable && !isLast) setCurrentPath(pathClosure) }}
                             >

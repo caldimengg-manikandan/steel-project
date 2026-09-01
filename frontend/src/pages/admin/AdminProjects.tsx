@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useMessage } from '../../context/MessageContext';
 import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
@@ -75,6 +76,7 @@ const DEFAULT_FORM: CreateProjectForm = {
 
 export default function AdminProjects() {
     const navigate = useNavigate();
+    const { showMessage } = useMessage();
     const [projects, setProjects] = useState<Project[]>([]);
     const [totalProjectsCount, setTotalProjectsCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
@@ -550,7 +552,7 @@ export default function AdminProjects() {
                             <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Scope of Work
+                                        Scope of Work <span style={{ color: 'red' }}>*</span>
                                     </div>
                                     <button
                                         type="button"
@@ -649,7 +651,7 @@ export default function AdminProjects() {
                                 )}
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Location</label>
+                                <label className="form-label required">Location</label>
                                 <select className="form-control" value={form.location}
                                     onChange={(e) => setForm({ ...form, location: e.target.value })}>
                                     <option value="">Select Location</option>
@@ -805,21 +807,22 @@ export default function AdminProjects() {
                                     onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); setError(''); setModalError(''); }}>Cancel</button>
                                 <button className="btn btn-primary"
                                     onClick={() => {
-                                        // Validate required fields and sequences before creating
-                                        if (!form.name.trim() || !form.clientId) {
-                                            setModalError('Please provide: ' + (!form.name.trim() ? 'Project Name' : 'Client'));
-                                            return;
-                                        }
-                                        if (!form.year || isNaN(Number(form.year))) {
-                                            setModalError('Please provide: Year');
-                                            return;
-                                        }
+                                        const missing: string[] = [];
+                                        if (!form.clientId) missing.push('Client / Organization');
+                                        if (!form.contactPerson) missing.push('Contact Person');
+                                        if (!form.name.trim()) missing.push('Project Name');
+                                        if (!form.year || isNaN(Number(form.year))) missing.push('Project Year');
                                         if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (!form.startingTransmittalNumber || Number(form.startingTransmittalNumber) < 1)) {
-                                            setModalError('Please provide: Starting Transmittal Number');
-                                            return;
+                                            missing.push('Starting Transmittal Number');
                                         }
-                                        if (sequenceNames.length === 0) {
-                                            setModalError('Please add at least one Sequence');
+                                        if (!form.location) missing.push('Location');
+                                        if (!form.scopeOfWork || form.scopeOfWork.length === 0) missing.push('Scope of Work');
+                                        if (sequenceNames.length === 0) missing.push('Number of Sequences');
+
+                                        if (missing.length > 0) {
+                                            const msgText = 'Please fill in the following required field(s):\n• ' + missing.join('\n• ');
+                                            setModalError(msgText);
+                                            showMessage('Required Fields Missing', msgText, 'warning');
                                             return;
                                         }
                                         // All validations passed, proceed with creation
@@ -913,108 +916,76 @@ export default function AdminProjects() {
                                         <textarea className="form-control" rows={3} value={editTarget.description}
                                             onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
                                     </div>
-                                    {/* ── Scope of Work Builder ── */}
-                                     <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                 Scope of Work
-                                             </div>
-                                             <button
-                                                 type="button"
-                                                 className="btn btn-secondary btn-sm"
-                                                 onClick={() => {
-                                                     const currentSow = editTarget.scopeOfWork || [];
-                                                     const nextNum = String(currentSow.length + 1).padStart(2, '0');
-                                                     const newItem = {
-                                                         name: `SOW ${nextNum}`,
-                                                         percentage: 0,
-                                                         approval: 0,
-                                                         fabrication: 0,
-                                                         status: 'Yet to Start'
-                                                     };
-                                                     setEditTarget({ ...editTarget, scopeOfWork: [...currentSow, newItem] });
-                                                 }}
-                                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}
-                                             >
-                                                 + Add SOW
-                                             </button>
-                                         </div>
+                                    {/* ── Scope of Work Builder (Edit Project) ── */}
+                                      <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                  Scope of Work Progress
+                                              </div>
+                                          </div>
 
-                                         {(!editTarget.scopeOfWork || editTarget.scopeOfWork.length === 0) ? (
-                                             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                                 No Scope of Work items added yet. Click "+ Add SOW" to add one.
-                                             </div>
-                                         ) : (
-                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                                 {editTarget.scopeOfWork.map((item, idx) => (
-                                                     <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                                                         <div style={{ flex: 2 }}>
-                                                             <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
-                                                             <input
-                                                                 className="form-control form-control-sm"
-                                                                 value={item.name}
-                                                                 onChange={(e) => {
-                                                                     const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                     newSow[idx] = { ...newSow[idx], name: e.target.value };
-                                                                     setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                 }}
-                                                             />
-                                                         </div>
-                                                         <div style={{ flex: 1.8 }}>
+                                          {(!editTarget.scopeOfWork || editTarget.scopeOfWork.length === 0) ? (
+                                              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                                  No Scope of Work items defined for this project.
+                                              </div>
+                                          ) : (
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                  {editTarget.scopeOfWork.map((item, idx) => (
+                                                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                                                          <div style={{ flex: 2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
+                                                              <input
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.name}
+                                                                  disabled={true}
+                                                                  style={{ background: '#f1f5f9', cursor: 'not-allowed', color: '#475569', fontWeight: 600 }}
+                                                              />
+                                                          </div>
+                                                          <div style={{ flex: 1.8 }}>
                                                               <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
                                                               <input
                                                                   type="number"
                                                                   className="form-control form-control-sm"
                                                                   value={item.percentage || ''}
+                                                                  disabled={true}
+                                                                  style={{ background: '#f1f5f9', cursor: 'not-allowed', color: '#475569', fontWeight: 600 }}
+                                                              />
+                                                          </div>
+                                                          <div style={{ flex: 1.2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
+                                                              <input
+                                                                  type="number"
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.approval || ''}
+                                                                  min="0"
+                                                                  max="100"
                                                                   onChange={(e) => {
                                                                       const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                      newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
                                                                       setEditTarget({ ...editTarget, scopeOfWork: newSow });
                                                                   }}
                                                               />
                                                           </div>
-                                                         <div style={{ flex: 1.2 }}>
-                                                             <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
-                                                             <input
-                                                                 type="number"
-                                                                 className="form-control form-control-sm"
-                                                                 value={item.approval || ''}
-                                                                 onChange={(e) => {
-                                                                     const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                     newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
-                                                                     setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                 }}
-                                                             />
-                                                         </div>
-                                                         <div style={{ flex: 1.2 }}>
-                                                             <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
-                                                             <input
-                                                                 type="number"
-                                                                 className="form-control form-control-sm"
-                                                                 value={item.fabrication || ''}
-                                                                 onChange={(e) => {
-                                                                     const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                     newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
-                                                                     setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                 }}
-                                                             />
-                                                         </div>
-                                                         <button
-                                                             type="button"
-                                                             onClick={() => {
-                                                                 const newSow = (editTarget.scopeOfWork || []).filter((_, i) => i !== idx);
-                                                                 setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                             }}
-                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4, marginTop: 14, fontSize: 14, fontWeight: 700 }}
-                                                             title="Remove SOW item"
-                                                         >
-                                                             ✕
-                                                         </button>
-                                                     </div>
-                                                 ))}
-                                             </div>
-                                         )}
-                                     </div>
+                                                          <div style={{ flex: 1.2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
+                                                              <input
+                                                                  type="number"
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.fabrication || ''}
+                                                                  min="0"
+                                                                  max="100"
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
+                                                                      setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                  }}
+                                                              />
+                                                          </div>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          )}
+                                      </div>
                                     <div className="form-group">
                                         <label className="form-label">Location</label>
                                         <select className="form-control" value={editTarget.location}

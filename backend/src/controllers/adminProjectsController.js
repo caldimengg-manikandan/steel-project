@@ -560,6 +560,9 @@ async function uploadCOR(req, res) {
 
             // Map some common variations to internal enum
             if (statusRaw === 'COMPLETED') statusRaw = 'WORK_COMPLETED';
+            if (statusRaw === 'VOID' || statusRaw === 'VOIDED' || statusRaw === 'DECLINED' || statusRaw === 'REJECTED' || statusRaw === 'CANCELLED' || statusRaw?.includes('VOID') || statusRaw?.includes('CANCEL')) {
+                statusRaw = 'CANCELLED';
+            }
             const VALID = ['PENDING', 'APPROVED', 'WORK_COMPLETED', 'CANCELLED'];
             const status = VALID.includes(statusRaw) ? statusRaw : 'PENDING';
 

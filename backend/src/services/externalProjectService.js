@@ -121,10 +121,11 @@ async function fetchAndCache(projectsUrl, countUrl) {
                     hasCOR: p.corStatus.hasCOR || false,
                     totalCORItems: p.corStatus.totalCORItems || 0,
                     totalAmount: p.coCost || p.corStatus.totalAmount || p.corStatus.approvedCoCost || 0,
-                    statusSummary: p.corStatus.statusSummary || {
+                    statusSummary: {
                         Approved: p.corStatus.statusSummary?.Approved || 0,
                         Completed: p.corStatus.statusSummary?.Completed || 0,
-                        Submitted: p.corStatus.statusSummary?.Submitted || 0
+                        Submitted: p.corStatus.statusSummary?.Submitted || 0,
+                        Declined: (p.corStatus.statusSummary?.Declined || 0) + (p.corStatus.statusSummary?.Cancelled || 0) + (p.corStatus.statusSummary?.Void || 0) + (p.corStatus.statusSummary?.Voided || 0)
                     },
                     statusAmounts: p.corStatus.statusAmounts || {
                         Approved: p.corStatus.statusAmounts?.Approved || p.corStatus.approvedCoCost || 0,

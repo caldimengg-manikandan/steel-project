@@ -24,6 +24,9 @@ function getErrorStatus(err) {
     return 400;
 }
 
+const DrawingExtraction = require('../models/DrawingExtraction');
+const RfiExtraction = require('../models/RfiExtraction');
+
 /**
  * GET /api/files/browse?path=<relativePath>
  * ──────────────────────────────────────────
@@ -33,6 +36,25 @@ exports.browse = async (req, res) => {
     try {
         const requestedPath = req.query.path || '';
         const entries = await storageGateway.listDirectory(requestedPath);
+
+        // Fetch uploadedBy usernames from DB for file items
+        const fileNames = entries.filter(e => e.type !== 'directory').map(e => e.name);
+        if (fileNames.length > 0) {
+            const [drawingDocs, rfiDocs] = await Promise.all([
+                DrawingExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
+                RfiExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
+            ]);
+
+            const userMap = {};
+            drawingDocs.forEach(d => { userMap[d.originalFileName] = d.uploadedBy; });
+            rfiDocs.forEach(r => { userMap[r.originalFileName] = r.uploadedBy; });
+
+            entries.forEach(e => {
+                if (e.type !== 'directory' && userMap[e.name]) {
+                    e.uploadedBy = userMap[e.name];
+                }
+            });
+        }
 
         res.json({
             path: requestedPath || '/',

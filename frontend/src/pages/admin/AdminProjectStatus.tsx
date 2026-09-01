@@ -269,14 +269,14 @@ export default function AdminProjectStatus() {
                                         <div className="project-status-stat-sub">drawings uploaded</div>
                                     </div>
                                     <div className="project-status-stat">
-                                        <div className="project-status-stat-label">Fabrications</div>
-                                        <div className="project-status-stat-value">{fabPercentage}%</div>
-                                        <div className="project-status-stat-sub">{fabricationCount} drawings fabricated</div>
-                                    </div>
-                                    <div className="project-status-stat">
                                         <div className="project-status-stat-label">Approvals</div>
                                         <div className="project-status-stat-value">{appPercentage}%</div>
                                         <div className="project-status-stat-sub">{approvedCount} drawings approved</div>
+                                    </div>
+                                    <div className="project-status-stat">
+                                        <div className="project-status-stat-label">Fabrications</div>
+                                        <div className="project-status-stat-value">{fabPercentage}%</div>
+                                        <div className="project-status-stat-sub">{fabricationCount} drawings fabricated</div>
                                     </div>
                                     <div className="project-status-stat">
                                         <div className="project-status-stat-label">Overall Percentage</div>

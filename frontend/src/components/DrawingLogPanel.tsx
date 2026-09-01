@@ -46,13 +46,21 @@ export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
         );
     }
 
+    const normalizeRev = (r: string) => (r || '').replace(/^rev[\s\-_]*/i, '').toUpperCase().trim();
+
     // Determine all revision marks across all drawings for dynamic columns
     const allRevsSet = new Set<string>();
     logData.drawings.forEach((d: any) => {
         (d.revisionHistory || []).forEach((rh: any) => {
-            if (rh.revision) allRevsSet.add(String(rh.revision).toUpperCase().trim());
+            if (rh.revision) {
+                const norm = normalizeRev(rh.revision);
+                if (norm) allRevsSet.add(norm);
+            }
         });
-        if (d.currentRevision) allRevsSet.add(String(d.currentRevision).toUpperCase().trim());
+        if (d.currentRevision) {
+            const norm = normalizeRev(d.currentRevision);
+            if (norm) allRevsSet.add(norm);
+        }
     });
     
     const allRevsArr = Array.from(allRevsSet);
@@ -92,12 +100,17 @@ export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
                             if (d.revisionHistory) {
                                 d.revisionHistory.forEach((rh: any) => {
                                     if (rh.revision) {
-                                        revMap[rh.revision.toUpperCase()] = rh.date || rh.transmittalNo || '✓';
+                                        const norm = normalizeRev(rh.revision);
+                                        const val = rh.date || (rh.transmittalNo ? `TR-${String(rh.transmittalNo).padStart(3, '0')}` : '✓');
+                                        revMap[norm] = val;
                                     }
                                 });
                             }
-                            if (d.currentRevision && !revMap[d.currentRevision.toUpperCase()]) {
-                                revMap[d.currentRevision.toUpperCase()] = d.lastUpdated ? new Date(d.lastUpdated).toLocaleDateString() : '✓';
+                            if (d.currentRevision) {
+                                const norm = normalizeRev(d.currentRevision);
+                                if (!revMap[norm]) {
+                                    revMap[norm] = d.lastUpdated ? new Date(d.lastUpdated).toLocaleDateString() : '✓';
+                                }
                             }
 
                             return (

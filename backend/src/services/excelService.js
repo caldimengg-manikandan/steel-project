@@ -852,9 +852,34 @@ async function generateProjectStatusExcel(projectsData) {
         cell.style = headerStyle;
     });
 
-    // ── Status label map ──────────────────────────────────────
-    const STATUS_LABEL = { active: 'Active', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived' };
-    const STATUS_COLOR = { active: 'FF00B050', on_hold: 'FFFFC000', completed: 'FF0070C0', archived: 'FF7F7F7F' };
+    // ── Status label map & Title-case formatter ──────────────
+    const STATUS_LABEL = { active: 'Active', in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived' };
+    const STATUS_COLOR = { active: 'FF00B050', in_progress: 'FF00B050', on_hold: 'FFFFC000', completed: 'FF0070C0', archived: 'FF7F7F7F' };
+
+    function formatStatusTitleCase(str) {
+        if (!str) return '';
+        const raw = String(str).trim();
+        const map = {
+            'in_progress': 'In-progress',
+            'in progress': 'In-progress',
+            'in-progress': 'In-progress',
+            'on_hold': 'On Hold',
+            'on-hold': 'On Hold',
+            'completed': 'Completed',
+            'active': 'Active',
+            'archived': 'Archived',
+            'yet_to_start': 'Yet To Start',
+        };
+
+        const lower = raw.toLowerCase();
+        if (map[lower]) return map[lower];
+
+        return raw
+            .replace(/_/g, ' ')
+            .split(' ')
+            .map(w => w ? (w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : '')
+            .join(' ');
+    }
 
     // ── Data rows ─────────────────────────────────────────────
     const commonBorder = {
@@ -867,6 +892,9 @@ async function generateProjectStatusExcel(projectsData) {
         const approvalPercentage = proj.approvalPercentage !== undefined ? proj.approvalPercentage : sowProg.approvalPercentage;
         const fabricationPercentage = proj.fabricationPercentage !== undefined ? proj.fabricationPercentage : sowProg.fabricationPercentage;
 
+        const rawStatusText = proj.rawStatus || STATUS_LABEL[proj.status] || proj.status || '';
+        const formattedFabStatus = formatStatusTitleCase(rawStatusText);
+
         const dataRow = sheet.addRow({
             cdeNo: '', // Placeholder
             branch: proj.location || '', 
@@ -878,7 +906,7 @@ async function generateProjectStatusExcel(projectsData) {
             pm: '', // Placeholder
             approvalStatus: `${approvalPercentage}%`,
             rfiStatus: `Open: ${proj.openRfiCount || 0}, Closed: ${proj.closedRfiCount || 0}`,
-            fabStatus: STATUS_LABEL[proj.status] || proj.status || '',
+            fabStatus: formattedFabStatus,
             approvedCo: proj.corStatus?.statusSummary?.Approved ?? proj.approvedCO ?? 0,
             pendingCo: proj.corStatus?.statusSummary?.Submitted ?? proj.pendingCO ?? 0,
             declinedCo: proj.corStatus?.statusSummary?.Declined ?? 0,

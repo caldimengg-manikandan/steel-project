@@ -402,8 +402,57 @@ exports.downloadExcel = async (req, res) => {
     // Fetch system settings for logo
     const settings = await SystemSettings.findOne().lean();
 
-    // Generate fresh Excel with Drawing Log + Extraction Data sheets
-    const { buffer, filename } = await generateProjectExcel(extractions, projectDetails, type, settings?.logoPath);
+    const Transmittal = require('../models/Transmittal');
+    const { getDrawingLog } = require('../services/transmittalService');
+    const { generateTransmittalExcel, generateDrawingLogExcel } = require('../services/transmittalExcelService');
+
+    let buffer, filename;
+
+    if (type === 'transmittal') {
+        // Download ONLY the latest transmittal's data (today's uploaded batch)
+        let targetTransmittal = await Transmittal.findOne({ projectId }).sort({ transmittalNumber: -1 }).lean();
+
+        if (!targetTransmittal) {
+            // Build virtual transmittal from the latest targetTransmittalNumber upload batch
+            const targetNums = extractions.map(e => e.targetTransmittalNumber).filter(n => n != null);
+            const maxTarget = targetNums.length > 0 ? Math.max(...targetNums) : 1;
+            const latestBatch = extractions.filter(e => e.targetTransmittalNumber === maxTarget);
+            const batchToUse = latestBatch.length > 0 ? latestBatch : extractions;
+
+            targetTransmittal = {
+                transmittalNumber: maxTarget,
+                drawings: batchToUse.map(e => ({
+                    drawingNumber: e.extractedFields?.drawingNumber || e.originalFileName || '',
+                    drawingTitle: e.extractedFields?.drawingTitle || e.extractedFields?.drawingDescription || e.originalFileName || '',
+                    revision: e.extractedFields?.revision || '0',
+                    date: e.extractedFields?.date || '',
+                    remarks: e.extractedFields?.remarks || 'ISSUED FOR APPROVAL',
+                    folderName: e.folderName || '',
+                    changeType: 'new',
+                })),
+            };
+        }
+
+        projectDetails.transmittalNo = targetTransmittal.transmittalNumber || projectDetails.transmittalNo;
+        const result = await generateTransmittalExcel(targetTransmittal, projectDetails, settings?.logoPath);
+        buffer = result.buffer;
+        filename = result.filename;
+    } else if (type === 'log') {
+        const log = await getDrawingLog(projectId);
+        if (log) {
+            const result = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
+            buffer = result.buffer;
+            filename = result.filename;
+        } else {
+            const result = await generateProjectExcel(extractions, projectDetails, type, settings?.logoPath);
+            buffer = result.buffer;
+            filename = result.filename;
+        }
+    } else {
+        const result = await generateProjectExcel(extractions, projectDetails, type, settings?.logoPath);
+        buffer = result.buffer;
+        filename = result.filename;
+    }
 
     // ── Feature 6: Also save Excel to the uploaded folder path ─────────
     try {
