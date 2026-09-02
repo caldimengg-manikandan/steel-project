@@ -357,9 +357,6 @@ def extract_rfi(pdf_path, original_filename):
                         words_set = set(re.findall(r'\b\w+\b', text_lower))
                         if any(k in words_set for k in closed_keywords):
                             rfi['status'] = 'CLOSED'
-                            if not rfi['response'] and 'confirmed' in words_set: rfi['response'] = 'Confirmed'
-                            if not rfi['response'] and 'approved' in words_set: rfi['response'] = 'Approved'
-                            if not rfi['response'] and 'ok' in words_set: rfi['response'] = 'OK'
 
                         if text_lower.startswith('response:') or text_lower.startswith('ans:'):
                             parts = re.split(r'response:|ans:|answer:', a['text'], flags=re.IGNORECASE)

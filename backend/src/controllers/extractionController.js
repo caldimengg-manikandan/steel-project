@@ -409,13 +409,24 @@ exports.downloadExcel = async (req, res) => {
     let buffer, filename;
 
     if (type === 'transmittal') {
-        // Download ONLY the latest transmittal's data (today's uploaded batch)
-        let targetTransmittal = await Transmittal.findOne({ projectId }).sort({ transmittalNumber: -1 }).lean();
+        // Download ONLY the latest transmittal's data (latest targetTransmittalNumber / upload batch)
+        const reqTransNo = req.query.transmittalNumber ? parseInt(req.query.transmittalNumber, 10) : null;
+        const targetNums = extractions.map(e => e.targetTransmittalNumber).filter(n => n != null);
+        const maxTarget = reqTransNo || (targetNums.length > 0 ? Math.max(...targetNums) : 1);
 
+        // 1. Try to find a saved Transmittal for this maxTarget transmittal number first
+        let targetTransmittal = await Transmittal.findOne({ projectId, transmittalNumber: maxTarget }).lean();
+
+        // 2. If not requested explicitly and not found for maxTarget, fall back to highest saved Transmittal IF its number >= maxTarget
+        if (!targetTransmittal && !reqTransNo) {
+            const highestSaved = await Transmittal.findOne({ projectId }).sort({ transmittalNumber: -1 }).lean();
+            if (highestSaved && highestSaved.transmittalNumber >= maxTarget) {
+                targetTransmittal = highestSaved;
+            }
+        }
+
+        // 3. If still no saved Transmittal applies, build virtual transmittal from the target batch
         if (!targetTransmittal) {
-            // Build virtual transmittal from the latest targetTransmittalNumber upload batch
-            const targetNums = extractions.map(e => e.targetTransmittalNumber).filter(n => n != null);
-            const maxTarget = targetNums.length > 0 ? Math.max(...targetNums) : 1;
             const latestBatch = extractions.filter(e => e.targetTransmittalNumber === maxTarget);
             const batchToUse = latestBatch.length > 0 ? latestBatch : extractions;
 
