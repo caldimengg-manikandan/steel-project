@@ -661,15 +661,28 @@ async function getTransmittals(projectId) {
  */
 async function getDrawingLog(projectId) {
     let log = await DrawingLog.findOne({ projectId }).lean();
-    if (log && log.drawings && log.drawings.length > 0) return log;
+    const extractions = await DrawingExtraction.find({ projectId, status: 'completed' }).sort({ createdAt: 1 }).lean();
 
-    // Fallback: Build virtual Drawing Log from completed extractions if no formal transmittal generated yet
-    const extractions = await DrawingExtraction.find({ projectId, status: 'completed' }).lean();
-    if (extractions.length === 0) {
+    if ((!log || !log.drawings || log.drawings.length === 0) && extractions.length === 0) {
         return log || null;
     }
 
     const drawingsMap = {};
+
+    // 1. If saved DrawingLog exists, initialize drawingsMap with saved drawings
+    if (log && Array.isArray(log.drawings)) {
+        log.drawings.forEach((d) => {
+            const key = (d.drawingNumber || '').trim().toUpperCase();
+            if (key) {
+                drawingsMap[key] = {
+                    ...d,
+                    revisionHistory: Array.isArray(d.revisionHistory) ? [...d.revisionHistory] : []
+                };
+            }
+        });
+    }
+
+    // 2. Merge ALL completed extractions for this project into drawingsMap
     extractions.forEach((ex) => {
         const f = ex.extractedFields || {};
         const drawingNo = (f.drawingNumber || '').trim() || ex.originalFileName || 'Extracted';
@@ -685,7 +698,7 @@ async function getDrawingLog(projectId) {
         const normalizedEntries = revHist.map(rh => ({
             revision: normalizeRevision(rh.mark),
             date: rh.date || '',
-            transmittalNo: ex.targetTransmittalNumber || 1,
+            transmittalNo: ex.targetTransmittalNumber || (log?.lastTransmittalNo || 1),
             remarks: rh.remarks || '',
             recordedAt: ex.createdAt || new Date()
         }));
@@ -704,18 +717,37 @@ async function getDrawingLog(projectId) {
             };
         } else {
             const existing = drawingsMap[key];
-            existing.revisionHistory = [...existing.revisionHistory, ...normalizedEntries];
+            normalizedEntries.forEach(ne => {
+                const alreadyHasRev = (existing.revisionHistory || []).some(rh => 
+                    rh.revision === ne.revision && 
+                    rh.transmittalNo === ne.transmittalNo
+                );
+                if (!alreadyHasRev) {
+                    existing.revisionHistory.push(ne);
+                }
+            });
+
             if (compareRevisions(currentRevMark, existing.currentRevision) > 0) {
                 existing.currentRevision = currentRevMark;
+            }
+            if (ex.createdAt && new Date(ex.createdAt) > new Date(existing.lastUpdated || 0)) {
+                existing.lastUpdated = ex.createdAt;
+                if (ex.folderName) existing.folderName = ex.folderName;
+                if (ex.originalFileName) existing.originalFileName = ex.originalFileName;
+                if (f.drawingTitle || f.drawingDescription) existing.drawingTitle = f.drawingTitle || f.drawingDescription;
             }
         }
     });
 
+    const allDrawings = Object.values(drawingsMap);
+    const maxTR = extractions.reduce((max, e) => (e.targetTransmittalNumber > max ? e.targetTransmittalNumber : max), log?.lastTransmittalNo || 1);
+
     return {
+        _id: log?._id,
         projectId,
-        lastTransmittalNo: 1,
-        drawings: Object.values(drawingsMap),
-        createdAt: new Date(),
+        lastTransmittalNo: Math.max(log?.lastTransmittalNo || 1, maxTR),
+        drawings: allDrawings,
+        createdAt: log?.createdAt || new Date(),
         updatedAt: new Date()
     };
 }
