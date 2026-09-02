@@ -86,6 +86,8 @@ const Card = ({ title, children, action }: { title: string, children: React.Reac
 
 // ─── Main Page ───
 
+const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+
 export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -119,7 +121,7 @@ export default function AdminSettings() {
     const handleSendTestReport = async () => {
         setLoadingTestReport(true);
         try {
-            const res = await fetch('/steel/api/settings/scheduler/test', {
+            const res = await fetch(`${BASE}/settings/scheduler/test`, {
                 method: 'POST',
                 credentials: 'include'
             });
@@ -163,7 +165,7 @@ export default function AdminSettings() {
     const fetchLogs = async () => {
         setLoadingLogs(true);
         try {
-            const res = await fetch('/steel/api/admin/activity-logs', {
+            const res = await fetch(`${BASE}/admin/activity-logs`, {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -196,7 +198,7 @@ export default function AdminSettings() {
             const formData = new FormData();
             formData.append('logo', logoFile);
             
-            const res = await fetch('/steel/api/settings/logo', {
+            const res = await fetch(`${BASE}/settings/logo`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
@@ -388,7 +390,7 @@ export default function AdminSettings() {
                         const handleSaveEmail = async () => {
                             setSavingEmail(true);
                             try {
-                                const res = await fetch('/steel/api/settings/email', {
+                                const res = await fetch(`${BASE}/settings/email`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     credentials: 'include',
@@ -411,7 +413,7 @@ export default function AdminSettings() {
                         const handleTestEmail = async () => {
                             setTestingEmail(true);
                             try {
-                                const res = await fetch('/steel/api/settings/email/test', {
+                                const res = await fetch(`${BASE}/settings/email/test`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     credentials: 'include',

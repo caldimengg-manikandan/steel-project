@@ -49,19 +49,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
     });
 
+const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+
     const fetchSettings = async () => {
         try {
-            const res = await fetch('/steel/api/settings', {
+            const res = await fetch(`${BASE}/settings`, {
                 credentials: 'include'
             });
             if (res.ok) {
                 const data = await res.json();
+                const prefix = BASE.endsWith('/api') ? BASE.slice(0, -4) : BASE;
                 setSettings(prev => ({ 
                     ...prev, 
                     ...data,
-                    // If logoPath exists on backend, ensure it's fully qualified for the UI if needed
-                    // Actually /uploads/system/ logo.png is served by backend
-                    logoPath: data.logoPath ? `/steel${data.logoPath}` : ''
+                    logoPath: data.logoPath ? (data.logoPath.startsWith(prefix) ? data.logoPath : `${prefix}${data.logoPath.startsWith('/') ? '' : '/'}${data.logoPath}`) : ''
                 }));
             }
         } catch (err) {
@@ -91,7 +92,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Sync to backend
         try {
-            await fetch('/steel/api/settings', {
+            const res = await fetch(`${BASE}/settings`, {
                 method: 'PATCH',
                 headers: { 
                     'Content-Type': 'application/json'
@@ -99,6 +100,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 body: JSON.stringify(newSettings),
                 credentials: 'include'
             });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                console.error('Failed to sync settings to backend:', errData.error || res.statusText);
+            }
         } catch (err) {
             console.error('Failed to sync settings to backend:', err);
         }
