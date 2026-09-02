@@ -52,6 +52,46 @@ def is_drawing_note(text):
     return False
 
 
+def is_blue_color(color):
+    """Check if RGB color tuple or stroke is pure blue (not cyan, yellow, or green)."""
+    if not color or not isinstance(color, (list, tuple)) or len(color) < 3:
+        return False
+    r, g, b = float(color[0]), float(color[1]), float(color[2])
+    if r > 1 or g > 1 or b > 1:
+        r, g, b = r / 255.0, g / 255.0, b / 255.0
+    return b > 0.4 and r < 0.3 and (b > g + 0.2)
+
+
+def get_blue_boxes(page):
+    """Find blue annotation or vector drawing rectangles on the page."""
+    blue_rects = []
+    try:
+        annots = page.annots()
+        if annots:
+            for a in annots:
+                colors = getattr(a, 'colors', {})
+                stroke = colors.get("stroke") if isinstance(colors, dict) else None
+                fill = colors.get("fill") if isinstance(colors, dict) else None
+                if is_blue_color(stroke) or is_blue_color(fill):
+                    blue_rects.append(a.rect)
+    except Exception:
+        pass
+
+    try:
+        drawings = page.get_drawings()
+        for d in drawings:
+            col = d.get("color")
+            fill = d.get("fill")
+            if is_blue_color(col) or is_blue_color(fill):
+                r = d.get("rect")
+                if r and (r.x1 - r.x0) > 20 and (r.y1 - r.y0) > 10:
+                    blue_rects.append(r)
+    except Exception:
+        pass
+
+    return blue_rects
+
+
 def extract_rfi(pdf_path, original_filename):
     rfis = []
 
@@ -63,6 +103,7 @@ def extract_rfi(pdf_path, original_filename):
 
         for page in doc:
             valid_annots = []
+            blue_boxes = get_blue_boxes(page)
 
             # ---------------------------------------------------------------
             # PASS 1: PDF annotation objects (comments, text boxes, markups)
@@ -191,6 +232,21 @@ def extract_rfi(pdf_path, original_filename):
                         if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
                             continue
 
+                        # Check if sibling text center is inside or directly enclosed by a blue box
+                        cx_s = (sibling['x0'] + sibling['x1']) / 2
+                        cy_s = (sibling['y0'] + sibling['y1']) / 2
+                        s_pt = fitz.Point(cx_s, cy_s)
+                        in_blue_box = False
+                        for b_rect in blue_boxes:
+                            expanded_b = b_rect + (-25, -25, 25, 25)
+                            if expanded_b.contains(s_pt):
+                                in_blue_box = True
+                                break
+
+                        # If blue boxes are present on the page, strictly require the candidate text to be inside a blue box
+                        if blue_boxes and not in_blue_box:
+                            continue
+
                         x_dist = max(0, max(a['x0'] - sibling['x1'], sibling['x0'] - a['x1']))
                         y_dist = max(0, max(a['y0'] - sibling['y1'], sibling['y0'] - a['y1']))
                         rect_dist = (x_dist**2 + y_dist**2)**0.5
@@ -200,10 +256,10 @@ def extract_rfi(pdf_path, original_filename):
                         center_dist = ((cx_a - cx_s)**2 + (cy_a - cy_s)**2)**0.5
 
                         overlap_bonus = len(sibling['text']) * 0.5 if rect_dist < 20 else 0
+                        blue_box_bonus = 10000 if in_blue_box else 0
+                        dist = rect_dist + 0.01 * center_dist - overlap_bonus - blue_box_bonus
 
-                        dist = rect_dist + 0.01 * center_dist - overlap_bonus
-
-                        if dist < min_dist and rect_dist < 200:
+                        if dist < min_dist and rect_dist < 300:
                             if (len(sibling['text']) > 5 or 'response' in sibling['text'].lower()) and len(sibling['text']) < 1500:
                                 if is_drawing_note(sibling['text']):
                                     continue
@@ -243,77 +299,21 @@ def extract_rfi(pdf_path, original_filename):
                         '_rect': a['rect']
                     })
 
-            # Additional fallback: scan raw page text for ANY missed Q markers
-            existing_qnums = {r['rfiNumber'] for r in page_rfis}
-            raw_text = page.get_text("text")
-            
-            for line in raw_text.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                # Find ALL Q-number occurrences on this raw line
-                matches = list(re.finditer(r'\bQ[\.\-\:\s]*(\d+[a-zA-Z]?)\b', line, re.IGNORECASE))
-                if not matches:
-                    continue
+            # Filter out RFIs with empty or invalid descriptions, and deduplicate by description text
+            filtered_page_rfis = []
+            seen_descriptions = set()
+            for rfi in page_rfis:
+                desc = str(rfi.get('description', '')).strip()
+                if len(desc) >= 5 and not is_drawing_note(desc) and desc not in seen_descriptions:
+                    seen_descriptions.add(desc)
+                    filtered_page_rfis.append(rfi)
 
-                if len(matches) == 1:
-                    m = matches[0]
-                    rfi_num = f"Q{m.group(1).upper()}"
-                    if rfi_num in existing_qnums:
-                        continue
-                        
-                    desc = line.replace(m.group(0), '').strip(' :.-')
-                    if not desc or re.match(r'^Q[\.\-\:\s]*\d+[a-zA-Z]?[\.:\-]?$', desc, re.IGNORECASE):
-                        desc = ''
-                    page_rfis.append({
-                        'rfiNumber': rfi_num,
-                        'refDrawing': original_filename,
-                        'description': desc,
-                        'response': '',
-                        'status': 'OPEN',
-                        'remarks': '',
-                        'skNumber': sk_number,
-                        '_rect': None
-                    })
-                    existing_qnums.add(rfi_num)
-                else:
-                    for m in matches:
-                        rfi_num = f"Q{m.group(1).upper()}"
-                        if rfi_num in existing_qnums:
-                            continue
-                        page_rfis.append({
-                            'rfiNumber': rfi_num,
-                            'refDrawing': original_filename,
-                            'description': '',
-                            'response': '',
-                            'status': 'OPEN',
-                            'remarks': '',
-                            'skNumber': sk_number,
-                            '_rect': None
-                        })
-                        existing_qnums.add(rfi_num)
+            # If main single-digit Q-numbers (Q1-Q9) exist on the page, filter out high secondary numbers (Q10+)
+            has_main_q = any(re.match(r'^Q[1-9]$', r['rfiNumber'], re.IGNORECASE) for r in filtered_page_rfis)
+            if has_main_q:
+                filtered_page_rfis = [r for r in filtered_page_rfis if re.match(r'^Q[1-9]$', r['rfiNumber'], re.IGNORECASE)]
 
-            for a2 in valid_annots:
-                txt = a2['text']
-                fallback_match = re.search(r'\bQ[\.\-\:\s]*(\d+[a-zA-Z]?)\b', txt, re.IGNORECASE)
-                if fallback_match:
-                    rfi_num = f"Q{fallback_match.group(1).upper()}"
-                    if rfi_num in existing_qnums:
-                        continue
-                        
-                    desc_text = txt.replace(fallback_match.group(0), '').strip(' :.-')
-                    page_rfis.append({
-                        'rfiNumber': rfi_num,
-                        'refDrawing': original_filename,
-                        'description': desc_text,
-                        'response': '',
-                        'status': 'OPEN',
-                        'remarks': '',
-                        'skNumber': sk_number,
-                        '_rect': a2['rect']
-                    })
-                    existing_qnums.add(rfi_num)
-            # End of fallback handling
+            page_rfis = filtered_page_rfis
 
             # 3. Process Responses and Status Keywords
             closed_keywords = ['confirmed', 'ok', 'approved', 'closed', 'resolved']

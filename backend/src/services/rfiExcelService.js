@@ -126,7 +126,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     });
 
     const hasClientRfiNo = allRfis.some(r => r.clientRfiNumber && r.clientRfiNumber.trim().length > 0);
-    const TOTAL_COLS = hasClientRfiNo ? 11 : 10;
+    const TOTAL_COLS = hasClientRfiNo ? 10 : 9;
 
     // ── Column widths ─────────────────────────────────────────
     sheet.getColumn(1).width = 8;    // S.NO
@@ -140,13 +140,11 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         sheet.getColumn(8).width = 12;   // Status
         sheet.getColumn(9).width = 14;   // Closed on
         sheet.getColumn(10).width = 30;  // Remarks
-        sheet.getColumn(11).width = 20;  // Link to Source
     } else {
         sheet.getColumn(6).width = 38;   // Response
         sheet.getColumn(7).width = 12;   // Status
         sheet.getColumn(8).width = 14;   // Closed on
         sheet.getColumn(9).width = 30;   // Remarks
-        sheet.getColumn(10).width = 20;  // Link to Source
     }
 
     const commonBorder = {
@@ -248,7 +246,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     // ROW 4 — Column headers
     const COL_HEADERS = ['S.NO', 'Sent On', 'SK #', 'Ref. Drawing', 'Description'];
     if (hasClientRfiNo) COL_HEADERS.push('CLIENT RFI NUMBER');
-    COL_HEADERS.push('Response', 'Status', 'Closed on', 'Remarks', 'Link to Source');
+    COL_HEADERS.push('Response', 'Status', 'Closed on', 'Remarks');
 
     const colHeaderStyle = {
         font: { bold: true, size: 10, color: { argb: 'FF000000' } },
@@ -362,17 +360,6 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         // Remarks
         dataRow.getCell(cursor).value = item.remarks || '';
         dataRow.getCell(cursor).style = { font: { size: 10 }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
-        cursor++;
-
-        // Link to Source
-        const linkCell = dataRow.getCell(cursor);
-        if (href) {
-            linkCell.value = { text: 'View PDF', hyperlink: href };
-            linkCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
-        } else {
-            linkCell.value = 'View PDF';
-            linkCell.style = { font: { size: 10, color: { argb: 'FF9CA3AF' }, italic: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'center' }, border: commonBorder };
-        }
 
         // Grouping
         const isSameGroup = (sentOnStr === prevSentOn && skNum === prevSkNum);

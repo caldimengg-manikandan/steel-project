@@ -7,7 +7,7 @@ const { downloadFile: downloadFromOneDrive } = require('../utils/onedrive');
 const mongoose = require('mongoose');
 
 const SCRIPT_PATH = path.join(__dirname, '../scripts/extract_rfi.py');
-const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'py' : 'python3');
 
 function _downloadFromGridFS(fileId, destPath) {
     return new Promise((resolve, reject) => {
