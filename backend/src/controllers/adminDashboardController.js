@@ -11,10 +11,20 @@ const { getExternalProjects } = require('../services/externalProjectService');
  */
 async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
+    const mongoose = require('mongoose');
+
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
+
     const filter = {};
-    if (req.principal.role !== 'superadmin') {
-        filter.createdByAdminId = adminId;
+    if (isFullAccess) {
+        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
+    } else {
+        const userId = req.principal.id;
+        const queryUserId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+        filter['assignments.userId'] = queryUserId;
     }
+
     const userFilter = {};
     if (req.principal.role !== 'superadmin') {
         userFilter.adminId = adminId;

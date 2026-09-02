@@ -5,7 +5,7 @@ import { formatDate } from '../../utils/dateUtils';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { useMessage } from '../../context/MessageContext';
-import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload } from '../../components/Icons';
+import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit } from '../../components/Icons';
 
 interface CreateUserForm {
     username: string; 
@@ -34,6 +34,20 @@ export default function AdminUsers() {
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
     const [assignClient, setAssignClient] = useState('ALL');
+
+    const [editTarget, setEditTarget] = useState<User | null>(null);
+    const [editForm, setEditForm] = useState<{
+        displayName: string;
+        email: string;
+        role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+        password?: string;
+    }>({
+        displayName: '',
+        email: '',
+        role: 'team_member',
+        password: ''
+    });
+    const [savingEdit, setSavingEdit] = useState(false);
 
     const [showCreate, setShowCreate] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
@@ -128,6 +142,30 @@ export default function AdminUsers() {
                 showMessage('Error', err.message, 'error');
             }
         });
+    }
+
+    async function handleUpdateUser() {
+        if (!editTarget) return;
+        try {
+            setSavingEdit(true);
+            const updateData: any = {
+                displayName: editForm.displayName,
+                email: editForm.email,
+                role: editForm.role || 'team_member'
+            };
+            if (editForm.password && editForm.password.trim()) {
+                updateData.password = editForm.password;
+            }
+
+            const { user: updated } = await adminUpdateUser(editTarget.id, updateData);
+            setUsers((prev) => prev.map((u) => (u.id === editTarget.id ? { ...updated, id: updated._id || updated.id } : u)));
+            setEditTarget(null);
+            showMessage('Success', `User "${updated.username}" updated successfully.`, 'success');
+        } catch (err: any) {
+            showMessage('Error', err.message || 'Failed to update user', 'error');
+        } finally {
+            setSavingEdit(false);
+        }
     }
 
     async function handleToggleStatus(u: User) {
@@ -294,55 +332,70 @@ export default function AdminUsers() {
                                         </td>
                                         <td style={{ color: 'var(--color-text-secondary)' }}>{u.email}</td>
                                         <td>
-                                            <span style={{ 
-                                                textTransform: 'capitalize', 
-                                                fontWeight: 600, 
-                                                fontSize: 12,
-                                                color: u.role === 'superadmin' ? 'var(--color-danger-mid)' : 
-                                                       u.role === 'project_manager' ? 'var(--color-primary)' : 
-                                                       u.role === 'team_lead' ? 'var(--color-success-mid)' : 'var(--color-text-secondary)'
-                                            }}>
-                                                {u.role ? u.role.split('_').join(' ') : 'User'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span style={{
-                                                fontWeight: 500,
-                                                color: countRoles(u.id) > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                                            }}>
-                                                {countRoles(u.id)} assignment{countRoles(u.id) !== 1 ? 's' : ''}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${u.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
-                                                {u.status === 'active' ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </td>
-                                        <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {formatDate(u.createdAt)}
-                                        </td>
-                                        <td>
-                                            <div className="btn-group">
-                                                <button
-                                                    className="btn btn-secondary btn-sm"
-                                                    onClick={() => { 
-                                                        setAssignTarget(u); 
-                                                        setAssignProject(''); 
-                                                        // team_member defaults to editor per role design
-                                                        setAssignRole(u.role === 'team_member' ? 'editor' : 'viewer'); 
-                                                        setAssignClient('ALL'); 
-                                                    }}
-                                                    title="Assign Project"
-                                                >
-                                                    <IconAssign /> Assign
-                                                </button>
-                                                <button
-                                                    className="btn btn-ghost btn-sm"
-                                                    onClick={() => handleToggleStatus(u)}
-                                                    style={{ fontSize: 12 }}
-                                                >
-                                                    {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                                                </button>
+                                             <span style={{ 
+                                                 textTransform: 'capitalize', 
+                                                 fontWeight: 600, 
+                                                 fontSize: 12,
+                                                 color: u.role === 'superadmin' ? 'var(--color-danger-mid)' : 
+                                                        u.role === 'project_manager' ? 'var(--color-primary)' : 
+                                                        u.role === 'team_lead' ? 'var(--color-success-mid)' : 'var(--color-text-secondary)'
+                                             }}>
+                                                 {(!u.role || u.role === 'user') ? 'Team Member' : u.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                             </span>
+                                         </td>
+                                         <td>
+                                             <span style={{
+                                                 fontWeight: 500,
+                                                 color: countRoles(u.id) > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                                             }}>
+                                                 {countRoles(u.id)} assignment{countRoles(u.id) !== 1 ? 's' : ''}
+                                             </span>
+                                         </td>
+                                         <td>
+                                             <span className={`badge ${u.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
+                                                 {u.status === 'active' ? 'Active' : 'Inactive'}
+                                             </span>
+                                         </td>
+                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
+                                             {formatDate(u.createdAt)}
+                                         </td>
+                                         <td>
+                                             <div className="btn-group">
+                                                 <button
+                                                     className="btn btn-secondary btn-sm"
+                                                     onClick={() => {
+                                                         setEditTarget(u);
+                                                         setEditForm({
+                                                             displayName: u.displayName || '',
+                                                             email: u.email || '',
+                                                             role: (u.role as any) || 'team_member',
+                                                             password: ''
+                                                         });
+                                                     }}
+                                                     title="Edit User & Role"
+                                                 >
+                                                     <IconEdit /> Edit
+                                                 </button>
+                                                 <button
+                                                     className="btn btn-secondary btn-sm"
+                                                     onClick={() => { 
+                                                         setAssignTarget(u); 
+                                                         setAssignProject(''); 
+                                                         // team_member defaults to editor per role design
+                                                         setAssignRole(u.role === 'team_member' ? 'editor' : 'viewer'); 
+                                                         setAssignClient('ALL'); 
+                                                     }}
+                                                     title="Assign Project"
+                                                 >
+                                                     <IconAssign /> Assign
+                                                 </button>
+                                                 <button
+                                                     className="btn btn-ghost btn-sm"
+                                                     onClick={() => handleToggleStatus(u)}
+                                                     style={{ fontSize: 12 }}
+                                                 >
+                                                     {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                                                 </button>
                                                 <button
                                                     className="btn btn-danger btn-sm btn-icon"
                                                     onClick={() => handleDelete(u.id, u.username)}
@@ -505,6 +558,87 @@ export default function AdminUsers() {
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
                                     <button type="submit" className="btn btn-primary" disabled={creating || !form.username || !form.email || !form.password}>
                                         {creating ? 'Creating...' : 'Create User Account'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit User Modal ── */}
+            {editTarget && (
+                <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+                    <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Edit User — {editTarget.username}</span>
+                            <button className="modal-close" onClick={() => setEditTarget(null)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body">
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleUpdateUser();
+                                }}
+                                autoComplete="off"
+                            >
+                                {/* Account Role */}
+                                <div className="form-group">
+                                    <label className="form-label required">Account Role</label>
+                                    <select
+                                        className="form-control"
+                                        value={editForm.role === 'user' ? 'team_member' : editForm.role}
+                                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
+                                    >
+                                        <option value="team_member">Team Member — Editor access (assigned)</option>
+                                        <option value="team_lead">Team Lead — Full system access</option>
+                                        <option value="project_manager">Project Manager — Full system access</option>
+                                        <option value="superadmin">Superadmin — Full system access</option>
+                                    </select>
+                                </div>
+
+                                {/* Email Address */}
+                                <div className="form-group">
+                                    <label className="form-label required">Email Address</label>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        value={editForm.email}
+                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+
+                                {/* Display Name */}
+                                <div className="form-group">
+                                    <label className="form-label">Display Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="Display Name"
+                                        value={editForm.displayName}
+                                        onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
+                                    />
+                                </div>
+
+                                {/* New Password (Optional) */}
+                                <div className="form-group">
+                                    <label className="form-label">New Password (Leave blank to keep unchanged)</label>
+                                    <input
+                                        type="password"
+                                        className="form-control"
+                                        placeholder="New Password (optional)"
+                                        value={editForm.password || ''}
+                                        onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="form-actions" style={{ marginTop: 24 }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setEditTarget(null)} disabled={savingEdit}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="btn btn-primary" disabled={savingEdit}>
+                                        {savingEdit ? 'Saving...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </form>

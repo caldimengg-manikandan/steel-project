@@ -14,11 +14,12 @@
  */
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const Admin = require('../models/Admin');
 const Project = require('../models/Project');
 
 /**
  * GET /api/admin/users
- * Returns ONLY users belonging to the logged-in admin.
+ * Returns users belonging to the logged-in admin scope plus the primary tenant Admin.
  */
 async function listUsers(req, res) {
     const adminId = req.principal.adminId;
@@ -27,9 +28,30 @@ async function listUsers(req, res) {
     const users = await User
         .find(query)
         .select('-password_hash')
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
-    res.json({ count: users.length, users });
+    const primaryAdmin = await Admin.findById(adminId).select('-password_hash').lean();
+    let allUsers = users.map(u => ({ ...u, id: u._id.toString() }));
+    if (primaryAdmin) {
+        const formattedAdmin = {
+            _id: primaryAdmin._id,
+            id: primaryAdmin._id.toString(),
+            username: primaryAdmin.username,
+            email: primaryAdmin.email,
+            displayName: primaryAdmin.displayName || primaryAdmin.username,
+            role: primaryAdmin.role === 'admin' ? 'superadmin' : (primaryAdmin.role || 'superadmin'),
+            status: primaryAdmin.status || 'active',
+            createdAt: primaryAdmin.createdAt,
+            adminId: primaryAdmin._id
+        };
+        const exists = users.some(u => u._id.toString() === primaryAdmin._id.toString());
+        if (!exists) {
+            allUsers = [formattedAdmin, ...allUsers];
+        }
+    }
+
+    res.json({ count: allUsers.length, users: allUsers });
 }
 
 /**

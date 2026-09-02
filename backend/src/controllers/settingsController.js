@@ -58,7 +58,7 @@ exports.updateSettings = async (req, res) => {
         console.error('[Scheduler] Failed to reload scheduler:', err.message);
     }
     
-    const username = req.user ? req.user.username : 'Admin';
+    const username = req.principal?.username || req.user?.username || 'Admin';
     await logActivity(username, 'Config', 'System settings updated');
     
     res.json(settings);
@@ -89,7 +89,7 @@ exports.uploadLogo = async (req, res) => {
     settings.logoPath = relativePath;
     await settings.save();
 
-    const username = req.user ? req.user.username : 'Admin';
+    const username = req.principal?.username || req.user?.username || 'Admin';
     await logActivity(username, 'Config', 'Company logo updated');
 
     res.json({ message: 'Logo uploaded successfully', logoPath: relativePath });
@@ -126,7 +126,7 @@ exports.updateEmailSettings = async (req, res) => {
         }
         await settings.save();
 
-        const username = req.user ? req.user.username : 'Admin';
+        const username = req.principal?.username || req.user?.username || 'Admin';
         await logActivity(username, 'Config', 'Email settings updated');
 
         const safeSettings = settings.toObject();

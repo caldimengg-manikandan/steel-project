@@ -29,6 +29,7 @@ export interface User {
     _id?: string;
     username: string;
     email: string;
+    displayName?: string;
     role: UserRole;
     status: UserStatus;
     createdAt: string;

@@ -36,12 +36,19 @@ const { calculateSowProgress } = require('../utils/sowCalculator');
  * List all projects owned by the logged-in admin.
  */
 async function listProjects(req, res) {
-    const adminId = req.principal.adminId;
     const { status, search } = req.query;
 
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
+
     const filter = {};
-    if (req.principal.role !== 'superadmin') {
-        filter.createdByAdminId = adminId;
+    if (isFullAccess) {
+        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
+    } else {
+        // Limited access roles (team_member / user) see ONLY their assigned projects
+        const userId = req.principal.id;
+        const queryUserId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+        filter['assignments.userId'] = queryUserId;
     }
     if (status) filter.status = status;
     if (search) {

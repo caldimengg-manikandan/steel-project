@@ -30,11 +30,11 @@ async function listMyProjects(req, res) {
         status: { $ne: 'archived' }
     };
 
-    if (!isFullAccess) {
-        query['assignments.userId'] = queryUserId;
+    if (isFullAccess) {
+        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
     } else {
-        // Full access roles of the tenant see all projects created by that tenant
-        query['createdByAdminId'] = new mongoose.Types.ObjectId(req.principal.adminId);
+        // Limited access roles see ONLY their assigned projects
+        query['assignments.userId'] = queryUserId;
     }
 
     const projects = await Project

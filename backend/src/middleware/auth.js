@@ -59,6 +59,7 @@ async function verifyToken(req, res, next) {
                 role: 'admin',
                 adminId: admin._id.toString(),   // for admin: adminId === their own id
             };
+            req.user = req.principal;
         } else {
             const user = await User.findById(decoded.id).select('-password_hash');
             if (!user || user.status !== 'active') {
@@ -71,6 +72,7 @@ async function verifyToken(req, res, next) {
                 role: user.role || 'user',
                 adminId: user.adminId.toString(),  // for user: adminId = their admin's id
             };
+            req.user = req.principal;
         }
         next();
     } catch (err) {

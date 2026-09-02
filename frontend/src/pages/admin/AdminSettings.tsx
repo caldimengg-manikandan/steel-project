@@ -618,11 +618,22 @@ export default function AdminSettings() {
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         overflow: 'hidden', background: 'var(--color-bg-page)'
                                     }}>
-                                        {settings.logoPath ? (
-                                            <img src={settings.logoPath} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%' }} />
-                                        ) : (
-                                            <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>No Logo</span>
-                                        )}
+                                         {settings.logoPath ? (
+                                             <img 
+                                                 src={settings.logoPath.startsWith('/steel') ? settings.logoPath : `/steel${settings.logoPath.startsWith('/') ? '' : '/'}${settings.logoPath}`} 
+                                                 alt="Logo" 
+                                                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                                                 onError={(e) => {
+                                                     const target = e.target as HTMLImageElement;
+                                                     if (!target.dataset.retried) {
+                                                         target.dataset.retried = 'true';
+                                                         target.src = settings.logoPath;
+                                                     }
+                                                 }}
+                                             />
+                                         ) : (
+                                             <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>No Logo</span>
+                                         )}
                                     </div>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 600 }}>System Logo</div>
