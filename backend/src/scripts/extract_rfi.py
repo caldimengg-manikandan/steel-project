@@ -25,31 +25,66 @@ def get_q_num(text):
 
 
 def is_drawing_note(text):
-    """Detect if a text block is likely a drawing legend or general notes block rather than an RFI description."""
+    """Detect if a text block is likely a drawing legend, revision block, background title block, or general notes block rather than an RFI description."""
     text_upper = text.upper()
     
-    # 1. Explicit Headers
-    if any(h in text_upper for h in ["GENERAL NOTES", "STRUCTURAL NOTES", "TYPICAL NOTES"]):
+    # 1. Explicit Headers & Structural Notes
+    if any(h in text_upper for h in ["GENERAL NOTES", "STRUCTURAL NOTES", "TYPICAL NOTES", "REVISIONS", "REVISION LOG", "INFORMATION NOTED"]):
+        return True
+
+    # 2. Revision block headers, title block fields & standard drawing stamps
+    if any(rh in text_upper for rh in ["REV#", "DWN BY", "ISSUED FOR APPROVAL", "THIS DRAWING IS THE", "DWN", "CHKD", "REV #", "DWG NO"]):
+        return True
+
+    # 3. References to sheet background notes (e.g. "SEE NOTE 8 ON S133", "VERIFIED IN FIELD")
+    if re.search(r'\bSEE\s+NOTE\s+\d+\b', text_upper) or "VERIFIED IN FIELD" in text_upper:
         return True
         
-    # 2. Legends (Denotes/Indicates)
+    # 4. Legends (Denotes/Indicates)
     if text_upper.count("DENOTES") + text_upper.count("INDICATES") >= 2:
         return True
         
-    # 3. Heavy CAD Abbreviations
+    # 5. Heavy CAD Abbreviations
     if text_upper.count("U.N.O") >= 2 or text_upper.count("UNO") >= 3:
         return True
         
-    # 4. Long Numbered Lists (4+ items) - RFIs rarely have 4+ numbered items in a single bubble
+    # 6. Long Numbered Lists (4+ items) - RFIs rarely have 4+ numbered items in a single bubble
     list_matches = re.findall(r'\b\d+\s*\.\s*[A-Z\-]', text_upper)
     if len(list_matches) >= 4:
         return True
         
-    # 5. Title block elements, file paths, and Revit/CAD template stamps
+    # 7. Title block elements, file paths, and Revit/CAD template stamps
     if any(k in text_upper for k in ["DRAWING TITLE", "SHEET TITLE", "TEMPLATE:", ".RVT", ".DWG", "C:\\USERS\\", "C:/USERS/"]):
         return True
         
     return False
+
+
+def clean_duplicate_sentences(desc):
+    """
+    Remove duplicate paragraphs, numbered query items (#1, #2), or repeated sentences from RFI description text.
+    """
+    if not desc or len(desc) < 10:
+        return desc
+
+    # 1. Deduplicate numbered queries like #1., #2., Q1., etc.
+    items = re.split(r'(?=(?:^|\s)#\d+[\.:\s])', desc)
+    if len(items) > 1:
+        seen = []
+        for item in items:
+            it_clean = item.strip()
+            if it_clean and it_clean not in seen:
+                seen.append(it_clean)
+        return ' '.join(seen)
+
+    # 2. General sentence/paragraph deduplication
+    parts = re.split(r'(?<=\.)\s+|\n+', desc)
+    seen_parts = []
+    for p in parts:
+        p_clean = p.strip()
+        if p_clean and p_clean not in seen_parts:
+            seen_parts.append(p_clean)
+    return ' '.join(seen_parts)
 
 
 def is_blue_color(color):
@@ -92,6 +127,7 @@ def get_blue_boxes(page):
     return blue_rects
 
 
+
 def extract_rfi(pdf_path, original_filename):
     rfis = []
 
@@ -120,7 +156,8 @@ def extract_rfi(pdf_path, original_filename):
                             'y0': annot.rect.y0,
                             'x1': annot.rect.x1,
                             'y1': annot.rect.y1,
-                            'rect': annot.rect
+                            'rect': annot.rect,
+                            'is_annot': True
                         })
 
             # ---------------------------------------------------------------
@@ -183,7 +220,8 @@ def extract_rfi(pdf_path, original_filename):
                             'y0': b['y0'],
                             'x1': b['x1'],
                             'y1': b['y1'],
-                            'rect': fitz.Rect(b['x0'], b['y0'], b['x1'], b['y1'])
+                            'rect': fitz.Rect(b['x0'], b['y0'], b['x1'], b['y1']),
+                            'is_annot': False
                         })
             except Exception as e:
                 print(f"[RfiScript] Warning: Failed to extract text-layer lines: {e}")
@@ -289,16 +327,41 @@ def extract_rfi(pdf_path, original_filename):
                                     box_texts.append(sibling)
 
                     if box_texts:
+                        # Prioritize actual PDF markup annotation text over underlying background sheet layer text
+                        annot_texts = [bt for bt in box_texts if bt.get('is_annot')]
+                        if annot_texts:
+                            box_texts = annot_texts
+
                         # Deduplicate overlapping text blocks inside callout box
                         unique_box_texts = []
                         for bt in box_texts:
-                            if not any(ub['text'] == bt['text'] or (abs(ub['x0'] - bt['x0']) < 5 and abs(ub['y0'] - bt['y0']) < 5) for ub in unique_box_texts):
+                            bt_text = bt['text'].strip()
+                            if not bt_text:
+                                continue
+                            is_dup = False
+                            for ub in unique_box_texts:
+                                ub_text = ub['text'].strip()
+                                if ub_text == bt_text or (abs(ub['x0'] - bt['x0']) < 15 and abs(ub['y0'] - bt['y0']) < 15):
+                                    is_dup = True
+                                    if len(bt_text) > len(ub_text):
+                                        ub['text'] = bt_text
+                                    break
+                                elif bt_text in ub_text:
+                                    is_dup = True
+                                    break
+                                elif ub_text in bt_text:
+                                    ub['text'] = bt_text
+                                    is_dup = True
+                                    break
+                            if not is_dup:
                                 unique_box_texts.append(bt)
                         unique_box_texts.sort(key=lambda t: (t['y0'], t['x0']))
                         desc = ' '.join(t['text'].strip() for t in unique_box_texts)
                     else:
                         # Fallback: pick closest single block (best_annot) directly associated with Q tag
                         desc = str(best_annot.get('text', ''))
+
+                    desc = clean_duplicate_sentences(desc)
 
                     page_rfis.append({
                         'rfiNumber': rfi_num,
@@ -320,6 +383,7 @@ def extract_rfi(pdf_path, original_filename):
                     if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?$', desc, re.IGNORECASE):
                         continue
 
+                    desc = clean_duplicate_sentences(desc)
                     rfi_num = f"Q{combined_match.group(1).upper()}"
                     page_rfis.append({
                         'rfiNumber': rfi_num,
