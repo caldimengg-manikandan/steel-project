@@ -177,7 +177,26 @@ async function appendRowsToProjectExcel(projectId, rows) {
                     const safeProjectName = proj.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
                     const targetDir = `Projects/${safeProjectName}/Logs`;
                     const filename = `${safeProjectName}_Drawing_Log.xlsx`;
-                    const buffer = fs.readFileSync(filePath);
+
+                    let buffer;
+                    const { getDrawingLog } = require('./drawingLogService');
+                    const { generateDrawingLogExcel } = require('./transmittalExcelService');
+                    const SystemSettings = require('../models/SystemSettings');
+
+                    const drawingLog = await getDrawingLog(projectId);
+                    const settings = await SystemSettings.findOne().lean();
+                    const projectDetails = {
+                        projectName: proj.name,
+                        clientName: proj.clientName || 'CLIENT'
+                    };
+
+                    if (drawingLog) {
+                        const generated = await generateDrawingLogExcel(drawingLog, projectDetails, settings?.logoPath);
+                        buffer = generated.buffer;
+                    } else {
+                        buffer = fs.readFileSync(filePath);
+                    }
+
                     console.log(`[ExcelService] Uploading Excel to Storage Gateway: ${targetDir}/${filename}`);
                     await storageGateway.uploadFile(targetDir, filename, buffer);
                 }

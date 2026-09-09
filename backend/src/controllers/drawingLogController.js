@@ -69,6 +69,19 @@ exports.downloadDrawingLogExcel = async (req, res) => {
 
         const { buffer, filename } = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
 
+        // ── Save/Sync Excel to Storage Gateway ─────────
+        try {
+            const storageGateway = require('../utils/storageGateway');
+            if (storageGateway.isEnabled() && project && project.name) {
+                const safeProjectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+                const targetDir = `Projects/${safeProjectName}/Logs`;
+                console.log(`[DrawingLogController] Uploading downloaded Drawing Log Excel to Storage Gateway: ${targetDir}/${filename}`);
+                await storageGateway.uploadFile(targetDir, filename, buffer);
+            }
+        } catch (gwErr) {
+            console.error('[DrawingLogController] Failed to upload to Storage Gateway:', gwErr.message);
+        }
+
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.send(buffer);
