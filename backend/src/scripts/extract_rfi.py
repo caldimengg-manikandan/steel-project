@@ -45,8 +45,8 @@ def is_drawing_note(text):
     if len(list_matches) >= 4:
         return True
         
-    # 5. Title block elements
-    if "DRAWING TITLE" in text_upper or "SHEET TITLE" in text_upper:
+    # 5. Title block elements, file paths, and Revit/CAD template stamps
+    if any(k in text_upper for k in ["DRAWING TITLE", "SHEET TITLE", "TEMPLATE:", ".RVT", ".DWG", "C:\\USERS\\", "C:/USERS/"]):
         return True
         
     return False
@@ -226,47 +226,80 @@ def extract_rfi(pdf_path, original_filename):
                     best_annot = {}
                     min_dist = float('inf')
 
+                    # Find blue callout box enclosing or attached to the Q-tag 'a'
+                    cx_a, cy_a = (a['x0'] + a['x1'])/2, (a['y0'] + a['y1'])/2
+                    a_pt = fitz.Point(cx_a, cy_a)
+                    target_blue_box = None
+                    for b_rect in blue_boxes:
+                        # Ignore huge outer border/sheet boxes or multi-column regions (width or height > 350pt)
+                        if b_rect.width > 350 or b_rect.height > 350:
+                            continue
+                        expanded_b = b_rect + (-15, -15, 15, 15)
+                        if expanded_b.contains(a_pt) or expanded_b.intersects(a['rect']):
+                            target_blue_box = b_rect
+                            break
+
                     for sibling in valid_annots:
                         if sibling == a:
                             continue
                         if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
                             continue
 
-                        # Check if sibling text center is inside or directly enclosed by a blue box
                         cx_s = (sibling['x0'] + sibling['x1']) / 2
                         cy_s = (sibling['y0'] + sibling['y1']) / 2
                         s_pt = fitz.Point(cx_s, cy_s)
-                        in_blue_box = False
-                        for b_rect in blue_boxes:
-                            expanded_b = b_rect + (-25, -25, 25, 25)
-                            if expanded_b.contains(s_pt):
-                                in_blue_box = True
-                                break
 
-                        # If blue boxes are present on the page, strictly require the candidate text to be inside a blue box
-                        if blue_boxes and not in_blue_box:
-                            continue
+                        # If a blue callout box encloses the Q tag, check if sibling is inside the exact same box
+                        in_same_box = False
+                        if target_blue_box:
+                            if target_blue_box.contains(s_pt) or target_blue_box.intersects(sibling['rect']):
+                                in_same_box = True
 
                         x_dist = max(0, max(a['x0'] - sibling['x1'], sibling['x0'] - a['x1']))
                         y_dist = max(0, max(a['y0'] - sibling['y1'], sibling['y0'] - a['y1']))
                         rect_dist = (x_dist**2 + y_dist**2)**0.5
 
-                        cx_a, cy_a = (a['x0'] + a['x1'])/2, (a['y0'] + a['y1'])/2
-                        cx_s, cy_s = (sibling['x0'] + sibling['x1'])/2, (sibling['y0'] + sibling['y1'])/2
                         center_dist = ((cx_a - cx_s)**2 + (cy_a - cy_s)**2)**0.5
 
                         overlap_bonus = len(sibling['text']) * 0.5 if rect_dist < 20 else 0
-                        blue_box_bonus = 10000 if in_blue_box else 0
-                        dist = rect_dist + 0.01 * center_dist - overlap_bonus - blue_box_bonus
+                        same_box_bonus = 10000 if in_same_box else 0
+                        dist = rect_dist + 0.01 * center_dist - overlap_bonus - same_box_bonus
 
-                        if dist < min_dist and rect_dist < 300:
-                            if (len(sibling['text']) > 5 or 'response' in sibling['text'].lower()) and len(sibling['text']) < 1500:
+                        if dist < min_dist and rect_dist < 250:
+                            if (len(sibling['text']) > 5 or 'response' in sibling['text'].lower()) and len(sibling['text']) < 3000:
                                 if is_drawing_note(sibling['text']):
                                     continue
                                 min_dist = dist
                                 best_annot = sibling
 
-                    desc = str(best_annot.get('text', ''))
+                    # Collect text strictly inside the detected blue callout box
+                    box_texts = []
+                    if target_blue_box:
+                        strict_box = fitz.Rect(target_blue_box.x0 - 5, target_blue_box.y0 - 5, target_blue_box.x1 + 5, target_blue_box.y1 + 5)
+                        for sibling in valid_annots:
+                            if sibling == a:
+                                continue
+                            if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
+                                continue
+                            cx_s = (sibling['x0'] + sibling['x1']) / 2
+                            cy_s = (sibling['y0'] + sibling['y1']) / 2
+                            s_pt = fitz.Point(cx_s, cy_s)
+                            if strict_box.contains(s_pt) or strict_box.intersects(sibling['rect']):
+                                if not is_drawing_note(sibling['text']):
+                                    box_texts.append(sibling)
+
+                    if box_texts:
+                        # Deduplicate overlapping text blocks inside callout box
+                        unique_box_texts = []
+                        for bt in box_texts:
+                            if not any(ub['text'] == bt['text'] or (abs(ub['x0'] - bt['x0']) < 5 and abs(ub['y0'] - bt['y0']) < 5) for ub in unique_box_texts):
+                                unique_box_texts.append(bt)
+                        unique_box_texts.sort(key=lambda t: (t['y0'], t['x0']))
+                        desc = ' '.join(t['text'].strip() for t in unique_box_texts)
+                    else:
+                        # Fallback: pick closest single block (best_annot) directly associated with Q tag
+                        desc = str(best_annot.get('text', ''))
+
                     page_rfis.append({
                         'rfiNumber': rfi_num,
                         'refDrawing': original_filename,
@@ -299,26 +332,18 @@ def extract_rfi(pdf_path, original_filename):
                         '_rect': a['rect']
                     })
 
-            # Filter out RFIs with empty or invalid descriptions, and deduplicate by description text
+            # Filter out RFIs with invalid drawing notes and deduplicate
             filtered_page_rfis = []
-            seen_descriptions = set()
+            seen_items = set()
             for rfi in page_rfis:
                 desc = str(rfi.get('description', '')).strip()
-                if len(desc) >= 5 and not is_drawing_note(desc) and desc not in seen_descriptions:
-                    seen_descriptions.add(desc)
+                item_key = (rfi.get('rfiNumber'), desc)
+                if not is_drawing_note(desc) and item_key not in seen_items:
+                    seen_items.add(item_key)
                     filtered_page_rfis.append(rfi)
 
-            # If main single-digit Q-numbers (Q1-Q9) exist on the page, filter out high secondary numbers (Q10+)
-            has_main_q = any(re.match(r'^Q[1-9]$', r['rfiNumber'], re.IGNORECASE) for r in filtered_page_rfis)
-            if has_main_q:
-                filtered_page_rfis = [r for r in filtered_page_rfis if re.match(r'^Q[1-9]$', r['rfiNumber'], re.IGNORECASE)]
-
-            page_rfis = filtered_page_rfis
-
             # 3. Process Responses and Status Keywords
-            closed_keywords = ['confirmed', 'ok', 'approved', 'closed', 'resolved']
-
-            for rfi in page_rfis:
+            for rfi in filtered_page_rfis:
                 desc_text = str(rfi.get('description', ''))
                 
                 # Only drop if the description exactly equals "void", "closed", etc., or starts with "void "
@@ -335,6 +360,8 @@ def extract_rfi(pdf_path, original_filename):
 
                 desc_rect = rfi['_rect']
                 if desc_rect is None:
+                    # Status is CLOSED ONLY IF non-empty response exists
+                    rfi['status'] = 'CLOSED' if rfi.get('response', '').strip() else 'OPEN'
                     rfis.append(rfi)
                     continue
                 drect = fitz.Rect(desc_rect)
@@ -354,14 +381,13 @@ def extract_rfi(pdf_path, original_filename):
                             skip_rfi = True
                             break
 
-                        words_set = set(re.findall(r'\b\w+\b', text_lower))
-                        if any(k in words_set for k in closed_keywords):
-                            rfi['status'] = 'CLOSED'
-
                         if text_lower.startswith('response:') or text_lower.startswith('ans:'):
                             parts = re.split(r'response:|ans:|answer:', a['text'], flags=re.IGNORECASE)
                             if len(parts) > 1:
                                 rfi['response'] = parts[-1].strip()
+
+                # Status is strictly OPEN unless a non-empty response has been extracted
+                rfi['status'] = 'CLOSED' if rfi.get('response', '').strip() else 'OPEN'
 
                 if not skip_rfi:
                     rfis.append(rfi)
@@ -387,7 +413,13 @@ def extract_rfi(pdf_path, original_filename):
             if not desc:
                 score = -20000
             else:
-                score = len(desc)
+                # Prefer descriptions between 20 and 500 characters (typical RFI callout size)
+                # Penalize giant runaway text blocks (>500 chars) that grab sheet notes
+                if len(desc) > 500:
+                    score = 500 - (len(desc) - 500)
+                else:
+                    score = len(desc)
+
                 # Penalize descriptions claimed by multiple different RFI numbers
                 if len(desc_owners.get(desc, set())) > 1:
                     score -= 10000

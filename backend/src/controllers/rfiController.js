@@ -200,21 +200,18 @@ exports.updateRfiResponse = async (req, res) => {
             return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
         }
 
-        const { response, remarks, clientRfiNumber } = req.body;
+        const { response, remarks, clientRfiNumber, status: reqStatus } = req.body;
         const reqResponse = response !== undefined ? response : extraction.rfis[idx].response;
         const reqRemarks = remarks !== undefined ? remarks : extraction.rfis[idx].remarks;
         const reqClientRfiNumber = clientRfiNumber !== undefined ? clientRfiNumber : extraction.rfis[idx].clientRfiNumber;
 
         const hasResponse = reqResponse && reqResponse.trim() !== '';
-        const hasRemarks = reqRemarks && reqRemarks.trim() !== '';
 
         let newStatus = 'OPEN';
-        if (hasResponse && !hasRemarks) {
-            newStatus = 'CLOSED';
-        } else if (hasRemarks && !hasResponse) {
-            newStatus = 'OPEN';
-        } else if (hasResponse && hasRemarks) {
-            newStatus = 'CLOSED';
+        if (reqStatus && ['OPEN', 'CLOSED'].includes(reqStatus.toUpperCase())) {
+            newStatus = reqStatus.toUpperCase();
+        } else {
+            newStatus = hasResponse ? 'CLOSED' : 'OPEN';
         }
 
         const oldStatus = extraction.rfis[idx].status;
