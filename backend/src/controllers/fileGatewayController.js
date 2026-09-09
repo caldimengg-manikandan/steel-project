@@ -216,21 +216,46 @@ exports.remove = async (req, res) => {
         await storageGateway.deleteFile(deletedPath);
 
         // Clean up matching DrawingExtraction records from the database
-        // This covers both single-file deletes and recursive folder deletes
+        // This covers single-file deletes, subfolder deletes, and root project folder deletes
         try {
             const DrawingExtraction = require('../models/DrawingExtraction');
-            const cleanPath = deletedPath.replace(/\\/g, '/');
+            const Project = require('../models/Project');
+            const cleanPath = deletedPath.replace(/\\/g, '/').replace(/\/+$/, '');
+            const pathParts = cleanPath.split('/').filter(Boolean);
 
-            // Match extractions whose storageGatewayPath equals or starts with the deleted path
-            const deleteResult = await DrawingExtraction.deleteMany({
-                $or: [
-                    { storageGatewayPath: cleanPath },
-                    { storageGatewayPath: { $regex: `^${cleanPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/` } }
-                ]
-            });
+            const searchConditions = [
+                { storageGatewayPath: cleanPath },
+                { storageGatewayPath: { $regex: `^${cleanPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`, $options: 'i' } }
+            ];
+
+            // If deleting a specific file (e.g. filename.pdf)
+            const fileName = pathParts[pathParts.length - 1];
+            if (fileName && fileName.includes('.')) {
+                searchConditions.push({ originalFileName: new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+            }
+
+            // If deleting the entire project folder: Projects/<ProjectName>
+            if (pathParts.length >= 2 && pathParts[0].toLowerCase() === 'projects') {
+                const projName = pathParts[1].replace(/_/g, ' ');
+                const proj = await Project.findOne({
+                    $or: [
+                        { name: new RegExp(`^${projName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                        { name: new RegExp(`^${pathParts[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                    ]
+                }).lean();
+
+                if (proj) {
+                    // If deleting the root project folder or all drawing subfolders, also match by projectId
+                    if (pathParts.length === 2) {
+                        searchConditions.push({ projectId: proj._id });
+                    }
+                }
+            }
+
+            const deleteResult = await DrawingExtraction.deleteMany({ $or: searchConditions });
 
             if (deleteResult.deletedCount > 0) {
-                console.log(`[FileGateway] Also removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
+                console.log(`[FileGateway] Removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
             }
         } catch (dbErr) {
             console.error('[FileGateway] DB cleanup warning:', dbErr.message);
