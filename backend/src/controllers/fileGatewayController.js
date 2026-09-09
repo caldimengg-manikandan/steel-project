@@ -128,6 +128,30 @@ exports.download = async (req, res) => {
  *   - files: the file(s) to upload
  *   - targetPath: relative directory path to save into
  */
+// Helper function to check if a file is a Transmittal or Drawing Log file
+function isLogFile(filename) {
+    if (!filename) return false;
+    const lower = filename.toLowerCase();
+    return lower.includes('transmittal') || lower.includes('drawing_log') || lower.includes('drawing log') || lower.includes('master_log') || lower.includes('master log');
+}
+
+// Helper function to sanitize targetDir so non-log files are never placed inside /Logs
+function sanitizeUploadTargetDir(targetDir, filename) {
+    if (!targetDir) return targetDir;
+    const cleanDir = targetDir.replace(/\\/g, '/');
+    const isLogsDir = /\/Logs($|\/)/i.test(cleanDir) || /^Logs($|\/)/i.test(cleanDir);
+    
+    if (isLogsDir && !isLogFile(filename)) {
+        let redirected = cleanDir
+            .replace(/\/Logs($|\/)/gi, '/')
+            .replace(/^Logs($|\/)/gi, '')
+            .replace(/\/+/g, '/')
+            .replace(/\/$/, '');
+        return redirected;
+    }
+    return targetDir;
+}
+
 exports.upload = async (req, res) => {
     try {
         const targetDir = req.body.targetPath || '';
@@ -140,8 +164,9 @@ exports.upload = async (req, res) => {
 
         for (const file of req.files) {
             try {
+                const finalTargetDir = sanitizeUploadTargetDir(targetDir, file.originalname);
                 const result = await storageGateway.uploadFile(
-                    targetDir,
+                    finalTargetDir,
                     file.originalname,
                     file.buffer
                 );

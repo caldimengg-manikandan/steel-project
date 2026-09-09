@@ -690,7 +690,15 @@ async function uploadFolder(req, res) {
         const relativePath = pathArray[i] || file.originalname;
 
         // Get the optional base target path (from Storage UI), otherwise default to root project folder
-        const baseTarget = req.body.targetPath || `Projects/${projectName}`;
+        let baseTarget = req.body.targetPath || `Projects/${projectName}`;
+        
+        // Sanitize baseTarget if it points to Logs for non-log files
+        const isLogFile = (fn) => fn && /transmittal|drawing_log|drawing log|master_log|master log/i.test(fn);
+        if (/\/Logs($|\/)/i.test(baseTarget) || /^Logs($|\/)/i.test(baseTarget)) {
+            if (!isLogFile(file.originalname)) {
+                baseTarget = baseTarget.replace(/\/Logs($|\/)/gi, '/').replace(/^Logs($|\/)/gi, '').replace(/\/+/g, '/').replace(/\/$/, '');
+            }
+        }
 
         // Determine storage path, preserving the relative upload structure
         const targetDir = `${baseTarget}/${path.dirname(relativePath).replace(/\\/g, '/')}`;

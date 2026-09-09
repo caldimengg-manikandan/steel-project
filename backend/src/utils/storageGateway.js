@@ -249,10 +249,33 @@ async function searchFiles(query, searchRoot = '') {
  * @param {Buffer} buffer — File contents
  * @returns {Promise<Object>}
  */
+function isLogFile(filename) {
+    if (!filename) return false;
+    const lower = filename.toLowerCase();
+    return lower.includes('transmittal') || lower.includes('drawing_log') || lower.includes('drawing log') || lower.includes('master_log') || lower.includes('master log');
+}
+
+function sanitizeUploadTargetDir(targetDir, filename) {
+    if (!targetDir) return targetDir;
+    const cleanDir = targetDir.replace(/\\/g, '/');
+    const isLogsDir = /\/Logs($|\/)/i.test(cleanDir) || /^Logs($|\/)/i.test(cleanDir);
+    
+    if (isLogsDir && !isLogFile(filename)) {
+        let redirected = cleanDir
+            .replace(/\/Logs($|\/)/gi, '/')
+            .replace(/^Logs($|\/)/gi, '')
+            .replace(/\/+/g, '/')
+            .replace(/\/$/, '');
+        return redirected;
+    }
+    return targetDir;
+}
+
 async function uploadFile(targetDir, filename, buffer) {
+    const finalTargetDir = sanitizeUploadTargetDir(targetDir, filename);
     // Build multipart form data manually using the built-in FormData
     const formData = new FormData();
-    formData.append('targetPath', targetDir);
+    formData.append('targetPath', finalTargetDir);
     formData.append('files', new Blob([buffer]), filename);
 
     const response = await agentFetch('/upload', {
