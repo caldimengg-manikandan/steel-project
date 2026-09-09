@@ -129,10 +129,25 @@ exports.downloadRfiExcel = async (req, res) => {
             return res.status(404).json({ error: 'No completed RFI extractions found.' });
         }
 
-        const serverOrigin = `${req.protocol}://${req.get('host')}/api`;
+        const publicUrl = process.env.PUBLIC_SERVER_URL;
+        const hostHeader = req.get('host') || '';
+        const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
+        const protocol = isHttps ? 'https' : 'http';
+
+        // In hosted environment, hostHeader already contains domain/port (e.g. app.mydomain.com)
+        const serverOrigin = publicUrl 
+            ? publicUrl.replace(/\/$/, '') 
+            : `${protocol}://${hostHeader}/api`;
+
         const queryBase = req.query.baseUrl || '';
-        const baseUrl = queryBase || serverOrigin;
-        const isExternal = !!queryBase;
+        let baseUrl = queryBase || serverOrigin;
+        
+        // If queryBase contains localhost but request came from a domain or remote IP, use serverOrigin
+        if (queryBase && queryBase.includes('localhost') && !hostHeader.includes('localhost')) {
+            baseUrl = serverOrigin;
+        }
+
+        const isExternal = !!queryBase && !baseUrl.includes(hostHeader);
 
         // Generate a tiny viewer token for the Excel links so they don't exceed Excel's 255 character limit,
         // and so clients can view the PDFs without needing an admin login.
