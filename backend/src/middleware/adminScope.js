@@ -214,7 +214,7 @@ async function scopeProjectAccess(req, res, next) {
         const rawDoc = await Project.findById(projectId);
         if (rawDoc) {
             internalExists = true;
-            if (isFullAccess) {
+            if (isFullAccess || role === 'viewer') {
                 project = rawDoc;
             } else {
                 const assigned = rawDoc.assignments.some(a => a.userId.toString() === String(id));

@@ -47,7 +47,16 @@ async function verifyToken(req, res, next) {
 
     // 3. Load the account from DB to confirm it still exists
     try {
-        if (decoded.role === 'admin') {
+        if (decoded.role === 'viewer') {
+            req.principal = {
+                id: 'viewer',
+                username: 'viewer',
+                email: 'viewer@public',
+                role: 'viewer',
+                adminId: 'viewer',
+            };
+            req.user = req.principal;
+        } else if (decoded.role === 'admin') {
             const admin = await Admin.findById(decoded.id).select('-password_hash');
             if (!admin || admin.status !== 'active') {
                 return res.status(401).json({ error: 'Admin account not found or deactivated.' });
@@ -70,7 +79,7 @@ async function verifyToken(req, res, next) {
                 username: user.username,
                 email: user.email,
                 role: user.role || 'user',
-                adminId: user.adminId.toString(),  // for user: adminId = their admin's id
+                adminId: user.adminId ? user.adminId.toString() : user._id.toString(),  // for user: adminId = their admin's id
             };
             req.user = req.principal;
         }
