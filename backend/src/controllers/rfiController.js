@@ -389,7 +389,7 @@ exports.viewRfiPdf = async (req, res) => {
     console.log(`[DEBUG viewRfiPdf] Start. projectId=${projectId}, id=${id}, adminId=${adminId}`);
 
     try {
-        const doc = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOne({ _id: id, projectId });
         if (!doc) {
             console.log('[DEBUG viewRfiPdf] Document not found in DB!');
             return res.status(404).json({ error: 'RFI extraction not found.' });
