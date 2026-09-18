@@ -9,6 +9,7 @@ function errorHandler(err, req, res, next) {
     if (process.env.NODE_ENV === 'development' && err.stack) {
         console.error(err.stack);
     }
+    require('fs').appendFileSync(require('path').join(__dirname, '../../error_log.txt'), new Date().toISOString() + ': ' + err.stack + '\n');
 
     // CORS errors
     if (err.message === 'Not allowed by CORS') {

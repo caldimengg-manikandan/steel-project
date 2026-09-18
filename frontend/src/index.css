@@ -912,6 +912,13 @@ tbody tr:hover {
   box-shadow: 0 0 0 3px rgba(30, 79, 216, 0.1);
 }
 
+.form-control:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
 .form-control::placeholder {
   color: #b0bac8;
 }
@@ -3074,6 +3081,13 @@ tbody tr:hover {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(30, 79, 216, 0.1);
+}
+
+.form-control:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
 }
 
 .form-control::placeholder {

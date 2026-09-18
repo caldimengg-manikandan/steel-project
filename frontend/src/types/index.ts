@@ -90,6 +90,13 @@ export interface Project {
         fabrication?: number; 
         status?: string; 
     }>;
+    additionalScopeOfWork?: Array<{ 
+        name: string; 
+        percentage?: number; 
+        approval?: number; 
+        fabrication?: number; 
+        status?: string; 
+    }>;
     openRfiCount?: number;
     closedRfiCount?: number;
     totalCO?: number;

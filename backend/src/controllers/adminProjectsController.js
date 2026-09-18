@@ -193,6 +193,15 @@ async function updateProject(req, res) {
             status: s.status || 'Yet to Start'
         }));
     }
+    if (req.body.additionalScopeOfWork !== undefined && Array.isArray(req.body.additionalScopeOfWork)) {
+        project.additionalScopeOfWork = req.body.additionalScopeOfWork.map((s, idx) => ({
+            name: (s.name || '').trim() || `Additional SOW ${String(idx + 1).padStart(2, '0')}`,
+            percentage: Number(s.percentage) || 0,
+            approval: Number(s.approval) || 0,
+            fabrication: Number(s.fabrication) || 0,
+            status: s.status || 'Yet to Start'
+        }));
+    }
     if (connectionDesignVendor !== undefined) project.connectionDesignVendor = connectionDesignVendor;
     if (connectionDesignContact !== undefined) project.connectionDesignContact = connectionDesignContact;
     if (connectionDesignEmail !== undefined) project.connectionDesignEmail = connectionDesignEmail;
@@ -631,11 +640,12 @@ async function reserveTransmittalNumber(req, res) {
  * Modified to return empty as external projects are now merged with local projects.
  */
 async function listExternalProjects(req, res) {
-    res.json({
-        count: 0,
-        projects: [],
-        error: null
-    });
+    try {
+        const result = await getExternalProjects();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to retrieve external projects', details: err.message });
+    }
 }
 
 /**

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
-import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject } from '../../services/projectApi';
+import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject, adminListExternalProjects } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import { formatDate } from '../../utils/dateUtils';
@@ -55,7 +55,7 @@ interface CreateProjectForm {
     connectionDesignContact: string;
     connectionDesignEmail: string;
     year: string;
-    startingTransmittalNumber: string;
+    lastTransmittalNumber: string;
 }
 const DEFAULT_FORM: CreateProjectForm = {
     name: '',
@@ -71,7 +71,7 @@ const DEFAULT_FORM: CreateProjectForm = {
     connectionDesignContact: '',
     connectionDesignEmail: '',
     year: String(new Date().getFullYear()),
-    startingTransmittalNumber: '1',
+    lastTransmittalNumber: '0',
 };
 
 export default function AdminProjects() {
@@ -90,17 +90,21 @@ export default function AdminProjects() {
     const [editMode, setEditMode] = useState<'full' | 'sequences'>('full');
     const [actionLoading, setActionLoading] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
+    const [externalProjects, setExternalProjects] = useState<any[]>([]);
     const [sequenceNames, setSequenceNames] = useState<Array<{ name: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>>([]);
     const [seqInput, setSeqInput] = useState<string>('');
+    const [sowInput, setSowInput] = useState<string>('');
+    const [editSowInput, setEditSowInput] = useState<string>('');
     const { logout } = useAuth();
     const fetchProjects = useCallback(async () => {
         try {
             setLoading(true);
             setError('');
 
-            const [projData, clientData] = await Promise.all([
+            const [projData, clientData, externalData] = await Promise.all([
                 adminListProjects(),
-                adminListClients()
+                adminListClients(),
+                adminListExternalProjects()
             ]);
 
             if (!projData || !Array.isArray(projData.projects)) {
@@ -108,6 +112,7 @@ export default function AdminProjects() {
             }
 
             setClients(clientData.clients || []);
+            setExternalProjects(externalData.projects || []);
 
             const mapped = projData.projects.map((p: any) => ({
                 ...p,
@@ -178,7 +183,7 @@ export default function AdminProjects() {
                 connectionDesignContact: form.connectionDesignContact,
                 connectionDesignEmail: form.connectionDesignEmail,
                 year: Number(form.year),
-                startingTransmittalNumber: Number(form.year) <= 2026 ? Number(form.startingTransmittalNumber) || 1 : 1,
+                startingTransmittalNumber: Number(form.year) <= 2026 ? (Number(form.lastTransmittalNumber) || 0) + 1 : 1,
             } as any);
 
             const newProject = {
@@ -191,6 +196,7 @@ export default function AdminProjects() {
             setForm(DEFAULT_FORM);
             setSequenceNames([]);
             setSeqInput('0');
+            setSowInput('0');
         } catch (err: any) {
             setModalError(`Create failed: ${err.message}`);
         } finally {
@@ -214,9 +220,27 @@ export default function AdminProjects() {
 
     async function handleEditSave() {
         if (!editTarget) return;
+
+        if (editMode === 'full') {
+            const sumPercentage = (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+            if (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0 && sumPercentage !== 100) {
+                const msgText = `The sum of Percentage of Total Work (%) across all original SOWs must equal exactly 100. Current sum is ${sumPercentage}.`;
+                setModalError('');
+                showMessage('Invalid Scope of Work', msgText, 'warning');
+                return;
+            }
+            const addSumPercentage = (editTarget.additionalScopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+            if (editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0 && addSumPercentage !== 100) {
+                const msgText = `The sum of Percentage of Total Work (%) across all Additional SOWs must equal exactly 100. Current sum is ${addSumPercentage}.`;
+                setModalError('');
+                showMessage('Invalid Scope of Work', msgText, 'warning');
+                return;
+            }
+        }
+
         try {
             setActionLoading(true);
-            setError('');
+            setModalError('');
             const { project } = await adminUpdateProject(editTarget.id, {
                 name: editTarget.name,
                 clientName: editTarget.clientName,
@@ -225,6 +249,7 @@ export default function AdminProjects() {
                 description: editTarget.description,
                 status: editTarget.status,
                 scopeOfWork: editTarget.scopeOfWork || [],
+                additionalScopeOfWork: editTarget.additionalScopeOfWork || [],
                 location: editTarget.location,
                 sequences: editTarget.sequences,
                 connectionDesignVendor: editTarget.connectionDesignVendor,
@@ -243,7 +268,7 @@ export default function AdminProjects() {
             );
             setEditTarget(null);
         } catch (err: any) {
-            setError(`Update failed: ${err.message}`);
+            setModalError(`Update failed: ${err.message}`);
         } finally {
             setActionLoading(false);
         }
@@ -270,7 +295,7 @@ export default function AdminProjects() {
                     <h2 className="page-title">Projects</h2>
                     <p className="page-subtitle">Manage all steel detailing projects</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); }}>
+                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); }}>
                     <IconPlus /> New Project
                 </button>
             </div>
@@ -426,6 +451,7 @@ export default function AdminProjects() {
                                                         setEditTarget({ ...p });
                                                         setEditMode('full');
                                                         setSeqInput((p.sequences?.length || 0).toString());
+                                                        setEditSowInput((p.additionalScopeOfWork?.length || 0).toString());
                                                     }}
                                                     title="Edit"
                                                 >
@@ -450,7 +476,7 @@ export default function AdminProjects() {
 
             {/* ── Create Modal ── */}
             {showCreate && (
-                <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}>
                     <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Create New Project</span>
@@ -473,6 +499,42 @@ export default function AdminProjects() {
                                     ))}
                                 </select>
                             </div>
+                            
+                            {form.clientId && (
+                                <div className="form-group">
+                                    <label className="form-label">Available Projects in Project Management</label>
+                                    <select
+                                        className="form-control"
+                                        onChange={(e) => {
+                                            const selectedProjectName = e.target.value;
+                                            if (selectedProjectName) {
+                                                setForm({ ...form, name: selectedProjectName });
+                                            }
+                                        }}
+                                        defaultValue=""
+                                    >
+                                        <option value="">-- Select a project to auto-fill name --</option>
+                                        {externalProjects
+                                            .filter(ep => {
+                                                const selectedClient = clients.find(c => (c.id || c._id) === form.clientId);
+                                                if (!selectedClient || !selectedClient.name || !ep.clientName) return false;
+                                                
+                                                const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                                const normEp = normalize(ep.clientName);
+                                                const normSelected = normalize(selectedClient.name);
+                                                
+                                                return normEp.includes(normSelected) || normSelected.includes(normEp);
+                                            })
+                                            .map((ep, idx) => (
+                                                <option key={idx} value={ep.name}>{ep.name} ({ep.status || 'active'})</option>
+                                            ))
+                                        }
+                                    </select>
+                                    <small style={{ color: 'var(--color-text-secondary)', marginTop: 4, display: 'block' }}>
+                                        Selecting a project will auto-fill the Project Name field below.
+                                    </small>
+                                </div>
+                            )}
 
                             {form.clientId && (
                                 <div className="form-group">
@@ -522,64 +584,70 @@ export default function AdminProjects() {
                                     min="2000"
                                     max="2100"
                                     value={form.year}
-                                    onChange={(e) => setForm({ ...form, year: e.target.value, startingTransmittalNumber: '1' })}
+                                    onChange={(e) => setForm({ ...form, year: e.target.value, lastTransmittalNumber: '0' })}
                                 />
                             </div>
 
                             {Number(form.year) <= 2026 && Number(form.year) >= 2000 && (
                                 <div className="form-group" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 16px' }}>
-                                    <label className="form-label required" style={{ color: '#c2410c' }}>Starting Transmittal Number</label>
+                                    <label className="form-label required" style={{ color: '#c2410c' }}>Last Transmittal Number</label>
                                     <p style={{ fontSize: 12, color: '#9a3412', marginBottom: 8, marginTop: 2 }}>
-                                        Since this is a {form.year} project, enter the first transmittal number to use (e.g. if previous transmittals went up to 12, enter 13).
+                                        Since this is a {form.year} project, enter the last transmittal number used (e.g. if previous transmittals went up to 12, enter 12. If none, enter 0).
                                     </p>
                                     <input
                                         className="form-control"
                                         type="number"
-                                        placeholder="e.g. 1"
-                                        min="1"
-                                        value={form.startingTransmittalNumber}
-                                        onChange={(e) => setForm({ ...form, startingTransmittalNumber: e.target.value })}
+                                        placeholder="e.g. 12"
+                                        min="0"
+                                        value={form.lastTransmittalNumber || ''}
+                                        onChange={(e) => setForm({ ...form, lastTransmittalNumber: e.target.value })}
                                     />
                                 </div>
                             )}
 
                             <div className="form-group">
-                                <label className="form-label">Description</label>
-                                <textarea className="form-control" placeholder="Brief project description…" rows={3}
-                                    value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                                        <label className="form-label">Description</label>
+                                        <textarea className="form-control" placeholder="Brief project description…" rows={3}
+                                            value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                             </div>
                             {/* ── Scope of Work Builder (Create Project) ── */}
-                            <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Scope of Work <span style={{ color: 'red' }}>*</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => {
-                                            const currentSow = form.scopeOfWork || [];
-                                            const nextNum = String(currentSow.length + 1).padStart(2, '0');
-                                            const newItem = {
-                                                name: `SOW ${nextNum}`,
-                                                percentage: 0,
-                                                approval: 0,
-                                                fabrication: 0,
-                                                status: 'Yet to Start'
-                                            };
-                                            setForm({ ...form, scopeOfWork: [...currentSow, newItem] });
-                                        }}
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}
-                                    >
-                                        + Add SOW
-                                    </button>
-                                </div>
+                            <div className="form-group">
+                                <label className="form-label">Number of Scope of Work Items <span style={{ color: 'red' }}>*</span></label>
+                                <input
+                                    className="form-control"
+                                    type="number"
+                                    placeholder="e.g. 5"
+                                    value={sowInput}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setSowInput(val);
+                                        if (val === '') return;
 
-                                {(!form.scopeOfWork || form.scopeOfWork.length === 0) ? (
-                                    <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                        No Scope of Work items added yet. Click "+ Add SOW" to add one.
+                                        const count = parseInt(val);
+                                        if (isNaN(count) || count < 0) return;
+
+                                        const current = form.scopeOfWork || [];
+                                        if (count > current.length) {
+                                            const newRows = [...current];
+                                            for (let i = current.length; i < count; i++) {
+                                                const nextNum = String(i + 1).padStart(2, '0');
+                                                newRows.push({ name: `SOW ${nextNum}`, percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
+                                            }
+                                            setForm({ ...form, scopeOfWork: newRows });
+                                        } else if (count < current.length) {
+                                            setForm({ ...form, scopeOfWork: current.slice(0, count) });
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {form.scopeOfWork && form.scopeOfWork.length > 0 && (
+                                <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            Configure Scope of Work Details
+                                        </div>
                                     </div>
-                                ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {form.scopeOfWork.map((item, idx) => (
                                             <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
@@ -648,8 +716,19 @@ export default function AdminProjects() {
                                             </div>
                                         ))}
                                     </div>
-                                )}
-                            </div>
+                                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingRight: 10 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                                            Total Percentage: 
+                                            <span style={{ 
+                                                marginLeft: 8, 
+                                                color: (form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) === 100 ? '#16a34a' : '#ef4444' 
+                                            }}>
+                                                {(form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="form-group">
                                 <label className="form-label required">Location</label>
                                 <select className="form-control" value={form.location}
@@ -759,7 +838,7 @@ export default function AdminProjects() {
                                         className="form-control"
                                         placeholder="Enter vendor details"
                                         list="client-list-create"
-                                        value={form.connectionDesignVendor}
+                                        value={form.connectionDesignVendor || ''}
                                         onChange={(e) => setForm({ ...form, connectionDesignVendor: e.target.value })}
                                     />
                                     <datalist id="client-list-create">
@@ -775,7 +854,7 @@ export default function AdminProjects() {
                                         pattern="^[0-9]{10}$"
                                         maxLength={10}
                                         title="Please enter exactly 10 digits."
-                                        value={form.connectionDesignContact}
+                                        value={form.connectionDesignContact || ''}
                                         onChange={(e) => {
                                             const onlyDigits = e.target.value.replace(/\D/g, '');
                                             setForm({ ...form, connectionDesignContact: onlyDigits });
@@ -790,7 +869,7 @@ export default function AdminProjects() {
                                         placeholder="john@example.com"
                                         pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                                         title="Please enter a valid email address."
-                                        value={form.connectionDesignEmail}
+                                        value={form.connectionDesignEmail || ''}
                                         onChange={(e) => setForm({ ...form, connectionDesignEmail: e.target.value })}
                                     />
                                 </div>
@@ -812,8 +891,8 @@ export default function AdminProjects() {
                                         if (!form.contactPerson) missing.push('Contact Person');
                                         if (!form.name.trim()) missing.push('Project Name');
                                         if (!form.year || isNaN(Number(form.year))) missing.push('Project Year');
-                                        if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (!form.startingTransmittalNumber || Number(form.startingTransmittalNumber) < 1)) {
-                                            missing.push('Starting Transmittal Number');
+                                        if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (form.lastTransmittalNumber === undefined || form.lastTransmittalNumber.toString().trim() === '')) {
+                                            missing.push('Last Transmittal Number');
                                         }
                                         if (!form.location) missing.push('Location');
                                         if (!form.scopeOfWork || form.scopeOfWork.length === 0) missing.push('Scope of Work');
@@ -821,10 +900,19 @@ export default function AdminProjects() {
 
                                         if (missing.length > 0) {
                                             const msgText = 'Please fill in the following required field(s):\n• ' + missing.join('\n• ');
-                                            setModalError(msgText);
+                                            setModalError('');
                                             showMessage('Required Fields Missing', msgText, 'warning');
                                             return;
                                         }
+
+                                        const sumPercentage = (form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                                        if (form.scopeOfWork && form.scopeOfWork.length > 0 && sumPercentage !== 100) {
+                                            const msgText = `The sum of Percentage of Total Work (%) across all SOWs must equal exactly 100. Current sum is ${sumPercentage}.`;
+                                            setModalError('');
+                                            showMessage('Invalid Scope of Work', msgText, 'warning');
+                                            return;
+                                        }
+
                                         // All validations passed, proceed with creation
                                         handleCreate();
                                     }}
@@ -840,18 +928,18 @@ export default function AdminProjects() {
 
             {/* ── Edit Modal ── */}
             {editTarget && (
-                <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setEditTarget(null); setModalError(''); } }}>
                     <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">{editMode === 'sequences' ? `Manage Sequences: ${editTarget.name}` : 'Edit Project'}</span>
-                            <button className="modal-close" onClick={() => setEditTarget(null)}><IconClose /></button>
+                            <button className="modal-close" onClick={() => { setEditTarget(null); setModalError(''); }}><IconClose /></button>
                         </div>
                         <div className="modal-body">
                             {editMode === 'full' && (
                                 <>
                                     <div className="form-group">
                                         <label className="form-label required">Project Name</label>
-                                        <input className="form-control" value={editTarget.name}
+                                        <input className="form-control" value={editTarget.name || ''}
                                             onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })} />
                                     </div>
                                     <div className="form-group">
@@ -913,23 +1001,20 @@ export default function AdminProjects() {
 
                                     <div className="form-group">
                                         <label className="form-label">Description</label>
-                                        <textarea className="form-control" rows={3} value={editTarget.description}
+                                        <textarea className="form-control" rows={3} value={editTarget.description || ''}
                                             onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
                                     </div>
                                     {/* ── Scope of Work Builder (Edit Project) ── */}
-                                      <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                  Scope of Work Progress
-                                              </div>
-                                          </div>
+                                    {/* ── Original Scope of Work Progress (Frozen) ── */}
 
-                                          {(!editTarget.scopeOfWork || editTarget.scopeOfWork.length === 0) ? (
-                                              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                                  No Scope of Work items defined for this project.
-                                              </div>
-                                          ) : (
-                                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0 && (
+                                        <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    Configure Scope of Work Progress
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                   {editTarget.scopeOfWork.map((item, idx) => (
                                                       <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
                                                           <div style={{ flex: 2 }}>
@@ -937,8 +1022,7 @@ export default function AdminProjects() {
                                                               <input
                                                                   className="form-control form-control-sm"
                                                                   value={item.name}
-                                                                  disabled={true}
-                                                                  style={{ background: '#f1f5f9', cursor: 'not-allowed', color: '#475569', fontWeight: 600 }}
+                                                                  disabled
                                                               />
                                                           </div>
                                                           <div style={{ flex: 1.8 }}>
@@ -947,8 +1031,7 @@ export default function AdminProjects() {
                                                                   type="number"
                                                                   className="form-control form-control-sm"
                                                                   value={item.percentage || ''}
-                                                                  disabled={true}
-                                                                  style={{ background: '#f1f5f9', cursor: 'not-allowed', color: '#475569', fontWeight: 600 }}
+                                                                  disabled
                                                               />
                                                           </div>
                                                           <div style={{ flex: 1.2 }}>
@@ -984,11 +1067,137 @@ export default function AdminProjects() {
                                                       </div>
                                                   ))}
                                               </div>
-                                          )}
-                                      </div>
+                                              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingRight: 10 }}>
+                                                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                                                      Total Percentage: 
+                                                      <span style={{ 
+                                                          marginLeft: 8, 
+                                                          color: (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) === 100 ? '#16a34a' : '#ef4444' 
+                                                      }}>
+                                                          {(editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0)}%
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )}
+                                    {/* ── Additional Scope of Work Builder (Edit Project) ── */}
+                                    <div className="form-group" style={{ marginTop: '24px' }}>
+                                        <label className="form-label">Number of Additional Scope of Work Items</label>
+                                        <input
+                                            className="form-control"
+                                            type="number"
+                                            placeholder="e.g. 2"
+                                            value={editSowInput}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEditSowInput(val);
+                                                if (val === '') return;
+
+                                                const count = parseInt(val);
+                                                if (isNaN(count) || count < 0) return;
+
+                                                const current = editTarget.additionalScopeOfWork || [];
+                                                const originalCount = projects.find(p => p.id === editTarget.id)?.additionalScopeOfWork?.length || 0;
+                                                const effectiveCount = Math.max(count, originalCount);
+
+                                                if (effectiveCount > current.length) {
+                                                    const newRows = [...current];
+                                                    for (let i = current.length; i < effectiveCount; i++) {
+                                                        const nextNum = String(i + 1).padStart(2, '0');
+                                                        newRows.push({ name: `Additional SOW ${nextNum}`, percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
+                                                    }
+                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: newRows });
+                                                } else if (effectiveCount < current.length) {
+                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: current.slice(0, effectiveCount) });
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    {editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0 && (
+                                        <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    Configure Additional Scope of Work
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                  {editTarget.additionalScopeOfWork.map((item, idx) => (
+                                                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                                                          <div style={{ flex: 2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
+                                                              <input
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.name}
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], name: e.target.value };
+                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                  }}
+                                                              />
+                                                          </div>
+                                                          <div style={{ flex: 1.8 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
+                                                              <input
+                                                                  type="number"
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.percentage || ''}
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                  }}
+                                                              />
+                                                          </div>
+                                                          <div style={{ flex: 1.2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
+                                                              <input
+                                                                  type="number"
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.approval || ''}
+                                                                  min="0"
+                                                                  max="100"
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
+                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                  }}
+                                                              />
+                                                          </div>
+                                                          <div style={{ flex: 1.2 }}>
+                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
+                                                              <input
+                                                                  type="number"
+                                                                  className="form-control form-control-sm"
+                                                                  value={item.fabrication || ''}
+                                                                  min="0"
+                                                                  max="100"
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
+                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                  }}
+                                                              />
+                                                          </div>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingRight: 10 }}>
+                                                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                                                      Total Percentage: 
+                                                      <span style={{ 
+                                                          marginLeft: 8, 
+                                                          color: (editTarget.additionalScopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) === 100 ? '#16a34a' : '#ef4444' 
+                                                      }}>
+                                                          {(editTarget.additionalScopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0)}%
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )}
                                     <div className="form-group">
                                         <label className="form-label">Location</label>
-                                        <select className="form-control" value={editTarget.location}
+                                        <select className="form-control" value={editTarget.location || ''}
                                             onChange={(e) => setEditTarget({ ...editTarget, location: e.target.value })}>
                                             <option value="">Select Location</option>
                                             <option value="Chennai">Chennai</option>
@@ -997,7 +1206,7 @@ export default function AdminProjects() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Status</label>
-                                        <select className="form-control" value={editTarget.status}
+                                        <select className="form-control" value={editTarget.status || ''}
                                             onChange={(e) => setEditTarget({ ...editTarget, status: e.target.value as ProjectStatus })}>
                                             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                                         </select>
@@ -1143,8 +1352,13 @@ export default function AdminProjects() {
                                     </div>
                                 </div>
                             )}
+                            {modalError && (
+                                <div className="info-box danger mb-md" style={{ fontSize: 13, padding: '10px 14px' }}>
+                                    {modalError}
+                                </div>
+                            )}
                             <div className="form-actions">
-                                <button className="btn btn-secondary" disabled={actionLoading} onClick={() => setEditTarget(null)}>Cancel</button>
+                                <button className="btn btn-secondary" disabled={actionLoading} onClick={() => { setEditTarget(null); setModalError(''); }}>Cancel</button>
                                 <button
                                     className="btn btn-primary"
                                     disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === editTarget.id)?.sequences?.length || 0)}
@@ -1160,7 +1374,7 @@ export default function AdminProjects() {
 
             {/* ── Delete Confirm ── */}
             {deleteTarget && (
-                <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDeleteTarget(null) }}>
                     <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Confirm Deletion</span>

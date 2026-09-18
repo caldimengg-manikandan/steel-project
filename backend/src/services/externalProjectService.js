@@ -1,7 +1,7 @@
 const fetch = require('isomorphic-fetch');
 
 // Simple in-memory cache with stale-while-revalidate to prevent blocking the app
-let cache = { data: null, lastFetched: 0, isFetching: false };
+let cache = { data: null, lastFetched: 0, fetchPromise: null };
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -18,20 +18,23 @@ async function getExternalProjects() {
     // STALE-WHILE-REVALIDATE: If we have ANY data, return it immediately to make UI instant.
     // Trigger background fetch if TTL expired and not already fetching.
     if (cache.data) {
-        if (Date.now() - cache.lastFetched > CACHE_TTL && !cache.isFetching) {
-            fetchAndCache(projectsUrl, countUrl).catch(console.error);
+        if (Date.now() - cache.lastFetched > CACHE_TTL && !cache.fetchPromise) {
+            cache.fetchPromise = fetchAndCache(projectsUrl, countUrl).finally(() => { cache.fetchPromise = null; });
+            cache.fetchPromise.catch(console.error);
         }
         return cache.data;
     }
 
-    // If no data exists at all, we must wait for the first fetch (with a timeout)
-    return await fetchAndCache(projectsUrl, countUrl);
+    // If no data exists at all, wait for the fetch
+    if (cache.fetchPromise) {
+        return await cache.fetchPromise;
+    }
+
+    cache.fetchPromise = fetchAndCache(projectsUrl, countUrl).finally(() => { cache.fetchPromise = null; });
+    return await cache.fetchPromise;
 }
 
 async function fetchAndCache(projectsUrl, countUrl) {
-    if (cache.isFetching) return cache.data || { count: 0, projects: [] };
-    cache.isFetching = true;
-
     const headers = {};
     if (process.env.APP_A_API_KEY) {
         headers['x-api-key'] = process.env.APP_A_API_KEY;
@@ -160,7 +163,6 @@ async function fetchAndCache(projectsUrl, countUrl) {
             error: null
         };
         cache.lastFetched = Date.now();
-        cache.isFetching = false;
         return cache.data;
     } catch (error) {
         console.error('[ExternalProjectService] Failed to retrieve external projects:', {
@@ -174,8 +176,6 @@ async function fetchAndCache(projectsUrl, countUrl) {
             projects: [],
             error: `External App A is currently unreachable: ${error.message}`
         };
-    } finally {
-        cache.isFetching = false;
     }
 }
 

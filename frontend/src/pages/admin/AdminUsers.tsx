@@ -415,7 +415,7 @@ export default function AdminUsers() {
 
             {/* ── Create User Modal ── */}
             {showCreate && (
-                <div className="modal-overlay" onClick={() => { setShowCreate(false); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateError(''); setDuplicateFields([]); }}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowCreate(false); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateError(''); setDuplicateFields([]); } }}>
                     <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Create New User</span>
@@ -568,7 +568,7 @@ export default function AdminUsers() {
 
             {/* ── Edit User Modal ── */}
             {editTarget && (
-                <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditTarget(null) }}>
                     <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Edit User — {editTarget.username}</span>
@@ -650,7 +650,7 @@ export default function AdminUsers() {
 
             {/* ── Assign Project Modal ── */}
             {assignTarget && (
-                <div className="modal-overlay" onClick={() => setAssignTarget(null)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setAssignTarget(null) }}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Assign Project — {assignTarget.username}</span>
@@ -715,7 +715,7 @@ export default function AdminUsers() {
             )}
             {/* ── Bulk Upload Modal ── */}
             {showBulk && (
-                <div className="modal-overlay" onClick={() => setShowBulk(false)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowBulk(false) }}>
                     <div className="modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Bulk User Upload</span>

@@ -38,13 +38,13 @@ const upload = multer({ storage });
 
 const router = express.Router();
 
+// External Projects (Must be before /:projectId to avoid collision)
+router.get('/external', listExternalProjects);
+
 router.use(verifyToken, requireAdmin);
 
 // ── Project Status Excel (Must be before /:projectId to avoid route collision) ──
 router.get('/status/excel', downloadAllProjectsStatusExcel);
-
-// External Projects (Must be before /:projectId to avoid collision)
-router.get('/external', listExternalProjects);
 
 // Project CRUD
 router.get('/', listProjects);

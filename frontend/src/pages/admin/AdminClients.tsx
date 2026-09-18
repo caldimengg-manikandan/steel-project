@@ -375,7 +375,7 @@ export default function AdminClients() {
 
             {/* ── Bulk Upload Modal ── */}
             {showBulk && (
-                <div className="modal-overlay" onClick={() => setShowBulk(false)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowBulk(false) }}>
                     <div className="modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Bulk Client Upload</span>

@@ -968,7 +968,7 @@ export default function ProjectView() {
 
             {/* ── Transmittal Selection Modal ── */}
             {transmittalSelectModal && (
-                <div className="modal-overlay" onClick={() => setTransmittalSelectModal(false)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setTransmittalSelectModal(false) }}>
                     <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header" style={{ background: 'linear-gradient(135deg,#1e3a5f,#2563eb)', color: 'white', borderRadius: '8px 8px 0 0' }}>
                             <span className="modal-title" style={{ color: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1143,7 +1143,7 @@ export default function ProjectView() {
 
             {/* Upload Modal */}
             {uploadModal && (
-                <div className="modal-overlay" onClick={() => { setUploadModal(false); }}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setUploadModal(false) }}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Upload Drawing</span>
@@ -1219,7 +1219,7 @@ export default function ProjectView() {
             )}
             {/* ── Duplicate Detection Confirmation Modal ── */}
             {dupModal && (
-                <div className="modal-overlay" onClick={() => setDupModal(false)}>
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDupModal(false) }}>
                     <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">⚠️ Duplicate Drawings Detected</span>

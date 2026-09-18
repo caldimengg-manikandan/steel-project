@@ -113,16 +113,40 @@ export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
                                 }
                             }
 
+                            // Determine if drawing was sent for fabrication but not for approval
+                            let hasApproval = false;
+                            let hasFabrication = false;
+                            if (d.revisionHistory) {
+                                d.revisionHistory.forEach((rh: any) => {
+                                    if (rh.revision) {
+                                        const norm = normalizeRev(rh.revision);
+                                        if (/^[A-Za-z]/.test(norm)) hasApproval = true;
+                                        else hasFabrication = true;
+                                    }
+                                });
+                            }
+                            if (d.currentRevision) {
+                                const norm = normalizeRev(d.currentRevision);
+                                if (/^[A-Za-z]/.test(norm)) hasApproval = true;
+                                else hasFabrication = true;
+                            }
+
+                            const isOnlyFabrication = hasFabrication && !hasApproval;
+
                             return (
                                 <tr key={d._id || index}>
                                     <td>{index + 1}</td>
                                     <td><strong>{d.drawingNumber}</strong></td>
                                     <td>{d.drawingTitle || d.description}</td>
-                                    {revHeaders.map(r => (
-                                        <td key={`cell-${r}`} style={{ textAlign: 'center' }}>
-                                            {revMap[r] || '-'}
-                                        </td>
-                                    ))}
+                                    {revHeaders.map(r => {
+                                        const isApprovalCol = /^[A-Za-z]/.test(r);
+                                        const bg = (isOnlyFabrication && isApprovalCol) ? '#f1f5f9' : 'transparent';
+                                        return (
+                                            <td key={`cell-${r}`} style={{ textAlign: 'center', backgroundColor: bg }}>
+                                                {revMap[r] || '-'}
+                                            </td>
+                                        );
+                                    })}
                                     <td>
                                         {d.revisionHistory && d.revisionHistory.length > 0 
                                             ? d.revisionHistory[d.revisionHistory.length - 1].remarks 
