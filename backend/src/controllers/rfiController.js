@@ -166,7 +166,8 @@ exports.downloadRfiExcel = async (req, res) => {
             logoPath: settings?.logoPath || ''
         };
 
-        const { buffer, filename } = await generateRfiLogExcel(extractions, projectDetails, baseUrl, isExternal, token, rfiStatus);
+        const apiRoot = serverOrigin.replace(/\/api$/, '');
+        const { buffer, filename } = await generateRfiLogExcel(extractions, projectDetails, baseUrl, isExternal, token, rfiStatus, apiRoot);
 
         // If filtering by status, it's possible the buffer is nearly empty headers-only
         // But generateRfiLogExcel currently generates a file even if allRfis.length is 0.
@@ -359,8 +360,8 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
             return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
         }
 
-        // store the OneDrive URL for the response attachment
-        extraction.rfis[idx].responseAttachmentUrl = req.file.webUrl;
+        // Store the local URL for the response attachment
+        extraction.rfis[idx].responseAttachmentUrl = `/uploads/steel-dms-uploads/${req.file.filename}`;
         extraction.rfis[idx].responseAttachmentName = req.file.originalname;
         extraction.rfis[idx].status = 'CLOSED';
         extraction.rfis[idx].closedOn = new Date();

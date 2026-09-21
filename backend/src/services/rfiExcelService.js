@@ -76,7 +76,7 @@ function formatDescription(raw) {
  *   - Data rows with alternating white/light-grey backgrounds
  *   - "CONFIRMED" responses highlighted in yellow with red bold text
  */
-exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, isExternal = false, token = '', filterStatus = null) => {
+exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, isExternal = false, token = '', filterStatus = null, apiRoot = '') => {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'System';
     workbook.created = new Date();
@@ -327,13 +327,20 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         const respCell = dataRow.getCell(cursor);
         const responseVal = item.response || '';
         const isConfirmed = responseVal && responseVal.trim().toUpperCase() === 'CONFIRMED';
-        let responseHref = (item.responseAttachmentUrl && !isExternal) ? `${resolvedBase}${item.responseAttachmentUrl}` : '';
+        let responseHref = '';
+        if (item.responseAttachmentUrl) {
+            const root = apiRoot || resolvedBase;
+            responseHref = item.responseAttachmentUrl.startsWith('http')
+                ? item.responseAttachmentUrl
+                : `${root}${item.responseAttachmentUrl.startsWith('/') ? '' : '/'}${item.responseAttachmentUrl}`;
+        }
 
         if (isConfirmed) {
             respCell.value = 'CONFIRMED';
             respCell.style = { font: { bold: true, size: 10, color: { argb: 'FFFF0000' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: commonBorder };
         } else if (responseHref) {
-            respCell.value = { text: responseVal || 'View Attachment', hyperlink: responseHref };
+            const safeText = (responseVal || 'View Attachment').replace(/\r?\n/g, ' - ');
+            respCell.value = { text: safeText, hyperlink: responseHref };
             respCell.style = { font: { size: 10, color: { argb: 'FF2563EB' }, underline: true }, fill: rowFill, alignment: { vertical: 'middle', horizontal: 'left', wrapText: true }, border: commonBorder };
         } else {
             respCell.value = responseVal;

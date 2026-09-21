@@ -1,0 +1,11 @@
+const ExcelJS = require('exceljs');
+const workbook = new ExcelJS.Workbook();
+const worksheet = workbook.addWorksheet('Test');
+const url = 'http://localhost:5000/uploads/file.pdf';
+const val = '\n[Attached]: 25012-Cleveland.pdf';
+const safeText = val.replace(/"/g, '""').replace(/\r?\n/g, '" & CHAR(10) & "');
+const formulaStr = `HYPERLINK("${url}", "${safeText}")`;
+console.log('Formula:', formulaStr);
+worksheet.getCell('A1').value = { formula: formulaStr };
+worksheet.getCell('A1').style = { font: { color: { argb: 'FF0000FF' }, underline: true } };
+workbook.xlsx.writeFile('test_hyperlink.xlsx').then(() => console.log('Done test3')).catch(e => console.error(e));

@@ -5,6 +5,11 @@
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
 export const uploadRfiDrawing = async (projectId: string, files: File[], localSavePath?: string, sequences?: string[]) => {
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
@@ -16,6 +21,7 @@ export const uploadRfiDrawing = async (projectId: string, files: File[], localSa
     const res = await fetch(`${BASE}/rfis/${String(projectId)}/upload`, {
         method: 'POST',
         credentials: 'include',
+        headers: { ...getAuthHeaders() },
         body: formData,
     });
     if (!res.ok) {
@@ -35,7 +41,7 @@ export const uploadRfiDrawing = async (projectId: string, files: File[], localSa
 export const listRfiExtractions = async (projectId: string) => {
     const res = await fetch(`${BASE}/rfis/${String(projectId)}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -61,7 +67,7 @@ export const deleteRfiExtraction = async (projectId: string, extractionId: strin
     const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}`, {
         method: 'DELETE',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -81,7 +87,7 @@ export const updateRfiResponse = async (
     const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ response, remarks, clientRfiNumber }),
     });
     if (!res.ok) {
@@ -100,7 +106,7 @@ export const updateRfiStatus = async (
     const res = await fetch(`${BASE}/rfis/${String(projectId)}/${String(extractionId)}/status/${rfiIndex}`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ status }),
     });
     if (!res.ok) {

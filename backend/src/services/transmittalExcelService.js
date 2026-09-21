@@ -418,6 +418,14 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
         const rDataL = logSheet.addRow(rowData);
         rDataL.height = 22;
+        const hasNumRev = numRevs.some(revMark => revMap[revMark]);
+        const hasAlphaRev = alphaRevs.some(revMark => revMap[revMark]);
+        const alphaStart = 4;
+        const alphaEnd = 3 + alphaRevs.length;
+
+        // Check if drawing skipped approval (it has numeric revs but no alpha revs)
+        const isSkippedApproval = hasNumRev && !hasAlphaRev;
+
         rDataL.eachCell((cell, colNum) => {
             cell.border = commonBorderStyle;
             cell.alignment = {
@@ -425,6 +433,17 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                 horizontal: (colNum === 3 || colNum === sIdx) ? 'left' : 'center',
                 wrapText: true,
             };
+
+            const isAlphaCol = colNum >= alphaStart && colNum <= alphaEnd;
+            const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } }; // Light grey
+
+            // Highlight all Approval cells ONLY if approval was skipped entirely
+            if (isAlphaCol && isSkippedApproval) {
+                cell.fill = greyFill;
+                if (!cell.value) {
+                    cell.value = '-';
+                }
+            }
         });
     });
 

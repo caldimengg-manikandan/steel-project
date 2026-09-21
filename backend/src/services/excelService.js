@@ -733,13 +733,12 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
             // 1. If drawing has gone to Fabrication (numRevs) but skipped Approval (alphaRevs cells are blank)
             // 2. Or if 'Rev A' was used directly for fabrication (irregular case)
             const hasNumRev = numRevs.some(revMark => revMap[revMark]);
+            const hasAlphaRev = alphaRevs.some(revMark => revMap[revMark]);
             const alphaStart = 4;
             const alphaEnd = 3 + alphaRevs.length;
 
-            const latestRevObj = d.revisions && d.revisions.length > 0 ? pickLatestRevision(d.revisions) : {};
-            const latestRevMark = (latestRevObj.mark || '').replace(/^Rev\s*/i, '').trim().toUpperCase();
-            const hasFabricationRemark = d.revisions.some(r => /fabrication/i.test(r.remarks || ''));
-            const isOnlyFabLog = (latestRevMark === 'A') && hasFabricationRemark;
+            // Check if drawing skipped approval (it has numeric revs but no alpha revs)
+            const isSkippedApproval = hasNumRev && !hasAlphaRev;
 
             rDataL.eachCell((cell, colNum) => {
                 cell.border = commonBorderStyle;
@@ -750,17 +749,14 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 };
 
                 const isAlphaCol = colNum >= alphaStart && colNum <= alphaEnd;
-                const isRevACol = colNum === alphaStart; // Revision A is the first alpha column
-                const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } };
+                const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } }; // Light grey
 
-                // Highlight blank Approval cell ONLY for Rev A if drawing already has some Fabrication date (Skipped Approval)
-                if (isRevACol && !cell.value && hasNumRev) {
+                // Highlight all Approval cells ONLY if approval was skipped entirely
+                if (isAlphaCol && isSkippedApproval) {
                     cell.fill = greyFill;
-                }
-                
-                // Also highlight Rev A cell if it exists but is actually for Fabrication (Irregular case)
-                if (isRevACol && cell.value && isOnlyFabLog) {
-                    cell.fill = greyFill;
+                    if (!cell.value) {
+                        cell.value = '-';
+                    }
                 }
             });
         });
