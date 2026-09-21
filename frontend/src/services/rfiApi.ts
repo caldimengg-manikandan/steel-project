@@ -5,7 +5,7 @@
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-const getAuthHeaders = () => {
+const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem('token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
