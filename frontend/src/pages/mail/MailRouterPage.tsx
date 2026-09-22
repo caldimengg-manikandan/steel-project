@@ -701,20 +701,18 @@ function EmailDetail({
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', minHeight: 0 }}>
-            {/* Action bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-table-header-bg)', flexShrink: 0 }}>
-                <button className="btn btn-primary" onClick={onForwardClick}>
-                    📤 Forward to Detailers
-                </button>
-            </div>
-
             {/* Scrollable body */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '15px' }}>
                 {/* Header */}
-                <div style={{ marginBottom: 18 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12, lineHeight: 1.35 }}>
-                        Subject : <b style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-secondary)', lineHeight: 1.35 }}>{email.subject || '(No subject)'}</b>
-                    </h2>
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.35, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                            Subject : <b style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-secondary)', lineHeight: 1.35 }}>{email.subject || '(No subject)'}</b>
+                        </h2>
+                        <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            📤 Forward to Detailers
+                        </button>
+                    </div>
                     <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
@@ -747,7 +745,7 @@ function EmailDetail({
                 {/* Collapsible Resources Bar (Attachments & Links) */}
                 {(allAttachments.length > 0 || validLinks.length > 0) && (
                     <div style={{
-                        marginBottom: 18,
+                        marginBottom: 10,
                         borderRadius: 'var(--radius-md)',
                         border: '1px solid var(--color-border)',
                         background: 'var(--color-bg-card)',
@@ -1313,23 +1311,86 @@ export default function MailRouterPage() {
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', flex: 1 }}>
                 {/* ── Page Header (Sticky/Pinned at top) ──── */}
                 <div style={{ padding: '16px 24px 10px 24px', flexShrink: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)' }}>
-                    <div className="page-header" style={{ marginBottom: 10 }}>
+                    <div className="page-header" style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                         <div className="page-header-left">
                             <h1 className="page-title" style={{ fontSize: 22 }}>Mail Router</h1>
                             <p className="page-subtitle" style={{ fontSize: 13 }}>Connect mailboxes, sync emails, and forward drawing instructions to detailers</p>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {/* Sync status */}
-                            {latestJob && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px' }}>
-                                    <span style={{ color: 'var(--color-text-muted)' }}>Last sync:</span>
-                                    <span style={{ fontWeight: 600, color: latestJob.status === 'COMPLETED' ? 'var(--color-success-mid)' : latestJob.status === 'RUNNING' ? 'var(--color-primary)' : 'var(--color-danger-mid)' }}>
-                                        {latestJob.status}
-                                    </span>
-                                    <span style={{ color: 'var(--color-text-muted)' }}>{formatDateTime(latestJob.completedAt || latestJob.startedAt)}</span>
-                                </div>
-                            )}
-                            <button className="btn btn-primary" onClick={() => setShowConnect(true)}>+ Connect Mailbox</button>
+
+                        {/* Provider tabs */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            {(['MICROSOFT', 'ZOHO'] as const).map((provider, idx) => {
+                                const acc = accounts.find(a => a.provider === provider && a.isActive);
+                                const isActive = activeTab === provider;
+                                return (
+                                    <React.Fragment key={provider}>
+                                        {idx > 0 && <span style={{ color: 'var(--color-border)', fontSize: 18, fontWeight: 300, margin: '0 2px' }}>|</span>}
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                padding: '6px 14px',
+                                                borderRadius: 'var(--radius-md)',
+                                                border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                background: isActive ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.13s ease',
+                                                boxShadow: isActive ? '0 0 0 1px var(--color-primary-glow)' : 'var(--shadow-xs)',
+                                                userSelect: 'none',
+                                            }}
+                                            onClick={() => setActiveTab(provider)}
+                                        >
+                                            <span style={{ fontSize: 15 }}>{provider === 'MICROSOFT' ? '🔵' : '🟠'}</span>
+                                            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                {provider === 'MICROSOFT' ? 'Microsoft 365' : 'Zoho Mail'}
+                                            </span>
+                                            {acc ? (
+                                                isActive && (
+                                                    <>
+                                                        <span style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 5,
+                                                            fontSize: 12,
+                                                            background: 'var(--color-success-bg)',
+                                                            color: 'var(--color-success)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: 20,
+                                                            fontWeight: 600,
+                                                        }}>
+                                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success-mid)', display: 'inline-block' }} />
+                                                            {acc.email}
+                                                        </span>
+                                                        <button
+                                                            className="btn btn-danger btn-sm"
+                                                            style={{ marginLeft: 4, fontSize: 11.5, padding: '2px 8px' }}
+                                                            onClick={e => {
+                                                                e.stopPropagation();
+                                                                setShowDisconnect(acc);
+                                                            }}
+                                                        >
+                                                            Disconnect
+                                                        </button>
+                                                    </>
+                                                )
+                                            ) : (
+                                                <button
+                                                    className="btn btn-primary btn-sm"
+                                                    style={{ marginLeft: 4, fontSize: 11.5, padding: '2px 10px' }}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        if (provider === 'MICROSOFT') redirectToMicrosoftAuth();
+                                                        else redirectToZohoAuth();
+                                                    }}
+                                                >
+                                                    Connect
+                                                </button>
+                                            )}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -1345,35 +1406,6 @@ export default function MailRouterPage() {
                             <button className="btn btn-xs btn-ghost" onClick={() => setError('')} style={{ padding: '0 6px' }}>✕</button>
                         </div>
                     )}
-
-                    {/* Provider tabs */}
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                        {(['MICROSOFT', 'ZOHO'] as const).map(provider => {
-                            const acc = accounts.find(a => a.provider === provider && a.isActive);
-                            const isActive = activeTab === provider;
-                            return (
-                                <div key={provider} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 'var(--radius-md)', border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`, background: isActive ? 'var(--color-primary-glow)' : 'var(--color-bg-card)', cursor: 'pointer', transition: 'all 0.13s', boxShadow: isActive ? '0 0 0 1px var(--color-primary-glow)' : 'var(--shadow-xs)' }}
-                                    onClick={() => setActiveTab(provider)}
-                                >
-                                    <span style={{ fontSize: 16 }}>{provider === 'MICROSOFT' ? '🔵' : '🟠'}</span>
-                                    <span style={{ fontWeight: 700, fontSize: 13 }}>{provider === 'MICROSOFT' ? 'Microsoft 365' : 'Zoho Mail'}</span>
-                                    {acc ? (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, background: 'var(--color-success-bg)', color: 'var(--color-success)', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
-                                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-success-mid)', display: 'inline-block' }} />
-                                            {acc.email}
-                                        </span>
-                                    ) : (
-                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Not connected</span>
-                                    )}
-                                    {acc && isActive && (
-                                        <button className="btn btn-danger btn-sm" style={{ marginLeft: 4 }} onClick={e => { e.stopPropagation(); setShowDisconnect(acc); }}>
-                                            Disconnect
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
 
                     {/* Controls */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
