@@ -502,8 +502,8 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const matchingExt = externalProjects.find(ext => ext.name === p.name);
         const sowProg = calculateSowProgress(p.scopeOfWork || []);
 
-        const appPct = matchingExt?.approvalPercentage ?? (p.approvalPercentage !== undefined ? p.approvalPercentage : sowProg.approvalPercentage);
-        const fabPct = matchingExt?.fabricationPercentage ?? (p.fabricationPercentage !== undefined ? p.fabricationPercentage : sowProg.fabricationPercentage);
+        const appPct = sowProg.approvalPercentage;
+        const fabPct = sowProg.fabricationPercentage;
 
         return {
             ...p,

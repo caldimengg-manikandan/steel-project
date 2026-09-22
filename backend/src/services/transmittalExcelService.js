@@ -122,20 +122,51 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         return s;
     }
 
-    // ── 5. Group Drawings by Folder (Section Headers e.g. DETAIL SHEET) ──
-    const folderGroups = {};
-    (transmittal.drawings || []).forEach(d => {
-        const folder = normalizeFolderHeader(d.folderName);
-        if (!folderGroups[folder]) folderGroups[folder] = [];
-        folderGroups[folder].push(d);
+    // ── Fetch extractions to get full path for subfolder (SOW) grouping ──
+    const mongoose = require('mongoose');
+    let DrawingExtraction;
+    try {
+        DrawingExtraction = mongoose.model('DrawingExtraction');
+    } catch (e) {
+        DrawingExtraction = require('../models/DrawingExtraction');
+    }
+
+    const extIds = (transmittal.drawings || []).map(d => d.extractionId).filter(Boolean);
+    const extractions = await DrawingExtraction.find({ _id: { $in: extIds } }).select('fileUrl storageGatewayPath _id').lean();
+    const extMap = {};
+    extractions.forEach(e => {
+        extMap[e._id.toString()] = e;
     });
 
-    const sortedFolders = Object.keys(folderGroups).sort();
+    // ── 5. Group Drawings by Main Folder and Sub Folder ──
+    const groupedByMain = {};
+    (transmittal.drawings || []).forEach(d => {
+        const ext = extMap[d.extractionId?.toString()];
+        const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
+        let subFolder = '';
+
+        if (fullPath) {
+            const parts = fullPath.replace(/\\/g, '/').split('/');
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (/sow/i.test(parts[i].trim())) {
+                    subFolder = parts[i].trim().toUpperCase();
+                }
+            }
+        }
+
+        const mainFolder = normalizeFolderHeader(d.folderName);
+        if (!groupedByMain[mainFolder]) groupedByMain[mainFolder] = {};
+        if (!groupedByMain[mainFolder][subFolder]) groupedByMain[mainFolder][subFolder] = [];
+        
+        groupedByMain[mainFolder][subFolder].push(d);
+    });
+
+    const sortedMainFolders = Object.keys(groupedByMain).sort();
     let slNo = 1;
 
-    sortedFolders.forEach(folder => {
-        // Yellow Folder Header Row (e.g. DETAIL SHEET)
-        const fRow = trSheet.addRow([folder.toUpperCase()]);
+    sortedMainFolders.forEach(mainFolder => {
+        // Yellow Main Folder Header Row (e.g. DETAIL SHEET)
+        const fRow = trSheet.addRow([mainFolder.toUpperCase()]);
         const rNum = fRow.number;
         fRow.height = 22;
         fRow.getCell(1).style = {
@@ -150,29 +181,51 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
             if (i > 1) fRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         }
 
-        const sortedDrawings = [...folderGroups[folder]].sort((a, b) =>
-            (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
-        );
+        const sortedSubs = Object.keys(groupedByMain[mainFolder]).sort();
 
-        sortedDrawings.forEach(d => {
-            const dataRow = trSheet.addRow([
-                slNo++,
-                d.drawingNumber || '',
-                d.drawingTitle || '',
-                d.revision || '0',
-                d.date || '',
-                d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED')
-            ]);
-
-            dataRow.height = 22;
-
-            dataRow.eachCell((cell, colNum) => {
-                cell.border = commonBorderStyle;
-                cell.alignment = {
-                    vertical: 'middle',
-                    horizontal: (colNum === 1 || colNum === 4 || colNum === 5) ? 'center' : 'left',
-                    wrapText: true,
+        sortedSubs.forEach(sub => {
+            if (sub) {
+                // Yellow Sub Folder Header Row (e.g. SOW 1)
+                const sRow = trSheet.addRow([sub]);
+                const sNum = sRow.number;
+                sRow.height = 22;
+                sRow.getCell(1).style = {
+                    font: { bold: true, size: 11, color: { argb: 'FF000000' } },
+                    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
+                    alignment: { horizontal: 'center', vertical: 'middle' },
+                    border: commonBorderStyle,
                 };
+                trSheet.mergeCells(sNum, 1, sNum, 6);
+                for (let i = 1; i <= 6; i++) {
+                    sRow.getCell(i).border = commonBorderStyle;
+                    if (i > 1) sRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+                }
+            }
+
+            const sortedDrawings = [...groupedByMain[mainFolder][sub]].sort((a, b) =>
+                (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+            );
+
+            sortedDrawings.forEach(d => {
+                const dataRow = trSheet.addRow([
+                    slNo++,
+                    d.drawingNumber || '',
+                    d.drawingTitle || '',
+                    d.revision || '0',
+                    d.date || '',
+                    d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED')
+                ]);
+
+                dataRow.height = 22;
+
+                dataRow.eachCell((cell, colNum) => {
+                    cell.border = commonBorderStyle;
+                    cell.alignment = {
+                        vertical: 'middle',
+                        horizontal: (colNum === 1 || colNum === 4 || colNum === 5) ? 'center' : 'left',
+                        wrapText: true,
+                    };
+                });
             });
         });
     });

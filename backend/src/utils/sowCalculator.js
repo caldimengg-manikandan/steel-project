@@ -1,22 +1,5 @@
 /**
  * Scope of Work (SOW) Progress Calculator
- * 
- * Rules:
- * 1. Fixed Phase Weightages:
- *    - Approval = 80% weight (0.80)
- *    - Fabrication = 20% weight (0.20)
- * 2. User-entered fields for each SOW:
- *    - Percentage: Weight of SOW in total project scope (%)
- *    - App (%): Completion of Approval work for this SOW (%)
- *    - Fab (%): Completion of Fabrication work for this SOW (%)
- * 3. Calculations per SOW:
- *    - Approval Contribution = SOW Percentage * (App (%) / 100) * 0.80
- *    - Fabrication Contribution = SOW Percentage * (Fab (%) / 100) * 0.20
- *    - Overall Contribution = Approval Contribution + Fabrication Contribution
- * 4. Status Eligibility:
- *    - 'Pending' / 'Yet to Start' / 'Not Started': Contributions = 0
- *    - 'In Progress' / 'Completed' / 'Done': Calculates based on actual App (%) & Fab (%) values.
- * 5. Empty/missing App (%), Fab (%), or Percentage are strictly treated as 0.
  */
 
 function calculateSowProgress(scopeOfWork) {
@@ -29,45 +12,65 @@ function calculateSowProgress(scopeOfWork) {
         };
     }
 
-    let totalApprovalContrib = 0;
-    let totalFabricationContrib = 0;
+    let totalApprovalRaw = 0;
+    let totalFabricationRaw = 0;
+    const sowCount = scopeOfWork.length;
 
     const sowContributions = scopeOfWork.map(item => {
-        const rawStatus = (item.status || 'Yet to Start').trim();
-        const isPending = rawStatus === 'Pending' || rawStatus === 'Yet to Start' || rawStatus === 'Not Started';
+        // Use the actual Approval and Fabrication % value of each SOW.
+        // No null/missing-value handling is required per requirements.
+        const appPct = Number(item.approval);
+        const fabPct = Number(item.fabrication);
 
-        const sowPct = Number(item.percentage) || 0;
-        const appPct = Number(item.approval) || 0;
-        const fabPct = Number(item.fabrication) || 0;
-
-        let approvalContrib = 0;
-        let fabricationContrib = 0;
-
-        if (!isPending) {
-            approvalContrib = sowPct * (appPct / 100) * 0.80;
-            fabricationContrib = sowPct * (fabPct / 100) * 0.20;
-        }
-
-        const overallContrib = approvalContrib + fabricationContrib;
-
-        totalApprovalContrib += approvalContrib;
-        totalFabricationContrib += fabricationContrib;
+        totalApprovalRaw += appPct;
+        totalFabricationRaw += fabPct;
+        
+        console.log('SOW:', item.name);
+        console.log('APPROVAL:', item.approval);
+        console.log('FABRICATION:', item.fabrication);
 
         return {
             name: item.name || '',
-            sowPercentage: sowPct,
+            sowPercentage: item.percentage || 0,
             appPercentage: appPct,
             fabPercentage: fabPct,
-            status: rawStatus,
-            approvalContribution: Math.round(approvalContrib * 100) / 100,
-            fabricationContribution: Math.round(fabricationContrib * 100) / 100,
-            overallContribution: Math.round(overallContrib * 100) / 100
+            status: item.status || 'Yet to Start',
+            approvalContribution: 0,
+            fabricationContribution: 0,
+            overallContribution: 0
         };
     });
 
-    const roundedApproval = Math.round(totalApprovalContrib * 10) / 10;
-    const roundedFabrication = Math.round(totalFabricationContrib * 10) / 10;
-    const roundedOverall = Math.round((totalApprovalContrib + totalFabricationContrib) * 10) / 10;
+    let roundedApproval = 0;
+    let roundedFabrication = 0;
+    let roundedOverall = 0;
+    
+    let approvalCalc = 0;
+    let fabricationCalc = 0;
+
+    if (sowCount > 0) {
+        const maxPossible = sowCount * 100;
+        
+        // Approval % = (Sum of all SOW Approval % / (SOW Count * 100)) * 100
+        approvalCalc = (totalApprovalRaw / maxPossible) * 100;
+        
+        // Fabrication % = (Sum of all SOW Fabrication % / (SOW Count * 100)) * 100
+        fabricationCalc = (totalFabricationRaw / maxPossible) * 100;
+
+        roundedApproval = Math.round(approvalCalc * 10) / 10;
+        roundedFabrication = Math.round(fabricationCalc * 10) / 10;
+        
+        // Overall % calculation without any 80/20 or allocation weighting.
+        const overallCalc = ((totalApprovalRaw + totalFabricationRaw) / (maxPossible * 2)) * 100;
+        roundedOverall = Math.round(overallCalc * 10) / 10;
+    }
+
+    console.log('SOW COUNT:', sowCount);
+    console.log('SOW DATA:', scopeOfWork);
+    console.log('TOTAL APPROVAL:', totalApprovalRaw);
+    console.log('TOTAL FABRICATION:', totalFabricationRaw);
+    console.log('APPROVAL RESULT:', approvalCalc);
+    console.log('FABRICATION RESULT:', fabricationCalc);
 
     return {
         approvalPercentage: roundedApproval,

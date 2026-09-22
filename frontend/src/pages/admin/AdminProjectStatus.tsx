@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { adminListProjects, downloadProjectStatusExcel } from '../../services/projectApi';
 import { listRfiExtractions } from '../../services/rfiApi';
 import type { Project, ProjectStatus as TypeProjectStatus } from '../../types';
-import { calculateSowProgress } from '../../utils/sowCalculator';
 
 const STATUS_LABEL: Record<TypeProjectStatus, string> = {
     in_progress: 'In-progress', on_hold: 'On Hold', completed: 'Completed', archived: 'Archived',
@@ -217,10 +216,9 @@ export default function AdminProjectStatus() {
                         const approvedCount = (project as any).approvalCount || 0;
                         const openRfiCount = project.openRfiCount || 0;
                         const closedRfiCount = project.closedRfiCount || 0;
-                        const sowProg = calculateSowProgress(project.scopeOfWork);
-                        const fabPercentage = project.fabricationPercentage !== undefined ? project.fabricationPercentage : sowProg.fabricationPercentage;
-                        const appPercentage = project.approvalPercentage !== undefined ? project.approvalPercentage : sowProg.approvalPercentage;
-                        const ovrPercentage = project.overallPercentage !== undefined ? project.overallPercentage : sowProg.overallPercentage;
+                        const fabPercentage = project.fabricationPercentage !== undefined ? project.fabricationPercentage : 0;
+                        const appPercentage = project.approvalPercentage !== undefined ? project.approvalPercentage : 0;
+                        const ovrPercentage = project.overallPercentage !== undefined ? project.overallPercentage : 0;
 
                         const isSectionExpanded = expandedProjectId === project.id;
 
