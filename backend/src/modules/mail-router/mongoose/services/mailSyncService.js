@@ -66,7 +66,12 @@ async function runMailSync(options) {
 
       // Persist messages on this page
       for (const message of pageResult.messages) {
-        const savedEmail = await upsertEmail(message, jobId, syncAccount._id || syncAccount.id);
+        const savedEmail = await upsertEmail(
+          message,
+          jobId,
+          syncAccount._id || syncAccount.id,
+          syncAccount.userId
+        );
         messagesSynced += 1;
 
         if (message.hasAttachments) {

@@ -9,8 +9,21 @@ const { getEmailById } = require('../repositories/emailRepo');
 /**
  * Forward an imported email to a list of employee IDs.
  */
-async function forwardEmail(emailId, forwardedByUserId, recipientIds, note) {
-  if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+async function forwardEmail(emailId, arg2, arg3, note) {
+  let forwardedByUserId;
+  let recipientIds;
+
+  if (Array.isArray(arg2)) {
+    recipientIds = arg2;
+    forwardedByUserId = arg3;
+  } else if (Array.isArray(arg3)) {
+    forwardedByUserId = arg2;
+    recipientIds = arg3;
+  } else {
+    throw new Error('At least one recipient must be selected.');
+  }
+
+  if (!recipientIds || recipientIds.length === 0) {
     throw new Error('At least one recipient must be selected.');
   }
 

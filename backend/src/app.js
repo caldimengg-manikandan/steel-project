@@ -66,6 +66,9 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 
+// Auth middleware
+const { verifyToken: authMiddleware } = require('./middleware/auth');
+
 // Error handler
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -160,7 +163,13 @@ app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // ── Mail router ───────────────────────────────────────────
-app.use('/api/mail', authMiddleware, mailRouter);
+app.use(['/api/mail', '/api/mail-router'], (req, res, next) => {
+  // Allow OAuth callbacks to pass through without requiring Bearer token
+  if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback')) {
+    return next();
+  }
+  return authMiddleware(req, res, next);
+}, mailRouter);
 // ── Health check ───────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

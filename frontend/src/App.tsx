@@ -24,6 +24,8 @@ import UserRfi from './pages/user/UserRfi';
 import UserSettings from './pages/user/UserSettings';
 import ProjectView from './pages/shared/ProjectView';
 import NotificationsPage from './pages/dashboard/NotificationsPage';
+import MailRouterPage from './pages/mail/MailRouterPage';
+import EmployeeInboxPage from './pages/mail/EmployeeInboxPage';
 
 import { SettingsProvider } from './context/SettingsContext';
 import { MessageProvider } from './context/MessageContext';
@@ -83,6 +85,30 @@ export default function App() {
                 <Route path="settings" element={<UserSettings />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="projects/:id" element={<ProjectView />} />
+              </Route>
+
+              {/* Mail Router — admin/full-access only */}
+              <Route
+                path="/mail-router"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<MailRouterPage />} />
+              </Route>
+
+              {/* Employee Inbox — all authenticated users */}
+              <Route
+                path="/inbox"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<EmployeeInboxPage />} />
               </Route>
 
               {/* Default redirect */}

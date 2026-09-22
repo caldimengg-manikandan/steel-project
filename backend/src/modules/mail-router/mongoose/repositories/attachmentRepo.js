@@ -39,11 +39,25 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
 }
 
 async function listAttachmentsByEmail(emailId) {
-  return Attachment.find({ emailId }).select('-content').lean();
+  if (!emailId) return [];
+  const mongoose = require('mongoose');
+  const ids = [emailId];
+  if (typeof emailId === 'string' && mongoose.Types.ObjectId.isValid(emailId)) {
+    ids.push(new mongoose.Types.ObjectId(emailId));
+  } else if (emailId && emailId.toString) {
+    ids.push(emailId.toString());
+  }
+  return Attachment.find({ emailId: { $in: ids } }).select('-content').lean();
 }
 
 async function getAttachmentById(id) {
-  return Attachment.findById(id);
+  if (!id) return null;
+  const mongoose = require('mongoose');
+  const ids = [id];
+  if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+    ids.push(new mongoose.Types.ObjectId(id));
+  }
+  return Attachment.findOne({ _id: { $in: ids } });
 }
 
 module.exports = {
@@ -51,3 +65,4 @@ module.exports = {
   listAttachmentsByEmail,
   getAttachmentById,
 };
+

@@ -33,35 +33,73 @@ const { listAttachmentsByEmail, getAttachmentById } = require('../mongoose/repos
 const { listSyncJobs } = require('../mongoose/repositories/syncJobRepo');
 const { listMailboxItems, getMailboxItem, markAsRead, countUnread, listEmployees } = require('../mongoose/repositories/forwardingRepo');
 const { getAuthCodeUrl: getMsAuthCodeUrl, acquireTokenByCode: acquireMsToken } = require('../services/mail/msalProvider');
-const { getZohoAuthUrl, exchangeZohoAuthCode } = require('../services/mail/providers/zoho/auth');
+const { getZohoAuthUrl, exchangeZohoCode, exchangeZohoAuthCode } = require('../services/mail/providers/zoho/auth');
 const { saveMsProfile, clearMsProfile } = require('../mongoose/services/tokenStore');
 
-// Roles that can manage mailboxes, sync, and triage emails
-const MANAGER_ROLES = ['PROJECT_MANAGER', 'ADMIN', 'LEAD', 'CHECKER'];
+// Helper to resolve redirect URL against the frontend origin
+function resolveFrontendUrl(returnTo, params = {}) {
+  const fallbackOrigin = (process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:5173').trim().replace(/\/+$/, '');
+  let url;
+  try {
+    if (returnTo && (returnTo.startsWith('http://') || returnTo.startsWith('https://'))) {
+      url = new URL(returnTo);
+    } else {
+      const cleanPath = (returnTo || '/mail-router').startsWith('/') ? (returnTo || '/mail-router') : `/${returnTo || 'mail-router'}`;
+      url = new URL(cleanPath, fallbackOrigin);
+    }
+  } catch {
+    url = new URL('/mail-router', fallbackOrigin);
+  }
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  return url.toString();
+}
+
+// Match Steel-Detailing-DWF's FULL_ACCESS_ROLES (Tier 1 RBAC)
+const FULL_ACCESS_ROLES = [
+  'admin',
+  'superadmin',
+  'project_manager',
+  'team_lead',
+  'lead',
+  'checker',
+];
+const MANAGER_ROLES = FULL_ACCESS_ROLES;
 
 // Helper to extract authenticated user from Express request
+// Supports req.principal (populated by SDMS verifyToken), req.user, or req.session
 function getAuthUser(req) {
-  const user = req.user || (req.session && req.session.user) || {};
-  const id = user.id || user._id || req.userId;
+  const p = req.principal || req.user || (req.session && req.session.user) || {};
+  const id = p.id || p._id || req.userId;
   if (!id) {
     return null;
   }
+  const role = String(p.role || req.userRole || 'user').toLowerCase();
   return {
     id: String(id),
-    role: (user.role || req.userRole || 'PROJECT_MANAGER').toUpperCase(),
-    email: user.email || '',
+    role,
+    email: p.email || '',
+    username: p.username || '',
+    adminId: p.adminId ? String(p.adminId) : null,
+    isFullAccess: FULL_ACCESS_ROLES.includes(role),
   };
 }
 
-// Middleware: Require specific roles
+// Middleware: Require specific roles (or full-access roles)
 function requireRoles(...allowedRoles) {
   return (req, res, next) => {
     const user = getAuthUser(req);
     if (!user) return res.status(401).json({ error: 'Unauthorized: Authentication required.' });
-    if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-      return res.status(403).json({
-        error: `Forbidden: This action requires one of [${allowedRoles.join(', ')}] role. Your role is ${user.role}.`,
-      });
+    if (allowedRoles.length > 0) {
+      const lowerAllowed = allowedRoles.map((r) => r.toLowerCase());
+      if (!lowerAllowed.includes(user.role) && !user.isFullAccess) {
+        return res.status(403).json({
+          error: `Forbidden: This action requires full access or one of [${allowedRoles.join(', ')}] role. Your role is ${user.role}.`,
+        });
+      }
     }
     req.authUser = user;
     next();
@@ -133,9 +171,9 @@ router.get('/auth/microsoft', requireRoles(...MANAGER_ROLES), async (req, res) =
     const existingMs = await getMailAccountForUserAndProvider(req.authUser.id, 'MICROSOFT');
     if (existingMs && (!loginHint || existingMs.email.toLowerCase() !== loginHint.toLowerCase())) {
       return res.redirect(
-        `${returnTo}?error=${encodeURIComponent(
-          `A Microsoft mailbox is already connected (${existingMs.email}). Limit is 1 Microsoft mailbox per user. Disconnect it before connecting a different one.`
-        )}`
+        resolveFrontendUrl(returnTo, {
+          error: `A Microsoft mailbox is already connected (${existingMs.email}). Limit is 1 Microsoft mailbox per user. Disconnect it before connecting a different one.`
+        })
       );
     }
 
@@ -167,11 +205,11 @@ router.get('/auth/microsoft/callback', async (req, res) => {
 
   if (error) {
     console.error('[mailRouter:msal] Microsoft OAuth error:', error, error_description);
-    return res.redirect(`${returnTo}?error=${encodeURIComponent(String(error_description || error))}`);
+    return res.redirect(resolveFrontendUrl(returnTo, { error: String(error_description || error) }));
   }
 
   if (!code || !state || !userId) {
-    return res.status(400).json({ error: 'Missing code or state parameter.' });
+    return res.redirect(resolveFrontendUrl(returnTo, { error: 'Missing code or state parameter.' }));
   }
 
   try {
@@ -189,9 +227,9 @@ router.get('/auth/microsoft/callback', async (req, res) => {
     const existingMs = await getMailAccountForUserAndProvider(userId, 'MICROSOFT');
     if (existingMs && mailboxEmail && existingMs.email.toLowerCase() !== mailboxEmail.toLowerCase()) {
       return res.redirect(
-        `${returnTo}?error=${encodeURIComponent(
-          `Limit reached: You already have a Microsoft mailbox connected (${existingMs.email}). Disconnect it first.`
-        )}`
+        resolveFrontendUrl(returnTo, {
+          error: `Limit reached: You already have a Microsoft mailbox connected (${existingMs.email}). Disconnect it first.`
+        })
       );
     }
 
@@ -211,12 +249,10 @@ router.get('/auth/microsoft/callback', async (req, res) => {
       });
     }
 
-    const redirectUrl = new URL(returnTo, `${req.protocol}://${req.get('host')}`);
-    redirectUrl.searchParams.set('connected', '1');
-    return res.redirect(redirectUrl.toString());
+    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1' }));
   } catch (err) {
     console.error('[mailRouter:msal] Token exchange failed:', err);
-    return res.redirect(`${returnTo}?error=${encodeURIComponent(err.message || 'Token exchange failed')}`);
+    return res.redirect(resolveFrontendUrl(returnTo, { error: err.message || 'Token exchange failed' }));
   }
 });
 
@@ -229,14 +265,14 @@ router.get('/auth/zoho', requireRoles(...MANAGER_ROLES), async (req, res) => {
     const existingZoho = await getMailAccountForUserAndProvider(req.authUser.id, 'ZOHO');
     if (existingZoho && (!loginHint || existingZoho.email.toLowerCase() !== loginHint.toLowerCase())) {
       return res.redirect(
-        `${returnTo}?error=${encodeURIComponent(
-          `A Zoho mailbox is already connected (${existingZoho.email}). Limit is 1 Zoho mailbox. Disconnect it first.`
-        )}`
+        resolveFrontendUrl(returnTo, {
+          error: `A Zoho mailbox is already connected (${existingZoho.email}). Limit is 1 Zoho mailbox. Disconnect it first.`
+        })
       );
     }
 
     const state = Buffer.from(JSON.stringify({ returnTo, userId: req.authUser.id })).toString('base64url');
-    const authUrl = getZohoAuthUrl(state, loginHint);
+    const authUrl = getZohoAuthUrl(state, undefined, loginHint);
     return res.redirect(authUrl);
   } catch (err) {
     console.error('[mailRouter:zoho] Failed to initiate Zoho auth:', err);
@@ -262,24 +298,25 @@ router.get('/auth/zoho/callback', async (req, res) => {
   }
 
   if (error) {
-    return res.redirect(`${returnTo}?error=${encodeURIComponent(String(error))}`);
+    return res.redirect(resolveFrontendUrl(returnTo, { error: String(error) }));
   }
 
   if (!code || !state || !userId) {
-    return res.status(400).json({ error: 'Missing code or state parameter.' });
+    return res.redirect(resolveFrontendUrl(returnTo, { error: 'Missing code or state parameter.' }));
   }
 
   try {
-    const tokenResult = await exchangeZohoAuthCode(String(code));
+    const accountsServer = req.query['accounts-server'] || req.query.location || undefined;
+    const tokenResult = await (exchangeZohoCode || exchangeZohoAuthCode)(String(code), accountsServer);
     const { getZohoAccounts } = require('../services/mail/providers/zoho/mail-fetcher');
     let email = '';
     let accountId = '0';
 
     try {
-      const zohoAccounts = await getZohoAccounts(tokenResult.accessToken);
-      if (zohoAccounts.length > 0) {
-        accountId = zohoAccounts[0].accountId;
-        email = zohoAccounts[0].mailboxAddress;
+      const zohoAccounts = await getZohoAccounts(tokenResult.accessToken, tokenResult.apiUrl);
+      if (zohoAccounts && zohoAccounts.length > 0) {
+        accountId = String(zohoAccounts[0].accountId || '0');
+        email = zohoAccounts[0].mailboxAddress || zohoAccounts[0].email || '';
       }
     } catch (fetchErr) {
       console.warn('[mailRouter:zoho] Could not fetch Zoho account info:', fetchErr);
@@ -292,9 +329,9 @@ router.get('/auth/zoho/callback', async (req, res) => {
     const existingZoho = await getMailAccountForUserAndProvider(userId, 'ZOHO');
     if (existingZoho && existingZoho.email.toLowerCase() !== email.toLowerCase()) {
       return res.redirect(
-        `${returnTo}?error=${encodeURIComponent(
-          `Limit reached: You already have a Zoho mailbox connected (${existingZoho.email}). Disconnect it first.`
-        )}`
+        resolveFrontendUrl(returnTo, {
+          error: `Limit reached: You already have a Zoho mailbox connected (${existingZoho.email}). Disconnect it first.`
+        })
       );
     }
 
@@ -315,12 +352,10 @@ router.get('/auth/zoho/callback', async (req, res) => {
       isActive: true,
     });
 
-    const redirectUrl = new URL(returnTo, `${req.protocol}://${req.get('host')}`);
-    redirectUrl.searchParams.set('connected', '1');
-    return res.redirect(redirectUrl.toString());
+    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1' }));
   } catch (err) {
     console.error('[mailRouter:zoho] Callback error:', err);
-    return res.redirect(`${returnTo}?error=${encodeURIComponent(err.message || 'Zoho authentication failed')}`);
+    return res.redirect(resolveFrontendUrl(returnTo, { error: err.message || 'Zoho authentication failed' }));
   }
 });
 
@@ -418,12 +453,23 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
   const { startDate, endDate, provider } = req.query;
 
   try {
-    const emails = await listEmailsInWindow(
-      String(startDate),
-      String(endDate),
+    const cleanStartDate = startDate && startDate !== 'undefined' && startDate !== 'null' ? String(startDate) : undefined;
+    const cleanEndDate = endDate && endDate !== 'undefined' && endDate !== 'null' ? String(endDate) : undefined;
+    const rawEmails = await listEmailsInWindow(
+      cleanStartDate,
+      cleanEndDate,
       provider || undefined,
       req.authUser.id
     );
+
+    const emails = rawEmails.map((e) => ({
+      ...e,
+      from: e.from || { name: e.fromName || e.fromAddress, email: e.fromAddress },
+      isForwarded: e.isForwarded ?? (e.triageStatus === 'FORWARDED'),
+      snippetText: e.snippetText || e.bodyPreview || (e.bodyText ? e.bodyText.slice(0, 150) : ''),
+      hasAttachments: Boolean(e.hasAttachments),
+    }));
+
     return res.json({ emails });
   } catch (err) {
     console.error('[mailRouter:emails] Failed to query emails:', err);
@@ -444,8 +490,16 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
       }
     }
 
-    const attachments = await listAttachmentsByEmail(email.id);
-    return res.json({ email, attachments });
+    const emailId = email._id || email.id || req.params.id;
+    const attachments = await listAttachmentsByEmail(emailId);
+    const formattedEmail = {
+      ...email,
+      from: email.from || { name: email.fromName || email.fromAddress, email: email.fromAddress },
+      isForwarded: email.isForwarded ?? (email.triageStatus === 'FORWARDED'),
+      snippetText: email.snippetText || email.bodyPreview || (email.bodyText ? email.bodyText.slice(0, 150) : ''),
+      hasAttachments: Boolean(email.hasAttachments || (attachments && attachments.length > 0)),
+    };
+    return res.json({ email: formattedEmail, attachments });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch email' });
   }
@@ -462,7 +516,8 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
     const email = await getEmailById(req.params.id);
     if (!email) return res.status(404).json({ error: 'Email not found.' });
 
-    await forwardEmail(email.id, recipientIds, req.authUser.id, note);
+    const emailId = email._id || email.id || req.params.id;
+    await forwardEmail(emailId, req.authUser.id, recipientIds, note);
     return res.json({ success: true, count: recipientIds.length });
   } catch (err) {
     console.error('[mailRouter:forward] Forwarding error:', err);
@@ -473,7 +528,7 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
 // GET /api/mail-router/employees — List detailers/employees for triage assignment
 router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
-    const employees = await listEmployees();
+    const employees = await listEmployees(req.authUser.adminId);
     return res.json({ employees });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch employees' });
@@ -489,12 +544,14 @@ router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
 // GET /api/mail-router/inbox — Employee's personal inbox of forwarded emails
 router.get('/inbox', requireRoles(), async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
-  const offset = parseInt(req.query.offset || '0', 10);
+  const page = parseInt(req.query.page || '0', 10);
+  const offset = req.query.offset !== undefined ? parseInt(req.query.offset, 10) : page * limit;
 
   try {
     // Strictly scoped to authenticated employee's ID
     const items = await listMailboxItems(req.authUser.id, limit, offset);
-    return res.json({ items });
+    const unreadCount = await countUnread(req.authUser.id);
+    return res.json({ items, total: items.length, unreadCount });
   } catch (err) {
     console.error('[mailRouter:inbox] Error fetching employee inbox:', err);
     return res.status(500).json({ error: err.message || 'Failed to load inbox' });
@@ -505,7 +562,7 @@ router.get('/inbox', requireRoles(), async (req, res) => {
 router.get('/inbox/unread-count', requireRoles(), async (req, res) => {
   try {
     const count = await countUnread(req.authUser.id);
-    return res.json({ count });
+    return res.json({ count, unreadCount: count });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to get unread count' });
   }
@@ -513,19 +570,22 @@ router.get('/inbox/unread-count', requireRoles(), async (req, res) => {
 
 // GET /api/mail-router/inbox/:id — Open forwarded email, marks as read, returns attachments
 router.get('/inbox/:id', requireRoles(), async (req, res) => {
-  const emailId = req.params.id;
+  const targetId = req.params.id;
 
   try {
-    const item = await getMailboxItem(req.authUser.id, emailId);
+    const item = await getMailboxItem(req.authUser.id, targetId);
     if (!item) {
       return res.status(404).json({ error: 'Email not found or was not forwarded to you.' });
     }
 
     // Mark as read idempotently
-    await markAsRead(req.authUser.id, emailId);
+    await markAsRead(req.authUser.id, targetId);
 
     // Get drawing / file attachments
-    const attachments = await listAttachmentsByEmail(emailId);
+    const actualEmailId = item.emailId || (item.email && item.email._id) || targetId;
+    const attachments = (item.attachments && item.attachments.length > 0)
+      ? item.attachments
+      : await listAttachmentsByEmail(actualEmailId);
 
     return res.json({ item, attachments });
   } catch (err) {

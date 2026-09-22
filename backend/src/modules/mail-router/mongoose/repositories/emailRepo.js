@@ -1,10 +1,11 @@
 // backend-cjs/mongoose/repositories/emailRepo.js
 const Email = require('../models/Email');
 
-async function upsertEmail(normalizedMessage, syncJobId, accountId) {
+async function upsertEmail(normalizedMessage, syncJobId, accountId, userId) {
   const filter = { providerMessageId: normalizedMessage.providerMessageId };
 
   const update = {
+    userId: userId || undefined,
     provider: normalizedMessage.provider,
     providerMessageId: normalizedMessage.providerMessageId,
     mailboxAddress: normalizedMessage.mailboxAddress,
@@ -39,20 +40,30 @@ async function listEmailsInWindow(startDate, endDate, provider, userId) {
   const query = {};
 
   if (userId) {
-    query.userId = userId;
+    const MailAccount = require('../models/MailAccount');
+    const userAccounts = await MailAccount.find({ userId }).select('_id').lean();
+    const accountIds = userAccounts.map(a => a._id);
+    query.$or = [
+      { userId },
+      { accountId: { $in: accountIds } },
+      { accountId: { $in: accountIds.map(String) } }
+    ];
   }
 
   if (provider) {
-    query.provider = provider;
+    query.provider = provider.toUpperCase();
   }
 
-  if (startDate || endDate) {
+  const hasStart = startDate && startDate !== 'undefined' && startDate !== 'null' && String(startDate).trim() !== '';
+  const hasEnd = endDate && endDate !== 'undefined' && endDate !== 'null' && String(endDate).trim() !== '';
+
+  if (hasStart || hasEnd) {
     query.receivedAt = {};
-    if (startDate) {
-      query.receivedAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
+    if (hasStart) {
+      query.receivedAt.$gte = new Date(`${String(startDate).trim()}T00:00:00.000Z`);
     }
-    if (endDate) {
-      query.receivedAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
+    if (hasEnd) {
+      query.receivedAt.$lte = new Date(`${String(endDate).trim()}T23:59:59.999Z`);
     }
   }
 

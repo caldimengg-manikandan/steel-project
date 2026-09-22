@@ -10,6 +10,7 @@ exports.getZohoConfig = getZohoConfig;
 exports.extractZohoDatacenter = extractZohoDatacenter;
 exports.getZohoAuthUrl = getZohoAuthUrl;
 exports.exchangeZohoCode = exchangeZohoCode;
+exports.exchangeZohoAuthCode = exchangeZohoCode;
 exports.refreshZohoAccessToken = refreshZohoAccessToken;
 const errors_1 = require("../../errors");
 exports.ZOHO_DEFAULT_SCOPES = [
@@ -149,7 +150,10 @@ function getZohoAuthUrl(state, scopes = exports.ZOHO_DEFAULT_SCOPES, loginHint, 
  */
 async function exchangeZohoCode(code, customAccountsUrl) {
     const config = getZohoConfig();
-    const rawAccountsUrl = customAccountsUrl || config.accountsUrl;
+    let rawAccountsUrl = customAccountsUrl || config.accountsUrl;
+    if (rawAccountsUrl && !rawAccountsUrl.startsWith('http://') && !rawAccountsUrl.startsWith('https://')) {
+        rawAccountsUrl = `https://${rawAccountsUrl}`;
+    }
     const accountsUrl = rawAccountsUrl.replace(/\/+$/, '');
     const tokenUrl = `${accountsUrl}/oauth/v2/token`;
     const body = new URLSearchParams({
