@@ -49,6 +49,7 @@ const Admin = require('./models/Admin');
 const User = require('./models/User');
 
 // Routes
+const { mailRouter } = require('./modules/mail-router');
 const authRoutes = require('./routes/authRoutes');
 const { initGridFS } = require('./utils/gridfs');
 const adminUserRoutes = require('./routes/adminUserRoutes');
@@ -158,7 +159,8 @@ app.use('/api/error-log', require('./routes/errorLogRoutes'));
 app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
+// ── Mail router ───────────────────────────────────────────
+app.use('/api/mail', authMiddleware, mailRouter);
 // ── Health check ───────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
