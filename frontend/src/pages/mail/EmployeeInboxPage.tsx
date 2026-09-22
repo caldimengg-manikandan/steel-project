@@ -44,16 +44,20 @@ function initials(name?: string, email?: string): string {
 }
 
 function normalizeLink(link: any): { url: string; text: string } {
+    let url = '';
+    let text = '';
     if (typeof link === 'string') {
-        const u = link.trim();
-        return { url: u, text: u };
+        url = link.trim();
+        text = url;
+    } else if (link && typeof link === 'object') {
+        url = String(link.url || link.href || '').trim();
+        text = String(link.text || link.title || link.url || link.href || '').trim();
     }
-    if (link && typeof link === 'object') {
-        const url = String(link.url || link.href || '').trim();
-        const text = String(link.text || link.title || link.url || link.href || '').trim();
-        return { url, text: text || url };
+    // Filter out mailto:, tel:, and javascript: non-web links
+    if (!url || /^mailto:/i.test(url) || /^tel:/i.test(url) || /^javascript:/i.test(url)) {
+        return { url: '', text: '' };
     }
-    return { url: '', text: '' };
+    return { url, text: text || url };
 }
 
 function normalizeAttachment(att: any): { id: string; filename: string; sizeBytes: number } {
@@ -132,10 +136,11 @@ function InboxRow({
     const senderEmail = email?.from?.email || (email as any)?.fromAddress;
     const sender = senderName || senderEmail || 'Unknown sender';
     const snippet = email?.snippetText || (email as any)?.bodyPreview || (email?.bodyText ? email.bodyText.slice(0, 100) : '') || '';
-    const allAtts = (email?.attachments && email.attachments.length > 0) ? email.attachments : (item.attachments || []);
+    const allAtts = ((email?.attachments && email.attachments.length > 0) ? email.attachments : (item.attachments || [])).filter(a => !(a as any).isInline);
     const attCount = allAtts.length;
-    const hasAtt = Boolean(email?.hasAttachments || (item as any)?.hasAttachments || attCount > 0);
-    const linkCount = email?.links?.length || (item as any)?.links?.length || 0;
+    const hasAtt = attCount > 0;
+    const rawLinks: any[] = email?.links || (item as any)?.links || [];
+    const linkCount = rawLinks.map(normalizeLink).filter(l => Boolean(l.url)).length;
     const timestamp = item.createdAt || (item as any).forwardedAt || email?.receivedAt;
 
     return (
@@ -303,21 +308,21 @@ function InboxDetail({ item }: { item: InboxItem }) {
 
     const copyNote = () => {
         if (item.note) {
-            navigator.clipboard.writeText(item.note).catch(() => {});
+            navigator.clipboard.writeText(item.note).catch(() => { });
             setCopiedNote(true);
             setTimeout(() => setCopiedNote(false), 2000);
         }
     };
 
     const handleCopyLink = (url: string) => {
-        navigator.clipboard.writeText(url).catch(() => {});
+        navigator.clipboard.writeText(url).catch(() => { });
         setCopiedLink(url);
         setTimeout(() => setCopiedLink(null), 2000);
     };
 
     const handleCopyAllLinks = () => {
         const urls = validLinks.map(l => l.url).join('\n');
-        navigator.clipboard.writeText(urls).catch(() => {});
+        navigator.clipboard.writeText(urls).catch(() => { });
         setCopiedAllLinks(true);
         setTimeout(() => setCopiedAllLinks(false), 2000);
     };
@@ -516,14 +521,14 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                 )}
                             </div>
 
+                            {/* Summary info on the right when collapsed or active */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                {!showAttachments && !showLinks && (
-                                    <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
-                                        {allAttachments.length > 0 && `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})`}
-                                        {allAttachments.length > 0 && validLinks.length > 0 && ' • '}
-                                        {validLinks.length > 0 && `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}`}
-                                    </span>
-                                )}
+                                <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                    {[
+                                        allAttachments.length > 0 ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})` : null,
+                                        validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
+                                    ].filter(Boolean).join(' • ')}
+                                </span>
                                 {(showAttachments || showLinks) && (
                                     <button
                                         type="button"
@@ -532,11 +537,12 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                             border: 'none',
                                             background: 'transparent',
                                             color: 'var(--color-text-muted)',
-                                            fontSize: 12,
                                             cursor: 'pointer',
-                                            padding: '3px 8px',
+                                            fontSize: 11.5,
+                                            padding: '2px 6px',
                                             borderRadius: 4,
                                         }}
+                                        title="Collapse all resources"
                                     >
                                         ✕ Collapse
                                     </button>
@@ -940,7 +946,7 @@ export default function EmployeeInboxPage() {
                             ))}
                         </div>
                         <div className="search-input-wrapper" style={{ flex: 1, minWidth: 160 }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                             <input
                                 className="form-control"
                                 placeholder="Search subject, sender, instructions, or forwarder…"

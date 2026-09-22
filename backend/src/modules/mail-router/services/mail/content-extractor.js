@@ -109,8 +109,8 @@ function extractLinks(html, text) {
             return;
         // Clean trailing punctuation commonly caught in regex
         cleanUrl = cleanUrl.replace(/[.,;:)\]}>]+$/, '');
-        // Only accept valid web or mail links
-        if (!/^(https?:\/\/|mailto:)/i.test(cleanUrl)) {
+        // Only accept valid web links (http:// and https://), exclude mailto:
+        if (!/^https?:\/\//i.test(cleanUrl) || /^mailto:/i.test(cleanUrl)) {
             return;
         }
         const key = cleanUrl.toLowerCase();

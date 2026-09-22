@@ -6,7 +6,7 @@ import {
     redirectToMicrosoftAuth, redirectToZohoAuth,
     triggerSync, listSyncJobs, listEmails, getEmail, forwardEmail,
     listEmployees, getAttachmentUrl,
-    type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo,
+    type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -46,16 +46,20 @@ function initials(name?: string, email?: string): string {
 }
 
 function normalizeLink(link: any): { url: string; text: string } {
+    let url = '';
+    let text = '';
     if (typeof link === 'string') {
-        const u = link.trim();
-        return { url: u, text: u };
+        url = link.trim();
+        text = url;
+    } else if (link && typeof link === 'object') {
+        url = String(link.url || link.href || '').trim();
+        text = String(link.text || link.title || link.url || link.href || '').trim();
     }
-    if (link && typeof link === 'object') {
-        const url = String(link.url || link.href || '').trim();
-        const text = String(link.text || link.title || link.url || link.href || '').trim();
-        return { url, text: text || url };
+    // Filter out mailto:, tel:, and javascript: non-web links
+    if (!url || /^mailto:/i.test(url) || /^tel:/i.test(url) || /^javascript:/i.test(url)) {
+        return { url: '', text: '' };
     }
-    return { url: '', text: '' };
+    return { url, text: text || url };
 }
 
 function normalizeAttachment(att: any): { id: string; filename: string; sizeBytes: number } {
@@ -63,6 +67,26 @@ function normalizeAttachment(att: any): { id: string; filename: string; sizeByte
     const filename = String(att?.filename || att?.name || 'Attachment');
     const sizeBytes = Number(att?.sizeBytes || att?.size || 0);
     return { id, filename, sizeBytes };
+}
+
+function getFileIcon(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (['dwg', 'dxf'].includes(ext)) return '📐';
+    if (['pdf'].includes(ext)) return '📄';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
+    if (['xlsx', 'xls', 'csv'].includes(ext)) return '📊';
+    if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼️';
+    if (['doc', 'docx'].includes(ext)) return '📝';
+    return '📎';
+}
+
+function getDomain(urlString: string): string {
+    try {
+        const u = new URL(urlString);
+        return u.hostname.replace(/^www\./, '');
+    } catch {
+        return '';
+    }
 }
 
 // ── Error Boundary for Email Detail ──────────────────────────
@@ -549,9 +573,11 @@ function EmailCard({
     const senderEmail = msg.from?.email || (msg as any).fromAddress || '';
     const sender = senderName || senderEmail || 'Unknown';
     const time = msg.receivedAt ? new Date(msg.receivedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
-    const attCount = msg.attachments?.length || 0;
-    const hasAtt = Boolean(msg.hasAttachments || attCount > 0);
-    const linkCount = msg.links?.length || 0;
+    const validAtts = (msg.attachments || []).filter(att => !(att as any).isInline);
+    const attCount = validAtts.length;
+    const hasAtt = Boolean(attCount > 0 || (msg.hasAttachments && (!msg.attachments || msg.attachments.length === 0)));
+    const validLinks = (msg.links || []).map(normalizeLink).filter(l => Boolean(l.url));
+    const linkCount = validLinks.length;
     const snippet = msg.snippetText || msg.bodyText?.slice(0, 100) || '';
 
     return (
@@ -601,115 +627,501 @@ function EmailDetail({
 }: {
     email: MailMessage; accounts: MailAccount[]; onForwardClick: () => void;
 }) {
-    const [viewMode, setViewMode] = useState<'html' | 'text'>('html');
+    const [copiedLink, setCopiedLink] = useState<string | null>(null);
+    const [copiedAllLinks, setCopiedAllLinks] = useState(false);
+    const [showAttachments, setShowAttachments] = useState(false);
+    const [showLinks, setShowLinks] = useState(false);
+    const [linkFilter, setLinkFilter] = useState('');
+
     const account = accounts.find(a => a._id === email.accountId);
     const senderName = email.from?.name || (email as any).fromName;
     const senderEmail = email.from?.email || (email as any).fromAddress;
     const senderLabel = senderName && senderEmail ? `${senderName} <${senderEmail}>` : (senderName || senderEmail || 'Unknown');
 
+    const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !(att as any).isInline);
+
+    const preparedHtml = React.useMemo(() => {
+        if (!email.bodyHtml) return '';
+        const baseStyle = `
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    margin: 16px;
+                    color: #1e293b;
+                    line-height: 1.5;
+                }
+                img {
+                    max-width: 100%;
+                    height: auto;
+                }
+                /* Hide any unresolvable cid: references so broken image icon + machine alt text never appear */
+                img[src^="cid:"] {
+                    display: none !important;
+                }
+                a {
+                    color: #1e4fd8;
+                }
+            </style>
+        `;
+        if (email.bodyHtml.includes('<head>')) {
+            return email.bodyHtml.replace('<head>', `<head>${baseStyle}`);
+        }
+        return `${baseStyle}${email.bodyHtml}`;
+    }, [email.bodyHtml]);
+
+    const rawLinks: any[] = email.links || [];
+    const validLinks = rawLinks
+        .map(normalizeLink)
+        .filter(l => Boolean(l.url));
+
+    const filteredLinks = linkFilter.trim()
+        ? validLinks.filter(l =>
+            l.url.toLowerCase().includes(linkFilter.toLowerCase()) ||
+            l.text.toLowerCase().includes(linkFilter.toLowerCase())
+        )
+        : validLinks;
+
+    const totalAttBytes = allAttachments.reduce((sum, att) => {
+        const norm = normalizeAttachment(att);
+        return sum + (norm.sizeBytes || 0);
+    }, 0);
+
+    const handleCopyLink = (url: string) => {
+        navigator.clipboard.writeText(url).catch(() => { });
+        setCopiedLink(url);
+        setTimeout(() => setCopiedLink(null), 2000);
+    };
+
+    const handleCopyAllLinks = () => {
+        const urls = validLinks.map(l => l.url).join('\n');
+        navigator.clipboard.writeText(urls).catch(() => { });
+        setCopiedAllLinks(true);
+        setTimeout(() => setCopiedAllLinks(false), 2000);
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', minHeight: 0 }}>
             {/* Action bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-table-header-bg)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-table-header-bg)', flexShrink: 0 }}>
                 <button className="btn btn-primary" onClick={onForwardClick}>
                     📤 Forward to Detailers
                 </button>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 0, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                    {(['html', 'text'] as const).map(m => (
-                        <button key={m} onClick={() => setViewMode(m)} style={{ padding: '5px 12px', fontSize: 12.5, border: 'none', background: viewMode === m ? 'var(--color-primary)' : 'var(--color-bg-card)', color: viewMode === m ? '#fff' : 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.12s' }}>
-                            {m === 'html' ? 'HTML' : 'Plain'}
-                        </button>
-                    ))}
-                </div>
             </div>
 
             {/* Scrollable body */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px' }}>
                 {/* Header */}
-                <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12, lineHeight: 1.3 }}>
-                        {email.subject || '(No subject)'}
+                <div style={{ marginBottom: 18 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12, lineHeight: 1.35 }}>
+                        Subject : <b style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-secondary)', lineHeight: 1.35 }}>{email.subject || '(No subject)'}</b>
                     </h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
-                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
-                        <span>{senderLabel}</span>
-                        {account && <>
-                            <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Mailbox</span>
-                            <span>{account.email} <span style={{ fontSize: 11, background: account.provider === 'MICROSOFT' ? '#dbeafe' : '#fef3c7', color: account.provider === 'MICROSOFT' ? '#1d4ed8' : '#92400e', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{account.provider}</span></span>
-                        </>}
-                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Received</span>
-                        <span>{formatDateTime(email.receivedAt)}</span>
+                    <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
+                            <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
+                            <span>{senderLabel}</span>
+                            {account && (
+                                <>
+                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Mailbox</span>
+                                    <span>
+                                        {account.email}{' '}
+                                        <span style={{
+                                            fontSize: 11,
+                                            background: account.provider === 'MICROSOFT' ? '#dbeafe' : '#fef3c7',
+                                            color: account.provider === 'MICROSOFT' ? '#1d4ed8' : '#92400e',
+                                            padding: '2px 7px',
+                                            borderRadius: 4,
+                                            fontWeight: 700,
+                                            letterSpacing: '0.03em'
+                                        }}>
+                                            {account.provider}
+                                        </span>
+                                    </span>
+                                </>
+                            )}
+                            <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Received</span>
+                            <span>{formatDateTime(email.receivedAt)}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Links box */}
-                {email.links && email.links.length > 0 && (
-                    <div style={{ background: 'var(--color-info-bg)', border: '1px solid #93c5fd', borderRadius: 'var(--radius-md)', padding: '12px 14px', marginBottom: 16 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-info)', marginBottom: 8 }}>🔗 Extracted Links ({email.links.length})</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {email.links.map((rawLink, i) => {
-                                const { url, text } = normalizeLink(rawLink);
-                                if (!url) return null;
-                                return (
-                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: 'var(--color-info-mid)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={url}>
-                                            {text || url}
-                                        </a>
+                {/* Collapsible Resources Bar (Attachments & Links) */}
+                {(allAttachments.length > 0 || validLinks.length > 0) && (
+                    <div style={{
+                        marginBottom: 18,
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-bg-card)',
+                        overflow: 'hidden',
+                        boxShadow: 'var(--shadow-xs)',
+                    }}>
+                        {/* Summary / Toggle Bar */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '9px 14px',
+                            background: 'var(--color-table-header-bg)',
+                            borderBottom: (showAttachments || showLinks) ? '1px solid var(--color-border-light)' : 'none',
+                            flexWrap: 'wrap',
+                            gap: 10,
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginRight: 2 }}>
+                                    Resources:
+                                </span>
+
+                                {allAttachments.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAttachments(prev => !prev)}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            padding: '5px 12px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            border: showAttachments ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                            background: showAttachments ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
+                                            color: showAttachments ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease',
+                                        }}
+                                    >
+                                        <span>📎</span>
+                                        <span>Attachments</span>
+                                        <span style={{
+                                            background: showAttachments ? 'var(--color-primary)' : 'rgba(0,0,0,0.08)',
+                                            color: showAttachments ? '#fff' : 'var(--color-text-secondary)',
+                                            borderRadius: 10,
+                                            padding: '1px 6px',
+                                            fontSize: 11,
+                                            fontWeight: 700
+                                        }}>
+                                            {allAttachments.length}
+                                        </span>
+                                        <span style={{ fontSize: 10, opacity: 0.7, transform: showAttachments ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                                            ▼
+                                        </span>
+                                    </button>
+                                )}
+
+                                {validLinks.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLinks(prev => !prev)}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            padding: '5px 12px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            border: showLinks ? '1px solid #3b82f6' : '1px solid var(--color-border)',
+                                            background: showLinks ? 'rgba(59, 130, 246, 0.08)' : 'var(--color-bg-card)',
+                                            color: showLinks ? '#2563eb' : 'var(--color-text-primary)',
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease',
+                                        }}
+                                    >
+                                        <span>🔗</span>
+                                        <span>Reference Links</span>
+                                        <span style={{
+                                            background: showLinks ? '#2563eb' : 'rgba(0,0,0,0.08)',
+                                            color: showLinks ? '#fff' : 'var(--color-text-secondary)',
+                                            borderRadius: 10,
+                                            padding: '1px 6px',
+                                            fontSize: 11,
+                                            fontWeight: 700
+                                        }}>
+                                            {validLinks.length}
+                                        </span>
+                                        <span style={{ fontSize: 10, opacity: 0.7, transform: showLinks ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                                            ▼
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Summary info on the right when collapsed or active */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                    {[
+                                        allAttachments.length > 0 ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})` : null,
+                                        validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
+                                    ].filter(Boolean).join(' • ')}
+                                </span>
+                                {(showAttachments || showLinks) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowAttachments(false); setShowLinks(false); }}
+                                        style={{
+                                            border: 'none',
+                                            background: 'transparent',
+                                            color: 'var(--color-text-muted)',
+                                            cursor: 'pointer',
+                                            fontSize: 11.5,
+                                            padding: '2px 6px',
+                                            borderRadius: 4,
+                                        }}
+                                        title="Collapse all resources"
+                                    >
+                                        ✕ Collapse
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Attachments Drawer */}
+                        {showAttachments && allAttachments.length > 0 && (
+                            <div style={{
+                                padding: '14px 16px',
+                                borderBottom: showLinks ? '1px solid var(--color-border-light)' : 'none',
+                                background: 'var(--color-bg-card)',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                                        📎 Drawing & File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
+                                    </div>
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: 8,
+                                    maxHeight: 200,
+                                    overflowY: 'auto',
+                                    paddingRight: 4,
+                                }}>
+                                    {allAttachments.map((rawAtt, i) => {
+                                        const att = normalizeAttachment(rawAtt);
+                                        const icon = getFileIcon(att.filename);
+                                        return (
+                                            <a
+                                                key={att.id || i}
+                                                href={att.id ? getAttachmentUrl(att.id) : '#'}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                download={att.filename}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                    padding: '8px 12px',
+                                                    border: '1px solid var(--color-border)',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    background: 'var(--color-table-row-alt)',
+                                                    textDecoration: 'none',
+                                                    color: 'var(--color-text-primary)',
+                                                    fontSize: 12.5,
+                                                    transition: 'all 0.12s',
+                                                    boxShadow: 'var(--shadow-xs)',
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
+                                                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+                                            >
+                                                <span style={{ fontSize: 18 }}>{icon}</span>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {att.filename}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                                        {formatBytes(att.sizeBytes)}
+                                                    </div>
+                                                </div>
+                                                <span style={{ marginLeft: 6, color: 'var(--color-primary)', fontSize: 13, fontWeight: 700 }}>↓</span>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reference Links Drawer */}
+                        {showLinks && validLinks.length > 0 && (
+                            <div style={{
+                                padding: '14px 16px',
+                                background: 'var(--color-table-row-alt)',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-info)' }}>
+                                        🔗 Extracted Reference Links ({validLinks.length})
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        {validLinks.length > 5 && (
+                                            <input
+                                                type="text"
+                                                placeholder="Filter links..."
+                                                value={linkFilter}
+                                                onChange={e => setLinkFilter(e.target.value)}
+                                                style={{
+                                                    padding: '3px 8px',
+                                                    fontSize: 12,
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    border: '1px solid var(--color-border)',
+                                                    background: 'var(--color-bg-card)',
+                                                    color: 'var(--color-text-primary)',
+                                                    outline: 'none',
+                                                    width: 140,
+                                                }}
+                                            />
+                                        )}
                                         <button
                                             type="button"
-                                            onClick={() => navigator.clipboard.writeText(url).catch(() => {})}
-                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-info-mid)', fontSize: 12, padding: '2px 6px', borderRadius: 3, flexShrink: 0 }}
+                                            onClick={handleCopyAllLinks}
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ fontSize: 11.5, padding: '2px 8px' }}
                                         >
-                                            Copy
+                                            {copiedAllLinks ? '✓ All Copied' : 'Copy All Links'}
                                         </button>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                                </div>
 
-                {/* Attachments */}
-                {email.attachments && email.attachments.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 10 }}>📎 Attachments ({email.attachments.length})</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {email.attachments.map((rawAtt, i) => {
-                                const att = normalizeAttachment(rawAtt);
-                                return (
-                                    <a
-                                        key={att.id || i}
-                                        href={att.id ? getAttachmentUrl(att.id) : '#'}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-card)', textDecoration: 'none', color: 'var(--color-text-primary)', fontSize: 13, transition: 'all 0.12s', boxShadow: 'var(--shadow-xs)' }}
-                                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
-                                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-                                    >
-                                        <span style={{ fontSize: 18 }}>📄</span>
-                                        <div>
-                                            <div style={{ fontWeight: 600, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.filename}</div>
-                                            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{formatBytes(att.sizeBytes)}</div>
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 6,
+                                    maxHeight: 220,
+                                    overflowY: 'auto',
+                                    paddingRight: 4,
+                                }}>
+                                    {filteredLinks.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', padding: '8px 0' }}>
+                                            No links matching "{linkFilter}"
                                         </div>
-                                        <span style={{ marginLeft: 4, color: 'var(--color-primary)', fontSize: 11.5 }}>↓</span>
-                                    </a>
-                                );
-                            })}
-                        </div>
+                                    ) : (
+                                        filteredLinks.map((l, i) => {
+                                            const domain = getDomain(l.url);
+                                            const isCopied = copiedLink === l.url;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 8,
+                                                        padding: '6px 10px',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        background: 'var(--color-bg-card)',
+                                                        border: '1px solid var(--color-border-light)',
+                                                    }}
+                                                >
+                                                    {domain && (
+                                                        <span style={{
+                                                            fontSize: 10.5,
+                                                            padding: '1px 6px',
+                                                            borderRadius: 3,
+                                                            background: 'rgba(59, 130, 246, 0.08)',
+                                                            color: '#2563eb',
+                                                            fontWeight: 600,
+                                                            flexShrink: 0,
+                                                        }}>
+                                                            {domain}
+                                                        </span>
+                                                    )}
+                                                    <a
+                                                        href={l.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: 'var(--color-text-primary)',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap',
+                                                            flex: 1,
+                                                            textDecoration: 'none',
+                                                        }}
+                                                        title={l.url}
+                                                        onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                                                        onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+                                                    >
+                                                        {l.text !== l.url ? (
+                                                            <span>
+                                                                <strong style={{ marginRight: 6 }}>{l.text}</strong>
+                                                                <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>({l.url})</span>
+                                                            </span>
+                                                        ) : (
+                                                            l.url
+                                                        )}
+                                                    </a>
+                                                    <a
+                                                        href={l.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            padding: '2px 6px',
+                                                            fontSize: 11,
+                                                            color: 'var(--color-primary)',
+                                                            textDecoration: 'none',
+                                                            fontWeight: 600,
+                                                            flexShrink: 0,
+                                                        }}
+                                                        title="Open in new tab"
+                                                    >
+                                                        ↗ Open
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyLink(l.url)}
+                                                        style={{
+                                                            border: 'none',
+                                                            background: isCopied ? 'var(--color-primary-glow)' : 'transparent',
+                                                            cursor: 'pointer',
+                                                            color: isCopied ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                                            fontSize: 11,
+                                                            padding: '2px 6px',
+                                                            borderRadius: 3,
+                                                            flexShrink: 0,
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        {isCopied ? '✓ Copied' : 'Copy'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Body */}
-                <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-card)', overflow: 'hidden' }}>
-                    {viewMode === 'html' && email.bodyHtml ? (
+                {/* Email Body (HTML rendering as-is) */}
+                <div style={{
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#ffffff',
+                    overflow: 'hidden',
+                    boxShadow: 'var(--shadow-xs)',
+                }}>
+                    {email.bodyHtml ? (
                         <iframe
-                            srcDoc={email.bodyHtml}
-                            style={{ width: '100%', minHeight: 450, border: 'none', display: 'block' }}
-                            sandbox="allow-same-origin"
+                            srcDoc={preparedHtml}
+                            style={{
+                                width: '100%',
+                                minHeight: 600,
+                                border: 'none',
+                                display: 'block',
+                                background: '#ffffff',
+                            }}
+                            sandbox="allow-same-origin allow-popups"
                             title="Email body"
                         />
                     ) : (
-                        <pre style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', lineHeight: 1.6, minHeight: 200, margin: 0 }}>
+                        <pre style={{
+                            padding: 20,
+                            fontSize: 13.5,
+                            color: 'var(--color-text-secondary)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            fontFamily: 'var(--font-mono)',
+                            lineHeight: 1.6,
+                            minHeight: 250,
+                            margin: 0,
+                        }}>
                             {email.bodyText || email.snippetText || '(No content)'}
                         </pre>
                     )}
