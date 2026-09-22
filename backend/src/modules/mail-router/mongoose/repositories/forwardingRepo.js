@@ -11,7 +11,7 @@ const Email = require('../models/Email');
  * Forward an email to one or more employee recipients.
  * Creates an EmailForward document for each recipient.
  */
-async function createForwarding(emailId, forwardedBy, recipientIds, note) {
+async function createForwarding(emailId, forwardedBy, recipientIds, note, projectId = null, projectName = '') {
   let actualForwardedBy = forwardedBy;
   let actualRecipientIds = recipientIds;
 
@@ -26,14 +26,16 @@ async function createForwarding(emailId, forwardedBy, recipientIds, note) {
 
   const createdDocs = [];
 
-  for (const recipientId of recipientIds) {
+  for (const recipientId of actualRecipientIds) {
     const doc = await EmailForward.findOneAndUpdate(
       { emailId, recipientId },
       {
         emailId,
         recipientId,
-        forwardedBy,
+        forwardedBy: actualForwardedBy,
         note: note || '',
+        projectId: projectId || null,
+        projectName: projectName || '',
         isRead: false,
         readAt: null,
       },
@@ -206,6 +208,8 @@ async function listMailboxItems(recipientId, limit = 50, offset = 0) {
       forwardedByName,
       forwardedAt: fw.createdAt ? new Date(fw.createdAt).toISOString() : new Date().toISOString(),
       note: fw.note || '',
+      projectId: fw.projectId ? String(fw.projectId) : null,
+      projectName: fw.projectName || '',
       readAt: fw.readAt ? new Date(fw.readAt).toISOString() : null,
       isRead: Boolean(fw.isRead),
       createdAt: fw.createdAt ? new Date(fw.createdAt).toISOString() : new Date().toISOString(),
@@ -252,7 +256,25 @@ async function getMailboxItem(recipientId, targetId) {
 
   const email = await Email.findOne({ _id: { $in: emailIds } }).lean() || {};
   const { listAttachmentsByEmail } = require('./attachmentRepo');
-  const attachments = await listAttachmentsByEmail(email._id || rawEid);
+  const Attachment = require('../models/Attachment');
+  const { resolveInlineImages } = require('../services/inlineImageService');
+
+  const [attachments, fullAttachments] = await Promise.all([
+    listAttachmentsByEmail(email._id || rawEid),
+    Attachment.find({ emailId: { $in: emailIds } }).lean(),
+  ]);
+
+  const { html: resolvedHtml, inlineAttachmentIds } = resolveInlineImages(email.bodyHtml, fullAttachments);
+
+  // If HTML had CIDs resolved, asynchronously cache in DB
+  if (resolvedHtml && resolvedHtml !== email.bodyHtml && email._id) {
+    Email.updateOne({ _id: email._id }, { bodyHtml: resolvedHtml }).catch(() => {});
+  }
+
+  // Filter out inline images from drawing/file attachments so they don't clutter the download tray
+  const drawingAttachments = attachments.filter(a =>
+    !inlineAttachmentIds.includes(String(a._id || a.id)) && !a.isInline
+  );
 
   // Forwarder name
   let forwardedByName = 'Project Manager';
@@ -296,10 +318,10 @@ async function getMailboxItem(recipientId, targetId) {
     receivedAt: email.receivedAt ? new Date(email.receivedAt).toISOString() : new Date(fw.createdAt).toISOString(),
     snippetText: email.snippetText || email.bodyPreview || (email.bodyText ? email.bodyText.slice(0, 150) : ''),
     bodyText: email.bodyText || '',
-    bodyHtml: email.bodyHtml || '',
+    bodyHtml: resolvedHtml || email.bodyHtml || '',
     links: email.links || [],
-    attachments,
-    hasAttachments: Boolean(email.hasAttachments || attachments.length > 0),
+    attachments: drawingAttachments,
+    hasAttachments: Boolean(drawingAttachments.length > 0),
     isForwarded: true,
     provider: email.provider || 'MICROSOFT',
   };
@@ -315,11 +337,13 @@ async function getMailboxItem(recipientId, targetId) {
     forwardedByName,
     forwardedAt: fw.createdAt ? new Date(fw.createdAt).toISOString() : new Date().toISOString(),
     note: fw.note || '',
+    projectId: fw.projectId ? String(fw.projectId) : null,
+    projectName: fw.projectName || '',
     readAt: fw.readAt ? new Date(fw.readAt).toISOString() : null,
     isRead: Boolean(fw.isRead),
     createdAt: fw.createdAt ? new Date(fw.createdAt).toISOString() : new Date().toISOString(),
     email: formattedEmail,
-    attachments,
+    attachments: drawingAttachments,
   };
 }
 
@@ -368,60 +392,114 @@ async function countUnread(recipientId) {
 }
 
 /**
- * List employees/detailers available for PM assignment.
- * Queries Mongoose User model or native users collection directly.
+ * List employees and projects for PM triage & assignment.
  * Scoped by adminId for multi-tenant isolation.
  */
 async function listEmployees(adminId = null) {
-  const query = {
-    $or: [
-      { role: { $in: ['team_member', 'user', 'team_lead', 'project_manager', 'employee', 'detailer'] } },
-      { roles: { $in: ['team_member', 'user', 'team_lead', 'project_manager', 'employee', 'detailer'] } },
-    ],
-  };
-
-  // Multi-tenant scoping: only show users in the same organization
+  const queryAdminIds = [];
   if (adminId) {
-    query.$and = [
-      {
-        $or: [
-          { adminId: adminId },
-          { createdByAdminId: adminId },
-        ],
-      },
+    queryAdminIds.push(adminId);
+    if (typeof adminId === 'string' && mongoose.Types.ObjectId.isValid(adminId)) {
+      queryAdminIds.push(new mongoose.Types.ObjectId(adminId));
+    } else if (adminId && adminId.toString) {
+      queryAdminIds.push(adminId.toString());
+    }
+  }
+
+  const userQuery = {
+    role: { $in: ['team_member', 'user', 'team_lead', 'project_manager', 'employee', 'detailer'] },
+  };
+  if (queryAdminIds.length > 0) {
+    userQuery.$or = [
+      { adminId: { $in: queryAdminIds } },
+      { createdByAdminId: { $in: queryAdminIds } },
     ];
   }
 
+  let UserModel = mongoose.models.User;
+  if (!UserModel) {
+    try { UserModel = require('../../../../models/User'); } catch { UserModel = null; }
+  }
+
+  let ProjectModel = mongoose.models.Project;
+  if (!ProjectModel) {
+    try { ProjectModel = require('../../../../models/Project'); } catch { ProjectModel = null; }
+  }
+
+  let users = [];
   try {
-    const UserModel = mongoose.models.User || (mongoose.modelNames().includes('User') ? mongoose.model('User') : null);
     if (UserModel) {
-      const users = await UserModel.find(query).select('_id username name email role').lean();
-      return users.map((u) => ({
-        id: String(u._id),
-        name: u.username || u.name || u.email,
-        email: u.email,
-        role: u.role || 'team_member',
-      }));
+      users = await UserModel.find(userQuery).select('_id username name email role adminId').lean();
+    } else if (mongoose.connection && mongoose.connection.db) {
+      users = await mongoose.connection.db.collection('users').find(userQuery).toArray();
     }
-  } catch (_e) {
-    // ignore and try collection fallback
+  } catch (err) {
+    console.warn('[forwardingRepo:listEmployees] Error querying users:', err);
   }
 
+  // Also query projects for this admin
+  const projQuery = { status: { $ne: 'archived' } };
+  if (queryAdminIds.length > 0) {
+    projQuery.createdByAdminId = { $in: queryAdminIds };
+  }
+
+  let projects = [];
   try {
-    if (mongoose.connection && mongoose.connection.db) {
-      const users = await mongoose.connection.db.collection('users').find(query).toArray();
-      return users.map((u) => ({
-        id: String(u._id),
-        name: u.username || u.name || u.email,
-        email: u.email,
-        role: u.role || 'team_member',
-      }));
+    if (ProjectModel) {
+      projects = await ProjectModel.find(projQuery).select('_id name clientName status assignments').sort({ name: 1 }).lean();
+    } else if (mongoose.connection && mongoose.connection.db) {
+      projects = await mongoose.connection.db.collection('projects').find(projQuery).toArray();
     }
-  } catch (_e) {
-    // fallback
+  } catch (err) {
+    console.warn('[forwardingRepo:listEmployees] Error querying projects:', err);
   }
 
-  return [];
+  // Build mapping of user -> projects
+  const userProjectsMap = {};
+  for (const p of projects) {
+    for (const a of (p.assignments || [])) {
+      const uid = String(a.userId);
+      if (!userProjectsMap[uid]) userProjectsMap[uid] = [];
+      userProjectsMap[uid].push({
+        id: String(p._id),
+        name: p.name,
+        permission: a.permission || 'viewer',
+      });
+    }
+  }
+
+  const formattedEmployees = users.map((u) => {
+    const uid = String(u._id);
+    const assignedProjects = userProjectsMap[uid] || [];
+    return {
+      id: uid,
+      _id: uid,
+      name: u.displayName || u.name || u.username || u.email,
+      username: u.username || u.email,
+      email: u.email || '',
+      role: u.role || 'team_member',
+      projectIds: assignedProjects.map((p) => p.id),
+      projects: assignedProjects,
+    };
+  });
+
+  const formattedProjects = projects.map((p) => {
+    const assignedUserIds = (p.assignments || []).map((a) => String(a.userId));
+    return {
+      id: String(p._id),
+      _id: String(p._id),
+      name: p.name,
+      clientName: p.clientName || '',
+      status: p.status || 'in_progress',
+      assignedUserIds,
+      memberCount: assignedUserIds.length,
+    };
+  });
+
+  return {
+    employees: formattedEmployees,
+    projects: formattedProjects,
+  };
 }
 
 module.exports = {

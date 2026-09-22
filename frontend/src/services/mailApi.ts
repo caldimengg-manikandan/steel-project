@@ -97,19 +97,34 @@ export interface InboxItem {
     forwardedByName?: string;
     forwardedAt?: string;
     note?: string;
+    projectId?: string;
+    projectName?: string;
     isRead: boolean;
     createdAt: string;
     email?: MailMessage;
     attachments?: MailAttachment[];
 }
 
+export interface ProjectInfo {
+    id: string;
+    _id?: string;
+    name: string;
+    clientName?: string;
+    status?: string;
+    assignedUserIds: string[];
+    memberCount: number;
+}
+
 export interface Employee {
     id: string;
     _id?: string;
     username: string;
+    name?: string;
     email: string;
     role: string;
     displayName?: string;
+    projectIds?: string[];
+    projects?: Array<{ id: string; name: string; permission?: string }>;
 }
 
 // ── Accounts ────────────────────────────────────────────────
@@ -201,21 +216,31 @@ export async function getEmail(id: string): Promise<{ email: MailMessage; attach
 export async function forwardEmail(
     emailId: string,
     recipientIds: string[],
-    note?: string
-): Promise<{ forwarded: number }> {
+    note?: string,
+    projectId?: string,
+    projectName?: string
+): Promise<{ forwarded?: number; success?: boolean; count?: number }> {
     const res = await fetch(`${BASE}/mail/emails/${emailId}/forward`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ recipientIds, note }),
+        body: JSON.stringify({ recipientIds, note, projectId, projectName }),
     });
     return handleResponse(res);
 }
 
-// ── Employees ───────────────────────────────────────────────
+// ── Employees & Projects ───────────────────────────────────
 
-export async function listEmployees(): Promise<{ employees: Employee[] }> {
+export async function listEmployees(): Promise<{ employees: Employee[]; projects?: ProjectInfo[] }> {
     const res = await fetch(`${BASE}/mail/employees`, {
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export async function listProjects(): Promise<{ projects: ProjectInfo[]; employees?: Employee[] }> {
+    const res = await fetch(`${BASE}/mail/projects`, {
         credentials: 'include',
         headers: authHeaders(),
     });

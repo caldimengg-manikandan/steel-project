@@ -491,15 +491,34 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
     }
 
     const emailId = email._id || email.id || req.params.id;
-    const attachments = await listAttachmentsByEmail(emailId);
+    const Attachment = require('../mongoose/models/Attachment');
+    const Email = require('../mongoose/models/Email');
+    const { resolveInlineImages } = require('../mongoose/services/inlineImageService');
+
+    const [attachments, fullAttachments] = await Promise.all([
+      listAttachmentsByEmail(emailId),
+      Attachment.find({ emailId }).lean(),
+    ]);
+
+    const { html: resolvedHtml, inlineAttachmentIds } = resolveInlineImages(email.bodyHtml, fullAttachments);
+    if (resolvedHtml && resolvedHtml !== email.bodyHtml && email._id) {
+      Email.updateOne({ _id: email._id }, { bodyHtml: resolvedHtml }).catch(() => {});
+    }
+
+    const drawingAttachments = attachments.filter(a =>
+      !inlineAttachmentIds.includes(String(a._id || a.id)) && !a.isInline
+    );
+
     const formattedEmail = {
       ...email,
       from: email.from || { name: email.fromName || email.fromAddress, email: email.fromAddress },
+      bodyHtml: resolvedHtml || email.bodyHtml || '',
       isForwarded: email.isForwarded ?? (email.triageStatus === 'FORWARDED'),
       snippetText: email.snippetText || email.bodyPreview || (email.bodyText ? email.bodyText.slice(0, 150) : ''),
-      hasAttachments: Boolean(email.hasAttachments || (attachments && attachments.length > 0)),
+      attachments: drawingAttachments,
+      hasAttachments: Boolean(drawingAttachments.length > 0),
     };
-    return res.json({ email: formattedEmail, attachments });
+    return res.json({ email: formattedEmail, attachments: drawingAttachments });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch email' });
   }
@@ -507,7 +526,7 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
 
 // POST /api/mail-router/emails/:id/forward — Forward email to detailers/employees
 router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, res) => {
-  const { recipientIds, note } = req.body || {};
+  const { recipientIds, note, projectId, projectName } = req.body || {};
   if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
     return res.status(400).json({ error: 'At least one recipient ID is required.' });
   }
@@ -517,7 +536,7 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
     if (!email) return res.status(404).json({ error: 'Email not found.' });
 
     const emailId = email._id || email.id || req.params.id;
-    await forwardEmail(emailId, req.authUser.id, recipientIds, note);
+    await forwardEmail(emailId, req.authUser.id, recipientIds, note, projectId, projectName);
     return res.json({ success: true, count: recipientIds.length });
   } catch (err) {
     console.error('[mailRouter:forward] Forwarding error:', err);
@@ -525,13 +544,25 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
   }
 });
 
-// GET /api/mail-router/employees — List detailers/employees for triage assignment
+// GET /api/mail-router/employees — List detailers/employees & projects for triage assignment
 router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
-    const employees = await listEmployees(req.authUser.adminId);
-    return res.json({ employees });
+    const adminId = req.authUser.adminId || req.authUser.id;
+    const { employees, projects } = await listEmployees(adminId);
+    return res.json({ employees, projects });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch employees' });
+  }
+});
+
+// GET /api/mail-router/projects — List projects with members for triage assignment
+router.get('/projects', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const adminId = req.authUser.adminId || req.authUser.id;
+    const { employees, projects } = await listEmployees(adminId);
+    return res.json({ projects, employees });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch projects' });
   }
 });
 

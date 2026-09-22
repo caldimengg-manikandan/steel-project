@@ -6,7 +6,7 @@ import {
     redirectToMicrosoftAuth, redirectToZohoAuth,
     triggerSync, listSyncJobs, listEmails, getEmail, forwardEmail,
     listEmployees, getAttachmentUrl,
-    type MailAccount, type MailMessage, type SyncJob, type Employee,
+    type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo,
 } from '../../services/mailApi';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -203,6 +203,8 @@ function ForwardModal({
     email: MailMessage; onClose: () => void; onSent: () => void;
 }) {
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [projects, setProjects] = useState<ProjectInfo[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [note, setNote] = useState('');
@@ -213,14 +215,42 @@ function ForwardModal({
     useEffect(() => {
         setLoading(true);
         listEmployees()
-            .then(d => setEmployees(d.employees || []))
+            .then(d => {
+                setEmployees(d.employees || []);
+                setProjects(d.projects || []);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
 
-    const filtered = employees.filter(e =>
-        `${e.username} ${e.email} ${e.role}`.toLowerCase().includes(search.toLowerCase())
-    );
+    // Currently active project if one is selected
+    const activeProject = selectedProjectId === 'all'
+        ? null
+        : projects.find(p => (p.id === selectedProjectId || (p as any)._id === selectedProjectId));
+
+    // Filter employees by project
+    const projectMembers = employees.filter(emp => {
+        if (selectedProjectId === 'all') return true;
+        const empId = emp.id || emp._id || '';
+        if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) return true;
+        if (activeProject && activeProject.assignedUserIds && activeProject.assignedUserIds.includes(empId)) return true;
+        return false;
+    });
+
+    // Filter by search text
+    const filtered = projectMembers.filter(e => {
+        if (!search) return true;
+        const s = search.toLowerCase();
+        return (
+            (e.displayName || '').toLowerCase().includes(s) ||
+            (e.username || '').toLowerCase().includes(s) ||
+            (e.name || '').toLowerCase().includes(s) ||
+            (e.email || '').toLowerCase().includes(s) ||
+            (e.role || '').toLowerCase().includes(s)
+        );
+    });
+
+    const allFilteredSelected = filtered.length > 0 && filtered.every(e => selected.has(e.id || e._id || ''));
 
     function toggle(id: string) {
         setSelected(prev => {
@@ -230,12 +260,42 @@ function ForwardModal({
         });
     }
 
+    function toggleSelectAllFiltered() {
+        if (allFilteredSelected) {
+            // Deselect all visible
+            setSelected(prev => {
+                const next = new Set(prev);
+                for (const e of filtered) {
+                    const id = e.id || e._id;
+                    if (id) next.delete(id);
+                }
+                return next;
+            });
+        } else {
+            // Select all visible
+            setSelected(prev => {
+                const next = new Set(prev);
+                for (const e of filtered) {
+                    const id = e.id || e._id;
+                    if (id) next.add(id);
+                }
+                return next;
+            });
+        }
+    }
+
     async function handleForward() {
         if (selected.size === 0) return;
         setSending(true);
         setError('');
         try {
-            await forwardEmail(email._id, Array.from(selected), note || undefined);
+            await forwardEmail(
+                email._id,
+                Array.from(selected),
+                note || undefined,
+                activeProject ? activeProject.id : undefined,
+                activeProject ? activeProject.name : undefined
+            );
             onSent();
         } catch (e: any) {
             setError(e.message || 'Forward failed');
@@ -248,68 +308,217 @@ function ForwardModal({
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <span className="modal-title">📤 Forward to Detailers</span>
+                    <span className="modal-title">📤 Forward to Detailers & Engineers</span>
                     <button className="modal-close" onClick={onClose}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
                 <div className="modal-body">
                     {/* Email summary */}
-                    <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Forwarding:</div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{email.subject || '(No subject)'}</div>
-                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>From: {email.from?.name || email.from?.email}</div>
+                    <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Forwarding message:</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>{email.subject || '(No subject)'}</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>From: {email.from?.name || email.from?.email}</div>
                     </div>
 
-                    {/* Search employees */}
-                    <div className="form-group">
-                        <label className="form-label">Select Team Members</label>
-                        <input
+                    {/* Project Selector Filter */}
+                    <div className="form-group" style={{ marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
+                                📁 Select Project
+                            </label>
+                            {activeProject ? (
+                                <span style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>
+                                    {projectMembers.length} member{projectMembers.length !== 1 ? 's' : ''} assigned to {activeProject.name}
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                    {projects.length} projects available
+                                </span>
+                            )}
+                        </div>
+                        <select
                             className="form-control"
-                            placeholder="Search by name, email or role..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
+                            value={selectedProjectId}
+                            onChange={e => setSelectedProjectId(e.target.value)}
+                            style={{ fontSize: 13.5, fontWeight: 500 }}
+                        >
+                            <option value="all">🌐 All Projects & Team Members ({employees.length})</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} — {p.memberCount || 0} member{(p.memberCount || 0) !== 1 ? 's' : ''}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    {/* Select All / Clear */}
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set(filtered.map(e => e.id || e._id || '')))}>Select All</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+                    {/* Search & Bulk Select Controls */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                            <input
+                                className="form-control"
+                                placeholder={activeProject ? `Search within ${activeProject.name}…` : 'Search by name, email or role…'}
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                style={{ fontSize: 13 }}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            className={`btn ${allFilteredSelected ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            onClick={toggleSelectAllFiltered}
+                            disabled={filtered.length === 0}
+                            style={{ fontSize: 12.5, whiteSpace: 'nowrap', fontWeight: 600 }}
+                        >
+                            {allFilteredSelected
+                                ? `✓ Deselect All (${filtered.length})`
+                                : `☑ Select All (${filtered.length})`}
+                        </button>
+                        {selected.size > 0 && (
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setSelected(new Set())}
+                                style={{ fontSize: 12, color: 'var(--color-danger-mid)', whiteSpace: 'nowrap' }}
+                            >
+                                Clear ({selected.size})
+                            </button>
+                        )}
                     </div>
+
+                    {/* Active Selected Recipients Chips Strip */}
+                    {selected.size > 0 && (
+                        <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '8px 12px', marginBottom: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                    Selected Recipients ({selected.size}):
+                                </span>
+                                <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Click ✕ to remove</span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 80, overflowY: 'auto' }}>
+                                {Array.from(selected).map(id => {
+                                    const emp = employees.find(e => (e.id === id || e._id === id));
+                                    const label = emp?.displayName || emp?.name || emp?.username || emp?.email || id;
+                                    return (
+                                        <span
+                                            key={id}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 5,
+                                                background: 'var(--color-primary-glow)',
+                                                border: '1px solid var(--color-primary)',
+                                                borderRadius: 16,
+                                                padding: '2px 8px 2px 10px',
+                                                fontSize: 12,
+                                                color: 'var(--color-primary)',
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {label}
+                                            <button
+                                                type="button"
+                                                onClick={() => toggle(id)}
+                                                style={{
+                                                    border: 'none',
+                                                    background: 'none',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--color-primary)',
+                                                    fontSize: 14,
+                                                    fontWeight: 700,
+                                                    padding: '0 2px',
+                                                    lineHeight: 1,
+                                                }}
+                                                title="Remove recipient"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Employee list */}
-                    <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 16 }}>
+                    <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 14 }}>
                         {loading ? (
                             <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}><Spinner size={20} /></div>
                         ) : filtered.length === 0 ? (
-                            <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>No team members found</div>
+                            <div style={{ padding: 28, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
+                                <div style={{ fontSize: 24, marginBottom: 6 }}>👥</div>
+                                {activeProject ? (
+                                    <>
+                                        <div>No team members are assigned to <strong>{activeProject.name}</strong> yet.</div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setSelectedProjectId('all')}
+                                            style={{ marginTop: 10, fontSize: 12 }}
+                                        >
+                                            Show All Team Members ({employees.length})
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div>No team members found matching "{search}"</div>
+                                )}
+                            </div>
                         ) : filtered.map(emp => {
                             const id = emp.id || emp._id || '';
                             const isChecked = selected.has(id);
                             return (
-                                <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', cursor: 'pointer', background: isChecked ? 'var(--color-primary-glow)' : 'transparent', borderBottom: '1px solid var(--color-border-light)', transition: 'background 0.12s' }}>
-                                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} style={{ accentColor: 'var(--color-primary)' }} />
+                                <label
+                                    key={id}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        padding: '9px 14px',
+                                        cursor: 'pointer',
+                                        background: isChecked ? 'var(--color-primary-glow)' : 'transparent',
+                                        borderBottom: '1px solid var(--color-border-light)',
+                                        transition: 'background 0.12s'
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => toggle(id)}
+                                        style={{ accentColor: 'var(--color-primary)', width: 16, height: 16, cursor: 'pointer' }}
+                                    />
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                                        {initials(emp.displayName || emp.username, emp.email)}
+                                        {initials(emp.displayName || emp.name || emp.username, emp.email)}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{emp.displayName || emp.username}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-text-primary)' }}>
+                                                {emp.displayName || emp.name || emp.username}
+                                            </span>
+                                            {emp.projects && emp.projects.length > 0 && selectedProjectId === 'all' && (
+                                                <span style={{ fontSize: 11, background: 'var(--color-table-row-alt)', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 4 }}>
+                                                    📁 {emp.projects[0].name}{emp.projects.length > 1 ? ` +${emp.projects.length - 1}` : ''}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{emp.email}</div>
                                     </div>
-                                    <span className="role-chip viewer" style={{ fontSize: 10.5, padding: '2px 7px' }}>{emp.role}</span>
+                                    <span className="role-chip viewer" style={{ fontSize: 10.5, padding: '2px 7px' }}>
+                                        {emp.role}
+                                    </span>
                                 </label>
                             );
                         })}
                     </div>
 
                     {/* PM Notes */}
-                    <div className="form-group">
-                        <label className="form-label">PM Notes / Drawing Instructions</label>
+                    <div className="form-group" style={{ marginBottom: 12 }}>
+                        <label className="form-label">
+                            PM Notes / Drawing Instructions
+                        </label>
                         <textarea
                             className="form-control"
                             rows={3}
-                            placeholder='e.g. "Review structural beam drawing rev 2 — check column grid lines"'
+                            placeholder={activeProject ? `e.g. "Drawings for ${activeProject.name} — please review sequence 1 structural beams"` : 'e.g. "Review structural beam drawing rev 2 — check column grid lines"'}
                             value={note}
                             onChange={e => setNote(e.target.value)}
                         />
@@ -404,9 +613,6 @@ function EmailDetail({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-table-header-bg)', flexShrink: 0 }}>
                 <button className="btn btn-primary" onClick={onForwardClick}>
                     📤 Forward to Detailers
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(window.location.href).catch(() => {})}>
-                    🔗 Copy Link
                 </button>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 0, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                     {(['html', 'text'] as const).map(m => (
@@ -697,7 +903,7 @@ export default function MailRouterPage() {
                 <div style={{ padding: '16px 24px 10px 24px', flexShrink: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)' }}>
                     <div className="page-header" style={{ marginBottom: 10 }}>
                         <div className="page-header-left">
-                            <h1 className="page-title" style={{ fontSize: 22 }}>✉️ Mail Router</h1>
+                            <h1 className="page-title" style={{ fontSize: 22 }}>Mail Router</h1>
                             <p className="page-subtitle" style={{ fontSize: 13 }}>Connect mailboxes, sync emails, and forward drawing instructions to detailers</p>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

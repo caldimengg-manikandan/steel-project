@@ -12,13 +12,15 @@ const graph_client_1 = require("./graph-client");
  */
 async function fetchAttachmentList(accessToken, mailboxId, messageId) {
     const basePath = mailboxId === 'me' ? '/me' : `/users/${encodeURIComponent(mailboxId)}`;
-    const data = await (0, graph_client_1.graphGet)(`${basePath}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size`, accessToken);
+    const data = await (0, graph_client_1.graphGet)(`${basePath}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline,contentId`, accessToken);
     return (data.value ?? []).map((att) => ({
         id: att.id,
         providerAttachmentId: att.id,
         filename: att.name,
         contentType: att.contentType || 'application/octet-stream',
         sizeBytes: att.size ?? null,
+        isInline: Boolean(att.isInline),
+        contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
     }));
 }
 /**

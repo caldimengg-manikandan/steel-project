@@ -27,6 +27,13 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
     sizeBytes: attachmentMeta.sizeBytes || attachmentMeta.size || null,
   };
 
+  if (attachmentMeta.contentId !== undefined) {
+    update.contentId = attachmentMeta.contentId;
+  }
+  if (attachmentMeta.isInline !== undefined) {
+    update.isInline = attachmentMeta.isInline;
+  }
+
   if (content) {
     update.content = content;
   }

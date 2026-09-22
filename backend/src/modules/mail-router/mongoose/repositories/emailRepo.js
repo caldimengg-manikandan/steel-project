@@ -70,8 +70,13 @@ async function listEmailsInWindow(startDate, endDate, provider, userId) {
   return Email.find(query).sort({ receivedAt: -1 }).lean();
 }
 
+async function updateEmailBodyHtml(id, bodyHtml) {
+  return Email.findByIdAndUpdate(id, { bodyHtml }, { new: true });
+}
+
 module.exports = {
   upsertEmail,
   getEmailById,
   listEmailsInWindow,
+  updateEmailBodyHtml,
 };

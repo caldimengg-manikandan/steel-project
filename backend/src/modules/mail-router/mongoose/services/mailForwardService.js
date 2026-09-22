@@ -9,7 +9,7 @@ const { getEmailById } = require('../repositories/emailRepo');
 /**
  * Forward an imported email to a list of employee IDs.
  */
-async function forwardEmail(emailId, arg2, arg3, note) {
+async function forwardEmail(emailId, arg2, arg3, note, projectId = null, projectName = '') {
   let forwardedByUserId;
   let recipientIds;
 
@@ -33,14 +33,14 @@ async function forwardEmail(emailId, arg2, arg3, note) {
     throw new Error(`Email ${emailId} not found.`);
   }
 
-  return createForwarding(emailId, forwardedByUserId, recipientIds, note);
+  return createForwarding(emailId, forwardedByUserId, recipientIds, note, projectId, projectName);
 }
 
 /**
- * Get the list of employees available for the PM's selector.
+ * Get the list of employees and projects available for PM's selector.
  */
-async function getEmployeeList() {
-  return listEmployees();
+async function getEmployeeList(adminId = null) {
+  return listEmployees(adminId);
 }
 
 module.exports = {

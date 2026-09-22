@@ -31,6 +31,17 @@ const emailForwardSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    projectId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'Project',
+      default: null,
+      index: true,
+    },
+    projectName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     isRead: {
       type: Boolean,
       default: false,

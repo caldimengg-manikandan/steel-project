@@ -7,8 +7,10 @@
 const { localRangeToUtcWindow, getTodayUtcWindow } = require('../../services/mail/timezone');
 const { getMailProvider } = require('../../services/mail/provider-factory');
 const { updateAccountSyncStatus } = require('./accountService');
-const { upsertEmail } = require('../repositories/emailRepo');
+const { upsertEmail, updateEmailBodyHtml } = require('../repositories/emailRepo');
 const { upsertAttachment } = require('../repositories/attachmentRepo');
+const { resolveInlineImages } = require('./inlineImageService');
+const Attachment = require('../models/Attachment');
 const {
   createSyncJob,
   markJobRunning,
@@ -74,8 +76,22 @@ async function runMailSync(options) {
         );
         messagesSynced += 1;
 
-        if (message.hasAttachments) {
-          await syncAttachmentsForMessage(mailProvider, syncAccount, message, savedEmail._id || savedEmail.id);
+        const hasInlineCids = /cid:[^\s"'>]+/i.test(message.bodyHtml || '');
+        if (message.hasAttachments || hasInlineCids) {
+          const emailDbId = savedEmail._id || savedEmail.id;
+          await syncAttachmentsForMessage(mailProvider, syncAccount, message, emailDbId);
+
+          if (hasInlineCids) {
+            try {
+              const fullAtts = await Attachment.find({ emailId: emailDbId }).lean();
+              const { html: resolvedHtml } = resolveInlineImages(savedEmail.bodyHtml, fullAtts);
+              if (resolvedHtml && resolvedHtml !== savedEmail.bodyHtml) {
+                await updateEmailBodyHtml(emailDbId, resolvedHtml);
+              }
+            } catch (inlineErr) {
+              console.warn('[mail-router:sync] Failed to resolve inline images:', inlineErr.message);
+            }
+          }
         }
       }
 
@@ -146,6 +162,8 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
         filename: att.filename,
         contentType: att.contentType,
         sizeBytes: att.sizeBytes,
+        isInline: att.isInline,
+        contentId: att.contentId,
         content,
       });
     }

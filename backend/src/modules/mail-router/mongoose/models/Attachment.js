@@ -29,6 +29,14 @@ const attachmentSchema = new mongoose.Schema(
     sizeBytes: {
       type: Number,
     },
+    contentId: {
+      type: String,
+      index: true,
+    },
+    isInline: {
+      type: Boolean,
+      default: false,
+    },
     content: {
       type: Buffer, // Binary file data
     },
