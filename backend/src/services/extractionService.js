@@ -231,13 +231,39 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         if (fields.drawingTitle) fields.drawingTitle = fields.drawingTitle.toString().trim();
         if (fields.revision) fields.revision = fields.revision.toString().trim().toUpperCase();
 
+        // ── Duplicate Detection Check ──
+        let newStatus = 'completed';
+        try {
+            const dwgNum = fields.drawingNumber;
+            const rev = fields.revision;
+            const date = fields.date;
+            
+            if (dwgNum && rev && date) {
+                const existingDuplicate = await DrawingExtraction.findOne({
+                    projectId,
+                    _id: { $ne: extractionId },
+                    'extractedFields.drawingNumber': dwgNum,
+                    'extractedFields.revision': rev,
+                    'extractedFields.date': date,
+                    status: { $in: ['completed', 'duplicate_pending'] }
+                });
+
+                if (existingDuplicate) {
+                    newStatus = 'duplicate_pending';
+                    console.log(`[Extraction] Duplicate detected for ${dwgNum} (Rev ${rev}, Date ${date}). Marking as duplicate_pending.`);
+                }
+            }
+        } catch (err) {
+            console.error('[Extraction] Error checking for duplicate:', err.message);
+        }
+
         // ── Step 5a: Update MongoDB record ────────────────────
         const processingTimeMs = Date.now() - start;
 
         const updatedDoc = await DrawingExtraction.findByIdAndUpdate(
             extractionId,
             {
-                status: 'completed',
+                status: newStatus,
                 extractedFields: fields,
                 validationResult: validation,
                 extractionConfidence: confidence,

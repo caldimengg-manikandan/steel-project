@@ -280,6 +280,37 @@ exports.reprocess = async (req, res) => {
     });
 };
 
+// ── Resolve Duplicate Extraction ──────────────────────────
+exports.resolveDuplicate = async (req, res) => {
+    const { projectId, id } = req.params;
+    const adminId = req.principal.adminId;
+    const { action } = req.body; // 'proceed' or 'skip'
+
+    if (!['proceed', 'skip'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action. Must be proceed or skip.' });
+    }
+
+    const doc = await DrawingExtraction.findOne({
+        _id: id,
+        projectId,
+        createdByAdminId: adminId
+    });
+
+    if (!doc) {
+        return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    if (doc.status !== 'duplicate_pending') {
+        return res.status(400).json({ error: 'Extraction is not pending duplicate resolution.' });
+    }
+
+    const newStatus = action === 'proceed' ? 'completed' : 'skipped';
+    doc.status = newStatus;
+    await doc.save();
+
+    res.json({ message: `Duplicate resolved as ${newStatus}`, status: newStatus });
+};
+
 // ── View PDF (Stream from GridFS/Disk) ─────────────────────
 exports.viewPdf = async (req, res) => {
     const { projectId, id } = req.params;

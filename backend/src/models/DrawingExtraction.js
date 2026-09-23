@@ -87,7 +87,7 @@ const drawingExtractionSchema = new mongoose.Schema(
         // ── Extraction metadata ──
         status: {
             type: String,
-            enum: ['queued', 'processing', 'completed', 'failed'],
+            enum: ['queued', 'processing', 'completed', 'failed', 'duplicate_pending', 'skipped'],
             default: 'queued',
             index: true,
         },
