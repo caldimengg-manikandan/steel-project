@@ -34,9 +34,9 @@ exports.uploadRfiDrawing = async (req, res) => {
             if (storageGateway.isEnabled()) {
                 let baseTarget = `Projects/${projectName}/RFIs`;
                 if (localSavePath) {
-                    baseTarget += `/${localSavePath.replace(/\\/g, '/').replace(/^\\/+|^\\\\+|\\/+$|\\\\+$/g, '')}`;
+                    baseTarget += `/${localSavePath.split(/[\\\\/]+/).filter(Boolean).join('/')}`;
                 }
-                const cleanTargetDir = baseTarget.replace(/\\/+/g, '/').replace(/\\/$/, '').replace(/\\/\\.$/, '');
+                const cleanTargetDir = baseTarget.split(new RegExp('/+')).filter(Boolean).join('/').replace(new RegExp('/$'), '').replace(new RegExp('/\\\\.$'), '');
                 
                 let lastError = null;
                 const maxRetries = 3;
