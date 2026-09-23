@@ -433,6 +433,7 @@ exports.downloadExcel = async (req, res) => {
             targetTransmittal = {
                 transmittalNumber: maxTarget,
                 drawings: batchToUse.map(e => ({
+                    extractionId: e._id,
                     drawingNumber: e.extractedFields?.drawingNumber || e.originalFileName || '',
                     drawingTitle: e.extractedFields?.drawingTitle || e.extractedFields?.drawingDescription || '',
                     revision: e.extractedFields?.revision || '0',

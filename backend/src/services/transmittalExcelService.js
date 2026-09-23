@@ -15,6 +15,8 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
+const Transmittal = require('../models/Transmittal');
 
 const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
 
@@ -125,10 +127,32 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     // ── Fetch extractions to get full path for subfolder (SOW) grouping ──
     const mongoose = require('mongoose');
     let DrawingExtraction;
+    let Project;
     try {
         DrawingExtraction = mongoose.model('DrawingExtraction');
     } catch (e) {
         DrawingExtraction = require('../models/DrawingExtraction');
+    }
+    try {
+        Project = mongoose.model('Project');
+    } catch (e) {
+        Project = require('../models/Project');
+    }
+
+    const pId = transmittal.projectId?._id || transmittal.projectId;
+    let validSowNames = [];
+    let sowPrefixes = new Set(['SOW', 'SOWLO', 'AREA']);
+    if (pId) {
+        const project = await Project.findById(pId).lean();
+        if (project) {
+            const extractPrefix = (sowName) => {
+                validSowNames.push(sowName.trim().toUpperCase());
+                const match = sowName.trim().toUpperCase().match(/^([A-Z\s_-]+?)\d+$/);
+                if (match) sowPrefixes.add(match[1].trim());
+            };
+            (project.scopeOfWork || []).forEach(sow => extractPrefix(sow.name));
+            (project.additionalScopeOfWork || []).forEach(sow => extractPrefix(sow.name));
+        }
     }
 
     const extIds = (transmittal.drawings || []).map(d => d.extractionId).filter(Boolean);
@@ -147,24 +171,89 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
 
         if (fullPath) {
             const parts = fullPath.replace(/\\/g, '/').split('/');
+            let matchedSub = '';
+            let detectedSow = null;
+            
+            const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
+
             for (let i = 0; i < parts.length - 1; i++) {
-                if (/sow/i.test(parts[i].trim())) {
-                    subFolder = parts[i].trim().toUpperCase();
+                const upperPart = parts[i].trim().toUpperCase();
+                
+                // Skip the main folder names so we don't accidentally match them as SOWs
+                if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(upperPart)) {
+                    continue;
+                }
+
+                // Dynamically detect SOW by looking for any configured prefix followed by digits
+                for (const prefix of sortedPrefixes) {
+                    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(${escapedPrefix}[\\s_#-]*\\d+)`, 'i');
+                    const match = upperPart.match(regex);
+                    if (match) {
+                        detectedSow = match[1].trim();
+                        break;
+                    }
+                }
+                
+                // If it explicitly matches one of the full configured names, also capture it
+                if (!detectedSow && validSowNames.length > 0) {
+                    if (validSowNames.some(sow => upperPart.includes(sow))) {
+                        // find which one matched
+                        detectedSow = validSowNames.find(sow => upperPart.includes(sow));
+                    }
+                }
+
+                if (detectedSow) {
+                    matchedSub = upperPart;
+                    break;
+                }
+            }
+
+            if (matchedSub && detectedSow) {
+                subFolder = `Folder: ${matchedSub}\nSOW: ${detectedSow}`;
+            } else if (parts.length > 2) {
+                // Fallback: If no explicit SOW match, use the immediate parent folder of the file
+                const immediateParent = parts[parts.length - 2].trim().toUpperCase();
+                if (!/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(immediateParent)) {
+                    subFolder = immediateParent;
                 }
             }
         }
 
         const mainFolder = normalizeFolderHeader(d.folderName);
-        if (!groupedByMain[mainFolder]) groupedByMain[mainFolder] = {};
-        if (!groupedByMain[mainFolder][subFolder]) groupedByMain[mainFolder][subFolder] = [];
+        let sowKey = subFolder || '';
+
+        if (!groupedByMain[sowKey]) groupedByMain[sowKey] = {};
+        if (!groupedByMain[sowKey][mainFolder]) groupedByMain[sowKey][mainFolder] = [];
         
-        groupedByMain[mainFolder][subFolder].push(d);
+        groupedByMain[sowKey][mainFolder].push(d);
     });
 
-    const sortedMainFolders = Object.keys(groupedByMain).sort();
+    const sortedSows = Object.keys(groupedByMain).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
     let slNo = 1;
 
-    sortedMainFolders.forEach(mainFolder => {
+    sortedSows.forEach(sowKey => {
+        if (sowKey) {
+            // Yellow SOW Header Row
+            const sRow = trSheet.addRow([sowKey]);
+            const sNum = sRow.number;
+            sRow.height = sowKey.includes('\n') ? 35 : 22;
+            sRow.getCell(1).style = {
+                font: { bold: true, size: 11, color: { argb: 'FF000000' } },
+                fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
+                alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+                border: commonBorderStyle,
+            };
+            trSheet.mergeCells(sNum, 1, sNum, 6);
+            for (let i = 1; i <= 6; i++) {
+                sRow.getCell(i).border = commonBorderStyle;
+                if (i > 1) sRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+            }
+        }
+
+        const sortedMainFolders = Object.keys(groupedByMain[sowKey]).sort();
+
+        sortedMainFolders.forEach(mainFolder => {
         // Yellow Main Folder Header Row (e.g. DETAIL SHEET)
         const fRow = trSheet.addRow([mainFolder.toUpperCase()]);
         const rNum = fRow.number;
@@ -181,28 +270,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
             if (i > 1) fRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         }
 
-        const sortedSubs = Object.keys(groupedByMain[mainFolder]).sort();
-
-        sortedSubs.forEach(sub => {
-            if (sub) {
-                // Yellow Sub Folder Header Row (e.g. SOW 1)
-                const sRow = trSheet.addRow([sub]);
-                const sNum = sRow.number;
-                sRow.height = 22;
-                sRow.getCell(1).style = {
-                    font: { bold: true, size: 11, color: { argb: 'FF000000' } },
-                    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
-                    alignment: { horizontal: 'center', vertical: 'middle' },
-                    border: commonBorderStyle,
-                };
-                trSheet.mergeCells(sNum, 1, sNum, 6);
-                for (let i = 1; i <= 6; i++) {
-                    sRow.getCell(i).border = commonBorderStyle;
-                    if (i > 1) sRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-                }
-            }
-
-            const sortedDrawings = [...groupedByMain[mainFolder][sub]].sort((a, b) =>
+            const sortedDrawings = [...groupedByMain[sowKey][mainFolder]].sort((a, b) =>
                 (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
             );
 
@@ -263,6 +331,26 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     const { projectName = 'Project', clientName = 'CLIENT' } = projectDetails;
     const drawings = drawingLog.drawings || [];
+    
+    // Cache transmittal dates to fall back on if drawing extraction date is missing
+    const projectId = drawingLog.projectId;
+    let transmittalDates = {};
+    if (projectId) {
+        try {
+            const transmittals = await Transmittal.find({ projectId }, 'transmittalNumber createdAt').lean();
+            const formatDt = (d) => {
+                if (!d) return '';
+                return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            };
+            transmittals.forEach(t => {
+                if (t.createdAt) {
+                    transmittalDates[t.transmittalNumber] = formatDt(t.createdAt);
+                }
+            });
+        } catch (e) {
+            console.error('[generateDrawingLogExcel] Failed to fetch transmittals for dates:', e);
+        }
+    }
 
     const logSheet = workbook.addWorksheet('Drawing Log');
 
@@ -442,7 +530,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
         (d.revisionHistory || []).forEach(rh => {
             if (rh.revision) {
                 const revKey = normalizeRevision(rh.revision);
-                revMap[revKey] = rh.date || (rh.transmittalNo ? `TR-${String(rh.transmittalNo).padStart(3, '0')}` : '✓');
+                revMap[revKey] = rh.date || (rh.transmittalNo && transmittalDates[rh.transmittalNo] ? transmittalDates[rh.transmittalNo] : (rh.transmittalNo ? `TR-${String(rh.transmittalNo).padStart(3, '0')}` : '✓'));
             }
             if (rh.remarks) {
                 allRemarks.add(rh.remarks.toUpperCase().trim());

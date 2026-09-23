@@ -7,7 +7,6 @@ function calculateSowProgress(scopeOfWork) {
         return {
             approvalPercentage: 0,
             fabricationPercentage: 0,
-            overallPercentage: 0,
             sowContributions: []
         };
     }
@@ -43,39 +42,32 @@ function calculateSowProgress(scopeOfWork) {
 
     let roundedApproval = 0;
     let roundedFabrication = 0;
-    let roundedOverall = 0;
     
     let approvalCalc = 0;
     let fabricationCalc = 0;
 
     if (sowCount > 0) {
-        const maxPossible = sowCount * 100;
-        
-        // Approval % = (Sum of all SOW Approval % / (SOW Count * 100)) * 100
-        approvalCalc = (totalApprovalRaw / maxPossible) * 100;
-        
-        // Fabrication % = (Sum of all SOW Fabrication % / (SOW Count * 100)) * 100
-        fabricationCalc = (totalFabricationRaw / maxPossible) * 100;
+        scopeOfWork.forEach(item => {
+            const sowWeight = Number(item.percentage) || 0;
+            const appPct = Number(item.approval) || 0;
+            const fabPct = Number(item.fabrication) || 0;
+            
+            approvalCalc += (appPct * (sowWeight / 100));
+            fabricationCalc += (fabPct * (sowWeight / 100));
+        });
 
         roundedApproval = Math.round(approvalCalc * 10) / 10;
         roundedFabrication = Math.round(fabricationCalc * 10) / 10;
-        
-        // Overall % calculation without any 80/20 or allocation weighting.
-        const overallCalc = ((totalApprovalRaw + totalFabricationRaw) / (maxPossible * 2)) * 100;
-        roundedOverall = Math.round(overallCalc * 10) / 10;
     }
 
     console.log('SOW COUNT:', sowCount);
     console.log('SOW DATA:', scopeOfWork);
-    console.log('TOTAL APPROVAL:', totalApprovalRaw);
-    console.log('TOTAL FABRICATION:', totalFabricationRaw);
     console.log('APPROVAL RESULT:', approvalCalc);
     console.log('FABRICATION RESULT:', fabricationCalc);
 
     return {
         approvalPercentage: roundedApproval,
         fabricationPercentage: roundedFabrication,
-        overallPercentage: roundedOverall,
         sowContributions
     };
 }

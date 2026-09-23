@@ -500,7 +500,8 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
         const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
         const matchingExt = externalProjects.find(ext => ext.name === p.name);
-        const sowProg = calculateSowProgress(p.scopeOfWork || []);
+        const allSows = [...(p.scopeOfWork || []), ...(p.additionalScopeOfWork || [])];
+        const sowProg = calculateSowProgress(allSows);
 
         const appPct = sowProg.approvalPercentage;
         const fabPct = sowProg.fabricationPercentage;
@@ -701,7 +702,7 @@ async function uploadFolder(req, res) {
 
         // Get the optional base target path (from Storage UI), otherwise default to root project folder
         let baseTarget = req.body.targetPath || `Projects/${projectName}`;
-        
+
         // Sanitize baseTarget if it points to Logs for non-log files
         const isLogFile = (fn) => fn && /transmittal|drawing_log|drawing log|master_log|master log/i.test(fn);
         if (/\/Logs($|\/)/i.test(baseTarget) || /^Logs($|\/)/i.test(baseTarget)) {
@@ -775,13 +776,17 @@ async function uploadFolder(req, res) {
         // ── Step 2: Check if this file is a drawing PDF ───
         const originalName = file.originalname.trim();
         const isPdf = file.mimetype === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
-        const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
-        const isBinderFolder = BINDER_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
-        const isGatherSheetFolder = GATHER_SHEET_PATTERN.test('/' + relativePath.replace(/\\/g, '/') + '/');
+
+        // For flat files, relativePath might just be the filename. We want to test the full intended target path.
+        const fullVirtualPath = `${cleanTargetDir}/${originalName}`.replace(/\/+/g, '/');
+
+        const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + fullVirtualPath + '/');
+        const isBinderFolder = BINDER_PATTERN.test('/' + fullVirtualPath + '/');
+        const isGatherSheetFolder = GATHER_SHEET_PATTERN.test('/' + fullVirtualPath + '/');
 
         if (isPdf && isDrawingFolder && !isBinderFolder && !isGatherSheetFolder) {
             // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets", ignoring subfolders)
-            const parts = relativePath.replace(/\\/g, '/').split('/');
+            const parts = fullVirtualPath.split('/');
             let folderName = parts.length > 1 ? parts[parts.length - 2].trim().toUpperCase() : 'DRAWINGS';
             for (let j = 0; j < parts.length - 1; j++) {
                 const p = parts[j].trim();
@@ -815,7 +820,7 @@ async function uploadFolder(req, res) {
             createdByAdminId: adminId,
             originalFileName: file.originalname,
             fileUrl: file.path, // Use the disk file path directly
-            storageGatewayPath: storageGatewayPath || '',
+            storageGatewayPath: storageGatewayPath || relativePath || '',
             folderName,
             fileSize: file.size,
             uploadedBy,

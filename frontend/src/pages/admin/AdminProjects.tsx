@@ -57,6 +57,114 @@ interface CreateProjectForm {
     year: string;
     lastTransmittalNumber: string;
 }
+const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], isAdditional: boolean = false) => {
+    const count = parseInt(countVal) || 0;
+    if (count < 0) return currentRows;
+    if (count === 0) return [];
+
+    let base = nameVal.trim() || (isAdditional ? 'Additional SOW ' : 'SOW ');
+    let startNum = 1;
+    let padLength = 0;
+
+    const match = base.match(/^(.*?)(\d+)$/);
+    if (match) {
+        base = match[1];
+        startNum = parseInt(match[2], 10);
+        padLength = match[2].length;
+    } else if (nameVal.trim()) {
+        padLength = 0; // Natural sorting will handle this without padding
+    } else {
+        padLength = 2; // Default padding for empty name 'SOW 01'
+    }
+
+    let newRows = [...currentRows];
+    
+    if (count > newRows.length) {
+        for (let i = newRows.length; i < count; i++) {
+            newRows.push({ name: '', percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
+        }
+    } else if (count < newRows.length) {
+        newRows = newRows.slice(0, count);
+    }
+
+    for (let i = 0; i < newRows.length; i++) {
+        const num = startNum + i;
+        const numStr = padLength > 0 ? String(num).padStart(padLength, '0') : String(num);
+        newRows[i].name = `${base}${numStr}`;
+    }
+
+    if (newRows.length > 0) {
+        const totalAmount = 100;
+        const defaultPct = Math.round((totalAmount / newRows.length) * 10) / 10;
+        newRows = newRows.map((row, idx) => {
+            if (idx === newRows.length - 1) {
+                const sumOthers = defaultPct * (newRows.length - 1);
+                const remainder = Math.round((totalAmount - sumOthers) * 10) / 10;
+                return { ...row, percentage: remainder };
+            }
+            return { ...row, percentage: defaultPct };
+        });
+    }
+
+    return newRows;
+};
+
+const generateAdditionalSowRows = (countVal: string, nameVal: string, currentRows: any[], originalSowRows: any[], originalCountFromDb: number) => {
+    const count = parseInt(countVal) || 0;
+    if (count < 0) return { newRows: currentRows, newOriginalSow: originalSowRows };
+
+    const effectiveCount = Math.max(count, originalCountFromDb);
+    if (effectiveCount === 0) return { newRows: [], newOriginalSow: originalSowRows };
+
+    let base = nameVal.trim() || 'Additional SOW ';
+    let startNum = 1;
+    let padLength = 0;
+
+    const match = base.match(/^(.*?)(\d+)$/);
+    if (match) {
+        base = match[1];
+        startNum = parseInt(match[2], 10);
+        padLength = match[2].length;
+    } else if (nameVal.trim()) {
+        padLength = 0;
+    } else {
+        padLength = 2;
+    }
+
+    let newRows = [...currentRows];
+    
+    if (effectiveCount > newRows.length) {
+        for (let i = newRows.length; i < effectiveCount; i++) {
+            newRows.push({ name: '', percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
+        }
+    } else if (effectiveCount < newRows.length) {
+        newRows = newRows.slice(0, effectiveCount);
+    }
+
+    for (let i = 0; i < newRows.length; i++) {
+        const num = startNum + i;
+        const numStr = padLength > 0 ? String(num).padStart(padLength, '0') : String(num);
+        newRows[i].name = `${base}${numStr}`;
+    }
+
+    let newOriginalSow = [...originalSowRows];
+    if (newOriginalSow.length > 0) {
+        const totalAdd = newRows.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+        const remaining = 100 - totalAdd;
+        const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
+        newOriginalSow = newOriginalSow.map((row, idx) => {
+            if (idx === newOriginalSow.length - 1) {
+                const sumOthers = defaultPct * (newOriginalSow.length - 1);
+                const rem = Math.round((remaining - sumOthers) * 10) / 10;
+                return { ...row, percentage: rem };
+            }
+            return { ...row, percentage: defaultPct };
+        });
+    }
+
+    return { newRows, newOriginalSow };
+};
+
 const DEFAULT_FORM: CreateProjectForm = {
     name: '',
     clientName: '',
@@ -94,7 +202,9 @@ export default function AdminProjects() {
     const [sequenceNames, setSequenceNames] = useState<Array<{ name: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>>([]);
     const [seqInput, setSeqInput] = useState<string>('');
     const [sowInput, setSowInput] = useState<string>('');
+    const [sowNameInput, setSowNameInput] = useState<string>('');
     const [editSowInput, setEditSowInput] = useState<string>('');
+    const [editSowNameInput, setEditSowNameInput] = useState<string>('');
     const { logout } = useAuth();
     const fetchProjects = useCallback(async () => {
         try {
@@ -197,6 +307,7 @@ export default function AdminProjects() {
             setSequenceNames([]);
             setSeqInput('0');
             setSowInput('0');
+            setSowNameInput('');
         } catch (err: any) {
             setModalError(`Create failed: ${err.message}`);
         } finally {
@@ -223,15 +334,12 @@ export default function AdminProjects() {
 
         if (editMode === 'full') {
             const sumPercentage = (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-            if (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0 && sumPercentage !== 100) {
-                const msgText = `The sum of Percentage of Total Work (%) across all original SOWs must equal exactly 100. Current sum is ${sumPercentage}.`;
-                setModalError('');
-                showMessage('Invalid Scope of Work', msgText, 'warning');
-                return;
-            }
             const addSumPercentage = (editTarget.additionalScopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-            if (editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0 && addSumPercentage !== 100) {
-                const msgText = `The sum of Percentage of Total Work (%) across all Additional SOWs must equal exactly 100. Current sum is ${addSumPercentage}.`;
+            const totalSowPercentage = sumPercentage + addSumPercentage;
+            
+            const hasSow = (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0) || (editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0);
+            if (hasSow && totalSowPercentage !== 100) {
+                const msgText = `The sum of Percentage of Total Work (%) across ALL Scope of Work entries (original + additional) must equal exactly 100. Current sum is ${totalSowPercentage}.`;
                 setModalError('');
                 showMessage('Invalid Scope of Work', msgText, 'warning');
                 return;
@@ -295,8 +403,8 @@ export default function AdminProjects() {
                     <h2 className="page-title">Projects</h2>
                     <p className="page-subtitle">Manage all steel detailing projects</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); }}>
-                    <IconPlus /> New Project
+                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); setSowNameInput(''); }}>
+                    <IconPlus style={{ width: 16, height: 16, marginRight: 8 }} /> Create Project
                 </button>
             </div>
 
@@ -611,34 +719,37 @@ export default function AdminProjects() {
                                             value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                             </div>
                             {/* ── Scope of Work Builder (Create Project) ── */}
-                            <div className="form-group">
-                                <label className="form-label">Number of Scope of Work Items <span style={{ color: 'red' }}>*</span></label>
-                                <input
-                                    className="form-control"
-                                    type="number"
-                                    placeholder="e.g. 5"
-                                    value={sowInput}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setSowInput(val);
-                                        if (val === '') return;
-
-                                        const count = parseInt(val);
-                                        if (isNaN(count) || count < 0) return;
-
-                                        const current = form.scopeOfWork || [];
-                                        if (count > current.length) {
-                                            const newRows = [...current];
-                                            for (let i = current.length; i < count; i++) {
-                                                const nextNum = String(i + 1).padStart(2, '0');
-                                                newRows.push({ name: `SOW ${nextNum}`, percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
-                                            }
+                            <div style={{ display: 'flex', gap: '16px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label className="form-label">Number of SOW Items <span style={{ color: 'red' }}>*</span></label>
+                                    <input
+                                        className="form-control"
+                                        type="number"
+                                        placeholder="e.g. 5"
+                                        value={sowInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSowInput(val);
+                                            const newRows = generateSowRows(val, sowNameInput, form.scopeOfWork || [], false);
                                             setForm({ ...form, scopeOfWork: newRows });
-                                        } else if (count < current.length) {
-                                            setForm({ ...form, scopeOfWork: current.slice(0, count) });
-                                        }
-                                    }}
-                                />
+                                        }}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label className="form-label">Starting SOW Name</label>
+                                    <input
+                                        className="form-control"
+                                        type="text"
+                                        placeholder="e.g. SOWLO1"
+                                        value={sowNameInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSowNameInput(val);
+                                            const newRows = generateSowRows(sowInput, val, form.scopeOfWork || [], false);
+                                            setForm({ ...form, scopeOfWork: newRows });
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             {form.scopeOfWork && form.scopeOfWork.length > 0 && (
@@ -721,9 +832,9 @@ export default function AdminProjects() {
                                             Total Percentage: 
                                             <span style={{ 
                                                 marginLeft: 8, 
-                                                color: (form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) === 100 ? '#16a34a' : '#ef4444' 
+                                                color: Number((form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2)) === 100 ? '#16a34a' : '#ef4444' 
                                             }}>
-                                                {(form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0)}%
+                                                {Number((form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2))}%
                                             </span>
                                         </div>
                                     </div>
@@ -1031,7 +1142,11 @@ export default function AdminProjects() {
                                                                   type="number"
                                                                   className="form-control form-control-sm"
                                                                   value={item.percentage || ''}
-                                                                  disabled
+                                                                  onChange={(e) => {
+                                                                      const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                      newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                      setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                  }}
                                                               />
                                                           </div>
                                                           <div style={{ flex: 1.2 }}>
@@ -1072,46 +1187,48 @@ export default function AdminProjects() {
                                                       Total Percentage: 
                                                       <span style={{ 
                                                           marginLeft: 8, 
-                                                          color: (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) === 100 ? '#16a34a' : '#ef4444' 
+                                                          color: Number((editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2)) === 100 ? '#16a34a' : '#ef4444' 
                                                       }}>
-                                                          {(editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0)}%
+                                                          {Number((editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2))}%
                                                       </span>
                                                   </div>
                                               </div>
                                           </div>
                                       )}
                                     {/* ── Additional Scope of Work Builder (Edit Project) ── */}
-                                    <div className="form-group" style={{ marginTop: '24px' }}>
-                                        <label className="form-label">Number of Additional Scope of Work Items</label>
-                                        <input
-                                            className="form-control"
-                                            type="number"
-                                            placeholder="e.g. 2"
-                                            value={editSowInput}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setEditSowInput(val);
-                                                if (val === '') return;
-
-                                                const count = parseInt(val);
-                                                if (isNaN(count) || count < 0) return;
-
-                                                const current = editTarget.additionalScopeOfWork || [];
-                                                const originalCount = projects.find(p => p.id === editTarget.id)?.additionalScopeOfWork?.length || 0;
-                                                const effectiveCount = Math.max(count, originalCount);
-
-                                                if (effectiveCount > current.length) {
-                                                    const newRows = [...current];
-                                                    for (let i = current.length; i < effectiveCount; i++) {
-                                                        const nextNum = String(i + 1).padStart(2, '0');
-                                                        newRows.push({ name: `Additional SOW ${nextNum}`, percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
-                                                    }
-                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: newRows });
-                                                } else if (effectiveCount < current.length) {
-                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: current.slice(0, effectiveCount) });
-                                                }
-                                            }}
-                                        />
+                                    <div style={{ display: 'flex', gap: '16px' }}>
+                                        <div className="form-group" style={{ flex: 1 }}>
+                                            <label className="form-label">Number of Additional SOWs</label>
+                                            <input
+                                                className="form-control"
+                                                type="number"
+                                                placeholder="e.g. 2"
+                                                value={editSowInput}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditSowInput(val);
+                                                    const originalCount = projects.find(p => p.id === editTarget.id)?.additionalScopeOfWork?.length || 0;
+                                                    const { newRows, newOriginalSow } = generateAdditionalSowRows(val, editSowNameInput, editTarget.additionalScopeOfWork || [], editTarget.scopeOfWork || [], originalCount);
+                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: newRows, scopeOfWork: newOriginalSow });
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="form-group" style={{ flex: 1 }}>
+                                            <label className="form-label">Starting SOW Name</label>
+                                            <input
+                                                className="form-control"
+                                                type="text"
+                                                placeholder="e.g. SOWLO1"
+                                                value={editSowNameInput}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditSowNameInput(val);
+                                                    const originalCount = projects.find(p => p.id === editTarget.id)?.additionalScopeOfWork?.length || 0;
+                                                    const { newRows, newOriginalSow } = generateAdditionalSowRows(editSowInput, val, editTarget.additionalScopeOfWork || [], editTarget.scopeOfWork || [], originalCount);
+                                                    setEditTarget({ ...editTarget, additionalScopeOfWork: newRows, scopeOfWork: newOriginalSow });
+                                                }}
+                                            />
+                                        </div>
                                     </div>
 
                                     {editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0 && (
@@ -1145,7 +1262,23 @@ export default function AdminProjects() {
                                                                   onChange={(e) => {
                                                                       const newSow = [...(editTarget.additionalScopeOfWork || [])];
                                                                       newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                      
+                                                                      let newOriginalSow = [...(editTarget.scopeOfWork || [])];
+                                                                      if (newOriginalSow.length > 0) {
+                                                                          const totalAdd = newSow.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                                                                          const remaining = 100 - totalAdd;
+                                                                          const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
+                                                                          newOriginalSow = newOriginalSow.map((row, innerIdx) => {
+                                                                              if (innerIdx === newOriginalSow.length - 1) {
+                                                                                  const sumOthers = defaultPct * (newOriginalSow.length - 1);
+                                                                                  const rem = Math.round((remaining - sumOthers) * 10) / 10;
+                                                                                  return { ...row, percentage: rem };
+                                                                              }
+                                                                              return { ...row, percentage: defaultPct };
+                                                                          });
+                                                                      }
+                                                                      
+                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow, scopeOfWork: newOriginalSow });
                                                                   }}
                                                               />
                                                           </div>

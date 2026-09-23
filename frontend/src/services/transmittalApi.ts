@@ -45,13 +45,25 @@ export function getTransmittalExcelUrl(projectId: string, transmittalId: string)
     return `${BASE}/transmittals/${projectId}/${transmittalId}/excel`;
 }
 
-export function getDrawingLogExcelUrl(projectId: string): string {
-    return `${BASE}/transmittals/${projectId}/drawing-log/excel`;
+export function getDrawingLogExcelUrl(projectId: string, upToTransmittalNumber?: number): string {
+    let url = `${BASE}/transmittals/${projectId}/drawing-log/excel`;
+    if (upToTransmittalNumber) {
+        url += `?upToTransmittalNumber=${upToTransmittalNumber}`;
+    }
+    return url;
 }
 
 export async function deleteTransmittal(projectId: string, transmittalId: string) {
     const res = await fetch(`${BASE}/transmittals/${projectId}/${transmittalId}`, {
         method: 'DELETE',
+        credentials: 'include'
+    });
+    return handleResponse<any>(res);
+}
+
+export async function voidTransmittal(projectId: string, transmittalId: string) {
+    const res = await fetch(`${BASE}/transmittals/${projectId}/${transmittalId}/void`, {
+        method: 'PUT',
         credentials: 'include'
     });
     return handleResponse<any>(res);

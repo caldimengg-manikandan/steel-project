@@ -162,7 +162,8 @@ async function attachProjectStats(projects) {
         };
         const approx = pObj.approximateDrawingsCount || 0;
         
-        const sowProgress = calculateSowProgress(pObj.scopeOfWork || []);
+        const allSows = [...(pObj.scopeOfWork || []), ...(pObj.additionalScopeOfWork || [])];
+        const sowProgress = calculateSowProgress(allSows);
 
         const nameLower = (pObj.name || '').toLowerCase().trim();
         const matchingExt = externalProjects.find(ext => (ext.name || '').toLowerCase().trim() === nameLower);
@@ -211,7 +212,6 @@ async function attachProjectStats(projects) {
             approximateDrawingsCount: mergedApproximateDrawingsCount,
             approvalPercentage: sowProgress.approvalPercentage,
             fabricationPercentage: sowProgress.fabricationPercentage,
-            overallPercentage: sowProgress.overallPercentage,
             sowContributions: sowProgress.sowContributions,
             corStatus: mergedCorStatus,
             rawStatus: matchingExt?.rawStatus,

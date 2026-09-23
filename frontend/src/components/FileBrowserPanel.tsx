@@ -291,7 +291,11 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         if (pendingUploadMode === 'folder') {
             executeFolderUpload(pendingUploadFiles, finalTransmittalNum, uploadPurpose, selectedUploadSequences);
         } else {
-            executeFilesUpload(pendingUploadFiles, currentPath);
+            if (projectId) {
+                executeFolderUpload(pendingUploadFiles, finalTransmittalNum, uploadPurpose, selectedUploadSequences);
+            } else {
+                executeFilesUpload(pendingUploadFiles, currentPath);
+            }
         }
     };
 
@@ -582,22 +586,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
 
                     {canUpload && (
                         <div style={{ display: 'flex', gap: 12 }}>
-                            {/* Regular file upload */}
-                            <input 
-                                type="file" 
-                                multiple 
-                                style={{ display: 'none' }} 
-                                ref={fileInputRef} 
-                                onChange={(e) => handleInitiateUpload(e.target.files, 'files')} 
-                            />
-                            <button 
-                                className="btn btn-secondary" 
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={uploading || uploadingFolder}
-                                title="Upload individual files to current folder"
-                            >
-                                <IconUpload /> {uploading ? 'Uploading...' : 'Upload Files'}
-                            </button>
+                            {/* Regular file upload removed as requested */}
 
                             {/* Folder upload — only if we have a projectId context */}
                             {projectId && (
