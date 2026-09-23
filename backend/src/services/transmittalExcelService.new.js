@@ -410,14 +410,10 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
             }
             
             // Fetch extractions
-            const drawingNumbers = drawings.map(d => d.drawingNumber).filter(Boolean);
-            const extractions = await DrawingExtraction.find({ projectId, 'extractedFields.drawingNumber': { $in: drawingNumbers } }).select('extractedFields.drawingNumber fileUrl storageGatewayPath createdAt').lean();
-            extractions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const extIds = drawings.map(d => d.extractionId).filter(Boolean);
+            const extractions = await DrawingExtraction.find({ _id: { $in: extIds } }).select('fileUrl storageGatewayPath _id').lean();
             extractions.forEach(e => {
-                const dwgNum = e.extractedFields?.drawingNumber;
-                if (dwgNum && !extMap[dwgNum]) {
-                    extMap[dwgNum] = e;
-                }
+                extMap[e._id.toString()] = e;
             });
             
         } catch (e) {
@@ -428,7 +424,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     // ── Group Drawings by SOW ──
     const groupedBySow = {};
     drawings.forEach(d => {
-        const ext = extMap[d.drawingNumber];
+        const ext = extMap[d.extractionId?.toString()];
         const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
         let sowKey = resolveSowKey(fullPath, validSowNames, sowPrefixes) || 'General';
         
