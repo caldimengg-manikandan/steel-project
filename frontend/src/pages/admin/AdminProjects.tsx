@@ -404,7 +404,7 @@ export default function AdminProjects() {
                     <p className="page-subtitle">Manage all steel detailing projects</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); setSowNameInput(''); }}>
-                    <IconPlus style={{ width: 16, height: 16, marginRight: 8 }} /> Create Project
+                    <span style={{ marginRight: 8, display: 'inline-flex' }}><IconPlus /></span> Create Project
                 </button>
             </div>
 
