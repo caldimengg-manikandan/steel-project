@@ -20,11 +20,53 @@ exports.uploadRfiDrawing = async (req, res) => {
 
     const createdExtractions = [];
 
+    const project = req.scopedProject;
+    const projectName = project ? project.name.replace(/[^a-zA-Z0-9 _-]/g, '_') : 'Unknown_Project';
 
     // Process each file
     for (const file of req.files) {
+        let storageGatewayPath = '';
+        let uploadedToGateway = false;
+
+        // Try Storage Gateway first
+        try {
+            const storageGateway = require('../utils/storageGateway');
+            if (storageGateway.isEnabled()) {
+                let baseTarget = `Projects/${projectName}/RFIs`;
+                if (localSavePath) {
+                    baseTarget += `/${localSavePath.replace(/\\/g, '/').replace(/^\\/+|^\\\\+|\\/+$|\\\\+$/g, '')}`;
+                }
+                const cleanTargetDir = baseTarget.replace(/\\/+/g, '/').replace(/\\/$/, '').replace(/\\/\\.$/, '');
+                
+                let lastError = null;
+                const maxRetries = 3;
+                const baseDelay = 1000;
+
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        const fileBuffer = fs.readFileSync(file.path);
+                        await storageGateway.uploadFile(cleanTargetDir, file.originalname, fileBuffer);
+                        storageGatewayPath = `${cleanTargetDir}/${file.originalname}`;
+                        console.log(`[RfiUpload] Stored: ${storageGatewayPath} (Attempt ${attempt})`);
+                        uploadedToGateway = true;
+                        break;
+                    } catch (err) {
+                        lastError = err;
+                        const waitTime = baseDelay * attempt;
+                        console.warn(`[RfiUpload] Attempt ${attempt} failed for ${file.originalname}. Retrying...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    }
+                }
+                if (!uploadedToGateway) {
+                    console.warn(`[RfiUpload] Gateway upload failed, falling back to GridFS/Local. Error: ${lastError?.message}`);
+                }
+            }
+        } catch (sgErr) {
+            console.error('[RfiUpload] Storage Gateway init error:', sgErr.message);
+        }
+
         let gridFsFileId = file.gridFsFileId || null;
-        if (!gridFsFileId && file.path && fs.existsSync(file.path)) {
+        if (!uploadedToGateway && !gridFsFileId && file.path && fs.existsSync(file.path)) {
             try {
                 const { getBucket } = require('../utils/gridfs');
                 const bucket = getBucket();
@@ -56,7 +98,7 @@ exports.uploadRfiDrawing = async (req, res) => {
             fileUrl: file.path || '',
             oneDriveFileId: file.oneDriveFileId || '', 
             oneDriveUrl: file.webUrl || '', 
-            storageGatewayPath: file.storageGatewayPath || '',
+            storageGatewayPath: file.storageGatewayPath || storageGatewayPath || localSavePath || '',
             gridFsFileId: gridFsFileId,
             status: 'queued',
             sequences: sequences || [],

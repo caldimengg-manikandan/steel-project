@@ -172,7 +172,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         if (fullPath) {
             const parts = fullPath.replace(/\\/g, '/').split('/');
             let matchedSub = '';
-            let detectedSow = null;
+            let detectedSows = new Set();
             
             const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
 
@@ -184,33 +184,42 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                     continue;
                 }
 
-                // Dynamically detect SOW by looking for any configured prefix followed by digits
+                // Match dynamically against all prefixes
                 for (const prefix of sortedPrefixes) {
                     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`(${escapedPrefix}[\\s_#-]*\\d+)`, 'i');
-                    const match = upperPart.match(regex);
-                    if (match) {
-                        detectedSow = match[1].trim();
-                        break;
+                    const regexList = new RegExp(`(${escapedPrefix})([\\s_#-]*)(\\d+(?:[\\s,;&_#-]+\\d+)*)`, 'gi');
+                    
+                    const listMatches = [...upperPart.matchAll(regexList)];
+                    for (const match of listMatches) {
+                        const originalPrefix = match[1];
+                        let sep = match[2] || '';
+                        const numbersStr = match[3];
+                        const numbers = numbersStr.split(/[\s,;&_#-]+/).filter(Boolean);
+                        numbers.forEach(n => {
+                            let formatted = originalPrefix.trim() + sep + n;
+                            detectedSows.add(formatted);
+                        });
                     }
                 }
                 
                 // If it explicitly matches one of the full configured names, also capture it
-                if (!detectedSow && validSowNames.length > 0) {
-                    if (validSowNames.some(sow => upperPart.includes(sow))) {
-                        // find which one matched
-                        detectedSow = validSowNames.find(sow => upperPart.includes(sow));
-                    }
+                if (detectedSows.size === 0 && validSowNames.length > 0) {
+                    validSowNames.forEach(sow => {
+                        if (upperPart.includes(sow)) {
+                            detectedSows.add(sow);
+                        }
+                    });
                 }
 
-                if (detectedSow) {
+                if (detectedSows.size > 0) {
                     matchedSub = upperPart;
                     break;
                 }
             }
 
-            if (matchedSub && detectedSow) {
-                subFolder = `Folder: ${matchedSub}\nSOW: ${detectedSow}`;
+            if (matchedSub && detectedSows.size > 0) {
+                const sowString = Array.from(detectedSows).join(', ');
+                subFolder = `Folder: ${matchedSub}\nSOW: ${sowString}`;
             } else if (parts.length > 2) {
                 // Fallback: If no explicit SOW match, use the immediate parent folder of the file
                 const immediateParent = parts[parts.length - 2].trim().toUpperCase();
