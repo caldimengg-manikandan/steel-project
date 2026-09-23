@@ -252,8 +252,11 @@ function ForwardModal({
         ? null
         : projects.find(p => (p.id === selectedProjectId || (p as any)._id === selectedProjectId));
 
-    // Filter employees by project
+    // Filter employees by project (strictly PMs, TLs, and team members; excluding admin/superadmin)
     const projectMembers = employees.filter(emp => {
+        const role = String(emp.role || '').toLowerCase();
+        if (role === 'admin' || role === 'superadmin') return false;
+
         if (selectedProjectId === 'all') return true;
         const empId = emp.id || emp._id || '';
         if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) return true;
@@ -367,7 +370,7 @@ function ForwardModal({
                             onChange={e => setSelectedProjectId(e.target.value)}
                             style={{ fontSize: 13.5, fontWeight: 500 }}
                         >
-                            <option value="all">🌐 All Projects & Team Members ({employees.length})</option>
+                            <option value="all">🌐 All Projects & Team Members ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length})</option>
                             {projects.map(p => (
                                 <option key={p.id} value={p.id}>
                                     📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} — {p.memberCount || 0} member{(p.memberCount || 0) !== 1 ? 's' : ''}
@@ -526,8 +529,11 @@ function ForwardModal({
                                         </div>
                                         <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{emp.email}</div>
                                     </div>
-                                    <span className="role-chip viewer" style={{ fontSize: 10.5, padding: '2px 7px' }}>
-                                        {emp.role}
+                                    <span
+                                        className={`role-chip ${['project_manager', 'pm', 'team_lead', 'tl'].includes(String(emp.role || '').toLowerCase()) ? 'editor' : 'viewer'}`}
+                                        style={{ fontSize: 10.5, padding: '2px 7px', textTransform: 'capitalize' }}
+                                    >
+                                        {emp.role === 'project_manager' ? 'PM' : emp.role === 'team_lead' ? 'Team Lead' : emp.role === 'team_member' ? 'Team Member' : (emp.role || 'Member').replace(/_/g, ' ')}
                                     </span>
                                 </label>
                             );

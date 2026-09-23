@@ -136,7 +136,7 @@ function InboxRow({
     const senderEmail = email?.from?.email || (email as any)?.fromAddress;
     const sender = senderName || senderEmail || 'Unknown sender';
     const snippet = email?.snippetText || (email as any)?.bodyPreview || (email?.bodyText ? email.bodyText.slice(0, 100) : '') || '';
-    const allAtts = ((email?.attachments && email.attachments.length > 0) ? email.attachments : (item.attachments || [])).filter(a => !(a as any).isInline);
+    const allAtts = ((email?.attachments && email.attachments.length > 0) ? email.attachments : (item.attachments || [])).filter((a: any) => !(a as any).isInline);
     const attCount = allAtts.length;
     const hasAtt = attCount > 0;
     const rawLinks: any[] = email?.links || (item as any)?.links || [];
@@ -848,7 +848,7 @@ export default function EmployeeInboxPage() {
 
     async function handleSelect(item: InboxItem) {
         const itemId = item._id || (item as any).id || (item as any).forwardingId || item.emailId;
-        if (selectedItem?._id === itemId && (selectedItem.email?.bodyHtml || selectedItem.email?.bodyText)) {
+        if (selectedItem && selectedItem._id === itemId && (selectedItem.email?.bodyHtml || selectedItem.email?.bodyText)) {
             return;
         }
 
@@ -867,7 +867,7 @@ export default function EmployeeInboxPage() {
                     ...item,
                     ...d.item,
                     email: d.item.email || item.email,
-                    attachments: d.attachments || d.item.attachments || d.item.email?.attachments || item.attachments || [],
+                    attachments: (d as any).attachments || d.item.attachments || d.item.email?.attachments || item.attachments || [],
                     isRead: true,
                 };
                 setSelectedItem(fullItem);

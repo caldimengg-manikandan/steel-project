@@ -547,7 +547,7 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
 // GET /api/mail-router/employees — List detailers/employees & projects for triage assignment
 router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
-    const adminId = req.authUser.adminId || req.authUser.id;
+    const adminId = req.authUser.role === 'superadmin' ? null : (req.authUser.adminId || req.authUser.id);
     const { employees, projects } = await listEmployees(adminId);
     return res.json({ employees, projects });
   } catch (err) {
@@ -558,7 +558,7 @@ router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
 // GET /api/mail-router/projects — List projects with members for triage assignment
 router.get('/projects', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
-    const adminId = req.authUser.adminId || req.authUser.id;
+    const adminId = req.authUser.role === 'superadmin' ? null : (req.authUser.adminId || req.authUser.id);
     const { employees, projects } = await listEmployees(adminId);
     return res.json({ projects, employees });
   } catch (err) {

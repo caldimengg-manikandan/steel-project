@@ -406,8 +406,21 @@ async function listEmployees(adminId = null) {
     }
   }
 
+  const ALLOWED_EMPLOYEE_ROLES = [
+    'team_member',
+    'user',
+    'team_lead',
+    'project_manager',
+    'employee',
+    'detailer',
+    'pm',
+    'tl',
+  ];
+  const EXCLUDED_ROLES = ['admin', 'superadmin'];
+
   const userQuery = {
-    role: { $in: ['team_member', 'user', 'team_lead', 'project_manager', 'employee', 'detailer'] },
+    role: { $in: ALLOWED_EMPLOYEE_ROLES, $nin: EXCLUDED_ROLES },
+    status: { $ne: 'inactive' },
   };
   if (queryAdminIds.length > 0) {
     userQuery.$or = [
@@ -429,13 +442,23 @@ async function listEmployees(adminId = null) {
   let users = [];
   try {
     if (UserModel) {
-      users = await UserModel.find(userQuery).select('_id username name email role adminId').lean();
+      users = await UserModel.find(userQuery).select('_id username displayName name email role adminId status').lean();
     } else if (mongoose.connection && mongoose.connection.db) {
       users = await mongoose.connection.db.collection('users').find(userQuery).toArray();
     }
   } catch (err) {
     console.warn('[forwardingRepo:listEmployees] Error querying users:', err);
   }
+
+  // Filter out any unexpected admin/superadmin accounts
+  const validUserMap = new Map();
+  for (const u of users) {
+    const role = String(u.role || '').toLowerCase();
+    if (!EXCLUDED_ROLES.includes(role)) {
+      validUserMap.set(String(u._id), u);
+    }
+  }
+  const validUserIds = new Set(validUserMap.keys());
 
   // Also query projects for this admin
   const projQuery = { status: { $ne: 'archived' } };
@@ -454,11 +477,12 @@ async function listEmployees(adminId = null) {
     console.warn('[forwardingRepo:listEmployees] Error querying projects:', err);
   }
 
-  // Build mapping of user -> projects
+  // Build mapping of user -> projects (only for valid non-admin users)
   const userProjectsMap = {};
   for (const p of projects) {
     for (const a of (p.assignments || [])) {
       const uid = String(a.userId);
+      if (!validUserIds.has(uid)) continue;
       if (!userProjectsMap[uid]) userProjectsMap[uid] = [];
       userProjectsMap[uid].push({
         id: String(p._id),
@@ -468,23 +492,33 @@ async function listEmployees(adminId = null) {
     }
   }
 
-  const formattedEmployees = users.map((u) => {
-    const uid = String(u._id);
-    const assignedProjects = userProjectsMap[uid] || [];
-    return {
-      id: uid,
-      _id: uid,
-      name: u.displayName || u.name || u.username || u.email,
-      username: u.username || u.email,
-      email: u.email || '',
-      role: u.role || 'team_member',
-      projectIds: assignedProjects.map((p) => p.id),
-      projects: assignedProjects,
-    };
-  });
+  const formattedEmployees = users
+    .filter((u) => validUserIds.has(String(u._id)))
+    .map((u) => {
+      const uid = String(u._id);
+      const assignedProjects = userProjectsMap[uid] || [];
+      return {
+        id: uid,
+        _id: uid,
+        name: u.displayName || u.name || u.username || u.email,
+        displayName: u.displayName || u.name || u.username || u.email,
+        username: u.username || u.email,
+        email: u.email || '',
+        role: u.role || 'team_member',
+        projectIds: assignedProjects.map((p) => p.id),
+        projects: assignedProjects,
+      };
+    });
 
   const formattedProjects = projects.map((p) => {
-    const assignedUserIds = (p.assignments || []).map((a) => String(a.userId));
+    // Only count assigned users who are in validUserIds (i.e. PMs, TLs, and team members — NOT admin/superadmin)
+    const assignedUserIds = Array.from(
+      new Set(
+        (p.assignments || [])
+          .map((a) => String(a.userId))
+          .filter((uid) => validUserIds.has(uid))
+      )
+    );
     return {
       id: String(p._id),
       _id: String(p._id),
