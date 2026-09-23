@@ -8,6 +8,7 @@ import {
     listEmployees, getAttachmentUrl,
     type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
+import { FileViewer, type FileViewerFile } from '../../components/file-viewer';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -629,15 +630,16 @@ function EmailCard({
 // ── Email Detail Panel ────────────────────────────────────────
 
 function EmailDetail({
-    email, accounts, onForwardClick,
+    email, accounts, onForwardClick, loadingAttachments = false,
 }: {
-    email: MailMessage; accounts: MailAccount[]; onForwardClick: () => void;
+    email: MailMessage; accounts: MailAccount[]; onForwardClick: () => void; loadingAttachments?: boolean;
 }) {
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
     const [copiedAllLinks, setCopiedAllLinks] = useState(false);
     const [showAttachments, setShowAttachments] = useState(false);
     const [showLinks, setShowLinks] = useState(false);
     const [linkFilter, setLinkFilter] = useState('');
+    const [previewFile, setPreviewFile] = useState<FileViewerFile | null>(null);
 
     const account = accounts.find(a => a._id === email.accountId);
     const senderName = email.from?.name || (email as any).fromName;
@@ -645,6 +647,13 @@ function EmailDetail({
     const senderLabel = senderName && senderEmail ? `${senderName} <${senderEmail}>` : (senderName || senderEmail || 'Unknown');
 
     const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !(att as any).isInline);
+    const hasAttachmentsFlag = Boolean(
+        email.hasAttachments ||
+        (email as any).attachmentCount > 0 ||
+        (email as any).attachmentsCount > 0 ||
+        allAttachments.length > 0
+    );
+    const isAttLoading = loadingAttachments && allAttachments.length === 0;
 
     const preparedHtml = React.useMemo(() => {
         if (!email.bodyHtml) return '';
@@ -713,7 +722,7 @@ function EmailDetail({
                 <div style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}>
                         <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.35, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
-                            Subject : <b style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-secondary)', lineHeight: 1.35 }}>{email.subject || '(No subject)'}</b>
+                            {email.subject || '(No subject)'}
                         </h2>
                         <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                             📤 Forward to Detailers
@@ -723,25 +732,7 @@ function EmailDetail({
                         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
                             <span>{senderLabel}</span>
-                            {account && (
-                                <>
-                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Mailbox</span>
-                                    <span>
-                                        {account.email}{' '}
-                                        <span style={{
-                                            fontSize: 11,
-                                            background: account.provider === 'MICROSOFT' ? '#dbeafe' : '#fef3c7',
-                                            color: account.provider === 'MICROSOFT' ? '#1d4ed8' : '#92400e',
-                                            padding: '2px 7px',
-                                            borderRadius: 4,
-                                            fontWeight: 700,
-                                            letterSpacing: '0.03em'
-                                        }}>
-                                            {account.provider}
-                                        </span>
-                                    </span>
-                                </>
-                            )}
+
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Received</span>
                             <span>{formatDateTime(email.receivedAt)}</span>
                         </div>
@@ -749,7 +740,7 @@ function EmailDetail({
                 </div>
 
                 {/* Collapsible Resources Bar (Attachments & Links) */}
-                {(allAttachments.length > 0 || validLinks.length > 0) && (
+                {(allAttachments.length > 0 || validLinks.length > 0 || (hasAttachmentsFlag && isAttLoading)) && (
                     <div style={{
                         marginBottom: 10,
                         borderRadius: 'var(--radius-md)',
@@ -774,7 +765,36 @@ function EmailDetail({
                                     Resources:
                                 </span>
 
-                                {allAttachments.length > 0 && (
+                                {hasAttachmentsFlag && isAttLoading && (
+                                    <div
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 7,
+                                            padding: '5px 12px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            border: '1px solid var(--color-border)',
+                                            background: 'var(--color-bg-card)',
+                                            color: 'var(--color-text-muted)',
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            userSelect: 'none',
+                                        }}
+                                    >
+                                        <span style={{
+                                            display: 'inline-block',
+                                            width: 12,
+                                            height: 12,
+                                            border: '2px solid var(--color-border-light, #cbd5e1)',
+                                            borderTopColor: 'var(--color-primary, #0284c7)',
+                                            borderRadius: '50%',
+                                            animation: 'mail-spin 0.8s linear infinite',
+                                        }} />
+                                        <span>Loading attachments...</span>
+                                    </div>
+                                )}
+
+                                {!isAttLoading && allAttachments.length > 0 && (
                                     <button
                                         type="button"
                                         onClick={() => setShowAttachments(prev => !prev)}
@@ -853,7 +873,11 @@ function EmailDetail({
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
                                     {[
-                                        allAttachments.length > 0 ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})` : null,
+                                        isAttLoading
+                                            ? 'Fetching attachments...'
+                                            : allAttachments.length > 0
+                                                ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})`
+                                                : null,
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
                                 </span>
@@ -902,12 +926,18 @@ function EmailDetail({
                                         const att = normalizeAttachment(rawAtt);
                                         const icon = getFileIcon(att.filename);
                                         return (
-                                            <a
+                                            <div
                                                 key={att.id || i}
-                                                href={att.id ? getAttachmentUrl(att.id) : '#'}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                download={att.filename}
+                                                onClick={() => {
+                                                    if (att.id) {
+                                                        setPreviewFile({
+                                                            id: att.id,
+                                                            filename: att.filename,
+                                                            url: getAttachmentUrl(att.id),
+                                                            sizeBytes: att.sizeBytes,
+                                                        });
+                                                    }
+                                                }}
                                                 style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -916,7 +946,7 @@ function EmailDetail({
                                                     border: '1px solid var(--color-border)',
                                                     borderRadius: 'var(--radius-md)',
                                                     background: 'var(--color-table-row-alt)',
-                                                    textDecoration: 'none',
+                                                    cursor: 'pointer',
                                                     color: 'var(--color-text-primary)',
                                                     fontSize: 12.5,
                                                     transition: 'all 0.12s',
@@ -924,6 +954,7 @@ function EmailDetail({
                                                 }}
                                                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
                                                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+                                                title="Click to preview in File Viewer"
                                             >
                                                 <span style={{ fontSize: 18 }}>{icon}</span>
                                                 <div>
@@ -931,11 +962,38 @@ function EmailDetail({
                                                         {att.filename}
                                                     </div>
                                                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                                                        {formatBytes(att.sizeBytes)}
+                                                        {formatBytes(att.sizeBytes)} • <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Preview</span>
                                                     </div>
                                                 </div>
-                                                <span style={{ marginLeft: 6, color: 'var(--color-primary)', fontSize: 13, fontWeight: 700 }}>↓</span>
-                                            </a>
+                                                <a
+                                                    href={att.id ? getAttachmentUrl(att.id) : '#'}
+                                                    download={att.filename}
+                                                    onClick={e => e.stopPropagation()}
+                                                    title="Download file directly"
+                                                    style={{
+                                                        marginLeft: 6,
+                                                        color: 'var(--color-text-muted)',
+                                                        padding: '4px 6px',
+                                                        borderRadius: 4,
+                                                        fontSize: 13,
+                                                        fontWeight: 700,
+                                                        textDecoration: 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
+                                                    onMouseEnter={e => {
+                                                        e.currentTarget.style.background = 'var(--color-border-light)';
+                                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                                    }}
+                                                    onMouseLeave={e => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                                                    }}
+                                                >
+                                                    ↓
+                                                </a>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -1131,6 +1189,9 @@ function EmailDetail({
                     )}
                 </div>
             </div>
+
+            {/* Microsoft 365 File Viewer Modal */}
+            <FileViewer file={previewFile} onClose={() => setPreviewFile(null)} />
         </div>
     );
 }
@@ -1266,10 +1327,25 @@ export default function MailRouterPage() {
         );
     });
 
+    const [loadingAttachments, setLoadingAttachments] = useState(false);
+
     // Load full details & attachments whenever an email is selected
     useEffect(() => {
         const id = selectedEmail?._id || selectedEmail?.id;
-        if (!id) return;
+        if (!id) {
+            setLoadingAttachments(false);
+            return;
+        }
+
+        const hasAtt = Boolean(
+            selectedEmail.hasAttachments ||
+            (selectedEmail as any).attachmentCount > 0 ||
+            (selectedEmail as any).attachmentsCount > 0 ||
+            (selectedEmail.attachments && selectedEmail.attachments.length > 0)
+        );
+        const alreadyHasLoadedAtts = Boolean(selectedEmail.attachments && selectedEmail.attachments.length > 0);
+        setLoadingAttachments(hasAtt && !alreadyHasLoadedAtts);
+
         let active = true;
         getEmail(id)
             .then(data => {
@@ -1285,7 +1361,10 @@ export default function MailRouterPage() {
                     };
                 });
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => {
+                if (active) setLoadingAttachments(false);
+            });
         return () => { active = false; };
     }, [selectedEmail?._id, selectedEmail?.id]);
 
@@ -1467,6 +1546,7 @@ export default function MailRouterPage() {
                                     email={selectedEmail}
                                     accounts={accounts}
                                     onForwardClick={() => setShowForward(selectedEmail)}
+                                    loadingAttachments={loadingAttachments}
                                 />
                             </DetailErrorBoundary>
                         ) : (

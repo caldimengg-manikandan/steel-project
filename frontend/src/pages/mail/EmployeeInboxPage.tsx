@@ -4,6 +4,7 @@ import {
     listInbox, getInboxItem, getAttachmentUrl,
     type InboxItem, type MailMessage, type MailAttachment,
 } from '../../services/mailApi';
+import { FileViewer, type FileViewerFile } from '../../components/file-viewer';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -221,13 +222,14 @@ function InboxRow({
 
 // ── Inbox Detail ──────────────────────────────────────────────
 
-function InboxDetail({ item }: { item: InboxItem }) {
+function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; loadingAttachments?: boolean }) {
     const [copiedNote, setCopiedNote] = useState(false);
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
     const [copiedAllLinks, setCopiedAllLinks] = useState(false);
     const [showAttachments, setShowAttachments] = useState(false);
     const [showLinks, setShowLinks] = useState(false);
     const [linkFilter, setLinkFilter] = useState('');
+    const [previewFile, setPreviewFile] = useState<FileViewerFile | null>(null);
 
     // Resolve email object with full fallbacks
     const email: MailMessage = item.email || {
@@ -259,6 +261,18 @@ function InboxDetail({ item }: { item: InboxItem }) {
         ? email.attachments
         : (item.attachments || [])
     ).filter(att => !(att as any).isInline);
+
+    const hasAttachmentsFlag = Boolean(
+        (item as any).hasAttachments ||
+        item.email?.hasAttachments ||
+        email.hasAttachments ||
+        (item as any).attachmentCount > 0 ||
+        (item as any).attachmentsCount > 0 ||
+        (email as any).attachmentCount > 0 ||
+        (email as any).attachmentsCount > 0 ||
+        allAttachments.length > 0
+    );
+    const isAttLoading = loadingAttachments && allAttachments.length === 0;
 
     const preparedHtml = React.useMemo(() => {
         if (!email.bodyHtml) return '';
@@ -336,7 +350,7 @@ function InboxDetail({ item }: { item: InboxItem }) {
                 {/* Title Header */}
                 <div style={{ marginBottom: 18 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12, lineHeight: 1.35 }}>
-                        Subject : <b style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 12, lineHeight: 1.35 }}>{email.subject || '(No subject)'}</b>
+                        {email.subject || '(No subject)'}
                     </h2>
 
                     {/* Metadata Card */}
@@ -344,13 +358,6 @@ function InboxDetail({ item }: { item: InboxItem }) {
                         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
                             <span>{senderLabel}</span>
-
-                            <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Forwarded by</span>
-                            <span>
-                                <strong style={{ color: 'var(--color-text-primary)' }}>
-                                    {item.forwardedByName || item.forwardedBy || 'Project Manager'}
-                                </strong>
-                            </span>
 
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Forwarded at</span>
                             <span>{formatDateTime(item.createdAt || (item as any).forwardedAt)}</span>
@@ -372,25 +379,6 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                             fontWeight: 700,
                                         }}>
                                             📁 {item.projectName}
-                                        </span>
-                                    </span>
-                                </>
-                            )}
-
-                            {email.provider && (
-                                <>
-                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Mailbox Provider</span>
-                                    <span>
-                                        <span style={{
-                                            fontSize: 11,
-                                            background: email.provider === 'MICROSOFT' ? '#dbeafe' : '#fef3c7',
-                                            color: email.provider === 'MICROSOFT' ? '#1d4ed8' : '#92400e',
-                                            padding: '2px 7px',
-                                            borderRadius: 4,
-                                            fontWeight: 700,
-                                            letterSpacing: '0.03em'
-                                        }}>
-                                            {email.provider}
                                         </span>
                                     </span>
                                 </>
@@ -421,7 +409,7 @@ function InboxDetail({ item }: { item: InboxItem }) {
                 )}
 
                 {/* Collapsible Resources Bar (Attachments & Links) */}
-                {(allAttachments.length > 0 || validLinks.length > 0) && (
+                {(allAttachments.length > 0 || validLinks.length > 0 || (hasAttachmentsFlag && isAttLoading)) && (
                     <div style={{
                         marginBottom: 18,
                         borderRadius: 'var(--radius-md)',
@@ -446,7 +434,36 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                     Resources:
                                 </span>
 
-                                {allAttachments.length > 0 && (
+                                {hasAttachmentsFlag && isAttLoading && (
+                                    <div
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 7,
+                                            padding: '5px 12px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            border: '1px solid var(--color-border)',
+                                            background: 'var(--color-bg-card)',
+                                            color: 'var(--color-text-muted)',
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            userSelect: 'none',
+                                        }}
+                                    >
+                                        <span style={{
+                                            display: 'inline-block',
+                                            width: 12,
+                                            height: 12,
+                                            border: '2px solid var(--color-border-light, #cbd5e1)',
+                                            borderTopColor: 'var(--color-primary, #0284c7)',
+                                            borderRadius: '50%',
+                                            animation: 'mail-spin 0.8s linear infinite',
+                                        }} />
+                                        <span>Loading attachments...</span>
+                                    </div>
+                                )}
+
+                                {!isAttLoading && allAttachments.length > 0 && (
                                     <button
                                         type="button"
                                         onClick={() => setShowAttachments(prev => !prev)}
@@ -525,7 +542,11 @@ function InboxDetail({ item }: { item: InboxItem }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
                                     {[
-                                        allAttachments.length > 0 ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})` : null,
+                                        isAttLoading
+                                            ? 'Fetching attachments...'
+                                            : allAttachments.length > 0
+                                                ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})`
+                                                : null,
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
                                 </span>
@@ -574,12 +595,18 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                         const att = normalizeAttachment(rawAtt);
                                         const icon = getFileIcon(att.filename);
                                         return (
-                                            <a
+                                            <div
                                                 key={att.id || i}
-                                                href={att.id ? getAttachmentUrl(att.id) : '#'}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                download={att.filename}
+                                                onClick={() => {
+                                                    if (att.id) {
+                                                        setPreviewFile({
+                                                            id: att.id,
+                                                            filename: att.filename,
+                                                            url: getAttachmentUrl(att.id),
+                                                            sizeBytes: att.sizeBytes,
+                                                        });
+                                                    }
+                                                }}
                                                 style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -588,7 +615,7 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                                     border: '1px solid var(--color-border)',
                                                     borderRadius: 'var(--radius-md)',
                                                     background: 'var(--color-table-row-alt)',
-                                                    textDecoration: 'none',
+                                                    cursor: 'pointer',
                                                     color: 'var(--color-text-primary)',
                                                     fontSize: 12.5,
                                                     transition: 'all 0.12s',
@@ -596,6 +623,7 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                                 }}
                                                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
                                                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+                                                title="Click to preview in File Viewer"
                                             >
                                                 <span style={{ fontSize: 18 }}>{icon}</span>
                                                 <div>
@@ -603,11 +631,38 @@ function InboxDetail({ item }: { item: InboxItem }) {
                                                         {att.filename}
                                                     </div>
                                                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                                                        {formatBytes(att.sizeBytes)}
+                                                        {formatBytes(att.sizeBytes)} • <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Preview</span>
                                                     </div>
                                                 </div>
-                                                <span style={{ marginLeft: 6, color: 'var(--color-primary)', fontSize: 13, fontWeight: 700 }}>↓</span>
-                                            </a>
+                                                <a
+                                                    href={att.id ? getAttachmentUrl(att.id) : '#'}
+                                                    download={att.filename}
+                                                    onClick={e => e.stopPropagation()}
+                                                    title="Download file directly"
+                                                    style={{
+                                                        marginLeft: 6,
+                                                        color: 'var(--color-text-muted)',
+                                                        padding: '4px 6px',
+                                                        borderRadius: 4,
+                                                        fontSize: 13,
+                                                        fontWeight: 700,
+                                                        textDecoration: 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
+                                                    onMouseEnter={e => {
+                                                        e.currentTarget.style.background = 'var(--color-border-light)';
+                                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                                    }}
+                                                    onMouseLeave={e => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                                                    }}
+                                                >
+                                                    ↓
+                                                </a>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -798,6 +853,9 @@ function InboxDetail({ item }: { item: InboxItem }) {
                     )}
                 </div>
             </div>
+
+            {/* Microsoft 365 File Viewer Modal */}
+            <FileViewer file={previewFile} onClose={() => setPreviewFile(null)} />
         </div>
     );
 }
@@ -832,8 +890,33 @@ export default function EmployeeInboxPage() {
                 if (prev) {
                     const match = list.find(i => (i._id === prev._id || (i as any).id === prev._id));
                     if (match) return { ...prev, ...match };
+                    return prev;
                 }
-                return list[0] || null;
+                const first = list[0] || null;
+                if (first) {
+                    const firstId = first._id || (first as any).id || (first as any).forwardingId || first.emailId;
+                    if (firstId) {
+                        setLoadingDetail(true);
+                        getInboxItem(firstId)
+                            .then(d => {
+                                if (d?.item) {
+                                    setSelectedItem(curr => {
+                                        if (!curr || (curr._id !== firstId && (curr as any).id !== firstId)) return curr;
+                                        return {
+                                            ...curr,
+                                            ...d.item,
+                                            email: d.item.email || curr.email,
+                                            attachments: (d as any).attachments || d.item.attachments || d.item.email?.attachments || curr.attachments || [],
+                                            isRead: true,
+                                        };
+                                    });
+                                }
+                            })
+                            .catch(() => {})
+                            .finally(() => setLoadingDetail(false));
+                    }
+                }
+                return first;
             });
         } catch {
             /* silently fail */
@@ -848,7 +931,8 @@ export default function EmployeeInboxPage() {
 
     async function handleSelect(item: InboxItem) {
         const itemId = item._id || (item as any).id || (item as any).forwardingId || item.emailId;
-        if (selectedItem && selectedItem._id === itemId && (selectedItem.email?.bodyHtml || selectedItem.email?.bodyText)) {
+        const alreadyHasLoaded = selectedItem && (selectedItem._id === itemId || (selectedItem as any).id === itemId) && (selectedItem.email?.bodyHtml || selectedItem.email?.bodyText) && (selectedItem.attachments && selectedItem.attachments.length > 0);
+        if (alreadyHasLoaded) {
             return;
         }
 
@@ -860,6 +944,7 @@ export default function EmployeeInboxPage() {
         if (!item.isRead) setUnread(u => Math.max(0, u - 1));
 
         // Fetch full email content and attachments from backend
+        setLoadingDetail(true);
         try {
             const d = await getInboxItem(itemId);
             if (d?.item) {
@@ -875,6 +960,8 @@ export default function EmployeeInboxPage() {
             }
         } catch (e) {
             console.warn('[handleSelect] Could not fetch detailed inbox item:', e);
+        } finally {
+            setLoadingDetail(false);
         }
     }
 
@@ -995,14 +1082,14 @@ export default function EmployeeInboxPage() {
 
                     {/* Right: detail (independent scroll) */}
                     <div style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', background: 'var(--color-bg-page)', display: 'flex', flexDirection: 'column' }}>
-                        {loadingDetail ? (
+                        {selectedItem ? (
+                            <InboxErrorBoundary>
+                                <InboxDetail item={selectedItem} loadingAttachments={loadingDetail} />
+                            </InboxErrorBoundary>
+                        ) : loadingDetail ? (
                             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
                                 <Spinner size={28} />
                             </div>
-                        ) : selectedItem ? (
-                            <InboxErrorBoundary>
-                                <InboxDetail item={selectedItem} />
-                            </InboxErrorBoundary>
                         ) : (
                             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
                                 <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📬</div>
