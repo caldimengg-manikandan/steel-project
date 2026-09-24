@@ -148,6 +148,8 @@ function InboxRow({
         <div
             onClick={onClick}
             style={{
+                width: '100%',
+                boxSizing: 'border-box',
                 padding: '14px 18px',
                 cursor: 'pointer',
                 borderBottom: '1px solid var(--color-border-light)',
@@ -155,6 +157,7 @@ function InboxRow({
                 borderLeft: active ? '3px solid var(--color-primary)' : item.isRead ? '3px solid transparent' : '3px solid var(--color-primary)',
                 transition: 'all 0.12s',
                 position: 'relative',
+                textAlign: 'left',
             }}
             onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--color-table-row-hover)'; }}
             onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = item.isRead ? 'var(--color-bg-card)' : 'rgba(30, 79, 216, 0.04)'; }}
@@ -164,14 +167,14 @@ function InboxRow({
                 <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
             )}
 
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', minWidth: 0 }}>
                 {/* Avatar */}
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                     {initials(senderName, senderEmail)}
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, width: '100%' }}>
                         <span style={{ fontWeight: item.isRead ? 500 : 700, fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>
                             {sender}
                         </span>
@@ -180,17 +183,17 @@ function InboxRow({
                         </span>
                     </div>
 
-                    <div style={{ fontWeight: item.isRead ? 500 : 700, fontSize: 13.5, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+                    <div style={{ fontWeight: item.isRead ? 500 : 700, fontSize: 13.5, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1, width: '100%' }}>
                         {subject}
                     </div>
 
                     {item.note && (
-                        <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                             📝 {item.note}
                         </div>
                     )}
 
-                    <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', marginTop: 2, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', marginTop: 2, lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {snippet}
                     </div>
 
@@ -218,6 +221,28 @@ function InboxRow({
             </div>
         </div>
     );
+}
+
+function linkifyText(text: string): React.ReactNode {
+    if (!text) return text;
+    const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#1e4fd8', textDecoration: 'underline' }}
+                >
+                    {part}
+                </a>
+            );
+        }
+        return part;
+    });
 }
 
 // ── Inbox Detail ──────────────────────────────────────────────
@@ -276,7 +301,8 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
 
     const preparedHtml = React.useMemo(() => {
         if (!email.bodyHtml) return '';
-        const baseStyle = `
+        const baseHead = `
+            <base target="_blank">
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -297,10 +323,20 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                 }
             </style>
         `;
-        if (email.bodyHtml.includes('<head>')) {
-            return email.bodyHtml.replace('<head>', `<head>${baseStyle}`);
+        let html = email.bodyHtml;
+        if (html.includes('<head>')) {
+            html = html.replace('<head>', `<head>${baseHead}`);
+        } else {
+            html = `${baseHead}${html}`;
         }
-        return `${baseStyle}${email.bodyHtml}`;
+        // Force all links inside email to open in a new tab safely
+        return html.replace(/<a\b([^>]*)>/gi, (_match, attrs) => {
+            const cleanAttrs = attrs
+                .replace(/\btarget=(['"])[^'"]*\1/gi, '')
+                .replace(/\brel=(['"])[^'"]*\1/gi, '')
+                .trim();
+            return `<a target="_blank" rel="noopener noreferrer" ${cleanAttrs}>`;
+        });
     }, [email.bodyHtml]);
 
     const rawLinks: any[] = email.links || [];
@@ -550,24 +586,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
                                 </span>
-                                {(showAttachments || showLinks) && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowAttachments(false); setShowLinks(false); }}
-                                        style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: 'var(--color-text-muted)',
-                                            cursor: 'pointer',
-                                            fontSize: 11.5,
-                                            padding: '2px 6px',
-                                            borderRadius: 4,
-                                        }}
-                                        title="Collapse all resources"
-                                    >
-                                        ✕ Collapse
-                                    </button>
-                                )}
+
                             </div>
                         </div>
 
@@ -832,7 +851,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                         <iframe
                             srcDoc={preparedHtml}
                             style={{ width: '100%', minHeight: 520, border: 'none', display: 'block', background: '#ffffff' }}
-                            sandbox="allow-same-origin allow-popups"
+                            sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                             title="Email body"
                         />
                     ) : (
@@ -848,7 +867,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                             margin: 0,
                             background: '#fafafa',
                         }}>
-                            {email.bodyText || email.snippetText || '(No content)'}
+                            {linkifyText(email.bodyText || email.snippetText || '(No content)')}
                         </pre>
                     )}
                 </div>
@@ -991,7 +1010,7 @@ export default function EmployeeInboxPage() {
                     <div className="page-header" style={{ marginBottom: 10 }}>
                         <div className="page-header-left">
                             <h1 className="page-title" style={{ fontSize: 22 }}>
-                                📬 My Inbox
+                                My Inbox
                                 {unread > 0 && (
                                     <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 700, background: 'var(--color-primary)', color: '#fff', padding: '2px 9px', borderRadius: 20, verticalAlign: 'middle' }}>
                                         {unread} unread
@@ -1049,16 +1068,15 @@ export default function EmployeeInboxPage() {
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
                     {/* Left: inbox list (independent scroll) */}
                     <div style={{ width: 380, flexShrink: 0, height: '100%', minHeight: 0, borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-card)' }}>
-                        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', minHeight: 0, overflowY: 'auto' }}>
                             {loading && items.length === 0 ? (
-                                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
                                     <Spinner size={24} />
                                 </div>
                             ) : displayItems.length === 0 ? (
-                                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                                    <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
-                                    {filter === 'unread' ? 'No unread messages.' : 'Your inbox is empty.'}
-                                    <br /><span style={{ fontSize: 12 }}>Emails forwarded by your PM will appear here.</span>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                    <p>{filter === 'unread' ? 'No unread messages.' : 'Your inbox is empty.'}</p>
+                                    <p style={{ fontSize: 12, marginTop: 4 }}>Emails forwarded by your PM will appear here.</p>
                                 </div>
                             ) : displayItems.map(item => (
                                 <InboxRow
@@ -1092,7 +1110,6 @@ export default function EmployeeInboxPage() {
                             </div>
                         ) : (
                             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📬</div>
                                 <p style={{ fontSize: 14, fontWeight: 500 }}>Select a message to view drawing instructions</p>
                             </div>
                         )}

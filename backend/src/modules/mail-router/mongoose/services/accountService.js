@@ -49,11 +49,15 @@ async function updateAccountSyncStatus(accountId, status) {
   });
 }
 
-async function updateMailAccountTokens(accountId, accessToken, expiresAt) {
-  return MailAccount.findByIdAndUpdate(accountId, {
+async function updateMailAccountTokens(accountId, accessToken, expiresAt, refreshToken) {
+  const update = {
     accessToken,
     tokenExpiresAt: expiresAt,
-  });
+  };
+  if (refreshToken) {
+    update.refreshToken = refreshToken;
+  }
+  return MailAccount.findByIdAndUpdate(accountId, update, { new: true });
 }
 
 module.exports = {

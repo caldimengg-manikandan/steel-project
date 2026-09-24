@@ -11,12 +11,15 @@ interface PageCardProps {
     scale: number;
     baseDims: { width: number; height: number };
     scrollContainer: HTMLElement | null;
+    isPanMode: boolean;
 }
 
-function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: PageCardProps) {
+function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer, isPanMode }: PageCardProps) {
     const cardRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const textLayerRef = useRef<HTMLDivElement>(null);
     const renderTaskRef = useRef<any>(null);
+    const textLayerTaskRef = useRef<any>(null);
     // Render first 2 pages immediately for instant initial content
     const [shouldRender, setShouldRender] = useState(pageNum <= 2);
     const [isRendered, setIsRendered] = useState(false);
@@ -45,7 +48,7 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
         return () => observer.disconnect();
     }, [scrollContainer]);
 
-    // Canvas render
+    // Canvas & TextLayer render
     useEffect(() => {
         if (!shouldRender || !pdfDoc || !canvasRef.current) return;
         if (lastRenderedScale.current === scale && isRendered) return;
@@ -56,6 +59,9 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
             try {
                 if (renderTaskRef.current) {
                     renderTaskRef.current.cancel();
+                }
+                if (textLayerTaskRef.current) {
+                    textLayerTaskRef.current.cancel();
                 }
 
                 const page = await pdfDoc.getPage(pageNum);
@@ -70,6 +76,7 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
 
                 const dpr = window.devicePixelRatio || 1;
                 const viewport = page.getViewport({ scale: scale * dpr });
+                const textViewport = page.getViewport({ scale });
 
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -82,6 +89,33 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
                 });
                 renderTaskRef.current = task;
                 await task.promise;
+
+                if (isCancelled) return;
+
+                // Render TextLayer for precise text selection in Cursor mode
+                if (textLayerRef.current) {
+                    textLayerRef.current.innerHTML = '';
+                    textLayerRef.current.style.width = `${Math.round(unscaledVp.width * scale)}px`;
+                    textLayerRef.current.style.height = `${Math.round(unscaledVp.height * scale)}px`;
+                    textLayerRef.current.style.setProperty('--total-scale-factor', `${scale}`);
+
+                    try {
+                        const textContentSource = await page.getTextContent();
+                        if (!isCancelled && textLayerRef.current && (pdfjsLib as any).TextLayer) {
+                            const textLayer = new (pdfjsLib as any).TextLayer({
+                                textContentSource,
+                                container: textLayerRef.current,
+                                viewport: textViewport,
+                            });
+                            textLayerTaskRef.current = textLayer;
+                            await textLayer.render();
+                        }
+                    } catch (textErr: any) {
+                        if (textErr?.name !== 'RenderingCancelledException') {
+                            console.warn(`[PdfViewer] TextLayer render error for page ${pageNum}:`, textErr);
+                        }
+                    }
+                }
 
                 if (!isCancelled) {
                     lastRenderedScale.current = scale;
@@ -101,6 +135,9 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
             if (renderTaskRef.current) {
                 renderTaskRef.current.cancel();
             }
+            if (textLayerTaskRef.current) {
+                textLayerTaskRef.current.cancel();
+            }
         };
     }, [shouldRender, pdfDoc, pageNum, scale, isRendered]);
 
@@ -118,9 +155,21 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer }: Page
                 width: displayW ? `${displayW}px` : 'auto',
                 minHeight: displayH ? `${displayH}px` : '400px',
                 height: isRendered ? 'auto' : `${displayH}px`,
+                position: 'relative',
             }}
         >
             <canvas ref={canvasRef} style={{ display: isRendered ? 'block' : 'none' }} />
+            <div
+                ref={textLayerRef}
+                className="textLayer"
+                style={{
+                    display: isRendered ? 'block' : 'none',
+                    width: displayW ? `${displayW}px` : '100%',
+                    height: displayH ? `${displayH}px` : '100%',
+                    pointerEvents: isPanMode ? 'none' : 'auto',
+                    userSelect: isPanMode ? 'none' : 'text',
+                }}
+            />
             {!isRendered && (
                 <div
                     className="m365-pdf-page-placeholder"
@@ -143,6 +192,7 @@ export default function PdfViewer({
     onNumPagesLoaded,
     requestedPage,
     isTwoPageView = false,
+    isPanMode = true,
 }: SubViewerProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
@@ -228,6 +278,27 @@ export default function PdfViewer({
         return zoom / 100;
     }, [fitMode, zoom, scrollContainer, baseDims.width, isTwoPageView]);
 
+    // Adjust scroll offsets smoothly when zoom level changes so content doesn't jump
+    const prevScaleRef = useRef(effectiveScale);
+    useEffect(() => {
+        if (!scrollContainer || prevScaleRef.current === effectiveScale) return;
+        const oldScale = prevScaleRef.current;
+        prevScaleRef.current = effectiveScale;
+
+        if (fitMode === 'width') {
+            scrollContainer.scrollLeft = 0;
+            return;
+        }
+
+        if (oldScale > 0 && effectiveScale > 0) {
+            const ratio = effectiveScale / oldScale;
+            const centerX = scrollContainer.scrollLeft + scrollContainer.clientWidth / 2;
+            const centerY = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
+            scrollContainer.scrollLeft = Math.max(0, Math.round(centerX * ratio - scrollContainer.clientWidth / 2));
+            scrollContainer.scrollTop = Math.max(0, Math.round(centerY * ratio - scrollContainer.clientHeight / 2));
+        }
+    }, [effectiveScale, scrollContainer, fitMode]);
+
     // Track scroll position to update visible page number in toolbar
     // Uses distance to natural reading line and NEVER falls back to page 1
     const handleScroll = useCallback(() => {
@@ -286,6 +357,88 @@ export default function PdfViewer({
             if (rafScrollRef.current) cancelAnimationFrame(rafScrollRef.current);
         };
     }, [scrollContainer, handleScroll]);
+
+    // Hand tool / click-and-drag mouse panning across PDF pages (active only when isPanMode is true)
+    useEffect(() => {
+        const sc = scrollContainer;
+        if (!sc) return;
+
+        if (!isPanMode) {
+            sc.classList.remove('has-pdf-viewer', 'is-pan-mode', 'is-panning');
+            sc.classList.add('is-cursor-mode');
+            document.body.classList.remove('pdf-panning-active');
+            return;
+        }
+
+        sc.classList.remove('is-cursor-mode');
+        sc.classList.add('has-pdf-viewer', 'is-pan-mode');
+
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let initialScrollLeft = 0;
+        let initialScrollTop = 0;
+
+        const onMouseDown = (e: MouseEvent) => {
+            // Only primary (left) mouse button
+            if (e.button !== 0) return;
+
+            // Don't drag if clicking buttons, inputs, links, or form controls
+            const target = e.target as HTMLElement | null;
+            if (target?.closest('button, input, select, textarea, a, [role="button"]')) {
+                return;
+            }
+
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialScrollLeft = sc.scrollLeft;
+            initialScrollTop = sc.scrollTop;
+
+            sc.classList.add('is-panning');
+            document.body.classList.add('pdf-panning-active');
+
+            // Prevent text selection / default drag ghosts
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+
+            e.preventDefault();
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+
+            sc.scrollLeft = initialScrollLeft - deltaX;
+            sc.scrollTop = initialScrollTop - deltaY;
+        };
+
+        const onMouseUp = () => {
+            if (isDragging) {
+                isDragging = false;
+                sc.classList.remove('is-panning');
+                document.body.classList.remove('pdf-panning-active');
+            }
+        };
+
+        const onDragStart = (e: DragEvent) => {
+            e.preventDefault();
+        };
+
+        sc.addEventListener('mousedown', onMouseDown);
+        sc.addEventListener('dragstart', onDragStart);
+        window.addEventListener('mousemove', onMouseMove, { passive: false });
+        window.addEventListener('mouseup', onMouseUp);
+
+        return () => {
+            sc.removeEventListener('mousedown', onMouseDown);
+            sc.removeEventListener('dragstart', onDragStart);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            sc.classList.remove('has-pdf-viewer', 'is-pan-mode', 'is-panning', 'is-cursor-mode');
+            document.body.classList.remove('pdf-panning-active');
+        };
+    }, [scrollContainer, isPanMode]);
 
     // Smooth programmatic scroll ONLY when user explicitly navigates (clicks Prev/Next or types page number)
     useEffect(() => {
@@ -382,7 +535,7 @@ export default function PdfViewer({
 
     if (isTwoPageView) {
         return (
-            <div ref={containerRef} className="m365-pdf-continuous-container is-two-page">
+            <div ref={containerRef} className="m365-pdf-continuous-container is-two-page" onDragStart={e => e.preventDefault()}>
                 {pagePairs.map((pair, rowIdx) => (
                     <div className="m365-pdf-page-pair" key={rowIdx}>
                         {pair.map(pageNum => (
@@ -393,6 +546,7 @@ export default function PdfViewer({
                                 scale={effectiveScale}
                                 baseDims={baseDims}
                                 scrollContainer={scrollContainer}
+                                isPanMode={isPanMode}
                             />
                         ))}
                     </div>
@@ -402,7 +556,7 @@ export default function PdfViewer({
     }
 
     return (
-        <div ref={containerRef} className="m365-pdf-continuous-container">
+        <div ref={containerRef} className="m365-pdf-continuous-container" onDragStart={e => e.preventDefault()}>
             {Array.from({ length: totalPages }).map((_, idx) => (
                 <PdfPageCard
                     key={idx + 1}
@@ -411,6 +565,7 @@ export default function PdfViewer({
                     scale={effectiveScale}
                     baseDims={baseDims}
                     scrollContainer={scrollContainer}
+                    isPanMode={isPanMode}
                 />
             ))}
         </div>

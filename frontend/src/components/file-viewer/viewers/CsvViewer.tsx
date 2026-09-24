@@ -90,6 +90,13 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
         });
     }, []);
 
+    const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+        // Support Shift + mouse wheel or horizontal wheel tilt
+        if (e.shiftKey && e.deltaY !== 0 && wrapRef.current) {
+            wrapRef.current.scrollLeft += e.deltaY;
+        }
+    }, []);
+
     const headers = useMemo(() => (rawRows.length > 0 ? rawRows[0] : []), [rawRows]);
     const bodyRows = useMemo(() => (rawRows.length > 1 ? rawRows.slice(1) : []), [rawRows]);
 
@@ -169,12 +176,12 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
     const bottomPadHeight = Math.max(0, (totalRows - endIndex) * ROW_HEIGHT);
 
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             <div
                 ref={wrapRef}
                 className="m365-grid-wrap"
                 onScroll={handleScroll}
-                style={{ flex: 1 }}
+                onWheel={handleWheel}
             >
                 <div
                     className="m365-grid-zoom-container"
@@ -235,22 +242,32 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
                 </div>
             </div>
             {/* Minimalist status bar showing metrics */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 12px',
-                background: '#ffffff',
-                borderTop: '1px solid #e2e8f0',
-                fontSize: 11.5,
-                color: '#64748b',
-                flexShrink: 0,
-            }}>
+            <div className="m365-grid-status-bar">
                 <span>
                     Showing <strong>{totalRows.toLocaleString()}</strong> rows • <strong>{headers.length}</strong> columns
                     {debouncedQuery && ` (filtered from ${bodyRows.length.toLocaleString()})`}
                 </span>
-                <span style={{ color: '#94a3b8' }}>Virtual scrolling active • 60 FPS</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: '#94a3b8', fontSize: 11 }}>Hold Shift + scroll wheel to scroll horizontally</span>
+                    <button
+                        type="button"
+                        className="m365-grid-scroll-btn"
+                        onClick={() => wrapRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}
+                        title="Scroll Left (or Shift + Wheel)"
+                        aria-label="Scroll table left"
+                    >
+                        ◀
+                    </button>
+                    <button
+                        type="button"
+                        className="m365-grid-scroll-btn"
+                        onClick={() => wrapRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
+                        title="Scroll Right (or Shift + Wheel)"
+                        aria-label="Scroll table right"
+                    >
+                        ▶
+                    </button>
+                </div>
             </div>
         </div>
     );

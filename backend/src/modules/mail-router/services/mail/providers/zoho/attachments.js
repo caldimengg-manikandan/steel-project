@@ -34,6 +34,8 @@ async function fetchZohoAttachmentList(accessToken, accountId, folderId, message
             filename: att.attachmentName || att.fileName || 'attachment',
             contentType: att.contentType || 'application/octet-stream',
             sizeBytes: att.attachmentSize ?? null,
+            isInline: Boolean(att.isInline || att.inline),
+            contentId: att.contentId || att.cid ? String(att.contentId || att.cid).replace(/^<|>$/g, '').trim() : null,
         }));
     }
     catch (err) {

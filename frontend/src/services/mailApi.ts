@@ -184,6 +184,31 @@ export async function listSyncJobs(): Promise<{ jobs: SyncJob[] }> {
     return handleResponse(res);
 }
 
+export async function getAutoSyncStatus(): Promise<{
+    enabled: boolean;
+    cronExpression: string;
+    intervalDescription: string;
+    isCycleRunning: boolean;
+    lastRunAt?: string;
+    lastRunStatus?: string;
+    activeMailboxesCount?: number;
+}> {
+    const res = await fetch(`${BASE}/mail/autosync/status`, {
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export async function triggerAutoSync(): Promise<{ success: boolean; results?: any[]; duration?: number }> {
+    const res = await fetch(`${BASE}/mail/autosync/trigger`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
 // ── Emails ──────────────────────────────────────────────────
 
 export async function listEmails(params: {
@@ -199,6 +224,15 @@ export async function listEmails(params: {
         if (v !== undefined) q.set(k, String(v));
     });
     const res = await fetch(`${BASE}/mail/emails?${q.toString()}`, {
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export async function clearDownloadedEmails(): Promise<{ success: boolean; message: string; deleted?: any }> {
+    const res = await fetch(`${BASE}/mail/emails`, {
+        method: 'DELETE',
         credentials: 'include',
         headers: authHeaders(),
     });

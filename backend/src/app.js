@@ -164,8 +164,11 @@ app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // ── Mail router ───────────────────────────────────────────
 app.use(['/api/mail', '/api/mail-router'], (req, res, next) => {
-  // Allow OAuth callbacks to pass through without requiring Bearer token
-  if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback')) {
+  // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
+  if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
+    if (req.headers.authorization) {
+      return authMiddleware(req, res, () => next());
+    }
     return next();
   }
   return authMiddleware(req, res, next);
@@ -233,6 +236,14 @@ connectDB().then(async () => {
         initWeeklyProgressScheduler();
     } catch (err) {
         console.error('[Scheduler] Failed to initialize scheduler on startup:', err.message);
+    }
+
+    // Start Mail Auto-Sync cron job for active mailboxes
+    try {
+        const { startMailAutoSync } = require('./modules/mail-router/services/mailAutoSyncService');
+        startMailAutoSync();
+    } catch (err) {
+        console.error('[MailAutoSync] Failed to initialize mail autosync on startup:', err.message);
     }
 
     const server = app.listen(PORT, async () => {

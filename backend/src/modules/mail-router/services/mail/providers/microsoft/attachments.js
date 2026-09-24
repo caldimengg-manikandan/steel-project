@@ -12,7 +12,12 @@ const graph_client_1 = require("./graph-client");
  */
 async function fetchAttachmentList(accessToken, mailboxId, messageId) {
     const basePath = mailboxId === 'me' ? '/me' : `/users/${encodeURIComponent(mailboxId)}`;
-    const data = await (0, graph_client_1.graphGet)(`${basePath}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline,contentId`, accessToken);
+    let data;
+    try {
+        data = await (0, graph_client_1.graphGet)(`${basePath}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline`, accessToken);
+    } catch {
+        data = await (0, graph_client_1.graphGet)(`${basePath}/messages/${encodeURIComponent(messageId)}/attachments`, accessToken);
+    }
     return (data.value ?? []).map((att) => ({
         id: att.id,
         providerAttachmentId: att.id,

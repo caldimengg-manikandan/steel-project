@@ -1,11 +1,11 @@
-import React, { Component, type ErrorInfo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { Component, type ErrorInfo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
     listMailAccounts, deleteMailAccount,
     redirectToMicrosoftAuth, redirectToZohoAuth,
     triggerSync, listSyncJobs, listEmails, getEmail, forwardEmail,
-    listEmployees, getAttachmentUrl,
+    listEmployees, getAttachmentUrl, getAutoSyncStatus, triggerAutoSync, clearDownloadedEmails,
     type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
 import { FileViewer, type FileViewerFile } from '../../components/file-viewer';
@@ -222,6 +222,40 @@ function DisconnectModal({
 
 // ── Forward Modal ────────────────────────────────────────────
 
+function normalizeRole(role?: string): string {
+    const r = String(role || '').toLowerCase().trim();
+    if (['project_manager', 'pm'].includes(r)) return 'project_manager';
+    if (['team_lead', 'tl', 'lead'].includes(r)) return 'team_lead';
+    if (['team_member', 'member', 'detailer', 'engineer', 'user', 'employee'].includes(r)) return 'team_member';
+    return r || 'team_member';
+}
+
+function getRoleLabel(roleKey: string): string {
+    switch (roleKey) {
+        case 'project_manager':
+            return 'Project Manager';
+        case 'team_lead':
+            return 'Team Lead';
+        case 'team_member':
+            return 'Team Member / Detailer';
+        default:
+            return roleKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+}
+
+function getRoleIcon(roleKey: string): string {
+    switch (roleKey) {
+        case 'project_manager':
+            return '👔';
+        case 'team_lead':
+            return '🎖️';
+        case 'team_member':
+            return '👷';
+        default:
+            return '👤';
+    }
+}
+
 function ForwardModal({
     email, onClose, onSent,
 }: {
@@ -230,6 +264,7 @@ function ForwardModal({
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [projects, setProjects] = useState<ProjectInfo[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+    const [selectedRole, setSelectedRole] = useState<string>('all');
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [note, setNote] = useState('');
@@ -254,29 +289,80 @@ function ForwardModal({
         : projects.find(p => (p.id === selectedProjectId || (p as any)._id === selectedProjectId));
 
     // Filter employees by project (strictly PMs, TLs, and team members; excluding admin/superadmin)
-    const projectMembers = employees.filter(emp => {
-        const role = String(emp.role || '').toLowerCase();
-        if (role === 'admin' || role === 'superadmin') return false;
+    const projectMembers = useMemo(() => {
+        return employees.filter(emp => {
+            const role = String(emp.role || '').toLowerCase();
+            if (role === 'admin' || role === 'superadmin') return false;
 
-        if (selectedProjectId === 'all') return true;
-        const empId = emp.id || emp._id || '';
-        if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) return true;
-        if (activeProject && activeProject.assignedUserIds && activeProject.assignedUserIds.includes(empId)) return true;
-        return false;
-    });
+            if (selectedProjectId === 'all') return true;
+            const empId = emp.id || emp._id || '';
+            if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) return true;
+            if (activeProject && activeProject.assignedUserIds && activeProject.assignedUserIds.includes(empId)) return true;
+            return false;
+        });
+    }, [employees, selectedProjectId, activeProject]);
+
+    // Role counts within the current project
+    const roleCounts = useMemo(() => {
+        const counts: Record<string, number> = { all: projectMembers.length };
+        for (const emp of projectMembers) {
+            const r = normalizeRole(emp.role);
+            counts[r] = (counts[r] || 0) + 1;
+        }
+        return counts;
+    }, [projectMembers]);
+
+    // Available role options formatted for dropdown & quick pills
+    const availableRoleOptions = useMemo(() => {
+        const presentRoles = new Set(projectMembers.map(e => normalizeRole(e.role)));
+        const standardOrder = ['project_manager', 'team_lead', 'team_member'];
+        const options: Array<{ id: string; label: string; icon: string; count: number }> = [
+            { id: 'all', label: 'All Roles', icon: '👥', count: projectMembers.length }
+        ];
+
+        for (const r of standardOrder) {
+            if (presentRoles.has(r)) {
+                options.push({
+                    id: r,
+                    label: getRoleLabel(r),
+                    icon: getRoleIcon(r),
+                    count: roleCounts[r] || 0,
+                });
+            }
+        }
+
+        for (const r of presentRoles) {
+            if (!standardOrder.includes(r)) {
+                options.push({
+                    id: r,
+                    label: getRoleLabel(r),
+                    icon: getRoleIcon(r),
+                    count: roleCounts[r] || 0,
+                });
+            }
+        }
+
+        return options;
+    }, [projectMembers, roleCounts]);
+
+    // Filter by role
+    const roleFiltered = useMemo(() => {
+        if (selectedRole === 'all') return projectMembers;
+        return projectMembers.filter(e => normalizeRole(e.role) === selectedRole);
+    }, [projectMembers, selectedRole]);
 
     // Filter by search text
-    const filtered = projectMembers.filter(e => {
-        if (!search) return true;
+    const filtered = useMemo(() => {
+        if (!search) return roleFiltered;
         const s = search.toLowerCase();
-        return (
+        return roleFiltered.filter(e =>
             (e.displayName || '').toLowerCase().includes(s) ||
             (e.username || '').toLowerCase().includes(s) ||
             (e.name || '').toLowerCase().includes(s) ||
             (e.email || '').toLowerCase().includes(s) ||
             (e.role || '').toLowerCase().includes(s)
         );
-    });
+    }, [roleFiltered, search]);
 
     const allFilteredSelected = filtered.length > 0 && filtered.every(e => selected.has(e.id || e._id || ''));
 
@@ -349,35 +435,109 @@ function ForwardModal({
                         <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>From: {email.from?.name || email.from?.email}</div>
                     </div>
 
-                    {/* Project Selector Filter */}
-                    <div className="form-group" style={{ marginBottom: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                            <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
-                                📁 Select Project
-                            </label>
-                            {activeProject ? (
-                                <span style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>
-                                    {projectMembers.length} member{projectMembers.length !== 1 ? 's' : ''} assigned to {activeProject.name}
-                                </span>
-                            ) : (
-                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                    {projects.length} projects available
-                                </span>
-                            )}
+                    {/* Project & Role Filter Selectors */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)', gap: 10, marginBottom: 8 }}>
+                        {/* Project Selector */}
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: 12.5 }}>
+                                    📁 Filter by Project
+                                </label>
+                                {activeProject && (
+                                    <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
+                                        {projectMembers.length} member{projectMembers.length !== 1 ? 's' : ''}
+                                    </span>
+                                )}
+                            </div>
+                            <select
+                                className="form-control"
+                                value={selectedProjectId}
+                                onChange={e => setSelectedProjectId(e.target.value)}
+                                style={{ fontSize: 13, fontWeight: 500 }}
+                            >
+                                <option value="all">🌐 All Projects ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length} members)</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} ({p.memberCount || 0})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                        <select
-                            className="form-control"
-                            value={selectedProjectId}
-                            onChange={e => setSelectedProjectId(e.target.value)}
-                            style={{ fontSize: 13.5, fontWeight: 500 }}
-                        >
-                            <option value="all">🌐 All Projects & Team Members ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length})</option>
-                            {projects.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} — {p.memberCount || 0} member{(p.memberCount || 0) !== 1 ? 's' : ''}
-                                </option>
-                            ))}
-                        </select>
+
+                        {/* Role Selector */}
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: 12.5 }}>
+                                    👤 Filter by Role
+                                </label>
+                                {selectedRole !== 'all' && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-xs"
+                                        onClick={() => setSelectedRole('all')}
+                                        style={{ fontSize: 11, padding: '0 4px', color: 'var(--color-primary)' }}
+                                    >
+                                        Reset
+                                    </button>
+                                )}
+                            </div>
+                            <select
+                                className="form-control"
+                                value={selectedRole}
+                                onChange={e => setSelectedRole(e.target.value)}
+                                style={{ fontSize: 13, fontWeight: 500 }}
+                            >
+                                {availableRoleOptions.map(opt => (
+                                    <option key={opt.id} value={opt.id}>
+                                        {opt.icon} {opt.label} ({opt.count})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Quick Role Filter Pills */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 2 }}>
+                            Quick Role:
+                        </span>
+                        {availableRoleOptions.map(opt => {
+                            const isActive = selectedRole === opt.id;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => setSelectedRole(opt.id)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        padding: '3px 9px',
+                                        borderRadius: 16,
+                                        fontSize: 11.5,
+                                        fontWeight: isActive ? 700 : 500,
+                                        border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                        background: isActive ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
+                                        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.12s ease',
+                                    }}
+                                >
+                                    <span>{opt.icon}</span>
+                                    <span>{opt.label}</span>
+                                    <span style={{
+                                        fontSize: 10.5,
+                                        background: isActive ? 'var(--color-primary)' : 'var(--color-border-light)',
+                                        color: isActive ? '#fff' : 'var(--color-text-muted)',
+                                        borderRadius: 10,
+                                        padding: '0.5px 5px',
+                                        fontWeight: 600,
+                                    }}>
+                                        {opt.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Search & Bulk Select Controls */}
@@ -385,7 +545,13 @@ function ForwardModal({
                         <div style={{ flex: 1, minWidth: 160 }}>
                             <input
                                 className="form-control"
-                                placeholder={activeProject ? `Search within ${activeProject.name}…` : 'Search by name, email or role…'}
+                                placeholder={
+                                    selectedRole !== 'all'
+                                        ? `Search ${getRoleLabel(selectedRole)}s…`
+                                        : activeProject
+                                        ? `Search within ${activeProject.name}…`
+                                        : 'Search by name, email or role…'
+                                }
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 style={{ fontSize: 13 }}
@@ -475,7 +641,41 @@ function ForwardModal({
                         ) : filtered.length === 0 ? (
                             <div style={{ padding: 28, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
                                 <div style={{ fontSize: 24, marginBottom: 6 }}>👥</div>
-                                {activeProject ? (
+                                {activeProject && selectedRole !== 'all' ? (
+                                    <>
+                                        <div>No <strong>{getRoleLabel(selectedRole)}s</strong> found assigned to <strong>{activeProject.name}</strong>.</div>
+                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => setSelectedRole('all')}
+                                                style={{ fontSize: 12 }}
+                                            >
+                                                Show All Roles in {activeProject.name} ({projectMembers.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() => { setSelectedProjectId('all'); setSelectedRole('all'); }}
+                                                style={{ fontSize: 12 }}
+                                            >
+                                                Show All Team Members
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : selectedRole !== 'all' ? (
+                                    <>
+                                        <div>No team members found with role <strong>{getRoleLabel(selectedRole)}</strong>.</div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setSelectedRole('all')}
+                                            style={{ marginTop: 10, fontSize: 12 }}
+                                        >
+                                            Show All Roles ({projectMembers.length})
+                                        </button>
+                                    </>
+                                ) : activeProject ? (
                                     <>
                                         <div>No team members are assigned to <strong>{activeProject.name}</strong> yet.</div>
                                         <button
@@ -494,6 +694,8 @@ function ForwardModal({
                         ) : filtered.map(emp => {
                             const id = emp.id || emp._id || '';
                             const isChecked = selected.has(id);
+                            const roleKey = normalizeRole(emp.role);
+                            const isLeadOrPM = ['project_manager', 'team_lead'].includes(roleKey);
                             return (
                                 <label
                                     key={id}
@@ -531,10 +733,11 @@ function ForwardModal({
                                         <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{emp.email}</div>
                                     </div>
                                     <span
-                                        className={`role-chip ${['project_manager', 'pm', 'team_lead', 'tl'].includes(String(emp.role || '').toLowerCase()) ? 'editor' : 'viewer'}`}
-                                        style={{ fontSize: 10.5, padding: '2px 7px', textTransform: 'capitalize' }}
+                                        className={`role-chip ${isLeadOrPM ? 'editor' : 'viewer'}`}
+                                        style={{ fontSize: 10.5, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                     >
-                                        {emp.role === 'project_manager' ? 'PM' : emp.role === 'team_lead' ? 'Team Lead' : emp.role === 'team_member' ? 'Team Member' : (emp.role || 'Member').replace(/_/g, ' ')}
+                                        <span>{getRoleIcon(roleKey)}</span>
+                                        <span>{emp.role === 'project_manager' ? 'PM' : emp.role === 'team_lead' ? 'Team Lead' : emp.role === 'team_member' ? 'Team Member' : (emp.role || 'Member').replace(/_/g, ' ')}</span>
                                     </span>
                                 </label>
                             );
@@ -591,29 +794,32 @@ function EmailCard({
         <div
             onClick={onClick}
             style={{
+                width: '100%',
+                boxSizing: 'border-box',
                 padding: '14px 16px',
                 cursor: 'pointer',
                 borderBottom: '1px solid var(--color-border-light)',
                 background: active ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
                 borderLeft: active ? '3px solid var(--color-primary)' : '3px solid transparent',
                 transition: 'all 0.12s',
+                textAlign: 'left',
             }}
             onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--color-table-row-hover)'; }}
             onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--color-bg-card)'; }}
         >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', minWidth: 0 }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                     {initials(senderName, senderEmail)}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, width: '100%' }}>
                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>{sender}</span>
                         <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)', flexShrink: 0 }}>{time}</span>
                     </div>
-                    <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1, width: '100%' }}>
                         {msg.subject || '(No subject)'}
                     </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginTop: 3, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginTop: 3, lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {snippet}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
@@ -625,6 +831,28 @@ function EmailCard({
             </div>
         </div>
     );
+}
+
+function linkifyText(text: string): React.ReactNode {
+    if (!text) return text;
+    const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#1e4fd8', textDecoration: 'underline' }}
+                >
+                    {part}
+                </a>
+            );
+        }
+        return part;
+    });
 }
 
 // ── Email Detail Panel ────────────────────────────────────────
@@ -657,7 +885,8 @@ function EmailDetail({
 
     const preparedHtml = React.useMemo(() => {
         if (!email.bodyHtml) return '';
-        const baseStyle = `
+        const baseHead = `
+            <base target="_blank">
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -678,10 +907,20 @@ function EmailDetail({
                 }
             </style>
         `;
-        if (email.bodyHtml.includes('<head>')) {
-            return email.bodyHtml.replace('<head>', `<head>${baseStyle}`);
+        let html = email.bodyHtml;
+        if (html.includes('<head>')) {
+            html = html.replace('<head>', `<head>${baseHead}`);
+        } else {
+            html = `${baseHead}${html}`;
         }
-        return `${baseStyle}${email.bodyHtml}`;
+        // Force all links inside email to open in a new tab safely
+        return html.replace(/<a\b([^>]*)>/gi, (_match, attrs) => {
+            const cleanAttrs = attrs
+                .replace(/\btarget=(['"])[^'"]*\1/gi, '')
+                .replace(/\brel=(['"])[^'"]*\1/gi, '')
+                .trim();
+            return `<a target="_blank" rel="noopener noreferrer" ${cleanAttrs}>`;
+        });
     }, [email.bodyHtml]);
 
     const rawLinks: any[] = email.links || [];
@@ -717,15 +956,15 @@ function EmailDetail({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', minHeight: 0 }}>
             {/* Scrollable body */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '15px' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px' }}>
                 {/* Header */}
                 <div style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-                        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.35, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', paddingLeft: 10, margin: 0, lineHeight: 1.35, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
                             {email.subject || '(No subject)'}
                         </h2>
                         <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            📤 Forward to Detailers
+                            Forward to Detailers
                         </button>
                     </div>
                     <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
@@ -881,24 +1120,7 @@ function EmailDetail({
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
                                 </span>
-                                {(showAttachments || showLinks) && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowAttachments(false); setShowLinks(false); }}
-                                        style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: 'var(--color-text-muted)',
-                                            cursor: 'pointer',
-                                            fontSize: 11.5,
-                                            padding: '2px 6px',
-                                            borderRadius: 4,
-                                        }}
-                                        title="Collapse all resources"
-                                    >
-                                        ✕ Collapse
-                                    </button>
-                                )}
+
                             </div>
                         </div>
 
@@ -1169,7 +1391,7 @@ function EmailDetail({
                                 display: 'block',
                                 background: '#ffffff',
                             }}
-                            sandbox="allow-same-origin allow-popups"
+                            sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                             title="Email body"
                         />
                     ) : (
@@ -1184,7 +1406,7 @@ function EmailDetail({
                             minHeight: 250,
                             margin: 0,
                         }}>
-                            {email.bodyText || email.snippetText || '(No content)'}
+                            {linkifyText(email.bodyText || email.snippetText || '(No content)')}
                         </pre>
                     )}
                 </div>
@@ -1206,7 +1428,7 @@ export default function MailRouterPage() {
     const [activeTab, setActiveTab] = useState<'ZOHO' | 'MICROSOFT'>('MICROSOFT');
     const [selectedEmail, setSelectedEmail] = useState<MailMessage | null>(null);
     const [search, setSearch] = useState('');
-    const [startDate, setStartDate] = useState(daysAgoStr(14));
+    const [startDate, setStartDate] = useState(todayStr());
     const [endDate, setEndDate] = useState(todayStr());
 
     const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -1221,6 +1443,59 @@ export default function MailRouterPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [autoSyncInfo, setAutoSyncInfo] = useState<{
+        enabled: boolean;
+        cronExpression?: string;
+        intervalDescription?: string;
+        lastRunAt?: string;
+        lastRunStatus?: string;
+        isCycleRunning?: boolean;
+    } | null>(null);
+
+    const lastRunAtRef = useRef<string | undefined>(undefined);
+
+    const refreshAutoSyncStatus = useCallback(async () => {
+        try {
+            const d = await getAutoSyncStatus();
+            setAutoSyncInfo(d);
+            // If background autosync cycle finished, silently refresh emails
+            if (d?.lastRunAt && lastRunAtRef.current && d.lastRunAt !== lastRunAtRef.current) {
+                listEmails({
+                    startDate,
+                    endDate,
+                    provider: activeTab,
+                    limit: 200,
+                }).then(res => {
+                    const list = res.emails || [];
+                    setEmails(list);
+                    setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
+                }).catch(() => {});
+            }
+            lastRunAtRef.current = d?.lastRunAt;
+        } catch { /* ignore */ }
+    }, [startDate, endDate, activeTab]);
+
+    useEffect(() => {
+        refreshAutoSyncStatus();
+        const interval = setInterval(refreshAutoSyncStatus, 15000);
+        return () => clearInterval(interval);
+    }, [refreshAutoSyncStatus]);
+
+    // Background email refresh every 60 seconds (1 minute) to stay in sync with server autosync
+    useEffect(() => {
+        const interval = setInterval(() => {
+            listEmails({
+                startDate,
+                endDate,
+                provider: activeTab,
+                limit: 200,
+            }).then(res => {
+                const list = res.emails || [];
+                setEmails(list);
+            }).catch(() => {});
+        }, 60000);
+        return () => clearInterval(interval);
+    }, [startDate, endDate, activeTab]);
 
     const fetchAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -1284,20 +1559,68 @@ export default function MailRouterPage() {
 
     const activeAccount = accounts.find(a => a.provider === activeTab && a.isActive);
 
-    async function handleSync() {
+    // 15 seconds cooldown after sync to prevent rapid API hammering
+    const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+    const cooldownRef = useRef(0);
+
+    useEffect(() => {
+        if (cooldownRemaining <= 0) return;
+        const timer = setInterval(() => {
+            setCooldownRemaining(prev => {
+                const next = Math.max(0, prev - 1);
+                cooldownRef.current = next;
+                return next;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [cooldownRemaining]);
+
+    const handleSync = useCallback(async (customStart?: string, customEnd?: string) => {
+        if (cooldownRef.current > 0 && !customStart) return;
         setSyncing(true);
         setError('');
         try {
             const accountId = activeAccount?._id;
-            await triggerSync({ accountId, startDate, endDate });
+            const s = customStart || startDate;
+            const e = customEnd || endDate;
+            await triggerSync({ accountId, startDate: s, endDate: e });
             await fetchEmails();
             await fetchSyncJobs();
         } catch (e: any) {
             setError(e.message);
         } finally {
             setSyncing(false);
+            setCooldownRemaining(15);
+            cooldownRef.current = 15;
         }
-    }
+    }, [activeAccount?._id, startDate, endDate, fetchEmails, fetchSyncJobs]);
+
+    // Automatically trigger sync when the date window is changed
+    const isFirstDateRender = useRef(true);
+    const prevDateRange = useRef({ startDate, endDate });
+
+    useEffect(() => {
+        if (isFirstDateRender.current) {
+            isFirstDateRender.current = false;
+            prevDateRange.current = { startDate, endDate };
+            return;
+        }
+
+        if (prevDateRange.current.startDate === startDate && prevDateRange.current.endDate === endDate) {
+            return;
+        }
+        prevDateRange.current = { startDate, endDate };
+
+        if (!startDate || !endDate || startDate > endDate) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            handleSync(startDate, endDate);
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [startDate, endDate, handleSync]);
 
     async function handleDisconnect() {
         if (!showDisconnect) return;
@@ -1473,6 +1796,10 @@ export default function MailRouterPage() {
                                                 </button>
                                             )}
                                         </div>
+                         
+                         
+                         
+                         
                                     </React.Fragment>
                                 );
                             })}
@@ -1502,8 +1829,26 @@ export default function MailRouterPage() {
                             <label style={{ fontSize: 12.5, color: 'var(--color-text-muted)', fontWeight: 600 }}>To</label>
                             <input type="date" className="form-control" style={{ width: 145, fontSize: 12.5 }} value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} />
                         </div>
-                        <button className="btn btn-primary" onClick={handleSync} disabled={syncing} style={{ fontSize: 13 }}>
-                            {syncing ? <><Spinner size={14} /> Syncing…</> : '🔄 Sync Emails'}
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => handleSync()}
+                            disabled={syncing || cooldownRemaining > 0}
+                            style={{
+                                textAlign: "center",
+                                fontSize: 13,
+                                minWidth: 115,
+                                opacity: (syncing || cooldownRemaining > 0) ? 0.5 : 1,
+                                cursor: (syncing || cooldownRemaining > 0) ? 'not-allowed' : 'pointer',
+                                transition: 'opacity 0.2s ease, background-color 0.2s ease',
+                            }}
+                        >
+                            {syncing ? (
+                                <><Spinner size={14} /> Syncing…</>
+                            ) : cooldownRemaining > 0 ? (
+                                `Sync (${cooldownRemaining}s)`
+                            ) : (
+                                'Sync Emails'
+                            )}
                         </button>
                         <div className="search-input-wrapper" style={{ flex: 1, minWidth: 180 }}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1511,6 +1856,25 @@ export default function MailRouterPage() {
                         </div>
                         <button className="btn btn-secondary" onClick={fetchEmails} disabled={loadingEmails} title="Refresh">
                             {loadingEmails ? <Spinner size={13} /> : '↻'}
+                        </button> 
+                        <button
+                            className="btn btn-danger btn-l"
+                            title="Clear downloaded emails from database (leaves user accounts and mailbox connections intact)"
+                            style={{ color: 'var(--color-text-muted)', fontSize: 12 }}
+                            onClick={async () => {
+                                if (window.confirm('Clear all downloaded emails from the database? User accounts and mailbox connections will remain intact.')) {
+                                    try {
+                                        await clearDownloadedEmails();
+                                        await fetchEmails();
+                                        await fetchSyncJobs();
+                                        setSuccessMsg('Downloaded emails cleared successfully.');
+                                    } catch (err: any) {
+                                        setError(err.message || 'Failed to clear emails');
+                                    }
+                                }
+                            }}
+                        >
+                            🗑️ Clear Mails
                         </button>
                     </div>
                 </div>
@@ -1518,23 +1882,38 @@ export default function MailRouterPage() {
                 {/* ── Master-detail (Fills remaining height, scrolls independently) ── */}
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
                     {/* Left: email list (independent vertical scroll) */}
-                    <div style={{ width: 380, flexShrink: 0, height: '100%', minHeight: 0, borderRight: '1px solid var(--color-border)', overflowY: 'auto', background: 'var(--color-bg-card)' }}>
+                    <div style={{
+                        width: 380,
+                        flexShrink: 0,
+                        height: '100%',
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        justifyContent: 'flex-start',
+                        borderRight: '1px solid var(--color-border)',
+                        overflowY: 'auto',
+                        background: 'var(--color-bg-card)',
+                    }}>
                         {loadingEmails ? (
-                            <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}><Spinner size={24} /></div>
-                        ) : filteredEmails.length === 0 ? (
-                            <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                                <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-                                No emails in this date window.<br />
-                                <span style={{ fontSize: 12.5 }}>Click <strong>Sync Emails</strong> to fetch from the connected mailbox.</span>
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
+                                <Spinner size={24} />
                             </div>
-                        ) : filteredEmails.map(msg => (
-                            <EmailCard
-                                key={msg._id}
-                                msg={msg}
-                                active={selectedEmail?._id === msg._id}
-                                onClick={() => setSelectedEmail(msg)}
-                            />
-                        ))}
+                        ) : filteredEmails.length === 0 ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
+                                No emails in this date window<br />
+                                <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Emails</strong> to fetch latest mails</span>
+                            </div>
+                        ) : (
+                            filteredEmails.map(msg => (
+                                <EmailCard
+                                    key={msg._id}
+                                    msg={msg}
+                                    active={selectedEmail?._id === msg._id}
+                                    onClick={() => setSelectedEmail(msg)}
+                                />
+                            ))
+                        )}
                     </div>
 
                     {/* Right: email detail (independent vertical scroll) */}
@@ -1551,7 +1930,6 @@ export default function MailRouterPage() {
                             </DetailErrorBoundary>
                         ) : (
                             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>✉️</div>
                                 <p style={{ fontSize: 14, fontWeight: 500 }}>Select an email from the left to view details and triage</p>
                             </div>
                         )}

@@ -121,9 +121,10 @@ class MicrosoftMailProvider {
                     const expiresAt = new Date(Date.now() + 3500000);
                     account.accessToken = freshToken;
                     account.tokenExpiresAt = expiresAt.toISOString();
-                    if (account.id) {
+                    const accountId = account.id || account._id;
+                    if (accountId) {
                         try {
-                            await (0, account_service_1.updateMailAccountTokens)(account.id, freshToken, expiresAt);
+                            await (0, account_service_1.updateMailAccountTokens)(accountId, freshToken, expiresAt);
                         }
                         catch (dbErr) {
                             console.warn('[microsoft:auth] Could not persist refreshed token to DB:', dbErr);

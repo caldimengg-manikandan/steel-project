@@ -192,37 +192,68 @@ async function exchangeZohoCode(code, customAccountsUrl) {
     };
 }
 /**
+ * In-flight promise cache to prevent concurrent Zoho token refresh requests from racing.
+ */
+const inFlightZohoRefreshes = new Map();
+
+/**
  * Refresh an existing Zoho access token using its refresh token.
  */
 async function refreshZohoAccessToken(refreshToken, customAccountsUrl) {
-    const config = getZohoConfig();
-    const accountsUrl = customAccountsUrl || config.accountsUrl;
-    const tokenUrl = `${accountsUrl}/oauth/v2/token`;
-    const body = new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        grant_type: 'refresh_token',
-    });
-    const res = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-    });
-    const data = (await res.json());
-    if (!res.ok || data.error || !data.access_token) {
+    if (!refreshToken) {
         throw new errors_1.MailProviderError({
             provider: 'ZOHO',
-            statusCode: res.status,
             code: 'AUTH_FAILED',
-            message: `Failed to refresh Zoho token: ${data.error || res.statusText}`,
+            message: 'Zoho refresh token is missing. Please re-authenticate the mailbox.',
             retryable: false,
         });
     }
-    const expiresInSec = data.expires_in || 3600;
-    const expiresAt = new Date(Date.now() + expiresInSec * 1000);
-    return {
-        accessToken: data.access_token,
-        expiresAt,
-    };
+
+    if (inFlightZohoRefreshes.has(refreshToken)) {
+        return inFlightZohoRefreshes.get(refreshToken);
+    }
+
+    const refreshPromise = (async () => {
+        const config = getZohoConfig();
+        const accountsUrl = customAccountsUrl || config.accountsUrl;
+        const tokenUrl = `${accountsUrl}/oauth/v2/token`;
+        const body = new URLSearchParams({
+            refresh_token: refreshToken,
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
+            grant_type: 'refresh_token',
+        });
+        const res = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+        });
+        const data = (await res.json());
+        if (!res.ok || data.error || !data.access_token) {
+            const rawErr = data.error_description || data.error || res.statusText || 'Access Denied';
+            console.error(`[zoho:auth] Token refresh failed for ${accountsUrl}:`, rawErr, data);
+            throw new errors_1.MailProviderError({
+                provider: 'ZOHO',
+                statusCode: res.status,
+                code: 'AUTH_FAILED',
+                message: `Failed to refresh Zoho token: ${rawErr}`,
+                retryable: false,
+            });
+        }
+        const expiresInSec = data.expires_in || 3600;
+        const expiresAt = new Date(Date.now() + expiresInSec * 1000);
+        return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token || refreshToken,
+            expiresAt,
+        };
+    })();
+
+    inFlightZohoRefreshes.set(refreshToken, refreshPromise);
+    try {
+        return await refreshPromise;
+    } finally {
+        inFlightZohoRefreshes.delete(refreshToken);
+    }
 }
+

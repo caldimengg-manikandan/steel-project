@@ -12,6 +12,7 @@ const { runMailSync } = require('./mongoose/services/mailSyncService');
 const { forwardEmail, getEmployeeList } = require('./mongoose/services/mailForwardService');
 const accountService = require('./mongoose/services/accountService');
 const tokenStore = require('./mongoose/services/tokenStore');
+const mailAutoSyncService = require('./services/mailAutoSyncService');
 
 // Native Mongoose Repositories
 const emailRepo = require('./mongoose/repositories/emailRepo');
@@ -39,6 +40,7 @@ module.exports = {
   attachmentRepo,
   syncJobRepo,
   forwardingRepo,
+  mailAutoSyncService,
   models: {
     MailAccount,
     Email,

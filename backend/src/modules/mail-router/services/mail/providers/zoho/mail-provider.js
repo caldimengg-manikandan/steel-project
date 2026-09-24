@@ -43,9 +43,13 @@ class ZohoMailProvider {
             const refreshResult = await (0, auth_1.refreshZohoAccessToken)(account.refreshToken, customAccountsUrl);
             account.accessToken = refreshResult.accessToken;
             account.tokenExpiresAt = refreshResult.expiresAt.toISOString();
-            if (account.id) {
+            if (refreshResult.refreshToken) {
+                account.refreshToken = refreshResult.refreshToken;
+            }
+            const accountId = account.id || account._id;
+            if (accountId) {
                 try {
-                    await (0, account_service_1.updateMailAccountTokens)(account.id, refreshResult.accessToken, refreshResult.expiresAt);
+                    await (0, account_service_1.updateMailAccountTokens)(accountId, refreshResult.accessToken, refreshResult.expiresAt, refreshResult.refreshToken);
                 }
                 catch (dbErr) {
                     console.warn('[zoho:mail-provider] Could not persist refreshed token to DB:', dbErr);

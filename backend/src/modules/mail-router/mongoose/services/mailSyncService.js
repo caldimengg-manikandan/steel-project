@@ -22,9 +22,38 @@ const {
 } = require('../repositories/syncJobRepo');
 
 /**
+ * In-flight map to deduplicate concurrent sync operations for the same mailbox account.
+ * Guarantees that auto-sync and user manual clicks never collide or double-sync.
+ */
+const activeSyncPromisesByAccount = new Map();
+
+/**
  * Trigger mail synchronisation for an account/provider across a UTC window.
  */
 async function runMailSync(options) {
+  const { userId, startDate, endDate, account } = options;
+  const providerType = account?.provider || options.provider || 'MICROSOFT';
+  const accountId = account?._id || account?.id;
+  const lockKey = accountId ? String(accountId) : `${userId}_${providerType}`;
+
+  if (activeSyncPromisesByAccount.has(lockKey)) {
+    console.log(`[mail-router:sync] Sync operation already in-flight for account ${lockKey}. Joining existing job.`);
+    return activeSyncPromisesByAccount.get(lockKey);
+  }
+
+  const syncPromise = (async () => {
+    return executeMailSync(options);
+  })();
+
+  activeSyncPromisesByAccount.set(lockKey, syncPromise);
+  try {
+    return await syncPromise;
+  } finally {
+    activeSyncPromisesByAccount.delete(lockKey);
+  }
+}
+
+async function executeMailSync(options) {
   const { userId, startDate, endDate, account } = options;
   const providerType = account?.provider || options.provider || 'MICROSOFT';
   const mailProvider = getMailProvider(providerType);
@@ -140,31 +169,102 @@ async function runMailSync(options) {
   return getSyncJob(jobId);
 }
 
+/**
+ * Determine whether an attachment is an inline/CID image that must be downloaded
+ * during email sync to ensure email HTML previews render correctly.
+ */
+function isInlineCidImage(att, bodyHtml) {
+  const html = (bodyHtml || '').toLowerCase();
+  const cleanCid = att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim().toLowerCase() : null;
+  const filename = (att.filename || '').toLowerCase();
+  const isImg = (att.contentType && att.contentType.toLowerCase().startsWith('image/')) ||
+                /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i.test(filename);
+
+  // 1. Explicit CID reference in HTML body
+  if (cleanCid && (html.includes(`cid:${cleanCid}`) || html.includes(`cid:&quot;${cleanCid}&quot;`))) {
+    return true;
+  }
+
+  // 2. Reference by filename in CID
+  if (filename && html.includes(`cid:${filename}`)) {
+    return true;
+  }
+
+  // 3. Email body contains CID references and attachment is marked inline
+  if (html.includes('cid:') && att.isInline && isImg) {
+    return true;
+  }
+
+  // 4. Marked inline and is an image
+  if (att.isInline && isImg) {
+    return true;
+  }
+
+  // 5. Has a contentId and is an image (common in Outlook/Zoho signatures)
+  if (cleanCid && isImg) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Optimized attachment sync for a message:
+ * 1. Fetch & save attachment metadata (filename, MIME type, size, providerAttachmentId, CID).
+ * 2. Download ONLY inline/CID images required for email preview rendering.
+ * 3. Never download normal attachments during sync (deferred to on-demand preview/download).
+ * 4. Never download an attachment if it is already cached in MongoDB.
+ */
 async function syncAttachmentsForMessage(provider, account, message, emailId) {
   try {
     const attachmentList = await provider.listAttachments(message.providerMessageId, account);
+    if (!attachmentList || !Array.isArray(attachmentList) || attachmentList.length === 0) {
+      return;
+    }
+
     for (const att of attachmentList) {
-      let content = null;
-      try {
-        const download = await provider.downloadAttachment(message.providerMessageId, att.providerAttachmentId, account);
-        content = download.content;
-      } catch (err) {
-        console.warn(
-          `[mail-router:sync] Could not download content for attachment ` +
-            `${att.providerAttachmentId} on message ${message.providerMessageId}:`,
-          err
-        );
+      const providerAttachmentId = att.providerAttachmentId || att.id;
+      if (!providerAttachmentId) continue;
+
+      // Check whether attachment is already cached in MongoDB
+      const existing = await Attachment.findOne({
+        emailId,
+        providerAttachmentId,
+      }).select('_id content').lean();
+
+      const isAlreadyCached = Boolean(existing && existing.content && existing.content.length > 0);
+
+      // Check if this is an inline/CID image needed for email preview
+      const isInline = isInlineCidImage(att, message.bodyHtml);
+
+      let contentToSave = undefined;
+
+      // Download ONLY if it is an inline/CID image and not already cached
+      if (isInline && !isAlreadyCached) {
+        try {
+          const download = await provider.downloadAttachment(message.providerMessageId, providerAttachmentId, account);
+          if (download && download.content) {
+            contentToSave = download.content;
+          }
+        } catch (downloadErr) {
+          console.warn(
+            `[mail-router:sync] Could not download inline image ${providerAttachmentId} on message ${message.providerMessageId}:`,
+            downloadErr.message
+          );
+        }
       }
 
+      // Save attachment metadata. Normal attachments are saved with no content (deferred).
+      // If already cached, upsertAttachment preserves existing content in MongoDB.
       await upsertAttachment({
         emailId,
-        providerAttachmentId: att.providerAttachmentId,
-        filename: att.filename,
-        contentType: att.contentType,
-        sizeBytes: att.sizeBytes,
-        isInline: att.isInline,
-        contentId: att.contentId,
-        content,
+        providerAttachmentId,
+        filename: att.filename || 'attachment',
+        contentType: att.contentType || 'application/octet-stream',
+        sizeBytes: att.sizeBytes ?? null,
+        isInline: Boolean(att.isInline || isInline),
+        contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
+        ...(contentToSave ? { content: contentToSave } : {}),
       });
     }
   } catch (err) {

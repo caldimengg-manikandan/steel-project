@@ -190,16 +190,37 @@
 .m365-sheet-tabs {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     background: #f3f2f1;
-    padding: 2px;
+    padding: 2px 4px;
     border-radius: 4px;
-    max-width: 600px;
+    max-width: min(560px, 42vw);
     overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+}
+
+.m365-sheet-tabs::-webkit-scrollbar {
+    height: 3px;
+}
+
+.m365-sheet-tabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.m365-sheet-tabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.m365-sheet-tabs::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .m365-sheet-tab {
-    padding: 3px 10px;
+    padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
     color: #605e5c;
@@ -208,14 +229,22 @@
     border-radius: 3px;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.12s;
+    flex-shrink: 0;
+    transition: all 0.14s ease;
+    user-select: none;
+}
+
+.m365-sheet-tab:hover {
+    background: #e1dfdd;
+    color: #201f1e;
 }
 
 .m365-sheet-tab.active {
     background: #ffffff;
     color: #047857;
     font-weight: 700;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    border-bottom: 2px solid #047857;
 }
 
 /* ── Search Input (CSV) ─────────────────────────────────── */
@@ -245,9 +274,10 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: normal;
     background: #f3f2f1;
     padding: 24px;
+    box-sizing: border-box;
 }
 
 .m365-viewport.is-grid-mode {
@@ -256,7 +286,7 @@
     overflow: hidden;
 }
 
-/* ── Paper Document Canvas (PDF, DOCX) ──────────────────── */
+/* ── Paper Document Canvas (PDF, DOCX, DOC) ─────────────── */
 .m365-paper-doc {
     background: #ffffff;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -269,6 +299,38 @@
     color: #201f1e;
     line-height: 1.6;
     font-size: 14px;
+    overflow-x: hidden;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.m365-paper-doc * {
+    box-sizing: border-box;
+}
+
+.m365-paper-doc img,
+.m365-paper-doc svg,
+.m365-paper-doc canvas,
+.m365-paper-doc video {
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+    display: block;
+    margin: 16px auto;
+    border-radius: 2px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.m365-paper-doc figure {
+    max-width: 100% !important;
+    margin: 16px auto;
+    text-align: center;
+}
+
+.m365-paper-doc p {
+    margin-bottom: 0.85em;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .m365-paper-doc h1,
@@ -277,12 +339,16 @@
     color: #111827;
     margin-top: 1.2em;
     margin-bottom: 0.6em;
+    word-break: break-word;
 }
 
 .m365-paper-doc table {
     border-collapse: collapse;
     width: 100%;
+    max-width: 100%;
     margin: 16px 0;
+    overflow-x: auto;
+    display: block;
 }
 
 .m365-paper-doc th,
@@ -290,6 +356,7 @@
     border: 1px solid #d1d5db;
     padding: 6px 10px;
     text-align: left;
+    word-break: break-word;
 }
 
 .m365-paper-doc th {
@@ -370,14 +437,120 @@
     user-select: none;
 }
 
-/* ── PDF Continuous Scroll Canvas Container ─────────────── */
+/* ── PDF Continuous Scroll Canvas Container & Hand Drag ── */
+.m365-viewport.has-pdf-viewer.is-pan-mode,
+.m365-viewport.is-pan-mode .m365-pdf-continuous-container,
+.m365-viewport.is-pan-mode .m365-pdf-page-card {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.m365-viewport.is-panning,
+.m365-viewport.is-panning *,
+body.pdf-panning-active,
+body.pdf-panning-active * {
+    cursor: grabbing !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+.m365-viewport.is-cursor-mode,
+.m365-viewport.is-cursor-mode .m365-pdf-continuous-container,
+.m365-viewport.is-cursor-mode .m365-pdf-page-card {
+    cursor: default;
+    user-select: auto;
+    -webkit-user-select: auto;
+}
+
+/* ── PDF.js Text Layer (Enables exact mouse text selection in Cursor mode) ── */
+.m365-pdf-page-card {
+    position: relative;
+}
+
+.m365-pdf-page-card .textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 1;
+    line-height: 1;
+    letter-spacing: normal;
+    word-spacing: normal;
+    -webkit-text-size-adjust: none;
+    -moz-text-size-adjust: none;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+    z-index: 2;
+    --min-font-size: 1;
+    --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+    --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.m365-pdf-page-card .textLayer :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+}
+
+.m365-pdf-page-card .textLayer > :not(.markedContent),
+.m365-pdf-page-card .textLayer .markedContent span:not(.markedContent) {
+    z-index: 1;
+    --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.m365-pdf-page-card .textLayer .markedContent {
+    display: contents;
+}
+
+.m365-pdf-page-card .textLayer span[role="img"] {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    cursor: default;
+}
+
+.m365-pdf-page-card .textLayer ::selection {
+    background: rgba(0, 120, 212, 0.35) !important;
+    color: transparent !important;
+}
+
+.m365-pdf-page-card .textLayer ::-moz-selection {
+    background: rgba(0, 120, 212, 0.35) !important;
+    color: transparent !important;
+}
+
+/* When in Pan mode, disable pointer events on textLayer so drag-to-pan is smooth */
+.m365-viewport.is-pan-mode .textLayer {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+/* When in Cursor mode, enable text selection */
+.m365-viewport.is-cursor-mode .textLayer {
+    pointer-events: auto !important;
+    user-select: text !important;
+}
+
 .m365-pdf-continuous-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 24px;
-    width: 100%;
+    min-width: 100%;
+    width: max-content;
+    margin: 0 auto;
     padding-bottom: 40px;
+    box-sizing: border-box;
 }
 
 .m365-pdf-continuous-container.is-two-page {
@@ -390,7 +563,9 @@
     align-items: flex-start;
     justify-content: center;
     gap: 20px;
-    width: 100%;
+    min-width: 100%;
+    width: max-content;
+    margin: 0 auto;
 }
 
 .m365-pdf-page-card {
@@ -404,6 +579,8 @@
     justify-content: center;
     transition: box-shadow 0.15s ease;
     flex-shrink: 0;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .m365-pdf-page-card:hover {
@@ -414,6 +591,9 @@
     display: block;
     max-width: 100%;
     height: auto;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 .m365-pdf-page-placeholder {
@@ -445,12 +625,40 @@
 /* ── Spreadsheet Grid Table ─────────────────────────────── */
 .m365-grid-wrap {
     width: 100%;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
     background: #ffffff;
     border: 1px solid #d1d5db;
     border-radius: 4px;
     overflow: auto;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.m365-grid-wrap::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.m365-grid-wrap::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.m365-grid-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+    border: 2px solid #f1f5f9;
+}
+
+.m365-grid-wrap::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.m365-grid-wrap::-webkit-scrollbar-corner {
+    background: #f1f5f9;
 }
 
 .m365-grid-zoom-container {
@@ -459,7 +667,8 @@
 }
 
 .m365-grid-table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%;
     font-size: 12px;
     font-family: Consolas, 'Segoe UI', monospace;
@@ -467,11 +676,14 @@
     white-space: nowrap;
 }
 
+/* Top Sticky Column Headers */
 .m365-grid-table th {
     position: sticky;
     top: 0;
     background: #f8fafc;
-    border: 1px solid #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    border-top: 1px solid #cbd5e1;
     padding: 6px 10px;
     font-weight: 700;
     color: #475569;
@@ -484,14 +696,86 @@
     background: #f1f5f9;
 }
 
+/* Sticky top-left corner cell (#) */
+.m365-grid-table th:first-child {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    background: #e2e8f0;
+    border-left: 1px solid #cbd5e1;
+    box-shadow: 1px 1px 0 #cbd5e1;
+}
+
+/* Sticky left column (Row Numbers #) */
+.m365-grid-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #f8fafc;
+    border-left: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    box-shadow: 1px 0 0 #cbd5e1;
+}
+
 .m365-grid-table td {
-    border: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
     padding: 5px 9px;
     background: #ffffff;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .m365-grid-table tr:hover td {
     background: #f8fafc;
+}
+
+.m365-grid-table tr:hover td:first-child {
+    background: #f1f5f9;
+}
+
+/* ── Grid Status Bar ────────────────────────────────────── */
+.m365-grid-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    font-size: 11.5px;
+    color: #64748b;
+    flex-shrink: 0;
+    user-select: none;
+    height: 32px;
+    box-sizing: border-box;
+}
+
+.m365-grid-scroll-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 10px;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+
+.m365-grid-scroll-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+.m365-grid-scroll-btn:active {
+    background: #cbd5e1;
 }
 
 /* ── Media Player Canvas (Video, Audio, Image) ──────────── */

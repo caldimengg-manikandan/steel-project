@@ -16,7 +16,13 @@
 // -----------------------------------------------------------------------------
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
+
+const Email = require('../mongoose/models/Email');
+const MailAccount = require('../mongoose/models/MailAccount');
+const Attachment = require('../mongoose/models/Attachment');
+const { getMailProvider } = require('../services/mail/provider-factory');
 
 const {
   listMailAccountsByUser,
@@ -446,6 +452,28 @@ router.get('/sync', requireRoles(...MANAGER_ROLES), async (req, res) => {
   }
 });
 
+// GET /api/mail-router/autosync/status — Inspect background autosync status
+router.get('/autosync/status', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const { getAutoSyncStatus } = require('../services/mailAutoSyncService');
+    const status = await getAutoSyncStatus();
+    return res.json(status);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to get autosync status' });
+  }
+});
+
+// POST /api/mail-router/autosync/trigger — Trigger immediate autosync for active mailboxes
+router.post('/autosync/trigger', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const { syncActiveMailboxes } = require('../services/mailAutoSyncService');
+    const result = await syncActiveMailboxes();
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to trigger autosync' });
+  }
+});
+
 // ── Triage Workspace & Email Forwarding ──────────────────────────────────────
 
 // GET /api/mail-router/emails — List emails in date range for active provider
@@ -474,6 +502,46 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
   } catch (err) {
     console.error('[mailRouter:emails] Failed to query emails:', err);
     return res.status(500).json({ error: err.message || 'Failed to list emails' });
+  }
+});
+
+// DELETE /api/mail-router/emails — Purge downloaded emails & attachments without touching user sessions or connected mailboxes
+router.delete('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const EmailForward = require('../mongoose/models/EmailForward');
+    const SyncJob = require('../mongoose/models/SyncJob');
+
+    const emailFilter = {};
+    if (!req.authUser.isFullAccess) {
+      emailFilter.userId = req.authUser.id;
+    }
+
+    const emailsToDelete = await Email.find(emailFilter).select('_id').lean();
+    const emailIds = emailsToDelete.map(e => e._id);
+
+    const deleteAttachments = await Attachment.deleteMany({ emailId: { $in: emailIds } });
+    const deleteForwards = await EmailForward.deleteMany({ emailId: { $in: emailIds } });
+    const deleteEmails = await Email.deleteMany(emailFilter);
+    const deleteSyncJobs = await SyncJob.deleteMany(emailFilter.userId ? { userId: emailFilter.userId } : {});
+
+    // Reset lastSync status on MailAccounts
+    await MailAccount.updateMany(emailFilter.userId ? { userId: emailFilter.userId } : {}, {
+      $set: { lastSyncAt: null, lastSyncStatus: null }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Downloaded emails cleared successfully. User accounts, user sessions, and mailbox connections remain intact.',
+      deleted: {
+        emails: deleteEmails.deletedCount,
+        attachments: deleteAttachments.deletedCount,
+        forwards: deleteForwards.deletedCount,
+        syncJobs: deleteSyncJobs.deletedCount,
+      }
+    });
+  } catch (err) {
+    console.error('[mailRouter:clearEmails] Failed to clear downloaded emails:', err);
+    return res.status(500).json({ error: err.message || 'Failed to clear downloaded emails' });
   }
 });
 
@@ -624,24 +692,315 @@ router.get('/inbox/:id', requireRoles(), async (req, res) => {
   }
 });
 
-// GET /api/mail-router/attachments/:id — Download drawing / attachment file
+// In-flight download deduplication map to prevent concurrent duplicate provider fetches
+const inFlightAttachmentDownloads = new Map();
+
+async function fetchAndCacheAttachment(attachment) {
+  const attachmentIdStr = String(attachment._id || attachment.id);
+
+  if (inFlightAttachmentDownloads.has(attachmentIdStr)) {
+    return inFlightAttachmentDownloads.get(attachmentIdStr);
+  }
+
+  const downloadPromise = (async () => {
+    // 1. Re-check DB in case another process/worker cached it in the meantime
+    const fresh = await Attachment.findById(attachment._id);
+    if (fresh && fresh.content && fresh.content.length > 0) {
+      attachment.content = fresh.content;
+      attachment.contentType = fresh.contentType || attachment.contentType;
+      attachment.filename = fresh.filename || attachment.filename;
+      return fresh.content;
+    }
+
+    // 2. Resolve parent Email
+    let email = null;
+    if (mongoose.Types.ObjectId.isValid(attachment.emailId)) {
+      email = await Email.findById(attachment.emailId).lean();
+    }
+    if (!email) {
+      email = await Email.findOne({ _id: attachment.emailId }).lean();
+    }
+    if (!email) {
+      throw new Error(`Associated email record not found for attachment ${attachment.filename || attachmentIdStr}.`);
+    }
+
+    // 3. Resolve MailAccount credentials
+    let account = null;
+    if (email.accountId) {
+      account = await MailAccount.findById(email.accountId).lean();
+    }
+    if (!account && email.mailboxAddress) {
+      account = await MailAccount.findOne({
+        email: email.mailboxAddress.toLowerCase(),
+        provider: email.provider,
+        isActive: true,
+      }).lean();
+    }
+    if (!account && email.userId) {
+      account = await MailAccount.findOne({
+        userId: email.userId,
+        provider: email.provider,
+        isActive: true,
+      }).lean();
+    }
+    if (!account) {
+      account = await MailAccount.findOne({
+        provider: email.provider,
+        isActive: true,
+      }).lean();
+    }
+
+    if (!account) {
+      throw new Error(`Connected mail account not found for provider ${email.provider}. Please ensure your mailbox is connected.`);
+    }
+
+    if (!account.id && account._id) {
+      account.id = String(account._id);
+    }
+
+    // 4. Download on-demand from provider (Zoho / Microsoft Graph)
+    const mailProvider = getMailProvider(email.provider);
+    const downloaded = await mailProvider.downloadAttachment(
+      email.providerMessageId,
+      attachment.providerAttachmentId,
+      account
+    );
+
+    if (!downloaded || !downloaded.content) {
+      throw new Error('Mail provider returned empty content for attachment.');
+    }
+
+    // 5. Cache the attachment in MongoDB so future requests are served immediately
+    const updateFields = {
+      content: downloaded.content,
+    };
+    if (downloaded.contentType) {
+      updateFields.contentType = downloaded.contentType;
+      attachment.contentType = downloaded.contentType;
+    }
+    if (downloaded.filename && (!attachment.filename || attachment.filename === 'attachment')) {
+      updateFields.filename = downloaded.filename;
+      attachment.filename = downloaded.filename;
+    }
+    if (downloaded.content.length && !attachment.sizeBytes) {
+      updateFields.sizeBytes = downloaded.content.length;
+      attachment.sizeBytes = downloaded.content.length;
+    }
+
+    await Attachment.findByIdAndUpdate(attachment._id, updateFields);
+    attachment.content = downloaded.content;
+
+    return downloaded.content;
+  })();
+
+  inFlightAttachmentDownloads.set(attachmentIdStr, downloadPromise);
+
+  try {
+    return await downloadPromise;
+  } finally {
+    inFlightAttachmentDownloads.delete(attachmentIdStr);
+  }
+}
+
+// GET /api/mail-router/attachments/:id — Download / Preview drawing / attachment file
 // Accessible by both Managers and Employees who have been forwarded the email
 router.get('/attachments/:id', requireRoles(), async (req, res) => {
   try {
     const attachment = await getAttachmentById(req.params.id);
     if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
 
-    if (!attachment.content) {
-      return res.status(404).json({ error: 'Attachment binary content is unavailable.' });
+    // Step 1: Check whether the attachment is already cached
+    if (attachment.content && attachment.content.length > 0) {
+      res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.filename)}"`);
+      res.setHeader('Content-Length', attachment.content.length);
+      res.setHeader('X-Attachment-Cache', 'HIT');
+      return res.end(attachment.content);
     }
+
+    // Step 2: Not cached: fetch on demand from provider, save to cache, and serve
+    const content = await fetchAndCacheAttachment(attachment);
 
     res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.filename)}"`);
-    res.setHeader('Content-Length', attachment.content.length);
-    return res.end(attachment.content);
+    res.setHeader('Content-Length', content.length);
+    res.setHeader('X-Attachment-Cache', 'MISS');
+    return res.end(content);
   } catch (err) {
+    console.error(`[mailRouter:attachments] Error serving attachment ${req.params.id}:`, err);
     return res.status(500).json({ error: err.message || 'Failed to download attachment' });
   }
 });
 
+// ── Word .doc to HTML Conversion Endpoint ─────────────────────────
+const WordExtractor = require('word-extractor');
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatDocTextToHtml(extracted) {
+  const bodyText = (extracted && typeof extracted.getBody === 'function') ? (extracted.getBody() || '') : '';
+  const headersText = (extracted && typeof extracted.getHeaders === 'function') ? (extracted.getHeaders() || '') : '';
+  const footersText = (extracted && typeof extracted.getFooters === 'function') ? (extracted.getFooters() || '') : '';
+  const footnotesText = (extracted && typeof extracted.getFootnotes === 'function') ? (extracted.getFootnotes() || '') : '';
+  const endnotesText = (extracted && typeof extracted.getEndnotes === 'function') ? (extracted.getEndnotes() || '') : '';
+  const textboxesText = (extracted && typeof extracted.getTextboxes === 'function') ? (extracted.getTextboxes() || '') : '';
+
+  const htmlParts = [];
+
+  if (headersText.trim()) {
+    htmlParts.push(`<header style="color: #64748b; font-size: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 20px;">${escapeHtml(headersText).replace(/\n/g, '<br/>')}</header>`);
+  }
+
+  const rawParagraphs = bodyText.split(/\r?\n\r?\n/).map(p => p.trim()).filter(Boolean);
+  if (rawParagraphs.length > 0) {
+    for (const p of rawParagraphs) {
+      if (p.length < 90 && p === p.toUpperCase() && p.replace(/[^A-Z]/g, '').length > 3) {
+        htmlParts.push(`<h2>${escapeHtml(p)}</h2>`);
+      } else if (p.length < 65 && !p.endsWith('.') && !p.includes('\n')) {
+        htmlParts.push(`<h3>${escapeHtml(p)}</h3>`);
+      } else {
+        htmlParts.push(`<p>${escapeHtml(p).replace(/\r?\n/g, '<br/>')}</p>`);
+      }
+    }
+  } else {
+    const singleLines = bodyText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (singleLines.length > 0) {
+      for (const line of singleLines) {
+        htmlParts.push(`<p>${escapeHtml(line)}</p>`);
+      }
+    } else {
+      htmlParts.push('<p style="color: #64748b; font-style: italic;">(Empty document)</p>');
+    }
+  }
+
+  if (textboxesText.trim()) {
+    htmlParts.push(`<div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 4px; padding: 12px; margin: 16px 0;"><strong>Text Boxes:</strong><br/>${escapeHtml(textboxesText).replace(/\n/g, '<br/>')}</div>`);
+  }
+
+  if (footnotesText.trim() || endnotesText.trim()) {
+    htmlParts.push(`<footer style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;"><strong>Notes:</strong><br/>${escapeHtml(footnotesText || endnotesText).replace(/\n/g, '<br/>')}</footer>`);
+  }
+
+  if (footersText.trim()) {
+    htmlParts.push(`<footer style="color: #94a3b8; font-size: 11px; text-align: center; margin-top: 30px;">${escapeHtml(footersText).replace(/\n/g, ' ')}</footer>`);
+  }
+
+  return htmlParts.join('\n');
+}
+
+// POST /api/mail-router/convert-doc — Convert legacy .doc / Word documents to HTML
+router.post('/convert-doc', express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
+  try {
+    let buffer = null;
+    let filename = req.query.filename || 'Document.doc';
+
+    const attachmentId = req.query.attachmentId;
+    if (attachmentId) {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required to access attachments.' });
+      }
+      const attachment = await getAttachmentById(attachmentId);
+      if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
+      filename = attachment.filename || filename;
+      buffer = (attachment.content && attachment.content.length > 0)
+        ? attachment.content
+        : await fetchAndCacheAttachment(attachment);
+    } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+      const contentType = (req.headers['content-type'] || '').toLowerCase();
+      if (contentType.includes('application/json')) {
+        try {
+          const parsed = JSON.parse(req.body.toString('utf8'));
+          if (parsed.base64) {
+            buffer = Buffer.from(parsed.base64, 'base64');
+          } else if (parsed.attachmentId) {
+            if (!req.user) {
+              return res.status(401).json({ error: 'Authentication required to access attachments.' });
+            }
+            const attachment = await getAttachmentById(parsed.attachmentId);
+            if (attachment) {
+              filename = attachment.filename || filename;
+              buffer = (attachment.content && attachment.content.length > 0)
+                ? attachment.content
+                : await fetchAndCacheAttachment(attachment);
+            }
+          }
+        } catch {
+          buffer = req.body;
+        }
+      } else {
+        buffer = req.body;
+      }
+    } else if (req.body && typeof req.body === 'object') {
+      if (req.body.base64) {
+        buffer = Buffer.from(req.body.base64, 'base64');
+      } else if (req.body.attachmentId) {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Authentication required to access attachments.' });
+        }
+        const attachment = await getAttachmentById(req.body.attachmentId);
+        if (attachment) {
+          filename = attachment.filename || filename;
+          buffer = (attachment.content && attachment.content.length > 0)
+            ? attachment.content
+            : await fetchAndCacheAttachment(attachment);
+        }
+      }
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'No document content provided.' });
+    }
+
+    // 1. Check if RTF document
+    if (buffer.length >= 5 && buffer.slice(0, 5).toString('ascii').startsWith('{\\rtf')) {
+      const rtfText = buffer.toString('utf8');
+      const cleaned = rtfText
+        .replace(/\\par[d]?\s*/g, '\n\n')
+        .replace(/\\[a-z0-9-]+\s?/gi, '')
+        .replace(/[{}]/g, '')
+        .trim();
+      const paragraphs = cleaned.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+      const html = paragraphs.map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`).join('\n');
+      return res.json({ success: true, html, filename, type: 'rtf' });
+    }
+
+    // 2. Check if HTML document saved as .doc
+    const headStr = buffer.slice(0, 120).toString('utf8').toLowerCase();
+    if (headStr.includes('<html') || headStr.includes('<!doctype') || headStr.includes('<body')) {
+      return res.json({ success: true, html: buffer.toString('utf8'), filename, type: 'html' });
+    }
+
+    // 3. Modern DOCX (ZIP format, starting with PK)
+    const isZip = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B;
+    if (isZip) {
+      try {
+        const mammoth = require('mammoth');
+        const mammothRes = await mammoth.convertToHtml({ buffer });
+        if (mammothRes.value) {
+          return res.json({ success: true, html: mammothRes.value, filename, type: 'docx' });
+        }
+      } catch { /* proceed to extractor */ }
+    }
+
+    // 4. Legacy .doc binary (OLE2 CFBF)
+    const extractor = new WordExtractor();
+    const doc = await extractor.extract(buffer);
+    const html = formatDocTextToHtml(doc);
+
+    return res.json({ success: true, html, filename, type: 'doc' });
+  } catch (err) {
+    console.error('[mailRouter:convert-doc] Error converting doc:', err);
+    return res.status(500).json({ error: err.message || 'Failed to extract .doc content' });
+  }
+});
+
 module.exports = { mailRouter: router };
+

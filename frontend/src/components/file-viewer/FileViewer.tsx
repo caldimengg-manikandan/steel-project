@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type { FileViewerProps, FileType } from './types';
 import { detectFileType, formatBytes, downloadFile, getOfficeBadge } from './utils';
 import './FileViewer.css';
@@ -36,10 +36,12 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
     const [pageInput, setPageInput] = useState<string>('1');
     const [requestedPage, setRequestedPage] = useState<{ page: number; timestamp: number } | null>(null);
     const [isTwoPageView, setIsTwoPageView] = useState(false);
+    const [isPanMode, setIsPanMode] = useState(true);
 
     // Spreadsheet state
     const [sheets, setSheets] = useState<string[]>([]);
     const [activeSheet, setActiveSheet] = useState<string>('');
+    const sheetTabsRef = useRef<HTMLDivElement>(null);
 
     // CSV state
     const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +60,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         setPageInput('1');
         setRequestedPage(null);
         setIsTwoPageView(false);
+        setIsPanMode(true);
         setSheets([]);
         setActiveSheet('');
         setSearchQuery('');
@@ -100,6 +103,24 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
             document.body.style.overflow = '';
         };
     }, [onClose]);
+
+    // Handle H / V hotkeys for PDF tool switching (H: Hand / Pan, V: Cursor / Select)
+    useEffect(() => {
+        if (fileType !== 'pdf') return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+            if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            if (e.key === 'h' || e.key === 'H') {
+                setIsPanMode(true);
+            } else if (e.key === 'v' || e.key === 'V') {
+                setIsPanMode(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [fileType]);
 
     // Commit page input on Enter or blur
     const commitPageInput = () => {
@@ -199,6 +220,51 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         return () => document.removeEventListener('fullscreenchange', onFsChange);
     }, []);
 
+    // Center the chosen sheet in the scrollable sheets tab bar
+    const centerActiveSheetTab = useCallback((sheetName?: string) => {
+        if (!sheetTabsRef.current) return;
+        const container = sheetTabsRef.current;
+        const targetSheet = sheetName || activeSheet;
+        if (!targetSheet) return;
+
+        requestAnimationFrame(() => {
+            if (!container) return;
+            const tabs = Array.from(container.querySelectorAll('.m365-sheet-tab')) as HTMLElement[];
+            const activeTabEl = tabs.find(el => el.getAttribute('data-sheet') === targetSheet)
+                || (container.querySelector('.m365-sheet-tab.active') as HTMLElement | null);
+            if (!activeTabEl) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const tabRect = activeTabEl.getBoundingClientRect();
+            const currentScroll = container.scrollLeft;
+            const offsetFromContainer = tabRect.left - containerRect.left + currentScroll;
+            const targetScrollLeft = offsetFromContainer - (container.clientWidth / 2) + (tabRect.width / 2);
+
+            container.scrollTo({
+                left: Math.max(0, targetScrollLeft),
+                behavior: 'smooth',
+            });
+        });
+    }, [activeSheet]);
+
+    // Automatically center active sheet tab when activeSheet changes or sheets are loaded
+    useEffect(() => {
+        if (fileType === 'xlsx' && activeSheet) {
+            centerActiveSheetTab(activeSheet);
+        }
+    }, [fileType, activeSheet, sheets, centerActiveSheetTab]);
+
+    // Recenter active sheet tab on window resize
+    useEffect(() => {
+        const handleResize = () => {
+            if (fileType === 'xlsx' && activeSheet) {
+                centerActiveSheetTab(activeSheet);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [fileType, activeSheet, centerActiveSheetTab]);
+
     const handleSheetsLoaded = useCallback((loadedSheets: string[], defaultSheet: string) => {
         setSheets(loadedSheets);
         setActiveSheet(defaultSheet);
@@ -288,13 +354,18 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                         {/* Excel Sheet Tabs */}
                         {fileType === 'xlsx' && sheets.length > 0 && (
                             <>
-                                <div className="m365-sheet-tabs">
+                                <div className="m365-sheet-tabs" ref={sheetTabsRef}>
                                     {sheets.map(sheet => (
                                         <button
                                             key={sheet}
                                             type="button"
+                                            data-sheet={sheet}
                                             className={`m365-sheet-tab ${activeSheet === sheet ? 'active' : ''}`}
-                                            onClick={() => setActiveSheet(sheet)}
+                                            onClick={() => {
+                                                setActiveSheet(sheet);
+                                                centerActiveSheetTab(sheet);
+                                            }}
+                                            title={`Switch to ${sheet}`}
                                         >
                                             {sheet}
                                         </button>
@@ -361,8 +432,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                             </>
                         )}
 
-                        {/* Fit Mode Button (PDF, DOCX, Image) */}
-                        {['pdf', 'docx', 'image'].includes(fileType) && (
+                        {/* Fit Mode Button (PDF, DOC, DOCX, Image) */}
+                        {['pdf', 'doc', 'docx', 'image'].includes(fileType) && (
                             <button
                                 type="button"
                                 className={`m365-btn ${fitMode !== 'custom' ? 'active' : ''}`}
@@ -385,9 +456,76 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                                 title={isTwoPageView ? 'Switch to Single-Page View' : 'Switch to Two-Page Spread View'}
                                 style={{ gap: 6 }}
                             >
-                                <span style={{ fontSize: 13 }}>{isTwoPageView ? '📖' : '📄'}</span>
                                 <span className="m365-btn-label">{isTwoPageView ? 'Two Pages' : 'Single Page'}</span>
                             </button>
+                        )}
+
+                        {/* PDF Cursor vs Pan Mode Toggle */}
+                        {fileType === 'pdf' && (
+                            <div
+                                className="m365-mode-toggle"
+                                role="group"
+                                aria-label="Cursor or Pan mode"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    background: '#f3f2f1',
+                                    borderRadius: 4,
+                                    padding: 2,
+                                    border: '1px solid #e1dfdd',
+                                    gap: 2,
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    className={`m365-btn ${!isPanMode ? 'active' : ''}`}
+                                    onClick={() => setIsPanMode(false)}
+                                    title="Cursor / Selection Tool: Select text and click normally (Shortcut: V)"
+                                    style={{
+                                        height: 26,
+                                        padding: '0 8px',
+                                        fontSize: 12,
+                                        borderRadius: 3,
+                                        border: 'none',
+                                        gap: 5,
+                                        background: !isPanMode ? '#ffffff' : 'transparent',
+                                        color: !isPanMode ? '#0078d4' : '#605e5c',
+                                        fontWeight: !isPanMode ? 600 : 500,
+                                        boxShadow: !isPanMode ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.12s ease',
+                                    }}
+                                >
+                                    <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12">
+                                        <path d="M14.082 2.182a.5.5 0 0 0-.7-.7L1.87 8.358a.5.5 0 0 0 .11.87l4.316 1.726 1.726 4.317a.5.5 0 0 0 .87.11l6.876-11.513a.5.5 0 0 0-.686-.686zM6.924 10.37L3.488 8.995 12.56 3.652 7.218 12.724 5.842 9.288l1.082-1.082z" />
+                                    </svg>
+                                    <span className="m365-btn-label">Cursor</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`m365-btn ${isPanMode ? 'active' : ''}`}
+                                    onClick={() => setIsPanMode(true)}
+                                    title="Hand Pan Tool: Click and drag anywhere with the mouse to pan across the PDF (Shortcut: H)"
+                                    style={{
+                                        height: 26,
+                                        padding: '0 8px',
+                                        fontSize: 12,
+                                        borderRadius: 3,
+                                        border: 'none',
+                                        gap: 5,
+                                        background: isPanMode ? '#ffffff' : 'transparent',
+                                        color: isPanMode ? '#0078d4' : '#605e5c',
+                                        fontWeight: isPanMode ? 600 : 500,
+                                        boxShadow: isPanMode ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.12s ease',
+                                    }}
+                                >
+                                    <span style={{ fontSize: 12 }}>✋</span>
+                                    <span className="m365-btn-label">Pan</span>
+                                </button>
+                            </div>
                         )}
 
                         {/* Image Rotate Button */}
@@ -482,6 +620,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                                 requestedPage={requestedPage}
                                 isTwoPageView={isTwoPageView}
                                 onToggleTwoPageView={() => setIsTwoPageView(p => !p)}
+                                isPanMode={isPanMode}
+                                onTogglePanMode={() => setIsPanMode(p => !p)}
                             />
                         )}
 

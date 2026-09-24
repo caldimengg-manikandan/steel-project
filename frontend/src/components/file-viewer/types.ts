@@ -41,6 +41,8 @@ export interface SubViewerProps {
     requestedPage?: { page: number; timestamp: number } | null;
     isTwoPageView?: boolean;
     onToggleTwoPageView?: () => void;
+    isPanMode?: boolean;
+    onTogglePanMode?: () => void;
     // Spreadsheet specifics
     sheets?: string[];
     activeSheet?: string;
