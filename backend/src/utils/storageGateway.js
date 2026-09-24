@@ -281,7 +281,7 @@ async function uploadFile(targetDir, filename, buffer) {
     const response = await agentFetch('/upload', {
         method: 'POST',
         body: formData,
-        signal: AbortSignal.timeout(300000), // 5 min for large uploads
+        signal: AbortSignal.timeout(15000), // 15s timeout to fail fast if agent is down
     });
 
     if (!response.ok) {
