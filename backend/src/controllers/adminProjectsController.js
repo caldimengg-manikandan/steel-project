@@ -720,7 +720,7 @@ async function uploadFolder(req, res) {
 
         if (storageGateway.isEnabled()) {
             let lastError = null;
-            const maxRetries = 5;
+            const maxRetries = 1; // Changed to 1: Do not retry if the Storage Agent is offline. Fail fast to GridFS.
             const baseDelay = 1000; // 1 second base delay
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
