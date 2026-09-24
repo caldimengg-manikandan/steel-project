@@ -238,19 +238,22 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             const rev = fields.revision;
             const date = fields.date;
             
-            if (dwgNum && rev && date) {
-                const existingDuplicate = await DrawingExtraction.findOne({
+            if (dwgNum && rev) {
+                const query = {
                     projectId,
                     _id: { $ne: extractionId },
                     'extractedFields.drawingNumber': dwgNum,
                     'extractedFields.revision': rev,
-                    'extractedFields.date': date,
                     status: { $in: ['completed', 'duplicate_pending'] }
-                });
+                };
+                if (date) {
+                    query['extractedFields.date'] = date;
+                }
+                const existingDuplicate = await DrawingExtraction.findOne(query);
 
                 if (existingDuplicate) {
                     newStatus = 'duplicate_pending';
-                    console.log(`[Extraction] Duplicate detected for ${dwgNum} (Rev ${rev}, Date ${date}). Marking as duplicate_pending.`);
+                    console.log(`[Extraction] Duplicate detected for ${dwgNum} (Rev ${rev}). Marking as duplicate_pending.`);
                 }
             }
         } catch (err) {
@@ -279,7 +282,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             const pId = new mongoose.Types.ObjectId(projectId);
             const eId = new mongoose.Types.ObjectId(extractionId);
 
-            if (targetFileName) {
+            if (targetFileName && newStatus === 'completed') {
                 const fileDel = await DrawingExtraction.deleteMany({
                     projectId: pId,
                     originalFileName: new RegExp(`^${targetFileName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i'),

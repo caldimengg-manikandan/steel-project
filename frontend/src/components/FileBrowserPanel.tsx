@@ -707,10 +707,10 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                             gap: 12,
                         }}>
                             <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)', paddingBottom: 8 }}>
-                                🤖 AI Extractions ({sessionFiles.filter(f => f.status === 'extracting' || f.status === 'completed').length})
+                                🤖 AI Extractions ({sessionFiles.filter(f => ['extracting', 'completed', 'duplicate_pending', 'skipped'].includes(f.status)).length})
                             </h5>
                             <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
-                                {sessionFiles.filter(f => f.status === 'extracting' || f.status === 'completed').length === 0 ? (
+                                {sessionFiles.filter(f => ['extracting', 'completed', 'duplicate_pending', 'skipped'].includes(f.status)).length === 0 ? (
                                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>No drawings detected.</span>
                                 ) : (
                                     sessionFiles.map((f, i) => {
@@ -722,27 +722,31 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                                         {f.status === 'extracting' ? (
                                                             <span style={{
-                                                                fontSize: 9,
-                                                                fontWeight: 700,
-                                                                color: 'var(--color-primary)',
-                                                                background: 'rgba(37,99,235,0.08)',
-                                                                padding: '2px 6px',
-                                                                borderRadius: 4,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: 4
+                                                                fontSize: 9, fontWeight: 700, color: 'var(--color-primary)',
+                                                                background: 'rgba(37,99,235,0.08)', padding: '2px 6px',
+                                                                borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4
                                                             }}>
                                                                 <svg className="animate-spin" style={{ animation: 'spin 1s linear infinite', width: 8, height: 8 }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} /><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4" style={{ opacity: 0.75 }} /></svg>
                                                                 AI RUNNING
                                                             </span>
+                                                        ) : f.status === 'duplicate_pending' ? (
+                                                            <span style={{
+                                                                fontSize: 9, fontWeight: 700, color: '#d97706',
+                                                                background: '#fef3c7', padding: '2px 6px', borderRadius: 4
+                                                            }}>
+                                                                ⚠️ DUPLICATE
+                                                            </span>
+                                                        ) : f.status === 'skipped' ? (
+                                                            <span style={{
+                                                                fontSize: 9, fontWeight: 700, color: '#94a3b8',
+                                                                background: '#f8fafc', padding: '2px 6px', borderRadius: 4
+                                                            }}>
+                                                                SKIPPED
+                                                            </span>
                                                         ) : (
                                                             <span style={{
-                                                                fontSize: 9,
-                                                                fontWeight: 700,
-                                                                color: 'var(--color-success-mid)',
-                                                                background: 'rgba(22,163,74,0.08)',
-                                                                padding: '2px 6px',
-                                                                borderRadius: 4
+                                                                fontSize: 9, fontWeight: 700, color: 'var(--color-success-mid)',
+                                                                background: 'rgba(22,163,74,0.08)', padding: '2px 6px', borderRadius: 4
                                                             }}>
                                                                 ✅ COMPLETE
                                                             </span>
@@ -1464,6 +1468,84 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                             >
                                 Start Upload
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Post-Extraction Duplicate Modal ── */}
+            {sessionFiles.filter(f => f.status === 'duplicate_pending').length > 0 && (
+                <div className="modal-overlay">
+                    <div className="modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header" style={{
+                            background: 'linear-gradient(135deg, #d97706, #b45309)',
+                            borderRadius: '8px 8px 0 0',
+                        }}>
+                            <span className="modal-title" style={{ color: 'white' }}>⚠️ Duplicate Extracted Data</span>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: 12, color: 'var(--color-text-secondary)', fontSize: 13 }}>
+                                The AI extraction found that <strong>{sessionFiles.filter(f => f.status === 'duplicate_pending').length}</strong> drawing(s) have the exact same drawing number and revision as existing drawings in this project.
+                            </p>
+                            <div className="table-wrapper" style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 16 }}>
+                                <table style={{ fontSize: 12, width: '100%', textAlign: 'left' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Filename</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sessionFiles.map((d, index) => {
+                                            if (d.status !== 'duplicate_pending') return null;
+                                            return (
+                                                <tr key={index}>
+                                                    <td className="text-muted font-mono" style={{ fontSize: 11 }}>{d.name}</td>
+                                                    <td>
+                                                        <button 
+                                                            style={{ padding: '4px 8px', fontSize: 11, background: '#cbd5e1', border: 'none', borderRadius: 4, cursor: 'pointer', marginRight: 4 }}
+                                                            onClick={() => uploadSessionStore.resolveDuplicate(index, 'skip')}
+                                                        >Skip</button>
+                                                        <button 
+                                                            style={{ padding: '4px 8px', fontSize: 11, background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                                                            onClick={() => uploadSessionStore.resolveDuplicate(index, 'proceed')}
+                                                        >Proceed</button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                                How would you like to handle these? <strong>Proceed</strong> will finalize the upload and include them. <strong>Skip</strong> will discard them from transmittals and logs.
+                            </p>
+                            <div className="form-actions">
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        sessionFiles.forEach((d, index) => {
+                                            if (d.status === 'duplicate_pending') {
+                                                uploadSessionStore.resolveDuplicate(index, 'skip');
+                                            }
+                                        });
+                                    }}
+                                >
+                                    Skip All
+                                </button>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => {
+                                        sessionFiles.forEach((d, index) => {
+                                            if (d.status === 'duplicate_pending') {
+                                                uploadSessionStore.resolveDuplicate(index, 'proceed');
+                                            }
+                                        });
+                                    }}
+                                >
+                                    Proceed All
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

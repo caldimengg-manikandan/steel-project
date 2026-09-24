@@ -833,12 +833,8 @@ async function uploadFolder(req, res) {
 
     let savedDocs = [];
     if (extractionDocs.length > 0) {
-        // Pre-cleanup: remove any existing extractions with the same filename in this project
-        const fileNames = extractionDocs.map(e => e.originalFileName);
-        await DrawingExtraction.deleteMany({
-            projectId: new mongoose.Types.ObjectId(projectId),
-            originalFileName: { $in: fileNames.map(f => new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) },
-        });
+        // Removed pre-cleanup (deleteMany) so that extractionService.js can properly
+        // detect duplicates by comparing against existing completed extractions.
 
         savedDocs = await DrawingExtraction.insertMany(extractionDocs);
 

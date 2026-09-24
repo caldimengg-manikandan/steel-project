@@ -1,10 +1,10 @@
-import { listExtractions, deleteExtraction } from './extractionApi';
+import { listExtractions, deleteExtraction, resolveDuplicateExtraction } from './extractionApi';
 
 export interface SessionFile {
     name: string;
     path: string;
     size: number;
-    status: 'uploading' | 'stored' | 'extracting' | 'completed' | 'failed';
+    status: 'uploading' | 'stored' | 'extracting' | 'completed' | 'failed' | 'duplicate_pending';
     error?: string;
     folder?: string;
     extractionId?: string;
@@ -272,6 +272,9 @@ export const uploadSessionStore = {
                         if (matched.status === 'completed') {
                             changes = true;
                             return { ...sf, status: 'completed' };
+                        } else if (matched.status === 'duplicate_pending') {
+                            changes = true;
+                            return { ...sf, status: 'duplicate_pending' };
                         } else if (matched.status === 'failed') {
                             changes = true;
                             return { ...sf, status: 'failed', error: matched.errorMessage || 'AI extraction failed' };
@@ -313,5 +316,27 @@ export const uploadSessionStore = {
         return () => {
             listeners = listeners.filter(l => l !== listener);
         };
+    },
+
+    async resolveDuplicate(index: number, action: 'proceed' | 'skip') {
+        if (!currentSession) return;
+        const file = currentSession.files[index];
+        if (!file || !file.extractionId) return;
+
+        try {
+            const result = await resolveDuplicateExtraction(currentSession.projectId, file.extractionId, action);
+            currentSession.files[index] = {
+                ...file,
+                status: result.status as 'completed' | 'skipped'
+            };
+            notify();
+            // Check if any others are still extracting
+            const stillExtracting = currentSession.files.some(f => f.status === 'extracting');
+            if (!stillExtracting) {
+                this.clearPolling();
+            }
+        } catch (err: any) {
+            console.error(`[UploadSessionStore] Failed to resolve duplicate for ${file.name}:`, err.message);
+        }
     }
 };

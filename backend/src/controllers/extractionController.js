@@ -601,3 +601,51 @@ exports.deleteExtraction = async (req, res) => {
 
     res.json({ message: 'Extraction deleted.' });
 };
+
+// ── Resolve Duplicate Extraction ──────────────────────────
+exports.resolveDuplicate = async (req, res) => {
+    const { projectId, id } = req.params;
+    const { action } = req.body; // 'proceed' or 'skip'
+    
+    // We import the model directly if not available in scope
+    const mongoose = require('mongoose');
+    const DrawingExtraction = mongoose.model('DrawingExtraction');
+
+    const doc = await DrawingExtraction.findOne({
+        _id: id,
+        projectId
+    });
+
+    if (!doc) {
+        return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    if (doc.status !== 'duplicate_pending') {
+        return res.status(400).json({ error: 'Extraction is not pending duplicate resolution.' });
+    }
+
+    if (action === 'proceed') {
+        // Find existing record and delete it, then mark this as completed
+        const query = {
+            projectId,
+            _id: { $ne: doc._id },
+            'extractedFields.drawingNumber': doc.extractedFields.drawingNumber,
+            'extractedFields.revision': doc.extractedFields.revision,
+            status: { $in: ['completed', 'duplicate_pending'] }
+        };
+        const existing = await DrawingExtraction.findOne(query);
+        if (existing) {
+            await DrawingExtraction.deleteOne({ _id: existing._id });
+        }
+        
+        doc.status = 'completed';
+        await doc.save();
+        return res.json({ message: 'Duplicate resolved: Proceeded.', status: 'completed' });
+    } else if (action === 'skip') {
+        doc.status = 'skipped';
+        await doc.save();
+        return res.json({ message: 'Duplicate resolved: Skipped.', status: 'skipped' });
+    } else {
+        return res.status(400).json({ error: 'Invalid action. Must be proceed or skip.' });
+    }
+};
