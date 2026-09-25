@@ -259,7 +259,7 @@ function sanitizeUploadTargetDir(targetDir, filename) {
     if (!targetDir) return targetDir;
     const cleanDir = targetDir.replace(/\\/g, '/');
     const isLogsDir = /\/Logs($|\/)/i.test(cleanDir) || /^Logs($|\/)/i.test(cleanDir);
-    
+
     if (isLogsDir && !isLogFile(filename)) {
         let redirected = cleanDir
             .replace(/\/Logs($|\/)/gi, '/')

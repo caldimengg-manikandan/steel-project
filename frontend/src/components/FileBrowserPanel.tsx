@@ -714,7 +714,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>No drawings detected.</span>
                                 ) : (
                                     sessionFiles.map((f, i) => {
-                                        if (f.status !== 'extracting' && f.status !== 'completed') return null;
+                                        if (!['extracting', 'completed', 'duplicate_pending', 'skipped'].includes(f.status)) return null;
                                         return (
                                             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, background: 'var(--color-bg-card)', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-light)' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

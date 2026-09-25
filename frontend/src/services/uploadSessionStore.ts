@@ -339,4 +339,5 @@ export const uploadSessionStore = {
             console.error(`[UploadSessionStore] Failed to resolve duplicate for ${file.name}:`, err.message);
         }
     }
+
 };

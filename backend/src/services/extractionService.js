@@ -235,25 +235,62 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         let newStatus = 'completed';
         try {
             const dwgNum = fields.drawingNumber;
-            const rev = fields.revision;
-            const date = fields.date;
+            const rev = (fields.revision || '').trim();
+            const date = (fields.date || '').trim();
+            const title = (fields.drawingTitle || '').trim();
             
-            if (dwgNum && rev) {
-                const query = {
+            if (dwgNum) {
+                const candidates = await DrawingExtraction.find({
                     projectId,
                     _id: { $ne: extractionId },
                     'extractedFields.drawingNumber': dwgNum,
-                    'extractedFields.revision': rev,
                     status: { $in: ['completed', 'duplicate_pending'] }
-                };
-                if (date) {
-                    query['extractedFields.date'] = date;
-                }
-                const existingDuplicate = await DrawingExtraction.findOne(query);
+                }).lean();
 
-                if (existingDuplicate) {
-                    newStatus = 'duplicate_pending';
-                    console.log(`[Extraction] Duplicate detected for ${dwgNum} (Rev ${rev}). Marking as duplicate_pending.`);
+                for (const candidate of candidates) {
+                    const cFields = candidate.extractedFields || {};
+                    const cRev = (cFields.revision || '').trim();
+                    const cDate = (cFields.date || '').trim();
+                    
+                    // Normalize undefined/null/empty/0 revisions to a standard empty state
+                    const revMatch = (rev === cRev) || 
+                                     ((rev === '' || rev === '0') && (cRev === '' || cRev === '0'));
+                                     
+                    // Helper to normalize and compare dates
+                    const parseDate = (d) => {
+                        if (!d || !d.trim()) return '';
+                        const parsed = new Date(d);
+                        return isNaN(parsed.getTime()) ? d.replace(/[\s\W_]+/g, '').toLowerCase() : parsed.getTime();
+                    };
+                    const dateMatch = parseDate(date) === parseDate(cDate);
+                    
+                    // Compare revision history (lengths and marks), ignoring completely empty rows
+                    const filterHist = (h) => (h || []).filter(r => (r.mark || '').trim() || (r.date || '').trim());
+                    const hist = filterHist(fields.revisionHistory);
+                    const cHist = filterHist(cFields.revisionHistory);
+                    
+                    let histMatch = true;
+                    if (hist.length !== cHist.length) {
+                        histMatch = false;
+                    } else {
+                        for (let i = 0; i < hist.length; i++) {
+                            const m1 = (hist[i].mark || '').trim().replace(/[\s\W_]+/g, '').toLowerCase();
+                            const m2 = (cHist[i].mark || '').trim().replace(/[\s\W_]+/g, '').toLowerCase();
+                            const d1 = parseDate((hist[i].date || '').trim());
+                            const d2 = parseDate((cHist[i].date || '').trim());
+                            
+                            if (m1 !== m2 || d1 !== d2) {
+                                histMatch = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (revMatch && dateMatch && histMatch) {
+                        newStatus = 'duplicate_pending';
+                        console.log(`[Extraction] Duplicate detected for ${dwgNum} (Rev ${rev}, Date ${date}). Marking as duplicate_pending.`);
+                        break;
+                    }
                 }
             }
         } catch (err) {
@@ -276,25 +313,6 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             { new: true }
         );
 
-        // ── Step 5a.2: Overwrite logic (Delete previous records with the EXACT same filename) ──
-        try {
-            const targetFileName = originalFileName;
-            const pId = new mongoose.Types.ObjectId(projectId);
-            const eId = new mongoose.Types.ObjectId(extractionId);
-
-            if (targetFileName && newStatus === 'completed') {
-                const fileDel = await DrawingExtraction.deleteMany({
-                    projectId: pId,
-                    originalFileName: new RegExp(`^${targetFileName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i'),
-                    _id: { $ne: eId }
-                });
-                if (fileDel.deletedCount > 0) {
-                    console.log(`[Extraction] Filename Overwrite: Deleted ${fileDel.deletedCount} items for File: ${targetFileName}`);
-                }
-            }
-        } catch (delErr) {
-            console.error('[Extraction] Overwrite delete failed:', delErr.message);
-        }
 
         // ── Step 5b: Dynamic "Total Expected Drawings" Increment ──────
         // Logic: if a sheet only has numeric revisions (0, 1, 2...) it's for fabrication.
@@ -443,7 +461,8 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
                     body: formData,
                     headers: {
                         'X-Internal-Api-Key': process.env.AI_SERVICE_INTERNAL_KEY || 'default_dev_key'
-                    }
+                    },
+                    signal: AbortSignal.timeout(120000) // 2-minute timeout
                 });
                 
                 if (response.ok) {

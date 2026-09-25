@@ -29,12 +29,12 @@ function resolveSowKey(fullPath, validSowNames, sowPrefixes) {
     const parts = fullPath.replace(/\\/g, '/').split('/');
     let detectedSow = null;
     let sowKey = '';
-    
+
     const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
 
     for (let i = parts.length - 2; i >= 0; i--) {
         const upperPart = parts[i].trim().toUpperCase();
-        
+
         if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(upperPart)) {
             continue;
         }
@@ -48,7 +48,7 @@ function resolveSowKey(fullPath, validSowNames, sowPrefixes) {
                 break;
             }
         }
-        
+
         if (!detectedSow && validSowNames.length > 0) {
             if (validSowNames.some(sow => upperPart.includes(sow))) {
                 detectedSow = validSowNames.find(sow => upperPart.includes(sow));
@@ -61,12 +61,7 @@ function resolveSowKey(fullPath, validSowNames, sowPrefixes) {
         }
     }
 
-    if (!sowKey && parts.length > 2) {
-        const immediateParent = parts[parts.length - 2].trim().toUpperCase();
-        if (!/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(immediateParent)) {
-            sowKey = immediateParent;
-        }
-    }
+
     return sowKey || '';
 }
 const commonBorderStyle = {
@@ -221,12 +216,12 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
         if (fullPath) {
             const parts = fullPath.replace(/\\/g, '/').split('/');
             let detectedSow = null;
-            
+
             const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
 
             for (let i = parts.length - 2; i >= 0; i--) {
                 const upperPart = parts[i].trim().toUpperCase();
-                
+
                 // Skip the main folder names so we don't accidentally match them as SOWs
                 if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(upperPart)) {
                     continue;
@@ -242,7 +237,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                         break;
                     }
                 }
-                
+
                 if (!detectedSow && validSowNames.length > 0) {
                     if (validSowNames.some(sow => upperPart.includes(sow))) {
                         detectedSow = validSowNames.find(sow => upperPart.includes(sow));
@@ -255,13 +250,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
                 }
             }
 
-            if (!sowKey && parts.length > 2) {
-                // Fallback
-                const immediateParent = parts[parts.length - 2].trim().toUpperCase();
-                if (!/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(immediateParent)) {
-                    sowKey = immediateParent;
-                }
-            }
+
         }
 
         const mainFolder = normalizeFolderHeader(d.folderName);
@@ -269,7 +258,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
 
         if (!groupedByMain[mainFolder]) groupedByMain[mainFolder] = {};
         if (!groupedByMain[mainFolder][sowKey]) groupedByMain[mainFolder][sowKey] = [];
-        
+
         groupedByMain[mainFolder][sowKey].push(d);
     });
 
@@ -371,7 +360,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     const { projectName = 'Project', clientName = 'CLIENT' } = projectDetails;
     const drawings = drawingLog.drawings || [];
-    
+
     const projectId = drawingLog.projectId;
     let transmittalDates = {};
     let validSowNames = [];
@@ -384,7 +373,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
             const Transmittal = mongoose.models.Transmittal || require('../models/Transmittal');
             const Project = mongoose.models.Project || require('../models/Project');
             const DrawingExtraction = mongoose.models.DrawingExtraction || require('../models/DrawingExtraction');
-            
+
             // Fetch transmittals
             const transmittals = await Transmittal.find({ projectId }, 'transmittalNumber createdAt').lean();
             const formatDt = (d) => {
@@ -396,7 +385,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                     transmittalDates[t.transmittalNumber] = formatDt(t.createdAt);
                 }
             });
-            
+
             // Fetch SOW names
             const project = await Project.findById(projectId).lean();
             if (project) {
@@ -408,7 +397,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                 (project.scopeOfWork || []).forEach(sow => extractPrefix(sow.name));
                 (project.additionalScopeOfWork || []).forEach(sow => extractPrefix(sow.name));
             }
-            
+
             // Fetch extractions
             const drawingNumbers = drawings.map(d => d.drawingNumber).filter(Boolean);
             const extractions = await DrawingExtraction.find({ projectId, 'extractedFields.drawingNumber': { $in: drawingNumbers } }).select('extractedFields.drawingNumber fileUrl storageGatewayPath createdAt').lean();
@@ -419,7 +408,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                     extMap[dwgNum] = e;
                 }
             });
-            
+
         } catch (e) {
             console.error('[generateDrawingLogExcel] Failed to fetch context data:', e);
         }
@@ -431,7 +420,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
         const ext = extMap[d.drawingNumber];
         const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
         let sowKey = resolveSowKey(fullPath, validSowNames, sowPrefixes) || 'General';
-        
+
         if (!groupedBySow[sowKey]) groupedBySow[sowKey] = [];
         groupedBySow[sowKey].push(d);
     });
@@ -441,7 +430,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     for (const sow of sortedSows) {
         const sowDrawings = groupedBySow[sow];
-        
+
         // Ensure valid sheet name
         let safeSheetName = sow.replace(/[\*?:\/\[\]]/g, '_').substring(0, 31);
         const logSheet = workbook.addWorksheet(safeSheetName);
@@ -630,7 +619,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
             const rowData = [logSlNo++, d.drawingNumber, d.drawingTitle];
             alphaRevs.forEach(r => rowData.push(revMap[r] || ''));
             numRevs.forEach(r => rowData.push(revMap[r] || ''));
-            rowData.push(combinedRemarks); 
+            rowData.push(combinedRemarks);
 
             const rDataL = logSheet.addRow(rowData);
             rDataL.height = 22;
@@ -650,7 +639,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
                 };
 
                 const isAlphaCol = colNum >= alphaStart && colNum <= alphaEnd;
-                const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } }; 
+                const greyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECECEC' } };
 
                 if (isAlphaCol && isSkippedApproval) {
                     cell.fill = greyFill;

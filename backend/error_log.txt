@@ -232,3 +232,841 @@
     at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
     at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
     at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:10.516Z: MongoServerError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at Connection.sendCommand (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\cmap\connection.js:306:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Connection.command (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\cmap\connection.js:334:26)
+    at async Server.command (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\sdam\server.js:194:29)
+    at async tryOperation (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\operations\execute_operation.js:213:32)
+    at async executeOperation (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async Collection.findOneAndUpdate (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:544:16)
+    at async model.Query._findOneAndUpdate (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongoose\lib\query.js:3536:13)
+    at async model.Query.exec (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongoose\lib\query.js:4627:63)
+    at async reserveTransmittalNumber (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:629:21)
+2026-09-24T09:16:10.819Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:10.986Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.140Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.290Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.456Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.590Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.744Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:11.891Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:12.501Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:12.641Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:12.812Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:12.947Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:13.390Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:13.536Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:13.896Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.048Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.203Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.353Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.484Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.632Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.787Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:14.928Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:15.314Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:15.450Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:16.210Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:16.401Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:16.625Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:16.811Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:16.959Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:17.262Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:17.427Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:17.576Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:17.944Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:18.380Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:18.547Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:18.934Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:19.087Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:19.457Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:20.420Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:20.601Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:20.750Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:20.907Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:21.085Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:21.581Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:21.770Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:21.950Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:22.117Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:22.279Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:22.428Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:22.568Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:16:22.703Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:08.014Z: MongoServerError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at Connection.sendCommand (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\cmap\connection.js:306:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Connection.command (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\cmap\connection.js:334:26)
+    at async Server.command (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\sdam\server.js:194:29)
+    at async tryOperation (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\operations\execute_operation.js:213:32)
+    at async executeOperation (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async Collection.findOneAndUpdate (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:544:16)
+    at async model.Query._findOneAndUpdate (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongoose\lib\query.js:3536:13)
+    at async model.Query.exec (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongoose\lib\query.js:4627:63)
+    at async reserveTransmittalNumber (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:629:21)
+2026-09-24T09:20:08.340Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:08.495Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:08.671Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:08.850Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:08.992Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:09.153Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:09.300Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:09.656Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:09.812Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:09.967Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:10.111Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:10.299Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.075Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.233Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.410Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.609Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.771Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:11.942Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:12.331Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:12.770Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:12.928Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:13.074Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:13.221Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:13.355Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:13.898Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:14.102Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:14.551Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:15.227Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:15.397Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:15.642Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:15.807Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:15.942Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:16.103Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:16.263Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:16.416Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:16.803Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:16.973Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:17.126Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:18.094Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:18.409Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:18.631Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:18.868Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:19.076Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:19.291Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:19.529Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:19.706Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:19.906Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:20.095Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:20.249Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:20.876Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-09-24T09:20:21.032Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)

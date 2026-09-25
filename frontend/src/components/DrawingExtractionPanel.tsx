@@ -567,7 +567,6 @@ export default function DrawingExtractionPanel({
     const processingCount = extractions.filter(
         (e) => e.status === 'queued' || e.status === 'processing'
     ).length;
-    const pendingDuplicates = extractions.filter((e) => e.status === 'duplicate_pending');
 
     return (
         <div>
@@ -703,66 +702,6 @@ export default function DrawingExtractionPanel({
                                     onClick={() => processUploads(pendingFiles)}
                                 >
                                     {uploading ? 'Uploading...' : 'Continue'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Post-Extraction Duplicate Modal ── */}
-            {pendingDuplicates.length > 0 && canUpload && (
-                <div className="modal-overlay">
-                    <div className="modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header" style={{
-                            background: 'linear-gradient(135deg, #d97706, #b45309)',
-                            borderRadius: '8px 8px 0 0',
-                        }}>
-                            <span className="modal-title" style={{ color: 'white' }}>⚠️ Duplicate Extracted Data</span>
-                        </div>
-                        <div className="modal-body">
-                            <p style={{ marginBottom: 12, color: 'var(--color-text-secondary)', fontSize: 13 }}>
-                                The AI extraction found that <strong>{pendingDuplicates.length}</strong> drawing{pendingDuplicates.length !== 1 ? 's' : ''} have the exact same drawing number, revision, and date as existing drawings in this project.
-                            </p>
-                            <div className="table-wrapper" style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 16 }}>
-                                <table style={{ fontSize: 12 }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Filename</th>
-                                            <th>Drawing No.</th>
-                                            <th>Revision</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingDuplicates.map((d) => (
-                                            <tr key={d._id}>
-                                                <td className="text-muted font-mono" style={{ fontSize: 11 }}>{d.originalFileName}</td>
-                                                <td>{d.extractedFields?.drawingNumber || '—'}</td>
-                                                <td>{d.extractedFields?.revision || '—'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 16 }}>
-                                How would you like to handle these? <strong>Proceed</strong> will finalize the upload and include them. <strong>Skip</strong> will discard them from transmittals and logs.
-                            </p>
-                            <div className="form-actions">
-                                <button
-                                    className="btn btn-secondary"
-                                    onClick={() => {
-                                        pendingDuplicates.forEach(d => handleResolveDuplicate(d, 'skip'));
-                                    }}
-                                >
-                                    Skip All
-                                </button>
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={() => {
-                                        pendingDuplicates.forEach(d => handleResolveDuplicate(d, 'proceed'));
-                                    }}
-                                >
-                                    Proceed All
                                 </button>
                             </div>
                         </div>
