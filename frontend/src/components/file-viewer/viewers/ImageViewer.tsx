@@ -3,6 +3,7 @@ import type { SubViewerProps } from '../types';
 
 export default function ImageViewer({
     file,
+    fileBlobUrl,
     zoom,
     fitMode,
     rotation = 0,
@@ -64,14 +65,13 @@ export default function ImageViewer({
         <div className="m365-media-canvas">
             {loading && !error && (
                 <div className="m365-loading-state" style={{ position: 'absolute' }}>
-                    <div style={{ fontSize: 28 }}>🖼️</div>
-                    <div>Loading image...</div>
+                    <div className="m365-loading-spinner" />
+                    <div style={{ color: '#000000', fontWeight: 600 }}>Loading image...</div>
                 </div>
             )}
 
             {error ? (
                 <div className="m365-error-state">
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to load image</div>
                     <div style={{ fontSize: 13, color: '#6b7280' }}>
                         The image file could not be displayed or is corrupted.
@@ -80,7 +80,7 @@ export default function ImageViewer({
             ) : (
                 <img
                     ref={imgRef}
-                    src={file.url}
+                    src={fileBlobUrl || file.url}
                     alt={file.filename}
                     className="m365-image-preview"
                     style={customStyle}

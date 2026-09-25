@@ -2,7 +2,7 @@
 const MailAccount = require('../models/MailAccount');
 
 async function listMailAccountsByUser(userId) {
-  return MailAccount.find({ userId, isActive: true }).lean();
+  return MailAccount.find({ userId }).lean();
 }
 
 async function getMailAccountById(id) {
@@ -10,10 +10,36 @@ async function getMailAccountById(id) {
 }
 
 async function getMailAccountForUserAndProvider(userId, provider) {
-  return MailAccount.findOne({ userId, provider, isActive: true }).lean();
+  return MailAccount.findOne({ userId, provider }).lean();
+}
+
+async function setActiveMailAccountForUser(userId, accountIdOrProvider) {
+  // 1. Mark all mail accounts for this user as inactive for autosync
+  await MailAccount.updateMany({ userId }, { $set: { isActive: false } });
+
+  // 2. Activate only the specified mailbox
+  const filter = { userId };
+  if (
+    typeof accountIdOrProvider === 'string' &&
+    accountIdOrProvider.length === 24 &&
+    /^[0-9a-fA-F]{24}$/.test(accountIdOrProvider)
+  ) {
+    filter._id = accountIdOrProvider;
+  } else {
+    filter.provider = accountIdOrProvider;
+  }
+
+  const updated = await MailAccount.findOneAndUpdate(filter, { $set: { isActive: true } }, { new: true });
+  return updated;
 }
 
 async function upsertMailAccount(accountData) {
+  // Make previously connected accounts inactive so the newly connected one is the single active mailbox
+  await MailAccount.updateMany(
+    { userId: accountData.userId, provider: { $ne: accountData.provider } },
+    { $set: { isActive: false } }
+  );
+
   const filter = {
     userId: accountData.userId,
     provider: accountData.provider,
@@ -64,6 +90,7 @@ module.exports = {
   listMailAccountsByUser,
   getMailAccountById,
   getMailAccountForUserAndProvider,
+  setActiveMailAccountForUser,
   upsertMailAccount,
   deleteMailAccount,
   updateAccountSyncStatus,

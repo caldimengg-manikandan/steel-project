@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { SubViewerProps } from '../types';
 
-export default function VideoViewer({ file }: SubViewerProps) {
+export default function VideoViewer({ file, fileBlobUrl }: SubViewerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [speed, setSpeed] = useState<number>(1);
     const [error, setError] = useState(false);
@@ -16,7 +16,6 @@ export default function VideoViewer({ file }: SubViewerProps) {
     if (error) {
         return (
             <div className="m365-error-state">
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to play video</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>
                     The video format might not be supported by your browser or the file is corrupted.
@@ -29,7 +28,7 @@ export default function VideoViewer({ file }: SubViewerProps) {
         <div className="m365-media-canvas" style={{ gap: 14 }}>
             <video
                 ref={videoRef}
-                src={file.url}
+                src={fileBlobUrl || file.url}
                 controls
                 autoPlay={false}
                 className="m365-video-player"

@@ -33,13 +33,23 @@ async function syncActiveMailboxes(options = {}) {
   const results = [];
 
   try {
-    // 1. Query all active mail accounts
-    const activeAccounts = await MailAccount.find({ isActive: true }).lean();
+    // 1. Query active mail accounts (sorted by most recently updated)
+    const activeAccounts = await MailAccount.find({ isActive: true }).sort({ updatedAt: -1 }).lean();
     const eligibleAccounts = activeAccounts.filter(
       (a) => (a.accessToken || a.refreshToken) && (a.provider === 'MICROSOFT' || a.provider === 'ZOHO')
     );
 
-    if (eligibleAccounts.length === 0) {
+    // Strictly enforce at most 1 active mailbox per user for autosync
+    const accountsByUser = new Map();
+    for (const acc of eligibleAccounts) {
+      const uId = String(acc.userId);
+      if (!accountsByUser.has(uId)) {
+        accountsByUser.set(uId, acc);
+      }
+    }
+    const accountsToSync = Array.from(accountsByUser.values());
+
+    if (accountsToSync.length === 0) {
       lastRunStatus = 'IDLE';
       lastRunResults = [];
       isCycleRunning = false;
@@ -52,7 +62,7 @@ async function syncActiveMailboxes(options = {}) {
     const startDate = options.startDate || twoDaysAgo.toISOString().substring(0, 10);
     const endDate = options.endDate || now.toISOString().substring(0, 10);
 
-    for (const account of eligibleAccounts) {
+    for (const account of accountsToSync) {
       const accountIdStr = String(account._id || account.id);
 
       // Prevent concurrent syncs for the same account

@@ -17,7 +17,14 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
+
+const ATTACHMENT_CACHE_DIR = path.join(__dirname, '../../../../uploads/mail-attachments');
+if (!fs.existsSync(ATTACHMENT_CACHE_DIR)) {
+  fs.mkdirSync(ATTACHMENT_CACHE_DIR, { recursive: true });
+}
 
 const Email = require('../mongoose/models/Email');
 const MailAccount = require('../mongoose/models/MailAccount');
@@ -30,6 +37,7 @@ const {
   deleteMailAccount,
   upsertMailAccount,
   getMailAccountForUserAndProvider,
+  setActiveMailAccountForUser,
 } = require('../mongoose/services/accountService');
 
 const { runMailSync } = require('../mongoose/services/mailSyncService');
@@ -156,6 +164,12 @@ router.delete('/accounts', requireRoles(...MANAGER_ROLES), async (req, res) => {
       return res.status(500).json({ error: 'Failed to delete mailbox connection.' });
     }
 
+    // If an active account was disconnected, automatically activate the remaining connected mailbox (if any)
+    const remaining = await listMailAccountsByUser(req.authUser.id);
+    if (remaining.length > 0 && !remaining.some((a) => a.isActive)) {
+      await setActiveMailAccountForUser(req.authUser.id, remaining[0]._id);
+    }
+
     return res.json({
       success: true,
       message: `Successfully disconnected ${account.provider} mailbox (${account.email}).`,
@@ -163,6 +177,30 @@ router.delete('/accounts', requireRoles(...MANAGER_ROLES), async (req, res) => {
   } catch (err) {
     console.error('[mailRouter] Error disconnecting account:', err);
     return res.status(500).json({ error: err.message || 'Failed to disconnect mailbox' });
+  }
+});
+
+// POST /api/mail-router/accounts/active — Set the active mailbox for autosync
+router.post('/accounts/active', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  const { accountId, provider } = req.body || {};
+  const target = accountId || provider;
+  if (!target) {
+    return res.status(400).json({ error: 'accountId or provider is required.' });
+  }
+
+  try {
+    const updated = await setActiveMailAccountForUser(req.authUser.id, target);
+    if (!updated) {
+      return res.status(404).json({ error: 'Mail account not found.' });
+    }
+    return res.json({
+      success: true,
+      message: `Active mailbox set to ${updated.provider} (${updated.email})`,
+      account: updated,
+    });
+  } catch (err) {
+    console.error('[mailRouter] Error setting active account:', err);
+    return res.status(500).json({ error: err.message || 'Failed to set active account' });
   }
 });
 
@@ -255,7 +293,7 @@ router.get('/auth/microsoft/callback', async (req, res) => {
       });
     }
 
-    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1' }));
+    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1', provider: 'MICROSOFT' }));
   } catch (err) {
     console.error('[mailRouter:msal] Token exchange failed:', err);
     return res.redirect(resolveFrontendUrl(returnTo, { error: err.message || 'Token exchange failed' }));
@@ -358,7 +396,7 @@ router.get('/auth/zoho/callback', async (req, res) => {
       isActive: true,
     });
 
-    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1' }));
+    return res.redirect(resolveFrontendUrl(returnTo, { connected: '1', provider: 'ZOHO' }));
   } catch (err) {
     console.error('[mailRouter:zoho] Callback error:', err);
     return res.redirect(resolveFrontendUrl(returnTo, { error: err.message || 'Zoho authentication failed' }));
@@ -483,20 +521,49 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
     const cleanStartDate = startDate && startDate !== 'undefined' && startDate !== 'null' ? String(startDate) : undefined;
     const cleanEndDate = endDate && endDate !== 'undefined' && endDate !== 'null' ? String(endDate) : undefined;
+    let targetProvider = provider && provider !== 'undefined' && provider !== 'null' ? String(provider).toUpperCase() : undefined;
+
+    if (!targetProvider) {
+      const MailAccount = require('../mongoose/models/MailAccount');
+      const activeAccount = await MailAccount.findOne({ userId: req.authUser.id, isActive: true }).lean();
+      if (activeAccount) {
+        targetProvider = activeAccount.provider;
+      }
+    }
+
     const rawEmails = await listEmailsInWindow(
       cleanStartDate,
       cleanEndDate,
-      provider || undefined,
+      targetProvider,
       req.authUser.id
     );
 
-    const emails = rawEmails.map((e) => ({
-      ...e,
-      from: e.from || { name: e.fromName || e.fromAddress, email: e.fromAddress },
-      isForwarded: e.isForwarded ?? (e.triageStatus === 'FORWARDED'),
-      snippetText: e.snippetText || e.bodyPreview || (e.bodyText ? e.bodyText.slice(0, 150) : ''),
-      hasAttachments: Boolean(e.hasAttachments),
-    }));
+    // Batch-load attachment metadata (non-inline drawings/files) for all emails in one fast indexed query
+    const emailIds = rawEmails.map(e => e._id);
+    const Attachment = require('../mongoose/models/Attachment');
+    const allAttachments = await Attachment.find({
+      emailId: { $in: emailIds },
+      isInline: { $ne: true },
+    }).select('_id emailId filename contentType sizeBytes isInline').lean();
+
+    const attMap = new Map();
+    for (const att of allAttachments) {
+      const eId = String(att.emailId);
+      if (!attMap.has(eId)) attMap.set(eId, []);
+      attMap.get(eId).push(att);
+    }
+
+    const emails = rawEmails.map((e) => {
+      const emailAtts = attMap.get(String(e._id)) || [];
+      return {
+        ...e,
+        from: e.from || { name: e.fromName || e.fromAddress, email: e.fromAddress },
+        isForwarded: e.isForwarded ?? (e.triageStatus === 'FORWARDED'),
+        snippetText: e.snippetText || e.bodyPreview || (e.bodyText ? e.bodyText.slice(0, 150) : ''),
+        hasAttachments: Boolean(e.hasAttachments || emailAtts.length > 0),
+        attachments: emailAtts,
+      };
+    });
 
     return res.json({ emails });
   } catch (err) {
@@ -563,9 +630,13 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
     const Email = require('../mongoose/models/Email');
     const { resolveInlineImages } = require('../mongoose/services/inlineImageService');
 
+    // Only load attachment binary buffers if the HTML body actually contains cid: references
+    const hasCid = Boolean(email.bodyHtml && email.bodyHtml.includes('cid:'));
     const [attachments, fullAttachments] = await Promise.all([
       listAttachmentsByEmail(emailId),
-      Attachment.find({ emailId }).lean(),
+      hasCid
+        ? Attachment.find({ emailId, $or: [{ isInline: true }, { contentId: { $exists: true, $ne: null } }] }).lean()
+        : Promise.resolve([]),
     ]);
 
     const { html: resolvedHtml, inlineAttachmentIds } = resolveInlineImages(email.bodyHtml, fullAttachments);
@@ -703,12 +774,29 @@ async function fetchAndCacheAttachment(attachment) {
   }
 
   const downloadPromise = (async () => {
+    const localFilePath = path.join(ATTACHMENT_CACHE_DIR, attachmentIdStr);
+
+    // 0. Check local disk first (0ms latency)
+    if (fs.existsSync(localFilePath)) {
+      try {
+        const diskContent = await fs.promises.readFile(localFilePath);
+        if (diskContent && diskContent.length > 0) {
+          attachment.content = diskContent;
+          return diskContent;
+        }
+      } catch (e) {
+        console.warn(`[mailRouter:attachments] Error reading local disk cache for ${attachmentIdStr}:`, e);
+      }
+    }
+
     // 1. Re-check DB in case another process/worker cached it in the meantime
     const fresh = await Attachment.findById(attachment._id);
     if (fresh && fresh.content && fresh.content.length > 0) {
       attachment.content = fresh.content;
       attachment.contentType = fresh.contentType || attachment.contentType;
       attachment.filename = fresh.filename || attachment.filename;
+      // Cache to local disk asynchronously so future reads are instantaneous
+      fs.promises.writeFile(localFilePath, fresh.content).catch(() => {});
       return fresh.content;
     }
 
@@ -733,20 +821,17 @@ async function fetchAndCacheAttachment(attachment) {
       account = await MailAccount.findOne({
         email: email.mailboxAddress.toLowerCase(),
         provider: email.provider,
-        isActive: true,
       }).lean();
     }
     if (!account && email.userId) {
       account = await MailAccount.findOne({
         userId: email.userId,
         provider: email.provider,
-        isActive: true,
       }).lean();
     }
     if (!account) {
       account = await MailAccount.findOne({
         provider: email.provider,
-        isActive: true,
       }).lean();
     }
 
@@ -770,7 +855,14 @@ async function fetchAndCacheAttachment(attachment) {
       throw new Error('Mail provider returned empty content for attachment.');
     }
 
-    // 5. Cache the attachment in MongoDB so future requests are served immediately
+    // 5. Cache the attachment locally on disk IMMEDIATELY
+    try {
+      await fs.promises.writeFile(localFilePath, downloaded.content);
+    } catch (diskErr) {
+      console.warn(`[mailRouter:attachments] Could not write to disk cache:`, diskErr);
+    }
+
+    // 6. Cache to MongoDB asynchronously in background without blocking response
     const updateFields = {
       content: downloaded.content,
     };
@@ -787,9 +879,11 @@ async function fetchAndCacheAttachment(attachment) {
       attachment.sizeBytes = downloaded.content.length;
     }
 
-    await Attachment.findByIdAndUpdate(attachment._id, updateFields);
-    attachment.content = downloaded.content;
+    Attachment.findByIdAndUpdate(attachment._id, updateFields).catch(dbErr => {
+      console.warn(`[mailRouter:attachments] Could not cache to MongoDB in background:`, dbErr);
+    });
 
+    attachment.content = downloaded.content;
     return downloaded.content;
   })();
 
@@ -805,25 +899,63 @@ async function fetchAndCacheAttachment(attachment) {
 // GET /api/mail-router/attachments/:id — Download / Preview drawing / attachment file
 // Accessible by both Managers and Employees who have been forwarded the email
 router.get('/attachments/:id', requireRoles(), async (req, res) => {
+  const attachmentIdStr = String(req.params.id);
+  const localFilePath = path.join(ATTACHMENT_CACHE_DIR, attachmentIdStr);
+
   try {
-    const attachment = await getAttachmentById(req.params.id);
+    const etag = `"${attachmentIdStr}"`;
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+
+    const isDownload = req.query.download === '1' || req.query.download === 'true';
+
+    // Step 0: Fast path — If cached on local disk, serve immediately without loading heavy buffer from MongoDB Atlas!
+    if (fs.existsSync(localFilePath)) {
+      const meta = await Attachment.findById(attachmentIdStr).select('_id filename contentType sizeBytes').lean();
+      const filename = meta?.filename || 'attachment';
+      const contentType = meta?.contentType || 'application/octet-stream';
+      const stat = fs.statSync(localFilePath);
+      const disposition = isDownload ? 'attachment' : 'inline';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Length', stat.size);
+      res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+      res.setHeader('ETag', etag);
+      res.setHeader('X-Attachment-Cache', 'DISK-HIT');
+
+      const stream = fs.createReadStream(localFilePath);
+      return stream.pipe(res);
+    }
+
+    // Step 1: Check whether the attachment is already in MongoDB
+    const attachment = await getAttachmentById(attachmentIdStr);
     if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
 
-    // Step 1: Check whether the attachment is already cached
+    const disposition = isDownload ? 'attachment' : 'inline';
+
     if (attachment.content && attachment.content.length > 0) {
+      // Save to local disk for future instant requests
+      fs.promises.writeFile(localFilePath, attachment.content).catch(() => {});
+
       res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.filename)}"`);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(attachment.filename)}"`);
       res.setHeader('Content-Length', attachment.content.length);
-      res.setHeader('X-Attachment-Cache', 'HIT');
+      res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+      res.setHeader('ETag', etag);
+      res.setHeader('X-Attachment-Cache', 'DB-HIT');
       return res.end(attachment.content);
     }
 
-    // Step 2: Not cached: fetch on demand from provider, save to cache, and serve
+    // Step 2: Not cached: fetch on demand from provider, save to local disk & DB, and serve
     const content = await fetchAndCacheAttachment(attachment);
 
     res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.filename)}"`);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(attachment.filename)}"`);
     res.setHeader('Content-Length', content.length);
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    res.setHeader('ETag', etag);
     res.setHeader('X-Attachment-Cache', 'MISS');
     return res.end(content);
   } catch (err) {

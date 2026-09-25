@@ -16,6 +16,7 @@
     "cheerio": "^1.2.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "mammoth": "^1.12.3",
     "papaparse": "^5.7.0",
     "pdfjs-dist": "^6.3.289",

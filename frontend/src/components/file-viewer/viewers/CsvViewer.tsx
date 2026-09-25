@@ -4,7 +4,7 @@ import Papa from 'papaparse';
 
 const ROW_HEIGHT = 29;
 
-export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerProps) {
+export default function CsvViewer({ file, fileBuffer, zoom, searchQuery = '' }: SubViewerProps) {
     const [rawRows, setRawRows] = useState<string[][]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
@@ -35,12 +35,19 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
 
         async function loadCsv() {
             try {
-                const token = localStorage.getItem('token');
-                const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(file.url, { headers, credentials: 'include' });
-                if (!res.ok) throw new Error(`Failed to load CSV (${res.status} ${res.statusText})`);
+                let text = '';
+                if (fileBuffer && fileBuffer.byteLength > 0) {
+                    text = new TextDecoder('utf-8').decode(fileBuffer);
+                } else {
+                    const token = localStorage.getItem('token');
+                    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+                    const res = await fetch(file.url, { headers, credentials: 'include' });
+                    if (!res.ok) throw new Error(`Failed to load CSV (${res.status} ${res.statusText})`);
+                    text = await res.text();
+                }
 
-                const text = await res.text();
+                if (!isMounted) return;
+
                 Papa.parse<string[]>(text, {
                     skipEmptyLines: 'greedy',
                     fastMode: true,
@@ -68,7 +75,7 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
         return () => {
             isMounted = false;
         };
-    }, [file.url]);
+    }, [file.url, fileBuffer]);
 
     // Measure viewport on mount and resize
     useEffect(() => {
@@ -137,8 +144,8 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
     if (loading) {
         return (
             <div className="m365-loading-state">
-                <div style={{ fontSize: 28 }}>📋</div>
-                <div>Parsing CSV file...</div>
+                <div className="m365-loading-spinner" />
+                <div style={{ color: '#000000', fontWeight: 600 }}>Parsing CSV file...</div>
             </div>
         );
     }
@@ -146,7 +153,6 @@ export default function CsvViewer({ file, zoom, searchQuery = '' }: SubViewerPro
     if (error) {
         return (
             <div className="m365-error-state">
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to render CSV</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{error}</div>
             </div>

@@ -4,7 +4,7 @@ import {
     listInbox, getInboxItem, getAttachmentUrl,
     type InboxItem, type MailMessage, type MailAttachment,
 } from '../../services/mailApi';
-import { FileViewer, type FileViewerFile } from '../../components/file-viewer';
+import { FileViewer, type FileViewerFile, prefetchFile, getCachedFile } from '../../components/file-viewer';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -74,6 +74,7 @@ function getFileIcon(filename: string): string {
     if (['pdf'].includes(ext)) return '📄';
     if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
     if (['xlsx', 'xls', 'csv'].includes(ext)) return '📊';
+    if (['ppt', 'pptx', 'potx', 'ppsx', 'pptm'].includes(ext)) return '📽️';
     if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼️';
     if (['doc', 'docx'].includes(ext)) return '📝';
     return '📎';
@@ -102,7 +103,6 @@ class InboxErrorBoundary extends Component<{ children: React.ReactNode }, { hasE
         if (this.state.hasError) {
             return (
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>Unable to display message</h3>
                     <p style={{ fontSize: 13, color: 'var(--color-danger-mid)', marginBottom: 16 }}>{this.state.errorText}</p>
                     <button className="btn btn-secondary btn-sm" onClick={() => this.setState({ hasError: false, errorText: '' })}>Retry</button>
@@ -377,6 +377,22 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
         setTimeout(() => setCopiedAllLinks(false), 2000);
     };
 
+    const handleDirectDownload = (e: React.MouseEvent, att: MailAttachment) => {
+        e.stopPropagation();
+        if (!att.id) return;
+        const url = getAttachmentUrl(att.id);
+        const cached = getCachedFile(url);
+        if (cached && cached.blobUrl) {
+            e.preventDefault();
+            const a = document.createElement('a');
+            a.href = cached.blobUrl;
+            a.download = att.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', minHeight: 0 }}>
 
@@ -480,7 +496,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                             borderRadius: 'var(--radius-sm)',
                                             border: '1px solid var(--color-border)',
                                             background: 'var(--color-bg-card)',
-                                            color: 'var(--color-text-muted)',
+                                            color: '#000000',
                                             fontSize: 12.5,
                                             fontWeight: 600,
                                             userSelect: 'none',
@@ -497,6 +513,12 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                         }} />
                                         <span>Loading attachments...</span>
                                     </div>
+                                )}
+
+                                {!isAttLoading && hasAttachmentsFlag && allAttachments.length === 0 && (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
+                                        No file attachments
+                                    </span>
                                 )}
 
                                 {!isAttLoading && allAttachments.length > 0 && (
@@ -556,7 +578,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                         }}
                                     >
                                         <span>🔗</span>
-                                        <span>Reference Links</span>
+                                        <span> Links</span>
                                         <span style={{
                                             background: showLinks ? '#2563eb' : 'rgba(0,0,0,0.08)',
                                             color: showLinks ? '#fff' : 'var(--color-text-secondary)',
@@ -599,7 +621,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                                        📎 Drawing & File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
+                                        File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
                                     </div>
                                 </div>
                                 <div style={{
@@ -640,7 +662,10 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                                     transition: 'all 0.12s',
                                                     boxShadow: 'var(--shadow-xs)',
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                                                    if (att.id) prefetchFile(getAttachmentUrl(att.id), att.sizeBytes);
+                                                }}
                                                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                                                 title="Click to preview in File Viewer"
                                             >
@@ -654,9 +679,9 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                                     </div>
                                                 </div>
                                                 <a
-                                                    href={att.id ? getAttachmentUrl(att.id) : '#'}
+                                                    href={att.id ? `${getAttachmentUrl(att.id)}&download=1` : '#'}
                                                     download={att.filename}
-                                                    onClick={e => e.stopPropagation()}
+                                                    onClick={e => handleDirectDownload(e, att)}
                                                     title="Download file directly"
                                                     style={{
                                                         marginLeft: 6,
@@ -696,7 +721,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-info)' }}>
-                                        🔗 Extracted Reference Links ({validLinks.length})
+                                        🔗 Extracted Links ({validLinks.length})
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         {validLinks.length > 5 && (

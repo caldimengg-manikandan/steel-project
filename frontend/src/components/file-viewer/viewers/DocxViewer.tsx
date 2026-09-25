@@ -81,7 +81,7 @@ function extractClientDocFallback(buffer: ArrayBuffer): string | null {
     }
 }
 
-export default function DocxViewer({ file, zoom, fitMode }: SubViewerProps) {
+export default function DocxViewer({ file, fileBuffer, zoom, fitMode }: SubViewerProps) {
     const [htmlContent, setHtmlContent] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
@@ -93,12 +93,15 @@ export default function DocxViewer({ file, zoom, fitMode }: SubViewerProps) {
 
         async function loadDoc() {
             try {
-                const token = localStorage.getItem('token');
-                const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(file.url, { headers, credentials: 'include' });
-                if (!res.ok) throw new Error(`Failed to load document (${res.status} ${res.statusText})`);
+                let buffer = fileBuffer;
+                if (!buffer || buffer.byteLength === 0) {
+                    const token = localStorage.getItem('token');
+                    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+                    const res = await fetch(file.url, { headers, credentials: 'include' });
+                    if (!res.ok) throw new Error(`Failed to load document (${res.status} ${res.statusText})`);
+                    buffer = await res.arrayBuffer();
+                }
 
-                const buffer = await res.arrayBuffer();
                 if (!isMounted) return;
 
                 if (!buffer || buffer.byteLength === 0) {
@@ -207,13 +210,13 @@ export default function DocxViewer({ file, zoom, fitMode }: SubViewerProps) {
         return () => {
             isMounted = false;
         };
-    }, [file.url, file.filename]);
+    }, [file.url, file.filename, fileBuffer]);
 
     if (loading) {
         return (
             <div className="m365-loading-state">
-                <div style={{ fontSize: 28 }}>📝</div>
-                <div>Formatting Word document...</div>
+                <div className="m365-loading-spinner" />
+                <div style={{ color: '#000000', fontWeight: 600 }}>Formatting Word document...</div>
             </div>
         );
     }
@@ -221,7 +224,6 @@ export default function DocxViewer({ file, zoom, fitMode }: SubViewerProps) {
     if (error) {
         return (
             <div className="m365-error-state" style={{ maxWidth: 440, margin: '48px auto', textAlign: 'center' }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: '#1f2937' }}>
                     Unable to render Word Document
                 </div>

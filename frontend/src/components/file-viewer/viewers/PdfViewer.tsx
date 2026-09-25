@@ -175,7 +175,10 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer, isPanM
                     className="m365-pdf-page-placeholder"
                     style={{ width: displayW ? `${displayW}px` : '100%', height: displayH ? `${displayH}px` : '400px' }}
                 >
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>📄</div>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.8" style={{ marginBottom: 6 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                    </svg>
                     <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Page {pageNum}</span>
                 </div>
             )}
@@ -185,6 +188,7 @@ function PdfPageCard({ pageNum, pdfDoc, scale, baseDims, scrollContainer, isPanM
 
 export default function PdfViewer({
     file,
+    fileBuffer,
     zoom,
     fitMode,
     pageNumber = 1,
@@ -217,25 +221,39 @@ export default function PdfViewer({
     // Fetch and load PDF
     useEffect(() => {
         let isMounted = true;
+        let activeLoadingTask: any = null;
         setLoading(true);
         setError('');
 
         async function loadPdf() {
             try {
-                const token = localStorage.getItem('token');
-                const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(file.url, { headers, credentials: 'include' });
-                if (!res.ok) throw new Error(`Failed to load PDF (${res.status} ${res.statusText})`);
+                let buffer = fileBuffer;
+                // If buffer is null or detached (byteLength === 0), fetch fresh from network
+                if (!buffer || buffer.byteLength === 0) {
+                    const token = localStorage.getItem('token');
+                    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+                    const res = await fetch(file.url, { headers, credentials: 'include' });
+                    if (!res.ok) throw new Error(`Failed to load PDF (${res.status} ${res.statusText})`);
+                    buffer = await res.arrayBuffer();
+                }
 
-                const buffer = await res.arrayBuffer();
+                if (!isMounted) return;
+
+                // PDF.js worker transfers the underlying ArrayBuffer which detaches it.
+                // Slicing guarantees that fileBuffer and cached copies remain intact across re-renders.
+                const workerBuffer = buffer.slice(0);
                 const loadingTask = pdfjsLib.getDocument({
-                    data: new Uint8Array(buffer),
+                    data: new Uint8Array(workerBuffer),
                     cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/cmaps/',
                     cMapPacked: true,
                 });
+                activeLoadingTask = loadingTask;
 
                 const doc = await loadingTask.promise;
-                if (!isMounted) return;
+                if (!isMounted) {
+                    try { doc.destroy(); } catch { /* ignore */ }
+                    return;
+                }
 
                 setPdfDoc(doc);
                 setTotalPages(doc.numPages);
@@ -253,7 +271,10 @@ export default function PdfViewer({
                     console.warn('[PdfViewer] Could not get base page dims:', dimErr);
                 }
             } catch (err: any) {
-                if (isMounted) setError(err.message || 'Error rendering PDF document');
+                if (isMounted) {
+                    console.error('[PdfViewer] loadPdf error:', err);
+                    setError(err.message || 'Error rendering PDF document');
+                }
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -263,8 +284,15 @@ export default function PdfViewer({
 
         return () => {
             isMounted = false;
+            if (activeLoadingTask) {
+                try {
+                    activeLoadingTask.destroy();
+                } catch {
+                    /* ignore */
+                }
+            }
         };
-    }, [file.url]);
+    }, [file.url, fileBuffer]);
 
     // Calculate effective scale (accounting for fitMode === 'width' and isTwoPageView)
     const effectiveScale = useMemo(() => {
@@ -517,8 +545,8 @@ export default function PdfViewer({
     if (loading) {
         return (
             <div className="m365-loading-state">
-                <div style={{ fontSize: 28 }}>📄</div>
-                <div>Loading PDF document...</div>
+                <div className="m365-loading-spinner" />
+                <div style={{ color: '#000000', fontWeight: 600 }}>Rendering PDF document...</div>
             </div>
         );
     }
@@ -526,7 +554,6 @@ export default function PdfViewer({
     if (error) {
         return (
             <div className="m365-error-state">
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to render PDF</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{error}</div>
             </div>

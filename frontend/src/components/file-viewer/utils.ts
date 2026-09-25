@@ -12,6 +12,7 @@ export function detectFileType(filename: string, contentType?: string): FileType
     if (ct.includes('pdf')) return 'pdf';
     if (ct.includes('wordprocessingml') || ct.includes('msword')) return 'docx';
     if (ct.includes('spreadsheetml') || ct.includes('ms-excel')) return 'xlsx';
+    if (ct.includes('presentationml') || ct.includes('powerpoint')) return 'pptx';
     if (ct.includes('csv') || ct.includes('comma-separated')) return 'csv';
     if (ct.startsWith('image/')) return 'image';
     if (ct.startsWith('video/')) return 'video';
@@ -29,6 +30,12 @@ export function detectFileType(filename: string, contentType?: string): FileType
         case 'xlsm':
         case 'xlsb':
             return 'xlsx';
+        case 'pptx':
+        case 'ppt':
+        case 'potx':
+        case 'ppsx':
+        case 'pptm':
+            return 'pptx';
         case 'csv':
         case 'tsv':
             return 'csv';
@@ -104,6 +111,8 @@ export function getOfficeBadge(type: FileType): { label: string; bg: string; col
             return { label: 'XLSX', bg: '#ecfdf5', color: '#047857' };
         case 'csv':
             return { label: 'CSV', bg: '#f0fdf4', color: '#15803d' };
+        case 'pptx':
+            return { label: 'PPTX', bg: '#fff1f0', color: '#c41d17' };
         case 'image':
             return { label: 'IMG', bg: '#faf5ff', color: '#7e22ce' };
         case 'video':

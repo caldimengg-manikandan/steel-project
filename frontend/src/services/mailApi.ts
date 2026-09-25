@@ -146,6 +146,22 @@ export async function deleteMailAccount(id: string): Promise<void> {
     return handleResponse(res);
 }
 
+export async function setActiveMailAccount(accountIdOrProvider: string): Promise<{
+    success: boolean;
+    message: string;
+    account?: MailAccount;
+}> {
+    const isId = /^[0-9a-fA-F]{24}$/.test(accountIdOrProvider);
+    const body = isId ? { accountId: accountIdOrProvider } : { provider: accountIdOrProvider };
+    const res = await fetch(`${BASE}/mail/accounts/active`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+}
+
 // ── OAuth Redirects (browser navigation) ───────────────────
 
 export function redirectToMicrosoftAuth(returnTo = '/mail-router') {

@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type { FileViewerProps, FileType } from './types';
 import { detectFileType, formatBytes, downloadFile, getOfficeBadge } from './utils';
+import { getCachedFile, setCachedFile } from './fileCache';
 import './FileViewer.css';
 
 // Lazy-load sub-viewers on demand to ensure zero bloat when not opened
@@ -11,6 +12,7 @@ const CsvViewer = React.lazy(() => import('./viewers/CsvViewer'));
 const ImageViewer = React.lazy(() => import('./viewers/ImageViewer'));
 const VideoViewer = React.lazy(() => import('./viewers/VideoViewer'));
 const AudioViewer = React.lazy(() => import('./viewers/AudioViewer'));
+const PptxViewer = React.lazy(() => import('./viewers/PptxViewer'));
 const UnsupportedViewer = React.lazy(() => import('./viewers/UnsupportedViewer'));
 
 export default function FileViewer({ file, onClose }: FileViewerProps) {
@@ -49,6 +51,16 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
     // Image state
     const [rotation, setRotation] = useState(0);
 
+    // Download and Progress State
+    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
+    const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+    const [downloadLoaded, setDownloadLoaded] = useState<number>(0);
+    const [downloadTotal, setDownloadTotal] = useState<number>(file.sizeBytes || 0);
+    const [downloadStatusText, setDownloadStatusText] = useState<string>('Connecting to server...');
+    const [downloadError, setDownloadError] = useState<string>('');
+    const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
+    const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
+
     // Reset view state when opening a different file
     useEffect(() => {
         setZoom(100);
@@ -66,6 +78,133 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         setSearchQuery('');
         setRotation(0);
     }, [file.url, fileType]);
+
+    // Download file buffer with real-time progress
+    useEffect(() => {
+        if (!file?.url) return;
+
+        // Reset state for new file
+        setDownloadError('');
+        setDownloadLoaded(0);
+        setDownloadTotal(file.sizeBytes || 0);
+
+        // Check in-memory cache first for instant opening
+        const cached = getCachedFile(file.url);
+        if (cached) {
+            setFileBuffer(cached.buffer);
+            setFileBlobUrl(cached.blobUrl);
+            setDownloadPercent(100);
+            setDownloadStatus('ready');
+            return;
+        }
+
+        // For unsupported files, no need to download binary upfront
+        if (fileType === 'unsupported') {
+            setDownloadStatus('ready');
+            return;
+        }
+
+        let isMounted = true;
+        setDownloadStatus('downloading');
+        setDownloadPercent(0);
+        setDownloadStatusText('Connecting to server...');
+
+        const token = localStorage.getItem('token');
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', file.url, true);
+        xhr.responseType = 'arraybuffer';
+        if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+
+        const slowTimer = setTimeout(() => {
+            if (isMounted) {
+                setDownloadStatusText('Retrieving attachment from mail server...');
+            }
+        }, 1200);
+
+        xhr.onprogress = (e) => {
+            if (!isMounted) return;
+            clearTimeout(slowTimer);
+
+            const total = (e.lengthComputable && e.total > 0) ? e.total : (file.sizeBytes || 0);
+            const loaded = e.loaded;
+            setDownloadLoaded(loaded);
+
+            if (total > 0) {
+                setDownloadTotal(total);
+                const pct = Math.min(99, Math.round((loaded / total) * 100));
+                setDownloadPercent(pct);
+                setDownloadStatusText(`Downloading... ${formatBytes(loaded)} of ${formatBytes(total)}`);
+            } else {
+                setDownloadPercent(null);
+                setDownloadStatusText(`Downloading... ${formatBytes(loaded)}`);
+            }
+        };
+
+        xhr.onload = () => {
+            clearTimeout(slowTimer);
+            if (!isMounted) return;
+
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const buffer = xhr.response as ArrayBuffer;
+                if (!buffer || buffer.byteLength === 0) {
+                    setDownloadError('File content is empty.');
+                    setDownloadStatus('error');
+                    return;
+                }
+                const contentType = xhr.getResponseHeader('Content-Type') || file.contentType || undefined;
+                const { blobUrl } = setCachedFile(file.url, buffer, contentType);
+                setFileBuffer(buffer.slice(0));
+                setFileBlobUrl(blobUrl);
+                setDownloadPercent(100);
+                setDownloadStatusText('Preparing document preview...');
+                setTimeout(() => {
+                    if (isMounted) setDownloadStatus('ready');
+                }, 60);
+            } else {
+                setDownloadError(`Failed to load file (${xhr.status} ${xhr.statusText || 'Error'})`);
+                setDownloadStatus('error');
+            }
+        };
+
+        xhr.onerror = () => {
+            clearTimeout(slowTimer);
+            if (isMounted) {
+                setDownloadError('Network error while connecting to server. Please check your connection.');
+                setDownloadStatus('error');
+            }
+        };
+
+        xhr.ontimeout = () => {
+            clearTimeout(slowTimer);
+            if (isMounted) {
+                setDownloadError('Request timed out while downloading the file.');
+                setDownloadStatus('error');
+            }
+        };
+
+        xhr.send();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(slowTimer);
+            xhr.abort();
+        };
+    }, [file.url, file.sizeBytes, file.contentType, fileType]);
+
+    const handleDownloadCurrentFile = useCallback(() => {
+        if (fileBlobUrl) {
+            const a = document.createElement('a');
+            a.href = fileBlobUrl;
+            a.download = file.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } else {
+            downloadFile(file.url, file.filename);
+        }
+    }, [fileBlobUrl, file.url, file.filename]);
 
     // Keep pageInput synced with pageNumber
     useEffect(() => {
@@ -298,8 +437,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
 
                     {/* Center: Contextual Tools based on File Type */}
                     <div className="m365-toolbar-center">
-                        {/* PDF Page Navigation */}
-                        {fileType === 'pdf' && (
+                        {/* PDF / PPTX Page & Slide Navigation */}
+                        {(fileType === 'pdf' || fileType === 'pptx') && (
                             <>
                                 <button
                                     type="button"
@@ -310,7 +449,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                                         setRequestedPage({ page: next, timestamp: Date.now() });
                                     }}
                                     disabled={pageNumber <= 1}
-                                    title="Previous Page (Left Arrow)"
+                                    title={fileType === 'pptx' ? "Previous Slide (Up / Left Arrow)" : "Previous Page (Left Arrow)"}
                                 >
                                     ‹
                                 </button>
@@ -329,8 +468,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                                             }
                                         }}
                                         onBlur={commitPageInput}
-                                        title="Type a page number and press Enter to navigate"
-                                        aria-label="Current page number"
+                                        title={fileType === 'pptx' ? "Type a slide number and press Enter" : "Type a page number and press Enter"}
+                                        aria-label="Current page/slide number"
                                     />
                                     <span className="m365-nav-total">/ {numPages}</span>
                                 </div>
@@ -343,7 +482,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                                         setRequestedPage({ page: next, timestamp: Date.now() });
                                     }}
                                     disabled={pageNumber >= numPages}
-                                    title="Next Page (Right Arrow)"
+                                    title={fileType === 'pptx' ? "Next Slide (Down / Right Arrow)" : "Next Page (Right Arrow)"}
                                 >
                                     ›
                                 </button>
@@ -569,7 +708,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                         <button
                             type="button"
                             className="m365-btn"
-                            onClick={() => downloadFile(file.url, file.filename)}
+                            onClick={handleDownloadCurrentFile}
                             title="Download original file"
                             style={{ background: '#0078d4', color: '#ffffff', borderColor: '#0078d4' }}
                         >
@@ -594,130 +733,303 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                     </div>
                 </div>
 
-                {/* ── Document Viewport with Suspense fallback ── */}
+                {/* ── Document Viewport with Download Progress, Error, & Suspense fallback ── */}
                 <div className={`m365-viewport ${['xlsx', 'csv'].includes(fileType) ? 'is-grid-mode' : ''}`}>
-                    <Suspense
-                        fallback={
-                            <div className="m365-loading-state">
-                                <div style={{ fontSize: 32 }}>⏳</div>
-                                <div style={{ fontWeight: 600 }}>Loading document viewer...</div>
+                    {downloadStatus === 'downloading' && (
+                        <div className="m365-loader-overlay">
+                            <div className="m365-loader-card">
+                                <span
+                                    className="m365-loader-badge"
+                                    style={{ background: badge.bg, color: badge.color }}
+                                >
+                                    <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12">
+                                        <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
+                                    </svg>
+                                    {badge.label}
+                                </span>
+
+                                <div className="m365-loader-filename" title={file.filename}>
+                                    {file.filename}
+                                </div>
+
+                                <div className="m365-loader-filesize">
+                                    {formatBytes(downloadTotal || file.sizeBytes || 0)}
+                                </div>
+
+                                <div className="m365-progress-track">
+                                    <div
+                                        className={`m365-progress-fill ${downloadPercent === null ? 'is-indeterminate' : ''}`}
+                                        style={{
+                                            width: downloadPercent !== null ? `${Math.max(4, downloadPercent)}%` : '40%',
+                                            background: badge.bg ? `linear-gradient(90deg, ${badge.bg}, #0284c7)` : undefined,
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="m365-progress-meta">
+                                    <span className="m365-progress-status">{downloadStatusText}</span>
+                                    <span className="m365-progress-percent">
+                                        {downloadPercent !== null ? `${downloadPercent}%` : ''}
+                                    </span>
+                                </div>
+
+                                <div className="m365-loader-actions">
+                                    <button
+                                        type="button"
+                                        className="m365-btn"
+                                        onClick={onClose}
+                                        style={{ fontSize: 12, padding: '5px 16px' }}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
-                        }
-                    >
-                        {fileType === 'pdf' && (
-                            <PdfViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                                pageNumber={pageNumber}
-                                numPages={numPages}
-                                onPageChange={setPageNumber}
-                                onNumPagesLoaded={setNumPages}
-                                requestedPage={requestedPage}
-                                isTwoPageView={isTwoPageView}
-                                onToggleTwoPageView={() => setIsTwoPageView(p => !p)}
-                                isPanMode={isPanMode}
-                                onTogglePanMode={() => setIsPanMode(p => !p)}
-                            />
-                        )}
+                        </div>
+                    )}
 
-                        {fileType === 'docx' && (
-                            <DocxViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                            />
-                        )}
+                    {downloadStatus === 'error' && (
+                        <div className="m365-loader-overlay">
+                            <div className="m365-error-state" style={{ maxWidth: 440 }}>
+                                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: '#000000' }}>
+                                    Unable to open file preview
+                                </div>
+                                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
+                                    {downloadError || 'Failed to download file from server.'}
+                                </div>
+                                <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDownloadStatus('downloading');
+                                            const token = localStorage.getItem('token');
+                                            const xhr = new XMLHttpRequest();
+                                            xhr.open('GET', file.url, true);
+                                            xhr.responseType = 'arraybuffer';
+                                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                                            xhr.onload = () => {
+                                                if (xhr.status >= 200 && xhr.status < 300) {
+                                                    const buf = xhr.response as ArrayBuffer;
+                                                    const { blobUrl } = setCachedFile(file.url, buf, file.contentType);
+                                                    setFileBuffer(buf);
+                                                    setFileBlobUrl(blobUrl);
+                                                    setDownloadPercent(100);
+                                                    setDownloadStatus('ready');
+                                                } else {
+                                                    setDownloadError(`Error ${xhr.status}: ${xhr.statusText}`);
+                                                    setDownloadStatus('error');
+                                                }
+                                            };
+                                            xhr.onerror = () => {
+                                                setDownloadError('Network error while connecting to server.');
+                                                setDownloadStatus('error');
+                                            };
+                                            xhr.send();
+                                        }}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: 6,
+                                            border: '1px solid #0078d4',
+                                            background: '#0078d4',
+                                            color: '#ffffff',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Try Again
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadCurrentFile}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: 6,
+                                            border: '1px solid #cbd5e1',
+                                            background: '#ffffff',
+                                            color: '#334155',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Download File
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: 6,
+                                            border: '1px solid #e2e8f0',
+                                            background: 'transparent',
+                                            color: '#64748b',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                        {fileType === 'xlsx' && (
-                            <SpreadsheetViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                                sheets={sheets}
-                                activeSheet={activeSheet}
-                                onSheetChange={setActiveSheet}
-                                onSheetsLoaded={handleSheetsLoaded}
-                            />
-                        )}
+                    {downloadStatus === 'ready' && (
+                        <Suspense
+                            fallback={
+                                <div className="m365-loading-state">
+                                    <div className="m365-loading-spinner" />
+                                    <div style={{ fontWeight: 600, color: '#000000' }}>Initializing document viewer...</div>
+                                </div>
+                            }
+                        >
+                            {fileType === 'pdf' && (
+                                <PdfViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    pageNumber={pageNumber}
+                                    numPages={numPages}
+                                    onPageChange={setPageNumber}
+                                    onNumPagesLoaded={setNumPages}
+                                    requestedPage={requestedPage}
+                                    isTwoPageView={isTwoPageView}
+                                    onToggleTwoPageView={() => setIsTwoPageView(p => !p)}
+                                    isPanMode={isPanMode}
+                                    onTogglePanMode={() => setIsPanMode(p => !p)}
+                                />
+                            )}
 
-                        {fileType === 'csv' && (
-                            <CsvViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                                searchQuery={searchQuery}
-                                onSearchQueryChange={setSearchQuery}
-                            />
-                        )}
+                            {fileType === 'docx' && (
+                                <DocxViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                />
+                            )}
 
-                        {fileType === 'image' && (
-                            <ImageViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                                rotation={rotation}
-                                onRotate={rotateImage}
-                                onFitZoomComputed={handleFitZoomComputed}
-                            />
-                        )}
+                            {fileType === 'xlsx' && (
+                                <SpreadsheetViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    sheets={sheets}
+                                    activeSheet={activeSheet}
+                                    onSheetChange={setActiveSheet}
+                                    onSheetsLoaded={handleSheetsLoaded}
+                                />
+                            )}
 
-                        {fileType === 'video' && (
-                            <VideoViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                            />
-                        )}
+                            {fileType === 'csv' && (
+                                <CsvViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    searchQuery={searchQuery}
+                                    onSearchQueryChange={setSearchQuery}
+                                />
+                            )}
 
-                        {fileType === 'audio' && (
-                            <AudioViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                            />
-                        )}
+                            {fileType === 'pptx' && (
+                                <PptxViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    pageNumber={pageNumber}
+                                    numPages={numPages}
+                                    onPageChange={setPageNumber}
+                                    onNumPagesLoaded={setNumPages}
+                                />
+                            )}
 
-                        {fileType === 'unsupported' && (
-                            <UnsupportedViewer
-                                file={file}
-                                zoom={zoom}
-                                onZoomChange={setZoom}
-                                fitMode={fitMode}
-                                onFitModeChange={setFitMode}
-                                isFullscreen={isFullscreen}
-                                onToggleFullscreen={toggleFullscreen}
-                            />
-                        )}
-                    </Suspense>
+                            {fileType === 'image' && (
+                                <ImageViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    rotation={rotation}
+                                    onRotate={rotateImage}
+                                    onFitZoomComputed={handleFitZoomComputed}
+                                />
+                            )}
+
+                            {fileType === 'video' && (
+                                <VideoViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                />
+                            )}
+
+                            {fileType === 'audio' && (
+                                <AudioViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                />
+                            )}
+
+                            {fileType === 'unsupported' && (
+                                <UnsupportedViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                />
+                            )}
+                        </Suspense>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { SubViewerProps } from '../types';
 
-export default function AudioViewer({ file }: SubViewerProps) {
+export default function AudioViewer({ file, fileBlobUrl }: SubViewerProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [speed, setSpeed] = useState<number>(1);
     const [error, setError] = useState(false);
@@ -16,7 +16,6 @@ export default function AudioViewer({ file }: SubViewerProps) {
     if (error) {
         return (
             <div className="m365-error-state">
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to play audio</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>
                     The audio format might not be supported or the file is corrupted.
@@ -28,12 +27,16 @@ export default function AudioViewer({ file }: SubViewerProps) {
     return (
         <div className="m365-media-canvas">
             <div className="m365-audio-card">
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
-                    🎵
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                    </svg>
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: '#000000', marginBottom: 4 }}>
                         {file.filename}
                     </div>
                     <div style={{ fontSize: 12, color: '#64748b' }}>Audio File Preview</div>
@@ -41,7 +44,7 @@ export default function AudioViewer({ file }: SubViewerProps) {
 
                 <audio
                     ref={audioRef}
-                    src={file.url}
+                    src={fileBlobUrl || file.url}
                     controls
                     style={{ width: '100%' }}
                     onError={() => setError(true)}

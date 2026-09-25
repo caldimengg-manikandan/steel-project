@@ -7,6 +7,7 @@ export type FileType =
     | 'docx'
     | 'xlsx'
     | 'csv'
+    | 'pptx'
     | 'image'
     | 'video'
     | 'audio'
@@ -27,6 +28,8 @@ export interface FileViewerProps {
 
 export interface SubViewerProps {
     file: FileViewerFile;
+    fileBuffer?: ArrayBuffer | null;
+    fileBlobUrl?: string | null;
     zoom: number;
     onZoomChange: (newZoom: number) => void;
     fitMode: 'custom' | 'width' | 'screen';
@@ -43,6 +46,11 @@ export interface SubViewerProps {
     onToggleTwoPageView?: () => void;
     isPanMode?: boolean;
     onTogglePanMode?: () => void;
+    // PPT specifics
+    slideNumber?: number;
+    numSlides?: number;
+    onSlideChange?: (slide: number) => void;
+    onNumSlidesLoaded?: (total: number) => void;
     // Spreadsheet specifics
     sheets?: string[];
     activeSheet?: string;

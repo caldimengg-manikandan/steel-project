@@ -2,23 +2,31 @@ import React from 'react';
 import type { SubViewerProps } from '../types';
 import { formatBytes, downloadFile } from '../utils';
 
-export default function UnsupportedViewer({ file }: SubViewerProps) {
+export default function UnsupportedViewer({ file, fileBlobUrl }: SubViewerProps) {
     const ext = file.filename.split('.').pop()?.toUpperCase() || 'FILE';
-
-    const getFileIcon = (extension: string) => {
-        if (['DWG', 'DXF', 'STEP', 'IGES', 'IFC'].includes(extension)) return '📐';
-        if (['ZIP', 'RAR', '7Z', 'TAR', 'GZ'].includes(extension)) return '📦';
-        if (['EXE', 'MSI', 'BAT', 'SH'].includes(extension)) return '⚙️';
-        return '📁';
-    };
 
     return (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
             <div className="m365-unsupported-card">
-                <div style={{ fontSize: 52 }}>{getFileIcon(ext)}</div>
+                <div style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 12,
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto',
+                    border: '1px solid #e2e8f0',
+                }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                </div>
 
                 <div>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: '#1e293b', wordBreak: 'break-word' }}>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
                         {file.filename}
                     </h3>
                     <div style={{ fontSize: 12.5, color: '#64748b' }}>

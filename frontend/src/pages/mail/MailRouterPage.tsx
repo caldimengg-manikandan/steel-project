@@ -2,13 +2,13 @@ import React, { Component, type ErrorInfo, useState, useEffect, useCallback, use
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-    listMailAccounts, deleteMailAccount,
+    listMailAccounts, deleteMailAccount, setActiveMailAccount,
     redirectToMicrosoftAuth, redirectToZohoAuth,
     triggerSync, listSyncJobs, listEmails, getEmail, forwardEmail,
     listEmployees, getAttachmentUrl, getAutoSyncStatus, triggerAutoSync, clearDownloadedEmails,
     type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
-import { FileViewer, type FileViewerFile } from '../../components/file-viewer';
+import { FileViewer, type FileViewerFile, prefetchFile, getCachedFile, setCachedFile } from '../../components/file-viewer';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -76,6 +76,7 @@ function getFileIcon(filename: string): string {
     if (['pdf'].includes(ext)) return '📄';
     if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
     if (['xlsx', 'xls', 'csv'].includes(ext)) return '📊';
+    if (['ppt', 'pptx', 'potx', 'ppsx', 'pptm'].includes(ext)) return '📽️';
     if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼️';
     if (['doc', 'docx'].includes(ext)) return '📝';
     return '📎';
@@ -104,7 +105,6 @@ class DetailErrorBoundary extends Component<{ children: React.ReactNode }, { has
         if (this.state.hasError) {
             return (
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>Unable to display email</h3>
                     <p style={{ fontSize: 13, color: 'var(--color-danger-mid)', marginBottom: 16 }}>{this.state.errorText}</p>
                     <button className="btn btn-secondary btn-sm" onClick={() => this.setState({ hasError: false, errorText: '' })}>Retry</button>
@@ -169,7 +169,7 @@ function ConnectModal({ onClose }: { onClose: () => void }) {
                                 <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, padding: '10px 14px', border: `1.5px solid ${provider === p ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-md)', background: provider === p ? 'var(--color-primary-glow)' : 'var(--color-bg-card)', transition: 'all 0.13s' }}>
                                     <input type="radio" name="provider" value={p} checked={provider === p} onChange={() => setProvider(p)} style={{ accentColor: 'var(--color-primary)' }} />
                                     <span style={{ fontWeight: 600 }}>
-                                        {p === 'auto' ? '🔍 Auto-detect from email domain' : p === 'MICROSOFT' ? '🔵 Microsoft 365 / Outlook' : '🟠 Zoho Mail'}
+                                        {p === 'auto' ? '🔍 Auto-detect from email domain' : p === 'MICROSOFT' ? '🔵 Outlook' : '🟠 Zoho Mail'}
                                     </span>
                                 </label>
                             ))}
@@ -814,9 +814,12 @@ function EmailCard({
                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, width: '100%' }}>
                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>{sender}</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)', flexShrink: 0 }}>{time}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontSize:   11.6, color: 'var(--color-text-muted)', flexShrink: 0 }}>{time}</span>
+                            <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)', flexShrink: 0 }}>{msg.receivedAt?.slice(0, 10)}</span>
+                        </div>
                     </div>
-                    <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1, width: '100%' }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1, width: '100%' }}>
                         {msg.subject || '(No subject)'}
                     </div>
                     <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginTop: 3, lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
@@ -856,6 +859,8 @@ function linkifyText(text: string): React.ReactNode {
 }
 
 // ── Email Detail Panel ────────────────────────────────────────
+
+
 
 function EmailDetail({
     email, accounts, onForwardClick, loadingAttachments = false,
@@ -953,6 +958,22 @@ function EmailDetail({
         setTimeout(() => setCopiedAllLinks(false), 2000);
     };
 
+    const handleDirectDownload = (e: React.MouseEvent, att: MailAttachment) => {
+        e.stopPropagation();
+        if (!att.id) return;
+        const url = getAttachmentUrl(att.id);
+        const cached = getCachedFile(url);
+        if (cached && cached.blobUrl) {
+            e.preventDefault();
+            const a = document.createElement('a');
+            a.href = cached.blobUrl;
+            a.download = att.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', minHeight: 0 }}>
             {/* Scrollable body */}
@@ -1014,7 +1035,7 @@ function EmailDetail({
                                             borderRadius: 'var(--radius-sm)',
                                             border: '1px solid var(--color-border)',
                                             background: 'var(--color-bg-card)',
-                                            color: 'var(--color-text-muted)',
+                                            color: '#000000',
                                             fontSize: 12.5,
                                             fontWeight: 600,
                                             userSelect: 'none',
@@ -1031,6 +1052,12 @@ function EmailDetail({
                                         }} />
                                         <span>Loading attachments...</span>
                                     </div>
+                                )}
+
+                                {!isAttLoading && hasAttachmentsFlag && allAttachments.length === 0 && (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
+                                        No file attachments
+                                    </span>
                                 )}
 
                                 {!isAttLoading && allAttachments.length > 0 && (
@@ -1090,7 +1117,7 @@ function EmailDetail({
                                         }}
                                     >
                                         <span>🔗</span>
-                                        <span>Reference Links</span>
+                                        <span> Links</span>
                                         <span style={{
                                             background: showLinks ? '#2563eb' : 'rgba(0,0,0,0.08)',
                                             color: showLinks ? '#fff' : 'var(--color-text-secondary)',
@@ -1133,7 +1160,7 @@ function EmailDetail({
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                                        📎 Drawing & File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
+                                        File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
                                     </div>
                                 </div>
                                 <div style={{
@@ -1174,7 +1201,10 @@ function EmailDetail({
                                                     transition: 'all 0.12s',
                                                     boxShadow: 'var(--shadow-xs)',
                                                 }}
-                                                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = 'var(--color-primary)';
+                                                    if (att.id) prefetchFile(getAttachmentUrl(att.id), att.sizeBytes);
+                                                }}
                                                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                                                 title="Click to preview in File Viewer"
                                             >
@@ -1187,34 +1217,31 @@ function EmailDetail({
                                                         {formatBytes(att.sizeBytes)} • <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Preview</span>
                                                     </div>
                                                 </div>
-                                                <a
-                                                    href={att.id ? getAttachmentUrl(att.id) : '#'}
-                                                    download={att.filename}
-                                                    onClick={e => e.stopPropagation()}
-                                                    title="Download file directly"
-                                                    style={{
-                                                        marginLeft: 6,
-                                                        color: 'var(--color-text-muted)',
-                                                        padding: '4px 6px',
-                                                        borderRadius: 4,
-                                                        fontSize: 13,
-                                                        fontWeight: 700,
-                                                        textDecoration: 'none',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                    }}
-                                                    onMouseEnter={e => {
-                                                        e.currentTarget.style.background = 'var(--color-border-light)';
-                                                        e.currentTarget.style.color = 'var(--color-primary)';
-                                                    }}
-                                                    onMouseLeave={e => {
-                                                        e.currentTarget.style.background = 'transparent';
-                                                        e.currentTarget.style.color = 'var(--color-text-muted)';
-                                                    }}
-                                                >
-                                                    ↓
-                                                </a>
+                                                {att.id && (
+                                                    <a
+                                                        href={`${getAttachmentUrl(att.id)}&download=1`}
+                                                        download={att.filename}
+                                                        onClick={e => handleDirectDownload(e, att)}
+                                                        title="Download file directly"
+                                                        style={{
+                                                            marginLeft: 6,
+                                                            color: 'var(--color-text-muted)',
+                                                            padding: '3px 6px',
+                                                            borderRadius: 4,
+                                                            fontSize: 14,
+                                                            fontWeight: 700,
+                                                            textDecoration: 'none',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'color 0.15s ease',
+                                                        }}
+                                                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--color-primary)'; }}
+                                                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)'; }}
+                                                    >
+                                                        ↓
+                                                    </a>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -1230,7 +1257,7 @@ function EmailDetail({
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-info)' }}>
-                                        🔗 Extracted Reference Links ({validLinks.length})
+                                        🔗 Extracted Links ({validLinks.length})
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         {validLinks.length > 5 && (
@@ -1420,12 +1447,19 @@ function EmailDetail({
 
 // ── Main Page ─────────────────────────────────────────────────
 
+// LocalStorage key for persisting last used mailbox
+const LAST_USED_PROVIDER_KEY = 'mailRouter_lastUsedProvider';
+
 export default function MailRouterPage() {
     const { user } = useAuth();
     const [accounts, setAccounts] = useState<MailAccount[]>([]);
     const [emails, setEmails] = useState<MailMessage[]>([]);
     const [syncJobs, setSyncJobs] = useState<SyncJob[]>([]);
-    const [activeTab, setActiveTab] = useState<'ZOHO' | 'MICROSOFT'>('MICROSOFT');
+    const [activeTab, setActiveTab] = useState<'ZOHO' | 'MICROSOFT'>(() => {
+        const saved = localStorage.getItem(LAST_USED_PROVIDER_KEY);
+        if (saved === 'ZOHO' || saved === 'MICROSOFT') return saved;
+        return 'MICROSOFT';
+    });
     const [selectedEmail, setSelectedEmail] = useState<MailMessage | null>(null);
     const [search, setSearch] = useState('');
     const [startDate, setStartDate] = useState(todayStr());
@@ -1452,28 +1486,41 @@ export default function MailRouterPage() {
         isCycleRunning?: boolean;
     } | null>(null);
 
+    const currentTabRef = useRef<'ZOHO' | 'MICROSOFT'>(activeTab);
+    const latestRequestIdRef = useRef<number>(0);
     const lastRunAtRef = useRef<string | undefined>(undefined);
+
+    // Keep currentTabRef perfectly in sync with activeTab
+    useEffect(() => {
+        currentTabRef.current = activeTab;
+    }, [activeTab]);
 
     const refreshAutoSyncStatus = useCallback(async () => {
         try {
             const d = await getAutoSyncStatus();
             setAutoSyncInfo(d);
-            // If background autosync cycle finished, silently refresh emails
+            // If background autosync cycle finished, silently refresh emails IF it ran for our current mailbox
             if (d?.lastRunAt && lastRunAtRef.current && d.lastRunAt !== lastRunAtRef.current) {
-                listEmails({
-                    startDate,
-                    endDate,
-                    provider: activeTab,
-                    limit: 200,
-                }).then(res => {
-                    const list = res.emails || [];
-                    setEmails(list);
-                    setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
-                }).catch(() => {});
+                const targetTab = currentTabRef.current;
+                const ranForCurrent = !d.lastRunResults || d.lastRunResults.length === 0 || d.lastRunResults.some((r: any) => r.provider === targetTab);
+                if (ranForCurrent) {
+                    const reqId = ++latestRequestIdRef.current;
+                    listEmails({
+                        startDate,
+                        endDate,
+                        provider: targetTab,
+                        limit: 200,
+                    }).then(res => {
+                        if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) return;
+                        const list = (res.emails || []).filter(e => !e.provider || e.provider === targetTab);
+                        setEmails(list);
+                        setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
+                    }).catch(() => {});
+                }
             }
             lastRunAtRef.current = d?.lastRunAt;
         } catch { /* ignore */ }
-    }, [startDate, endDate, activeTab]);
+    }, [startDate, endDate]);
 
     useEffect(() => {
         refreshAutoSyncStatus();
@@ -1484,24 +1531,60 @@ export default function MailRouterPage() {
     // Background email refresh every 60 seconds (1 minute) to stay in sync with server autosync
     useEffect(() => {
         const interval = setInterval(() => {
+            const targetTab = currentTabRef.current;
+            const reqId = ++latestRequestIdRef.current;
             listEmails({
                 startDate,
                 endDate,
-                provider: activeTab,
+                provider: targetTab,
                 limit: 200,
             }).then(res => {
-                const list = res.emails || [];
+                if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) return;
+                const list = (res.emails || []).filter(e => !e.provider || e.provider === targetTab);
                 setEmails(list);
             }).catch(() => {});
         }, 60000);
         return () => clearInterval(interval);
-    }, [startDate, endDate, activeTab]);
+    }, [startDate, endDate]);
 
     const fetchAccounts = useCallback(async () => {
         setLoadingAccounts(true);
         try {
             const d = await listMailAccounts();
-            setAccounts(d.accounts || []);
+            const list = d.accounts || [];
+            setAccounts(list);
+
+            const savedProvider = localStorage.getItem(LAST_USED_PROVIDER_KEY) as 'ZOHO' | 'MICROSOFT' | null;
+            const currentTab = currentTabRef.current;
+            const currentTabHasAccount = list.some(a => a.provider === currentTab);
+            const otherConnected = list.find(a => a.provider !== currentTab);
+            const activeAcc = list.find(a => a.isActive);
+
+            let chosenProvider: 'MICROSOFT' | 'ZOHO' = currentTab;
+
+            if (savedProvider && list.some(a => a.provider === savedProvider)) {
+                chosenProvider = savedProvider;
+            } else if (!currentTabHasAccount && otherConnected) {
+                chosenProvider = otherConnected.provider;
+            } else if (!savedProvider && activeAcc) {
+                chosenProvider = activeAcc.provider;
+            }
+
+            if (chosenProvider !== currentTabRef.current) {
+                currentTabRef.current = chosenProvider;
+                setActiveTab(chosenProvider);
+            }
+            localStorage.setItem(LAST_USED_PROVIDER_KEY, chosenProvider);
+
+            // Ensure server active mailbox matches currently chosen mailbox for autosync
+            const target = list.find(a => a.provider === chosenProvider);
+            if (target && !target.isActive) {
+                setActiveMailAccount(target._id || chosenProvider).catch(() => {});
+                setAccounts(prev => prev.map(a => ({
+                    ...a,
+                    isActive: a.provider === chosenProvider,
+                })));
+            }
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -1510,21 +1593,28 @@ export default function MailRouterPage() {
     }, []);
 
     const fetchEmails = useCallback(async () => {
+        const targetTab = currentTabRef.current;
+        const reqId = ++latestRequestIdRef.current;
         setLoadingEmails(true);
         try {
             const d = await listEmails({
                 startDate,
                 endDate,
-                provider: activeTab,
+                provider: targetTab,
                 limit: 200,
             });
-            const list = d.emails || [];
+            if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) {
+                return;
+            }
+            const list = (d.emails || []).filter(e => !e.provider || e.provider === targetTab);
             setEmails(list);
             setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
         } catch { /* silently fail if no emails yet */ } finally {
-            setLoadingEmails(false);
+            if (reqId === latestRequestIdRef.current) {
+                setLoadingEmails(false);
+            }
         }
-    }, [startDate, endDate, activeTab]);
+    }, [startDate, endDate]);
 
     const fetchSyncJobs = useCallback(async () => {
         try {
@@ -1536,17 +1626,27 @@ export default function MailRouterPage() {
     useEffect(() => {
         fetchAccounts();
         fetchSyncJobs();
+    }, [fetchAccounts, fetchSyncJobs]);
+
+    useEffect(() => {
         fetchEmails();
-    }, [fetchAccounts, fetchSyncJobs, fetchEmails]);
+    }, [activeTab, fetchEmails]);
 
     useEffect(() => {
         const connected = searchParams.get('connected');
+        const providerParam = searchParams.get('provider') as 'MICROSOFT' | 'ZOHO' | null;
         const err = searchParams.get('error');
         if (connected === '1') {
             setSuccessMsg('Mailbox connected successfully!');
+            if (providerParam === 'MICROSOFT' || providerParam === 'ZOHO') {
+                currentTabRef.current = providerParam;
+                setActiveTab(providerParam);
+                localStorage.setItem(LAST_USED_PROVIDER_KEY, providerParam);
+            }
             fetchAccounts();
             const next = new URLSearchParams(searchParams);
             next.delete('connected');
+            next.delete('provider');
             setSearchParams(next, { replace: true });
         }
         if (err) {
@@ -1557,7 +1657,29 @@ export default function MailRouterPage() {
         }
     }, [searchParams, setSearchParams, fetchAccounts]);
 
-    const activeAccount = accounts.find(a => a.provider === activeTab && a.isActive);
+    const handleSelectProvider = useCallback(async (provider: 'MICROSOFT' | 'ZOHO') => {
+        if (provider === currentTabRef.current) return;
+        currentTabRef.current = provider;
+        latestRequestIdRef.current++;
+        setActiveTab(provider);
+        setEmails([]);
+        setSelectedEmail(null);
+        localStorage.setItem(LAST_USED_PROVIDER_KEY, provider);
+        const targetAcc = accounts.find(a => a.provider === provider);
+        if (targetAcc) {
+            try {
+                await setActiveMailAccount(targetAcc._id || provider);
+                setAccounts(prev => prev.map(a => ({
+                    ...a,
+                    isActive: a.provider === provider,
+                })));
+            } catch (e: any) {
+                console.error('Failed to update active mailbox on server:', e);
+            }
+        }
+    }, [accounts]);
+
+    const activeAccount = accounts.find(a => a.provider === activeTab);
 
     // 15 seconds cooldown after sync to prevent rapid API hammering
     const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
@@ -1577,10 +1699,15 @@ export default function MailRouterPage() {
 
     const handleSync = useCallback(async (customStart?: string, customEnd?: string) => {
         if (cooldownRef.current > 0 && !customStart) return;
+        const currentMailbox = accounts.find(a => a.provider === activeTab);
+        if (!currentMailbox) {
+            setError(`Please connect your ${activeTab === 'MICROSOFT' ? 'Outlook' : 'Zoho Mail'} mailbox first.`);
+            return;
+        }
         setSyncing(true);
         setError('');
         try {
-            const accountId = activeAccount?._id;
+            const accountId = currentMailbox._id;
             const s = customStart || startDate;
             const e = customEnd || endDate;
             await triggerSync({ accountId, startDate: s, endDate: e });
@@ -1593,7 +1720,7 @@ export default function MailRouterPage() {
             setCooldownRemaining(15);
             cooldownRef.current = 15;
         }
-    }, [activeAccount?._id, startDate, endDate, fetchEmails, fetchSyncJobs]);
+    }, [accounts, activeTab, startDate, endDate, fetchEmails, fetchSyncJobs]);
 
     // Automatically trigger sync when the date window is changed
     const isFirstDateRender = useRef(true);
@@ -1627,6 +1754,12 @@ export default function MailRouterPage() {
         setDisconnecting(true);
         try {
             await deleteMailAccount(showDisconnect._id);
+            const remaining = accounts.filter(a => a._id !== showDisconnect._id);
+            if (showDisconnect.provider === activeTab) {
+                const nextProvider = remaining[0]?.provider || (activeTab === 'MICROSOFT' ? 'ZOHO' : 'MICROSOFT');
+                setActiveTab(nextProvider);
+                localStorage.setItem(LAST_USED_PROVIDER_KEY, nextProvider);
+            }
             setShowDisconnect(null);
             await fetchAccounts();
         } catch (e: any) {
@@ -1638,24 +1771,34 @@ export default function MailRouterPage() {
 
     const latestJob = syncJobs[0];
 
-    const filteredEmails = emails.filter(e => {
-        if (!search) return true;
-        const s = search.toLowerCase();
-        return (
-            (e.from?.email || '').toLowerCase().includes(s) ||
-            (e.from?.name || '').toLowerCase().includes(s) ||
-            (e.subject || '').toLowerCase().includes(s) ||
-            (e.snippetText || '').toLowerCase().includes(s) ||
-            (e.bodyText || '').toLowerCase().includes(s)
-        );
-    });
+    const filteredEmails = emails
+        .filter(e => !e.provider || e.provider === activeTab)
+        .filter(e => {
+            if (!search) return true;
+            const s = search.toLowerCase();
+            return (
+                (e.from?.email || '').toLowerCase().includes(s) ||
+                (e.from?.name || '').toLowerCase().includes(s) ||
+                (e.subject || '').toLowerCase().includes(s) ||
+                (e.snippetText || '').toLowerCase().includes(s) ||
+                (e.bodyText || '').toLowerCase().includes(s)
+            );
+        });
 
     const [loadingAttachments, setLoadingAttachments] = useState(false);
+    // Track which email IDs we've already resolved attachments for so we never re-spin
+    const resolvedEmailIdsRef = useRef<Set<string>>(new Set());
 
     // Load full details & attachments whenever an email is selected
     useEffect(() => {
         const id = selectedEmail?._id || selectedEmail?.id;
         if (!id) {
+            setLoadingAttachments(false);
+            return;
+        }
+
+        // If we already fetched details for this email (even if it had zero real attachments), skip
+        if (resolvedEmailIdsRef.current.has(String(id))) {
             setLoadingAttachments(false);
             return;
         }
@@ -1667,12 +1810,22 @@ export default function MailRouterPage() {
             (selectedEmail.attachments && selectedEmail.attachments.length > 0)
         );
         const alreadyHasLoadedAtts = Boolean(selectedEmail.attachments && selectedEmail.attachments.length > 0);
-        setLoadingAttachments(hasAtt && !alreadyHasLoadedAtts);
+
+        if (alreadyHasLoadedAtts) {
+            resolvedEmailIdsRef.current.add(String(id));
+            setLoadingAttachments(false);
+            return;
+        }
+
+        setLoadingAttachments(hasAtt);
 
         let active = true;
         getEmail(id)
             .then(data => {
-                if (!active || !data) return;
+                if (!active) return;
+                // Mark as resolved regardless of attachment count to break any potential loop
+                resolvedEmailIdsRef.current.add(String(id));
+                if (!data) return;
                 setSelectedEmail(prev => {
                     if (!prev) return null;
                     const prevId = prev._id || prev.id;
@@ -1684,11 +1837,14 @@ export default function MailRouterPage() {
                     };
                 });
             })
-            .catch(() => {})
+            .catch(() => {
+                if (active) resolvedEmailIdsRef.current.add(String(id));
+            })
             .finally(() => {
                 if (active) setLoadingAttachments(false);
             });
         return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedEmail?._id, selectedEmail?.id]);
 
     return (
@@ -1728,8 +1884,8 @@ export default function MailRouterPage() {
                         {/* Provider tabs */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             {(['MICROSOFT', 'ZOHO'] as const).map((provider, idx) => {
-                                const acc = accounts.find(a => a.provider === provider && a.isActive);
-                                const isActive = activeTab === provider;
+                                const acc = accounts.find(a => a.provider === provider);
+                                const isCurrentTab = activeTab === provider;
                                 return (
                                     <React.Fragment key={provider}>
                                         {idx > 0 && <span style={{ color: 'var(--color-border)', fontSize: 18, fontWeight: 300, margin: '0 2px' }}>|</span>}
@@ -1740,21 +1896,21 @@ export default function MailRouterPage() {
                                                 gap: 8,
                                                 padding: '6px 14px',
                                                 borderRadius: 'var(--radius-md)',
-                                                border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                background: isActive ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
+                                                border: `1.5px solid ${isCurrentTab ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                background: isCurrentTab ? 'var(--color-primary-glow)' : 'var(--color-bg-card)',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.13s ease',
-                                                boxShadow: isActive ? '0 0 0 1px var(--color-primary-glow)' : 'var(--shadow-xs)',
+                                                boxShadow: isCurrentTab ? '0 0 0 1px var(--color-primary-glow)' : 'var(--shadow-xs)',
                                                 userSelect: 'none',
                                             }}
-                                            onClick={() => setActiveTab(provider)}
+                                            onClick={() => handleSelectProvider(provider)}
                                         >
                                             <span style={{ fontSize: 15 }}>{provider === 'MICROSOFT' ? '🔵' : '🟠'}</span>
                                             <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                {provider === 'MICROSOFT' ? 'Microsoft 365' : 'Zoho Mail'}
+                                                {provider === 'MICROSOFT' ? 'Outlook' : 'Zoho Mail'}
                                             </span>
                                             {acc ? (
-                                                isActive && (
+                                                isCurrentTab && (
                                                     <>
                                                         <span style={{
                                                             display: 'flex',
@@ -1796,10 +1952,6 @@ export default function MailRouterPage() {
                                                 </button>
                                             )}
                                         </div>
-                         
-                         
-                         
-                         
                                     </React.Fragment>
                                 );
                             })}

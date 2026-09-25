@@ -6,6 +6,7 @@ const ROW_HEIGHT = 28;
 
 export default function SpreadsheetViewer({
     file,
+    fileBuffer,
     zoom,
     activeSheet,
     onSheetsLoaded,
@@ -29,12 +30,17 @@ export default function SpreadsheetViewer({
 
         async function loadWorkbook() {
             try {
-                const token = localStorage.getItem('token');
-                const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(file.url, { headers, credentials: 'include' });
-                if (!res.ok) throw new Error(`Failed to load spreadsheet (${res.status} ${res.statusText})`);
+                let buffer = fileBuffer;
+                if (!buffer || buffer.byteLength === 0) {
+                    const token = localStorage.getItem('token');
+                    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+                    const res = await fetch(file.url, { headers, credentials: 'include' });
+                    if (!res.ok) throw new Error(`Failed to load spreadsheet (${res.status} ${res.statusText})`);
+                    buffer = await res.arrayBuffer();
+                }
 
-                const buffer = await res.arrayBuffer();
+                if (!isMounted) return;
+
                 const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
                 if (!isMounted) return;
 
@@ -54,7 +60,7 @@ export default function SpreadsheetViewer({
         return () => {
             isMounted = false;
         };
-    }, [file.url]);
+    }, [file.url, fileBuffer]);
 
     // Parse active sheet whenever sheet selection or workbook changes
     useEffect(() => {
@@ -118,8 +124,8 @@ export default function SpreadsheetViewer({
     if (loading) {
         return (
             <div className="m365-loading-state">
-                <div style={{ fontSize: 28 }}>📊</div>
-                <div>Loading spreadsheet workbook...</div>
+                <div className="m365-loading-spinner" />
+                <div style={{ color: '#000000', fontWeight: 600 }}>Loading spreadsheet workbook...</div>
             </div>
         );
     }
@@ -127,7 +133,6 @@ export default function SpreadsheetViewer({
     if (error) {
         return (
             <div className="m365-error-state">
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Unable to render Spreadsheet</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{error}</div>
             </div>
