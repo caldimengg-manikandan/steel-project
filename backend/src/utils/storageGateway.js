@@ -1,254 +1,139 @@
 /**
  * ============================================================
- * Storage Gateway — HTTP Client (Cloud-Side)
+ * Storage Gateway — Local File System Override
  * ============================================================
- * This module runs in the cloud-hosted Steel DMS backend.
- * Instead of accessing the filesystem directly, it makes
- * HTTP requests to the Storage Agent running on the
- * Windows server (via Cloudflare Tunnel).
- *
- * Same API surface as the original local version —
- * the controller/routes don't need to change.
- *
- * Configuration (from .env):
- *   STORAGE_AGENT_URL  — The agent's URL (Cloudflare Tunnel URL)
- *   STORAGE_AGENT_API_KEY — Shared secret for auth
- *   STORAGE_ENABLED — true/false
+ * This module was modified to store files directly on the 
+ * VPS server's local file system, instead of using an external
+ * Windows Storage Agent.
  * ============================================================
  */
+const fs = require('fs');
+const fsPromises = fs.promises;
+const path = require('path');
 const { Readable } = require('stream');
 
-// ── Configuration ──────────────────────────────────────────
-const AGENT_URL = (process.env.STORAGE_AGENT_URL || '').replace(/\/+$/, '');
-const AGENT_API_KEY = process.env.STORAGE_AGENT_API_KEY || '';
-const STORAGE_ENABLED = process.env.STORAGE_ENABLED !== 'false';
+// Use local uploads folder
+const STORAGE_DIR = path.join(__dirname, '../../uploads/storage');
 
-/**
- * isEnabled
- * ─────────
- * Returns whether the storage gateway is active.
- */
+// Ensure storage directory exists
+if (!fs.existsSync(STORAGE_DIR)) {
+    fs.mkdirSync(STORAGE_DIR, { recursive: true });
+}
+
 function isEnabled() {
-    return STORAGE_ENABLED && !!AGENT_URL;
+    return true; // Always enabled for local storage
 }
 
-function getTimeoutSignal(ms) {
-    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-        return AbortSignal.timeout(ms);
-    }
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), ms);
-    return controller.signal;
-}
-
-/**
- * validateRoot
- * ────────────
- * Checks connectivity to the remote Storage Agent.
- * Called at server startup.
- *
- * @returns {Promise<{ ok: boolean, error?: string, skipped?: boolean }>}
- */
 async function validateRoot() {
-    if (!STORAGE_ENABLED) {
-        return { ok: true, skipped: true };
-    }
-
-    if (!AGENT_URL) {
-        return { ok: false, error: 'STORAGE_AGENT_URL is not configured in .env' };
-    }
-
-    if (!AGENT_API_KEY) {
-        return { ok: false, error: 'STORAGE_AGENT_API_KEY is not configured in .env' };
-    }
-
-    try {
-        const response = await fetch(`${AGENT_URL}/health`, {
-            method: 'GET',
-            signal: getTimeoutSignal(10000), // 10s timeout
-        });
-
-        if (!response.ok) {
-            return { ok: false, error: `Agent health check returned HTTP ${response.status}` };
-        }
-
-        const data = await response.json();
-        return {
-            ok: true,
-            storageRoot: data.storageRoot,
-            readOnly: data.readOnly,
-        };
-    } catch (err) {
-        return {
-            ok: false,
-            error: `Cannot reach Storage Agent at ${AGENT_URL}: ${err.message}`
-        };
-    }
+    return { ok: true, storageRoot: STORAGE_DIR, readOnly: false };
 }
 
-/**
- * agentFetch
- * ──────────
- * Internal helper: make an authenticated request to the agent with explicit logging and timeout.
- */
-async function agentFetch(endpoint, options = {}) {
-    const url = `${AGENT_URL}${endpoint}`;
-    const timeoutMs = options.timeoutMs || 8000; // Hard timeout: 8s default
-    const signal = options.signal || getTimeoutSignal(timeoutMs);
-    const start = Date.now();
+function getLocalPath(relativePath) {
+    if (!relativePath) return STORAGE_DIR;
+    
+    // Prevent path traversal
+    const safePath = relativePath.replace(/\.\./g, '').replace(/^[\/\\]+/, '');
+    return path.join(STORAGE_DIR, safePath);
+}
 
-    console.log(`[StorageGateway] agentFetch START -> ${options.method || 'GET'} ${url} (timeout: ${timeoutMs}ms)`);
-
-    const headers = {
-        'X-API-Key': AGENT_API_KEY,
-        ...(options.headers || {}),
-    };
-
+async function listDirectory(relativePath = '') {
+    const dirPath = getLocalPath(relativePath);
     try {
-        const response = await fetch(url, {
-            ...options,
-            headers,
-            signal,
-        });
-
-        const duration = Date.now() - start;
-        console.log(`[StorageGateway] agentFetch SUCCESS -> ${options.method || 'GET'} ${url} HTTP ${response.status} (${duration}ms)`);
-        return response;
+        const dirents = await fsPromises.readdir(dirPath, { withFileTypes: true });
+        const entries = [];
+        
+        for (const dirent of dirents) {
+            const fullPath = path.join(dirPath, dirent.name);
+            try {
+                const stat = await fsPromises.stat(fullPath);
+                entries.push({
+                    name: dirent.name,
+                    type: dirent.isDirectory() ? 'directory' : 'file',
+                    size: dirent.isFile() ? stat.size : null,
+                    modified: stat.mtime.toISOString(),
+                });
+            } catch (err) {
+                // Ignore stat errors for individual files
+            }
+        }
+        return entries;
     } catch (err) {
-        const duration = Date.now() - start;
-        console.error(`[StorageGateway] agentFetch ERROR -> ${options.method || 'GET'} ${url} after ${duration}ms:`, {
-            name: err.name,
-            message: err.message,
-            code: err.code,
-            cause: err.cause,
-            stack: err.stack,
-        });
+        if (err.code === 'ENOENT') return [];
         throw err;
     }
 }
 
-/**
- * listDirectory
- * ──────────────
- * Lists the contents of a directory on the remote storage.
- *
- * @param {string} relativePath
- * @returns {Promise<Array<{ name, type, size, modified }>>}
- */
-async function listDirectory(relativePath = '') {
-    if (!isEnabled()) {
-        // Return an empty array instead of crashing the UI when disabled
-        return [];
-    }
-
-    const response = await agentFetch(`/browse?path=${encodeURIComponent(relativePath)}`);
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Failed to browse: HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.entries || [];
-}
-
-/**
- * fileExists
- * ──────────
- * Checks whether a file exists on the remote storage.
- *
- * @param {string} relativePath
- * @returns {Promise<boolean>}
- */
 async function fileExists(relativePath) {
     try {
-        const response = await agentFetch(`/info?path=${encodeURIComponent(relativePath)}`);
-        return response.ok;
+        await fsPromises.stat(getLocalPath(relativePath));
+        return true;
     } catch {
         return false;
     }
 }
 
-/**
- * getFileInfo
- * ───────────
- * Returns metadata about a file on the remote storage.
- *
- * @param {string} relativePath
- * @returns {Promise<{ name, size, mimeType, modified, created }>}
- */
 async function getFileInfo(relativePath) {
-    const response = await agentFetch(`/info?path=${encodeURIComponent(relativePath)}`);
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Failed to get info: HTTP ${response.status}`);
+    const filePath = getLocalPath(relativePath);
+    try {
+        const stat = await fsPromises.stat(filePath);
+        return {
+            name: path.basename(filePath),
+            size: stat.size,
+            mimeType: 'application/octet-stream', // basic default
+            modified: stat.mtime.toISOString(),
+            created: stat.birthtime.toISOString(),
+        };
+    } catch (err) {
+        throw new Error(`Failed to get info: ${err.message}`);
     }
-
-    return response.json();
 }
 
-/**
- * getFileStream
- * ──────────────
- * Returns a readable stream for a file from the remote storage.
- * This proxies the download from the agent.
- *
- * @param {string} relativePath
- * @returns {Promise<{ stream: ReadableStream, headers: Object }>}
- */
 async function getFileStream(relativePath) {
-    const response = await agentFetch(
-        `/download?path=${encodeURIComponent(relativePath)}`,
-        { timeoutMs: 8000 } // 8s hard timeout so reads fail fast and allow GridFS fallback
-    );
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Failed to download: HTTP ${response.status}`);
+    const filePath = getLocalPath(relativePath);
+    try {
+        const stat = await fsPromises.stat(filePath);
+        const stream = fs.createReadStream(filePath);
+        return {
+            stream,
+            contentType: 'application/octet-stream',
+            contentLength: stat.size,
+            contentDisposition: `attachment; filename="${path.basename(filePath)}"`,
+        };
+    } catch (err) {
+        throw new Error(`Failed to download: ${err.message}`);
     }
-
-    return {
-        stream: Readable.fromWeb(response.body),
-        contentType: response.headers.get('content-type') || 'application/octet-stream',
-        contentLength: response.headers.get('content-length'),
-        contentDisposition: response.headers.get('content-disposition'),
-    };
 }
 
-/**
- * searchFiles
- * ────────────
- * Search for files by name on the remote storage.
- *
- * @param {string} query — Search term
- * @param {string} searchRoot — Directory to search within
- * @returns {Promise<{ results, count, truncated }>}
- */
+async function _searchRecursive(dir, queryLower, results) {
+    const dirents = await fsPromises.readdir(dir, { withFileTypes: true });
+    for (const dirent of dirents) {
+        const fullPath = path.join(dir, dirent.name);
+        if (dirent.name.toLowerCase().includes(queryLower)) {
+            const stat = await fsPromises.stat(fullPath);
+            const relPath = path.relative(STORAGE_DIR, fullPath).replace(/\\/g, '/');
+            results.push({
+                name: dirent.name,
+                path: relPath,
+                type: dirent.isDirectory() ? 'directory' : 'file',
+                size: dirent.isFile() ? stat.size : null,
+                modified: stat.mtime.toISOString(),
+            });
+        }
+        if (dirent.isDirectory()) {
+            await _searchRecursive(fullPath, queryLower, results);
+        }
+    }
+}
+
 async function searchFiles(query, searchRoot = '') {
-    const params = new URLSearchParams({ q: query });
-    if (searchRoot) params.set('path', searchRoot);
-
-    const response = await agentFetch(`/search?${params.toString()}`);
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Search failed: HTTP ${response.status}`);
-    }
-
-    return response.json();
+    const results = [];
+    const rootPath = getLocalPath(searchRoot);
+    if (!fs.existsSync(rootPath)) return { results, count: 0 };
+    
+    await _searchRecursive(rootPath, query.toLowerCase(), results);
+    return { results, count: results.length };
 }
 
-/**
- * uploadFile
- * ──────────
- * Upload a file to the remote storage.
- *
- * @param {string} targetDir — Target directory on the storage
- * @param {string} filename — Name of the file
- * @param {Buffer} buffer — File contents
- * @returns {Promise<Object>}
- */
 function isLogFile(filename) {
     if (!filename) return false;
     const lower = filename.toLowerCase();
@@ -273,49 +158,28 @@ function sanitizeUploadTargetDir(targetDir, filename) {
 
 async function uploadFile(targetDir, filename, buffer) {
     const finalTargetDir = sanitizeUploadTargetDir(targetDir, filename);
-    // Build multipart form data manually using the built-in FormData
-    const formData = new FormData();
-    formData.append('targetPath', finalTargetDir);
-    formData.append('files', new Blob([buffer]), filename);
-
-    const response = await agentFetch('/upload', {
-        method: 'POST',
-        body: formData,
-        signal: AbortSignal.timeout(15000), // 15s timeout to fail fast if agent is down
-    });
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Upload failed: HTTP ${response.status}`);
-    }
-
-    return response.json();
+    const dirPath = getLocalPath(finalTargetDir);
+    
+    await fsPromises.mkdir(dirPath, { recursive: true });
+    
+    const filePath = path.join(dirPath, filename);
+    await fsPromises.writeFile(filePath, buffer);
+    
+    return { message: 'File saved successfully to local server disk.' };
 }
 
-/**
- * deleteFile
- * ──────────
- * Delete a file from the remote storage.
- *
- * @param {string} relativePath
- * @returns {Promise<boolean>}
- */
 async function deleteFile(relativePath) {
-    const response = await agentFetch(
-        `/delete?path=${encodeURIComponent(relativePath)}`,
-        { method: 'DELETE' }
-    );
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(err.error || `Delete failed: HTTP ${response.status}`);
+    const targetPath = getLocalPath(relativePath);
+    try {
+        await fsPromises.rm(targetPath, { recursive: true, force: true });
+        return true;
+    } catch (err) {
+        throw new Error(`Delete failed: ${err.message}`);
     }
-
-    return true;
 }
 
 module.exports = {
-    AGENT_URL,
+    AGENT_URL: 'local',
     isEnabled,
     validateRoot,
     listDirectory,
