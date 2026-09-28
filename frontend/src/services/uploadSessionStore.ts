@@ -4,7 +4,7 @@ export interface SessionFile {
     name: string;
     path: string;
     size: number;
-    status: 'uploading' | 'stored' | 'extracting' | 'completed' | 'failed' | 'duplicate_pending';
+    status: 'uploading' | 'stored' | 'extracting' | 'completed' | 'failed' | 'duplicate_pending' | 'skipped';
     error?: string;
     folder?: string;
     extractionId?: string;
