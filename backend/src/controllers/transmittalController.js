@@ -276,6 +276,18 @@ exports.downloadDrawingLogExcel = async (req, res) => {
 
     const { buffer, filename } = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
 
+    // Ensure a copy is saved to the server disk
+    try {
+        const storageGateway = require('../utils/storageGateway');
+        if (storageGateway.isEnabled() && project && project.name) {
+            const safeProjectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+            const targetDir = `Projects/${safeProjectName}/Logs`;
+            await storageGateway.uploadFile(targetDir, filename, buffer);
+        }
+    } catch (err) {
+        console.error('[DownloadDrawingLog] Failed to save copy to server:', err.message);
+    }
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
@@ -319,6 +331,18 @@ exports.downloadTransmittalExcel = async (req, res) => {
     };
 
     const { buffer, filename } = await generateTransmittalExcel(transmittal, projectDetails, settings?.logoPath);
+
+    // Ensure a copy is saved to the server disk
+    try {
+        const storageGateway = require('../utils/storageGateway');
+        if (storageGateway.isEnabled() && project && project.name) {
+            const safeProjectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+            const targetDir = `Projects/${safeProjectName}/Logs`;
+            await storageGateway.uploadFile(targetDir, filename, buffer);
+        }
+    } catch (err) {
+        console.error('[DownloadTransmittal] Failed to save copy to server:', err.message);
+    }
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
