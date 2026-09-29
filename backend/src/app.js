@@ -133,9 +133,17 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Debugging log (Remove after fixing)
+// Debugging log
 app.use((req, res, next) => {
     console.log(`[API_DEBUG] ${req.method} ${req.originalUrl}`);
+    next();
+});
+
+// Normalize /steel/api prefix to /api so direct calls and variations work seamlessly across dev, preview, and hosted environments
+app.use((req, res, next) => {
+    if (req.url.startsWith('/steel/api')) {
+        req.url = req.url.replace(/^\/steel\/api/, '/api');
+    }
     next();
 });
 
@@ -169,7 +177,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Also serve project root uploads folder if present (e.g. /var/www/steel-project/uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 // ── Mail router ───────────────────────────────────────────
-app.use(['/api/mail', '/api/mail-router'], (req, res, next) => {
+app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
   // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
   if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
     if (req.headers.authorization || req.query.token || req.cookies?.sdms_token) {
