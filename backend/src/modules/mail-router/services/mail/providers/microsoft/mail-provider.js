@@ -78,8 +78,8 @@ function resolveMicrosoftMailboxId(auth, account, requestedMailboxId) {
             retryable: false,
         });
     }
-    // Delegated authentication
-    if (requestedMailboxId && requestedMailboxId !== 'me') {
+    // Delegated authentication: using '/me' is standard and avoids 403 directory read restrictions
+    if (requestedMailboxId && requestedMailboxId !== 'me' && requestedMailboxId !== account?.email && requestedMailboxId !== account?.providerUserId) {
         return requestedMailboxId;
     }
     return 'me';

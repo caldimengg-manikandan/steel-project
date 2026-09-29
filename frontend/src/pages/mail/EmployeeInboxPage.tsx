@@ -386,7 +386,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
             e.preventDefault();
             const a = document.createElement('a');
             a.href = cached.blobUrl;
-            a.download = att.filename;
+            a.download = att.filename || 'attachment';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

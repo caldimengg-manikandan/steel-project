@@ -93,9 +93,9 @@ export default function DocxViewer({ file, fileBuffer, zoom, fitMode }: SubViewe
 
         async function loadDoc() {
             try {
+                const token = localStorage.getItem('token');
                 let buffer = fileBuffer;
                 if (!buffer || buffer.byteLength === 0) {
-                    const token = localStorage.getItem('token');
                     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
                     const res = await fetch(file.url, { headers, credentials: 'include' });
                     if (!res.ok) throw new Error(`Failed to load document (${res.status} ${res.statusText})`);

@@ -21,10 +21,20 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 
-const ATTACHMENT_CACHE_DIR = path.join(__dirname, '../../../../uploads/mail-attachments');
-if (!fs.existsSync(ATTACHMENT_CACHE_DIR)) {
-  fs.mkdirSync(ATTACHMENT_CACHE_DIR, { recursive: true });
+const { ensureDirectory } = require('../../../utils/initDirectories');
+
+function resolveAttachmentCacheDir() {
+  if (process.env.MAIL_ATTACHMENTS_DIR) {
+    ensureDirectory(process.env.MAIL_ATTACHMENTS_DIR);
+    return path.resolve(process.env.MAIL_ATTACHMENTS_DIR);
+  }
+  const backendDir = path.resolve(__dirname, '../../../../uploads/mail-attachments');
+  const rootDir = path.resolve(__dirname, '../../../../../uploads/mail-attachments');
+  ensureDirectory(backendDir);
+  ensureDirectory(rootDir);
+  return backendDir;
 }
+const ATTACHMENT_CACHE_DIR = resolveAttachmentCacheDir();
 
 const Email = require('../mongoose/models/Email');
 const MailAccount = require('../mongoose/models/MailAccount');
@@ -59,10 +69,12 @@ function resolveFrontendUrl(returnTo, params = {}) {
       url = new URL(returnTo);
     } else {
       const cleanPath = (returnTo || '/mail-router').startsWith('/') ? (returnTo || '/mail-router') : `/${returnTo || 'mail-router'}`;
-      url = new URL(cleanPath, fallbackOrigin);
+      const baseObj = new URL(fallbackOrigin.startsWith('http') ? fallbackOrigin : `http://${fallbackOrigin}`);
+      const combinedPath = (baseObj.pathname.replace(/\/+$/, '') + '/' + cleanPath.replace(/^\/+/, '')).replace(/\/+/g, '/');
+      url = new URL(combinedPath, baseObj.origin);
     }
   } catch {
-    url = new URL('/mail-router', fallbackOrigin);
+    url = new URL('/mail-router', fallbackOrigin.startsWith('http') ? fallbackOrigin : `http://${fallbackOrigin}`);
   }
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) {
@@ -806,7 +818,10 @@ async function fetchAndCacheAttachment(attachment) {
       attachment.contentType = fresh.contentType || attachment.contentType;
       attachment.filename = fresh.filename || attachment.filename;
       // Cache to local disk asynchronously so future reads are instantaneous
-      fs.promises.writeFile(localFilePath, fresh.content).catch(() => {});
+      ensureDirectory(path.dirname(localFilePath));
+      fs.promises.writeFile(localFilePath, fresh.content)
+        .then(() => { if (process.platform !== 'win32') try { fs.chmodSync(localFilePath, 0o664); } catch {} })
+        .catch(() => {});
       return fresh.content;
     }
 
@@ -867,15 +882,18 @@ async function fetchAndCacheAttachment(attachment) {
 
     // 5. Cache the attachment locally on disk IMMEDIATELY
     try {
+      ensureDirectory(path.dirname(localFilePath));
       await fs.promises.writeFile(localFilePath, downloaded.content);
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(localFilePath, 0o664); } catch {}
+      }
     } catch (diskErr) {
       console.warn(`[mailRouter:attachments] Could not write to disk cache:`, diskErr);
     }
 
-    // 6. Cache to MongoDB asynchronously in background without blocking response
-    const updateFields = {
-      content: downloaded.content,
-    };
+    // 6. Cache to MongoDB asynchronously in background only if file is <= 2MB (e.g. inline images / signatures)
+    // Larger files (blueprints, DWGs, multi-page PDFs) are safely served from disk cache to preserve MongoDB Atlas quota
+    const updateFields = {};
     if (downloaded.contentType) {
       updateFields.contentType = downloaded.contentType;
       attachment.contentType = downloaded.contentType;
@@ -888,9 +906,12 @@ async function fetchAndCacheAttachment(attachment) {
       updateFields.sizeBytes = downloaded.content.length;
       attachment.sizeBytes = downloaded.content.length;
     }
+    if (downloaded.content.length <= 2 * 1024 * 1024) {
+      updateFields.content = downloaded.content;
+    }
 
     Attachment.findByIdAndUpdate(attachment._id, updateFields).catch(dbErr => {
-      console.warn(`[mailRouter:attachments] Could not cache to MongoDB in background:`, dbErr);
+      console.warn(`[mailRouter:attachments] Could not cache to MongoDB in background:`, dbErr.message);
     });
 
     attachment.content = downloaded.content;
@@ -921,11 +942,17 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
     const isDownload = req.query.download === '1' || req.query.download === 'true';
 
     // Step 0: Fast path — If cached on local disk, serve immediately without loading heavy buffer from MongoDB Atlas!
-    if (fs.existsSync(localFilePath)) {
+    let targetPath = fs.existsSync(localFilePath) ? localFilePath : null;
+    if (!targetPath) {
+      const altPath = path.resolve(__dirname, '../../../../../uploads/mail-attachments', attachmentIdStr);
+      if (fs.existsSync(altPath)) targetPath = altPath;
+    }
+
+    if (targetPath) {
       const meta = await Attachment.findById(attachmentIdStr).select('_id filename contentType sizeBytes').lean();
       const filename = meta?.filename || 'attachment';
       const contentType = meta?.contentType || 'application/octet-stream';
-      const stat = fs.statSync(localFilePath);
+      const stat = fs.statSync(targetPath);
       const disposition = isDownload ? 'attachment' : 'inline';
 
       res.setHeader('Content-Type', contentType);
@@ -935,7 +962,7 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
       res.setHeader('ETag', etag);
       res.setHeader('X-Attachment-Cache', 'DISK-HIT');
 
-      const stream = fs.createReadStream(localFilePath);
+      const stream = fs.createReadStream(targetPath);
       return stream.pipe(res);
     }
 
@@ -947,7 +974,10 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
 
     if (attachment.content && attachment.content.length > 0) {
       // Save to local disk for future instant requests
-      fs.promises.writeFile(localFilePath, attachment.content).catch(() => {});
+      ensureDirectory(path.dirname(localFilePath));
+      fs.promises.writeFile(localFilePath, attachment.content)
+        .then(() => { if (process.platform !== 'win32') try { fs.chmodSync(localFilePath, 0o664); } catch {} })
+        .catch(() => {});
 
       res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(attachment.filename)}"`);

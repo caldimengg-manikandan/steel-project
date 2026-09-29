@@ -162,16 +162,28 @@ export async function setActiveMailAccount(accountIdOrProvider: string): Promise
     return handleResponse(res);
 }
 
-// ── OAuth Redirects (browser navigation) ───────────────────
+function resolveReturnToUrl(returnTo?: string): string {
+    if (returnTo && (returnTo.startsWith('http://') || returnTo.startsWith('https://'))) {
+        return returnTo;
+    }
+    const origin = window.location.origin;
+    if (!returnTo) {
+        return `${origin}${window.location.pathname}${window.location.search}`;
+    }
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const cleanPath = returnTo.startsWith('/') ? returnTo : `/${returnTo}`;
+    const fullPath = (base && base !== '/') ? `${base}${cleanPath}` : cleanPath;
+    return `${origin}${fullPath}`;
+}
 
-export function redirectToMicrosoftAuth(returnTo = '/mail-router') {
-    const target = returnTo.startsWith('http') ? returnTo : `${window.location.origin}${returnTo}`;
+export function redirectToMicrosoftAuth(returnTo?: string) {
+    const target = resolveReturnToUrl(returnTo);
     const params = new URLSearchParams({ returnTo: target });
     window.location.href = `${BASE}/mail/auth/microsoft?${params.toString()}`;
 }
 
-export function redirectToZohoAuth(returnTo = '/mail-router') {
-    const target = returnTo.startsWith('http') ? returnTo : `${window.location.origin}${returnTo}`;
+export function redirectToZohoAuth(returnTo?: string) {
+    const target = resolveReturnToUrl(returnTo);
     const params = new URLSearchParams({ returnTo: target });
     window.location.href = `${BASE}/mail/auth/zoho?${params.toString()}`;
 }
@@ -207,6 +219,8 @@ export async function getAutoSyncStatus(): Promise<{
     isCycleRunning: boolean;
     lastRunAt?: string;
     lastRunStatus?: string;
+    lastRunResults?: any[];
+    currentlySyncingAccounts?: string[];
     activeMailboxesCount?: number;
 }> {
     const res = await fetch(`${BASE}/mail/autosync/status`, {

@@ -251,7 +251,7 @@ export default function PdfViewer({
 
                 const doc = await loadingTask.promise;
                 if (!isMounted) {
-                    try { doc.destroy(); } catch { /* ignore */ }
+                    try { (doc as any).destroy?.(); } catch { /* ignore */ }
                     return;
                 }
 

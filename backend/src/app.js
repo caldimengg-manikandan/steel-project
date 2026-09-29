@@ -73,6 +73,7 @@ const { verifyToken: authMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const allowedOrigins = [
+    'https://caldimproducts.com',
     'https://steel-dms-frontend.onrender.com',
     'https://steel-project-iota.vercel.app',
     'http://localhost:5174',
@@ -159,14 +160,19 @@ app.use('/api/admin/activity-logs', activityLogRoutes);
 app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
 app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));
 app.use('/api/error-log', require('./routes/errorLogRoutes'));
-app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
+// ── Ensure upload directories and permissions exist ─────────
+const { initUploadDirectories } = require('./utils/initDirectories');
+initUploadDirectories();
+
 // ── Serve uploaded files (PDFs, Excel) ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Also serve project root uploads folder if present (e.g. /var/www/steel-project/uploads)
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 // ── Mail router ───────────────────────────────────────────
 app.use(['/api/mail', '/api/mail-router'], (req, res, next) => {
   // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
   if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
-    if (req.headers.authorization) {
+    if (req.headers.authorization || req.query.token || req.cookies?.sdms_token) {
       return authMiddleware(req, res, () => next());
     }
     return next();
