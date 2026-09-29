@@ -6,6 +6,8 @@ frontend/node_modules_old/
 
 # Environment files
 .env
+.env*
+!.env.example
 backend/.env
 frontend/.env
 *.local
@@ -29,7 +31,7 @@ Thumbs.db
 *.db
 
 # Python
-__pycache__/
+**/__pycache__/
 backend/AiExtraction/__pycache__/
 
 # IDE / Editor
@@ -41,9 +43,7 @@ backend/AiExtraction/__pycache__/
 .agents/
 brain/
 *.log
-git_status.txt
-git_staged.txt
-git_status_utf8.txt
+
 # Machine Learning Weights
 *.pt
-*.pyc
+**/*.pyc

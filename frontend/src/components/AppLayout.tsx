@@ -321,6 +321,7 @@ export default function AppLayout() {
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
     const isAdmin = user?.role === 'admin';
+    const isMailRoute = pathname.startsWith('/mail-router') || pathname.startsWith('/inbox');
 
     return (
         <div className="app-shell">
@@ -328,7 +329,7 @@ export default function AppLayout() {
                 collapsed={sidebarCollapsed} 
                 onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
             />
-            <div className={`main-content ${sidebarCollapsed ? 'expanded' : ''}`}>
+            <div className={`main-content ${sidebarCollapsed ? 'expanded' : ''} ${isMailRoute ? 'main-content-viewport' : ''}`}>
                 {/* Topbar */}
                 <header className="topbar">
                     <style>{`
@@ -425,7 +426,7 @@ export default function AppLayout() {
                 </header>
 
                 {/* Page */}
-                <main className="page-content">
+                <main className={`page-content ${isMailRoute ? 'page-content-viewport' : ''}`}>
                     <Outlet />
                 </main>
             </div>

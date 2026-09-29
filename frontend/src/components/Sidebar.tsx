@@ -1,8 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import logoImg from '../assets/logo/caldim_engineering_logo.jpg';
 import { useSettings } from '../context/SettingsContext';
+import { getUnreadCount } from '../services/mailApi';
 import {
     IconDashboard, IconFolder, IconUsers,
     IconPermissions, IconSettings, IconChart
@@ -13,6 +14,7 @@ interface NavItem {
     to: string;
     icon?: React.ReactNode;
     subItems?: NavItem[];
+    badge?: number;
 }
 
 // Project Status icon
@@ -74,8 +76,34 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const isFullAccess = FULL_ACCESS_ROLES.includes(user?.role || '');
     const location = useLocation();
     const [expandedMenu, setExpandedMenu] = useState<string | null>(location.pathname.includes('/admin/weekly-progress') || location.pathname.includes('/admin/error-log') ? 'Reports' : null);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Fetch unread count and poll every 60 s
+    useEffect(() => {
+        let cancelled = false;
+        const fetchUnread = async () => {
+            try {
+                const d = await getUnreadCount();
+                if (!cancelled) setUnreadCount(d.unreadCount || 0);
+            } catch { /* silently ignore */ }
+        };
+        fetchUnread();
+        intervalRef.current = setInterval(fetchUnread, 60_000);
+        return () => {
+            cancelled = true;
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, []);
 
     let baseNav = isFullAccess ? [...adminNav] : [...userNav];
+
+    // Inject mail nav items based on role
+    if (isFullAccess) {
+        baseNav = [...baseNav, { label: 'Mail Router', to: '/mail-router', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> }];
+    }
+    // My Inbox for everyone — always append last
+    baseNav = [...baseNav, { label: 'My Inbox', to: '/inbox', badge: unreadCount || undefined, icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> }];
 
     // Filter based on global module toggles
     const navItems = baseNav.filter(item => {
@@ -182,7 +210,14 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             onClick={() => handleMenuClick(item.label, false)}
                         >
                             <span className="icon-only">{item.icon}</span>
-                            {!collapsed && <span>{item.label}</span>}
+                            {!collapsed && (
+                                <>
+                                    <span style={{ flex: 1 }}>{item.label}</span>
+                                    {item.badge && item.badge > 0 ? (
+                                        <span style={{ background: 'var(--color-primary)', color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20, flexShrink: 0, lineHeight: 1.4, minWidth: 20, textAlign: 'center' }}>{item.badge}</span>
+                                    ) : null}
+                                </>
+                            )}
                         </NavLink>
                     );
                 })}
