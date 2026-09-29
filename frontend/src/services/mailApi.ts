@@ -234,7 +234,8 @@ export async function listEmails(params: {
     provider?: string;
     page?: number;
     limit?: number;
-}): Promise<{ emails: MailMessage[]; total?: number }> {
+    offset?: number;
+}): Promise<{ emails: MailMessage[]; total?: number; hasMore?: boolean }> {
     const q = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined) q.set(k, String(v));

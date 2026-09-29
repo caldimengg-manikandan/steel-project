@@ -516,12 +516,16 @@ router.post('/autosync/trigger', requireRoles(...MANAGER_ROLES), async (req, res
 
 // GET /api/mail-router/emails — List emails in date range for active provider
 router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
-  const { startDate, endDate, provider } = req.query;
+  const { startDate, endDate, provider, limit: qLimit, offset: qOffset, page: qPage } = req.query;
 
   try {
     const cleanStartDate = startDate && startDate !== 'undefined' && startDate !== 'null' ? String(startDate) : undefined;
     const cleanEndDate = endDate && endDate !== 'undefined' && endDate !== 'null' ? String(endDate) : undefined;
     let targetProvider = provider && provider !== 'undefined' && provider !== 'null' ? String(provider).toUpperCase() : undefined;
+
+    const limit = Math.min(parseInt(qLimit || '200', 10), 500);
+    const page = parseInt(qPage || '0', 10);
+    const offset = qOffset !== undefined ? parseInt(qOffset, 10) : page * limit;
 
     if (!targetProvider) {
       const MailAccount = require('../mongoose/models/MailAccount');
@@ -531,11 +535,13 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
       }
     }
 
-    const rawEmails = await listEmailsInWindow(
+    const { emails: rawEmails, total } = await listEmailsInWindow(
       cleanStartDate,
       cleanEndDate,
       targetProvider,
-      req.authUser.id
+      req.authUser.id,
+      limit,
+      offset
     );
 
     // Batch-load attachment metadata (non-inline drawings/files) for all emails in one fast indexed query
@@ -559,13 +565,17 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
         ...e,
         from: e.from || { name: e.fromName || e.fromAddress, email: e.fromAddress },
         isForwarded: e.isForwarded ?? (e.triageStatus === 'FORWARDED'),
-        snippetText: e.snippetText || e.bodyPreview || (e.bodyText ? e.bodyText.slice(0, 150) : ''),
+        snippetText: e.snippetText || e.bodyPreview || '',
         hasAttachments: Boolean(e.hasAttachments || emailAtts.length > 0),
         attachments: emailAtts,
       };
     });
 
-    return res.json({ emails });
+    return res.json({
+      emails,
+      total,
+      hasMore: (offset + emails.length) < total,
+    });
   } catch (err) {
     console.error('[mailRouter:emails] Failed to query emails:', err);
     return res.status(500).json({ error: err.message || 'Failed to list emails' });

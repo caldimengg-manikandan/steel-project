@@ -1408,6 +1408,11 @@ function EmailDetail({
                     overflow: 'hidden',
                     boxShadow: 'var(--shadow-xs)',
                 }}>
+                    {!email.bodyHtml && loadingAttachments && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--color-bg-subtle, #f8fafc)', borderBottom: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                            <Spinner size={12} /> Loading full email content...
+                        </div>
+                    )}
                     {email.bodyHtml ? (
                         <iframe
                             srcDoc={preparedHtml}
@@ -1464,6 +1469,19 @@ export default function MailRouterPage() {
     const [search, setSearch] = useState('');
     const [startDate, setStartDate] = useState(todayStr());
     const [endDate, setEndDate] = useState(todayStr());
+    const [draftStartDate, setDraftStartDate] = useState(todayStr());
+    const [draftEndDate, setDraftEndDate] = useState(todayStr());
+    const toDateRef = useRef<HTMLInputElement>(null);
+
+    const [totalEmails, setTotalEmails] = useState<number>(0);
+    const [hasMore, setHasMore] = useState<boolean>(false);
+    const [loadingMore, setLoadingMore] = useState<boolean>(false);
+    const loadingMoreRef = useRef(false);
+
+    const lastFetchedKeyRef = useRef<string | null>(null);
+    const inFlightFetchRef = useRef<string | null>(null);
+    const syncInProgressRef = useRef<boolean>(false);
+    const emailDetailCacheRef = useRef<Map<string, MailMessage>>(new Map());
 
     const [loadingAccounts, setLoadingAccounts] = useState(true);
     const [loadingEmails, setLoadingEmails] = useState(false);
@@ -1495,57 +1513,164 @@ export default function MailRouterPage() {
         currentTabRef.current = activeTab;
     }, [activeTab]);
 
+    // Handle "From" date selection
+    // Rule: Selecting From date alone must NOT trigger email fetch or sync.
+    // Instantly pops up the "To" date picker.
+    const handleFromDateChange = (val: string) => {
+        if (!val) return;
+        setDraftStartDate(val);
+        if (draftEndDate && val > draftEndDate) {
+            setDraftEndDate(val);
+        }
+        setTimeout(() => {
+            if (toDateRef.current) {
+                try {
+                    toDateRef.current.focus();
+                    if (typeof (toDateRef.current as any).showPicker === 'function') {
+                        (toDateRef.current as any).showPicker();
+                    }
+                } catch {
+                    toDateRef.current?.focus();
+                }
+            }
+        }, 50);
+    };
+
+    // Handle "To" date selection
+    // Rule: The date range should only be applied after From is selected, To is selected, and range is valid.
+    const handleToDateChange = (val: string) => {
+        if (!val) return;
+        setDraftEndDate(val);
+        if (draftStartDate && val >= draftStartDate) {
+            setError('');
+            if (draftStartDate !== startDate || val !== endDate) {
+                setStartDate(draftStartDate);
+                setEndDate(val);
+            }
+        } else if (draftStartDate && val < draftStartDate) {
+            setError('Invalid date range: "From" date cannot be after "To" date.');
+        }
+    };
+
+    // Fetch lightweight email list with deduplication and progressive limit (50 emails per page)
+    const fetchEmails = useCallback(async (force = false) => {
+        const targetTab = currentTabRef.current;
+        const queryKey = `${targetTab}_${startDate}_${endDate}`;
+
+        if (!force && lastFetchedKeyRef.current === queryKey) {
+            return;
+        }
+        if (inFlightFetchRef.current === queryKey) {
+            return;
+        }
+
+        inFlightFetchRef.current = queryKey;
+        const reqId = ++latestRequestIdRef.current;
+        setLoadingEmails(true);
+
+        try {
+            const d = await listEmails({
+                startDate,
+                endDate,
+                provider: targetTab,
+                limit: 50,
+                offset: 0,
+            });
+
+            if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) {
+                return;
+            }
+
+            const list = (d.emails || []).filter(e => !e.provider || e.provider === targetTab);
+            setEmails(list);
+            const total = d.total ?? list.length;
+            setTotalEmails(total);
+            setHasMore(Boolean(d.hasMore ?? (total > list.length)));
+            lastFetchedKeyRef.current = queryKey;
+
+            setSelectedEmail(prev => {
+                if (!prev) return list[0] || null;
+                const found = list.find(e => e._id === prev._id);
+                if (found) {
+                    return prev.bodyHtml ? prev : found;
+                }
+                return list[0] || null;
+            });
+        } catch (err: any) {
+            console.error('Failed to fetch emails:', err);
+        } finally {
+            if (inFlightFetchRef.current === queryKey) {
+                inFlightFetchRef.current = null;
+            }
+            if (reqId === latestRequestIdRef.current) {
+                setLoadingEmails(false);
+            }
+        }
+    }, [startDate, endDate]);
+
+    // Progressive pagination: load next 50 emails
+    const loadMoreEmails = useCallback(async () => {
+        if (loadingMoreRef.current || !hasMore) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        try {
+            const targetTab = currentTabRef.current;
+            const currentCount = emails.length;
+            const d = await listEmails({
+                startDate,
+                endDate,
+                provider: targetTab,
+                limit: 50,
+                offset: currentCount,
+            });
+            const moreList = (d.emails || []).filter(e => !e.provider || e.provider === targetTab);
+            setEmails(prev => {
+                const existingIds = new Set(prev.map(e => e._id));
+                const novel = moreList.filter(e => !existingIds.has(e._id));
+                const nextList = [...prev, ...novel];
+                const total = d.total ?? (prev.length + moreList.length);
+                setTotalEmails(total);
+                setHasMore(Boolean(d.hasMore ?? (total > nextList.length)));
+                return nextList;
+            });
+        } catch (err) {
+            console.error('Failed to load more emails:', err);
+        } finally {
+            loadingMoreRef.current = false;
+            setLoadingMore(false);
+        }
+    }, [hasMore, emails.length, startDate, endDate]);
+
+    // Autosync status polling: avoids duplicate fetches and does not interfere with active manual sync
     const refreshAutoSyncStatus = useCallback(async () => {
         try {
             const d = await getAutoSyncStatus();
             setAutoSyncInfo(d);
-            // If background autosync cycle finished, silently refresh emails IF it ran for our current mailbox
-            if (d?.lastRunAt && lastRunAtRef.current && d.lastRunAt !== lastRunAtRef.current) {
+            if (
+                d?.lastRunAt &&
+                lastRunAtRef.current &&
+                d.lastRunAt !== lastRunAtRef.current &&
+                !syncInProgressRef.current &&
+                !syncing
+            ) {
                 const targetTab = currentTabRef.current;
-                const ranForCurrent = !d.lastRunResults || d.lastRunResults.length === 0 || d.lastRunResults.some((r: any) => r.provider === targetTab);
+                const ranForCurrent =
+                    !d.lastRunResults ||
+                    d.lastRunResults.length === 0 ||
+                    d.lastRunResults.some((r: any) => r.provider === targetTab);
                 if (ranForCurrent) {
-                    const reqId = ++latestRequestIdRef.current;
-                    listEmails({
-                        startDate,
-                        endDate,
-                        provider: targetTab,
-                        limit: 200,
-                    }).then(res => {
-                        if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) return;
-                        const list = (res.emails || []).filter(e => !e.provider || e.provider === targetTab);
-                        setEmails(list);
-                        setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
-                    }).catch(() => {});
+                    fetchEmails(true);
                 }
             }
             lastRunAtRef.current = d?.lastRunAt;
         } catch { /* ignore */ }
-    }, [startDate, endDate]);
+    }, [syncing, fetchEmails]);
 
     useEffect(() => {
         refreshAutoSyncStatus();
         const interval = setInterval(refreshAutoSyncStatus, 15000);
         return () => clearInterval(interval);
     }, [refreshAutoSyncStatus]);
-
-    // Background email refresh every 60 seconds (1 minute) to stay in sync with server autosync
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const targetTab = currentTabRef.current;
-            const reqId = ++latestRequestIdRef.current;
-            listEmails({
-                startDate,
-                endDate,
-                provider: targetTab,
-                limit: 200,
-            }).then(res => {
-                if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) return;
-                const list = (res.emails || []).filter(e => !e.provider || e.provider === targetTab);
-                setEmails(list);
-            }).catch(() => {});
-        }, 60000);
-        return () => clearInterval(interval);
-    }, [startDate, endDate]);
 
     const fetchAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -1592,30 +1717,6 @@ export default function MailRouterPage() {
         }
     }, []);
 
-    const fetchEmails = useCallback(async () => {
-        const targetTab = currentTabRef.current;
-        const reqId = ++latestRequestIdRef.current;
-        setLoadingEmails(true);
-        try {
-            const d = await listEmails({
-                startDate,
-                endDate,
-                provider: targetTab,
-                limit: 200,
-            });
-            if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) {
-                return;
-            }
-            const list = (d.emails || []).filter(e => !e.provider || e.provider === targetTab);
-            setEmails(list);
-            setSelectedEmail(prev => (prev && list.some(e => e._id === prev._id)) ? prev : (list[0] || null));
-        } catch { /* silently fail if no emails yet */ } finally {
-            if (reqId === latestRequestIdRef.current) {
-                setLoadingEmails(false);
-            }
-        }
-    }, [startDate, endDate]);
-
     const fetchSyncJobs = useCallback(async () => {
         try {
             const d = await listSyncJobs();
@@ -1661,9 +1762,13 @@ export default function MailRouterPage() {
         if (provider === currentTabRef.current) return;
         currentTabRef.current = provider;
         latestRequestIdRef.current++;
+        lastFetchedKeyRef.current = null;
+        inFlightFetchRef.current = null;
         setActiveTab(provider);
         setEmails([]);
         setSelectedEmail(null);
+        setHasMore(false);
+        setTotalEmails(0);
         localStorage.setItem(LAST_USED_PROVIDER_KEY, provider);
         const targetAcc = accounts.find(a => a.provider === provider);
         if (targetAcc) {
@@ -1698,56 +1803,46 @@ export default function MailRouterPage() {
     }, [cooldownRemaining]);
 
     const handleSync = useCallback(async (customStart?: string, customEnd?: string) => {
+        if (syncInProgressRef.current || syncing) return;
         if (cooldownRef.current > 0 && !customStart) return;
+
+        const s = customStart || draftStartDate || startDate;
+        const e = customEnd || draftEndDate || endDate;
+
+        if (!s || !e || s > e) {
+            setError('Please select a valid date range before syncing (From date must be on or before To date).');
+            return;
+        }
+
         const currentMailbox = accounts.find(a => a.provider === activeTab);
         if (!currentMailbox) {
             setError(`Please connect your ${activeTab === 'MICROSOFT' ? 'Outlook' : 'Zoho Mail'} mailbox first.`);
             return;
         }
+
+        syncInProgressRef.current = true;
         setSyncing(true);
         setError('');
+
         try {
+            // Keep active range aligned with synced range
+            if (s !== startDate || e !== endDate) {
+                setStartDate(s);
+                setEndDate(e);
+            }
             const accountId = currentMailbox._id;
-            const s = customStart || startDate;
-            const e = customEnd || endDate;
             await triggerSync({ accountId, startDate: s, endDate: e });
-            await fetchEmails();
+            await fetchEmails(true);
             await fetchSyncJobs();
         } catch (e: any) {
-            setError(e.message);
+            setError(e.message || 'Sync failed');
         } finally {
+            syncInProgressRef.current = false;
             setSyncing(false);
             setCooldownRemaining(15);
             cooldownRef.current = 15;
         }
-    }, [accounts, activeTab, startDate, endDate, fetchEmails, fetchSyncJobs]);
-
-    // Automatically trigger sync when the date window is changed
-    const isFirstDateRender = useRef(true);
-    const prevDateRange = useRef({ startDate, endDate });
-
-    useEffect(() => {
-        if (isFirstDateRender.current) {
-            isFirstDateRender.current = false;
-            prevDateRange.current = { startDate, endDate };
-            return;
-        }
-
-        if (prevDateRange.current.startDate === startDate && prevDateRange.current.endDate === endDate) {
-            return;
-        }
-        prevDateRange.current = { startDate, endDate };
-
-        if (!startDate || !endDate || startDate > endDate) {
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            handleSync(startDate, endDate);
-        }, 400);
-
-        return () => clearTimeout(timer);
-    }, [startDate, endDate, handleSync]);
+    }, [accounts, activeTab, draftStartDate, draftEndDate, startDate, endDate, syncing, fetchEmails, fetchSyncJobs]);
 
     async function handleDisconnect() {
         if (!showDisconnect) return;
@@ -1789,7 +1884,7 @@ export default function MailRouterPage() {
     // Track which email IDs we've already resolved attachments for so we never re-spin
     const resolvedEmailIdsRef = useRef<Set<string>>(new Set());
 
-    // Load full details & attachments whenever an email is selected
+    // Load full details & attachments on demand whenever an email is selected
     useEffect(() => {
         const id = selectedEmail?._id || selectedEmail?.id;
         if (!id) {
@@ -1797,8 +1892,16 @@ export default function MailRouterPage() {
             return;
         }
 
-        // If we already fetched details for this email (even if it had zero real attachments), skip
-        if (resolvedEmailIdsRef.current.has(String(id))) {
+        // Check if we already have the hydrated version in memory cache
+        const cached = emailDetailCacheRef.current.get(String(id));
+        if (cached && cached.bodyHtml && !selectedEmail.bodyHtml) {
+            setSelectedEmail(cached);
+            setLoadingAttachments(false);
+            return;
+        }
+
+        // If this email already has full bodyHtml and attachments are resolved, no need to refetch
+        if (selectedEmail.bodyHtml && resolvedEmailIdsRef.current.has(String(id))) {
             setLoadingAttachments(false);
             return;
         }
@@ -1809,13 +1912,6 @@ export default function MailRouterPage() {
             (selectedEmail as any).attachmentsCount > 0 ||
             (selectedEmail.attachments && selectedEmail.attachments.length > 0)
         );
-        const alreadyHasLoadedAtts = Boolean(selectedEmail.attachments && selectedEmail.attachments.length > 0);
-
-        if (alreadyHasLoadedAtts) {
-            resolvedEmailIdsRef.current.add(String(id));
-            setLoadingAttachments(false);
-            return;
-        }
 
         setLoadingAttachments(hasAtt);
 
@@ -1823,18 +1919,19 @@ export default function MailRouterPage() {
         getEmail(id)
             .then(data => {
                 if (!active) return;
-                // Mark as resolved regardless of attachment count to break any potential loop
                 resolvedEmailIdsRef.current.add(String(id));
-                if (!data) return;
+                if (!data?.email) return;
+                const fullEmail: MailMessage = {
+                    ...selectedEmail,
+                    ...data.email,
+                    attachments: data.attachments || (data.email as any)?.attachments || selectedEmail.attachments || [],
+                };
+                emailDetailCacheRef.current.set(String(id), fullEmail);
                 setSelectedEmail(prev => {
                     if (!prev) return null;
                     const prevId = prev._id || prev.id;
                     if (prevId !== id) return prev;
-                    return {
-                        ...prev,
-                        ...data.email,
-                        attachments: data.attachments || (data.email as any)?.attachments || prev.attachments || [],
-                    };
+                    return fullEmail;
                 });
             })
             .catch(() => {
@@ -1843,9 +1940,11 @@ export default function MailRouterPage() {
             .finally(() => {
                 if (active) setLoadingAttachments(false);
             });
-        return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedEmail?._id, selectedEmail?.id]);
+
+        return () => {
+            active = false;
+        };
+    }, [selectedEmail?._id, selectedEmail?.id, selectedEmail?.bodyHtml]);
 
     return (
         <>
@@ -1878,7 +1977,7 @@ export default function MailRouterPage() {
                     <div className="page-header" style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                         <div className="page-header-left">
                             <h1 className="page-title" style={{ fontSize: 22 }}>Mail Router</h1>
-                            <p className="page-subtitle" style={{ fontSize: 13 }}>Connect mailboxes, sync emails, and forward drawing instructions to detailers</p>
+                            <p className="page-subtitle" style={{ fontSize: 13 }}>Connect mailboxes, sync emails, and forward instructions to detailers</p>
                         </div>
 
                         {/* Provider tabs */}
@@ -1975,11 +2074,25 @@ export default function MailRouterPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <label style={{ fontSize: 12.5, color: 'var(--color-text-muted)', fontWeight: 600 }}>From</label>
-                            <input type="date" className="form-control" style={{ width: 145, fontSize: 12.5 }} value={startDate} onChange={e => setStartDate(e.target.value)} max={endDate} />
+                            <input
+                                type="date"
+                                className="form-control"
+                                style={{ width: 145, fontSize: 12.5 }}
+                                value={draftStartDate}
+                                onChange={e => handleFromDateChange(e.target.value)}
+                            />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <label style={{ fontSize: 12.5, color: 'var(--color-text-muted)', fontWeight: 600 }}>To</label>
-                            <input type="date" className="form-control" style={{ width: 145, fontSize: 12.5 }} value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} />
+                            <input
+                                ref={toDateRef}
+                                type="date"
+                                className="form-control"
+                                style={{ width: 145, fontSize: 12.5 }}
+                                value={draftEndDate}
+                                onChange={e => handleToDateChange(e.target.value)}
+                                min={draftStartDate || undefined}
+                            />
                         </div>
                         <button
                             className="btn btn-primary"
@@ -2006,7 +2119,7 @@ export default function MailRouterPage() {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             <input className="form-control" placeholder="Search sender, subject, snippet…" value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 32, fontSize: 13 }} />
                         </div>
-                        <button className="btn btn-secondary" onClick={fetchEmails} disabled={loadingEmails} title="Refresh">
+                        <button className="btn btn-secondary" onClick={() => fetchEmails(true)} disabled={loadingEmails} title="Refresh">
                             {loadingEmails ? <Spinner size={13} /> : '↻'}
                         </button> 
                         <button
@@ -2017,7 +2130,10 @@ export default function MailRouterPage() {
                                 if (window.confirm('Clear all downloaded emails from the database? User accounts and mailbox connections will remain intact.')) {
                                     try {
                                         await clearDownloadedEmails();
-                                        await fetchEmails();
+                                        emailDetailCacheRef.current.clear();
+                                        resolvedEmailIdsRef.current.clear();
+                                        lastFetchedKeyRef.current = null;
+                                        await fetchEmails(true);
                                         await fetchSyncJobs();
                                         setSuccessMsg('Downloaded emails cleared successfully.');
                                     } catch (err: any) {
@@ -2034,19 +2150,27 @@ export default function MailRouterPage() {
                 {/* ── Master-detail (Fills remaining height, scrolls independently) ── */}
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
                     {/* Left: email list (independent vertical scroll) */}
-                    <div style={{
-                        width: 380,
-                        flexShrink: 0,
-                        height: '100%',
-                        minHeight: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'stretch',
-                        justifyContent: 'flex-start',
-                        borderRight: '1px solid var(--color-border)',
-                        overflowY: 'auto',
-                        background: 'var(--color-bg-card)',
-                    }}>
+                    <div
+                        style={{
+                            width: 380,
+                            flexShrink: 0,
+                            height: '100%',
+                            minHeight: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                            justifyContent: 'flex-start',
+                            borderRight: '1px solid var(--color-border)',
+                            overflowY: 'auto',
+                            background: 'var(--color-bg-card)',
+                        }}
+                        onScroll={e => {
+                            const el = e.currentTarget;
+                            if (hasMore && !loadingMore && el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+                                loadMoreEmails();
+                            }
+                        }}
+                    >
                         {loadingEmails ? (
                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
                                 <Spinner size={24} />
@@ -2057,14 +2181,36 @@ export default function MailRouterPage() {
                                 <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Emails</strong> to fetch latest mails</span>
                             </div>
                         ) : (
-                            filteredEmails.map(msg => (
-                                <EmailCard
-                                    key={msg._id}
-                                    msg={msg}
-                                    active={selectedEmail?._id === msg._id}
-                                    onClick={() => setSelectedEmail(msg)}
-                                />
-                            ))
+                            <>
+                                {filteredEmails.map(msg => (
+                                    <EmailCard
+                                        key={msg._id}
+                                        msg={msg}
+                                        active={selectedEmail?._id === msg._id}
+                                        onClick={() => {
+                                            const cached = emailDetailCacheRef.current.get(String(msg._id));
+                                            setSelectedEmail(cached || msg);
+                                        }}
+                                    />
+                                ))}
+                                {hasMore && (
+                                    <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ width: '100%', fontSize: 12.5 }}
+                                            onClick={loadMoreEmails}
+                                            disabled={loadingMore}
+                                        >
+                                            {loadingMore ? <><Spinner size={12} /> Loading more…</> : `Load more emails (${emails.length} of ${totalEmails})`}
+                                        </button>
+                                    </div>
+                                )}
+                                {!hasMore && emails.length > 50 && (
+                                    <div style={{ padding: '10px 16px', textAlign: 'center', fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                        All {emails.length} emails loaded
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

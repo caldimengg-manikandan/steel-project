@@ -94,5 +94,8 @@ const emailSchema = new mongoose.Schema(
 
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ provider: 1, receivedAt: -1 });
+emailSchema.index({ accountId: 1, receivedAt: -1 });
+emailSchema.index({ provider: 1, receivedAt: -1, accountId: 1 });
 
 module.exports = mongoose.model('Email', emailSchema);
+

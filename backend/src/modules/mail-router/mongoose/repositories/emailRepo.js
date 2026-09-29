@@ -36,7 +36,7 @@ async function getEmailById(id) {
   return Email.findById(id).lean();
 }
 
-async function listEmailsInWindow(startDate, endDate, provider, userId) {
+async function listEmailsInWindow(startDate, endDate, provider, userId, limit = 200, offset = 0) {
   const andConditions = [];
 
   if (userId) {
@@ -71,7 +71,19 @@ async function listEmailsInWindow(startDate, endDate, provider, userId) {
   }
 
   const query = andConditions.length > 0 ? { $and: andConditions } : {};
-  return Email.find(query).sort({ receivedAt: -1 }).lean();
+
+  // High-performance projection: Exclude massive bodyHtml/bodyText. Keep bodyPreview for card snippets.
+  const [emails, total] = await Promise.all([
+    Email.find(query)
+      .select('_id userId accountId provider providerMessageId mailboxAddress fromName fromAddress subject receivedAt bodyPreview hasAttachments triageStatus isForwarded projectId createdAt')
+      .sort({ receivedAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean(),
+    Email.countDocuments(query),
+  ]);
+
+  return { emails, total };
 }
 
 async function updateEmailBodyHtml(id, bodyHtml) {
