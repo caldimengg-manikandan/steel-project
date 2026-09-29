@@ -49,20 +49,27 @@ interface CreateProjectForm {
     description: string;
     status: ProjectStatus;
     location: string;
-    scopeOfWork: Array<{ name: string; percentage: number; approval: number; fabrication: number; status: string }>;
-    sequenceCount: string;
+    trackingMode: 'sow' | 'seq';
+    scopeOfWork: Array<{ 
+        name: string; 
+        percentage: number; 
+        approval: number; 
+        fabrication: number; 
+        status: string;
+        sequences: Array<{ name: string; status: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>;
+    }>;
     connectionDesignVendor: string;
     connectionDesignContact: string;
     connectionDesignEmail: string;
     year: string;
     lastTransmittalNumber: string;
 }
-const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], isAdditional: boolean = false) => {
+const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], isAdditional: boolean = false, trackingMode: 'sow' | 'seq' = 'sow') => {
     const count = parseInt(countVal) || 0;
     if (count < 0) return currentRows;
     if (count === 0) return [];
 
-    let base = nameVal.trim() || (isAdditional ? 'Additional SOW ' : 'SOW ');
+    let base = nameVal.trim() || (isAdditional ? 'Additional SOW ' : (trackingMode === 'seq' ? 'SEQ ' : 'SOW '));
     let startNum = 1;
     let padLength = 0;
 
@@ -165,6 +172,37 @@ const generateAdditionalSowRows = (countVal: string, nameVal: string, currentRow
     return { newRows, newOriginalSow };
 };
 
+const AddSeqInline = ({ onAdd }: { onAdd: (count: number) => void }) => {
+    const [count, setCount] = useState('1');
+    return (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: '#475569', fontWeight: 500, marginRight: 2 }}>Number of Sequences:</span>
+            <input 
+                type="number" 
+                className="form-control form-control-sm" 
+                style={{ width: 50, padding: '2px 6px', fontSize: 11, height: 24, textAlign: 'center' }}
+                value={count}
+                min={1}
+                onChange={(e) => setCount(e.target.value)}
+            />
+            <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '2px 8px', fontSize: 11, height: 24 }}
+                onClick={() => {
+                    const num = parseInt(count);
+                    if (!isNaN(num) && num > 0) {
+                        onAdd(num);
+                        setCount('1');
+                    }
+                }}
+            >
+                + Add Seq
+            </button>
+        </div>
+    );
+};
+
 const DEFAULT_FORM: CreateProjectForm = {
     name: '',
     clientName: '',
@@ -173,8 +211,8 @@ const DEFAULT_FORM: CreateProjectForm = {
     description: '',
     status: 'in_progress',
     location: '',
+    trackingMode: 'sow',
     scopeOfWork: [],
-    sequenceCount: '0',
     connectionDesignVendor: '',
     connectionDesignContact: '',
     connectionDesignEmail: '',
@@ -280,15 +318,10 @@ export default function AdminProjects() {
                 contactPerson: form.contactPerson,
                 description: form.description.trim(),
                 status: form.status,
+                trackingMode: form.trackingMode,
                 scopeOfWork: form.scopeOfWork || [],
                 location: form.location,
-                sequences: sequenceNames.map(s => ({
-                    name: s.name,
-                    status: 'Not Completed',
-                    deadline: s.deadline,
-                    approvalDate: s.approvalDate,
-                    fabricationDate: s.fabricationDate
-                })),
+                sequences: [], // Deprecated
                 connectionDesignVendor: form.connectionDesignVendor,
                 connectionDesignContact: form.connectionDesignContact,
                 connectionDesignEmail: form.connectionDesignEmail,
@@ -304,7 +337,6 @@ export default function AdminProjects() {
             setProjects((prev) => [newProject, ...prev]);
             setShowCreate(false);
             setForm(DEFAULT_FORM);
-            setSequenceNames([]);
             setSeqInput('0');
             setSowInput('0');
             setSowNameInput('');
@@ -718,10 +750,46 @@ export default function AdminProjects() {
                                         <textarea className="form-control" placeholder="Brief project description…" rows={3}
                                             value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                             </div>
+
+                            {/* ── Tracking Mode Selection ── */}
+                            <div className="form-group" style={{ marginBottom: 16 }}>
+                                <label className="form-label required">Project Structure</label>
+                                <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 8 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                                        <input 
+                                            type="radio" 
+                                            name="trackingMode" 
+                                            checked={form.trackingMode === 'sow'} 
+                                            onChange={() => {
+                                                setForm({ ...form, trackingMode: 'sow', scopeOfWork: [] });
+                                                setSowInput('');
+                                                setSowNameInput('');
+                                            }} 
+                                            style={{ margin: 0 }}
+                                        />
+                                        Scope of Work (SOW) Based
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                                        <input 
+                                            type="radio" 
+                                            name="trackingMode" 
+                                            checked={form.trackingMode === 'seq'} 
+                                            onChange={() => {
+                                                setForm({ ...form, trackingMode: 'seq', scopeOfWork: [] });
+                                                setSowInput('');
+                                                setSowNameInput('');
+                                            }} 
+                                            style={{ margin: 0 }}
+                                        />
+                                        Sequence (SEQ) Based
+                                    </label>
+                                </div>
+                            </div>
+
                             {/* ── Scope of Work Builder (Create Project) ── */}
                             <div style={{ display: 'flex', gap: '16px' }}>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">Number of SOW Items <span style={{ color: 'red' }}>*</span></label>
+                                    <label className="form-label">Number of {form.trackingMode === 'seq' ? 'SEQ' : 'SOW'} Items <span style={{ color: 'red' }}>*</span></label>
                                     <input
                                         className="form-control"
                                         type="number"
@@ -730,23 +798,27 @@ export default function AdminProjects() {
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             setSowInput(val);
-                                            const newRows = generateSowRows(val, sowNameInput, form.scopeOfWork || [], false);
-                                            setForm({ ...form, scopeOfWork: newRows });
+                                            const newRows = generateSowRows(val, sowNameInput, form.scopeOfWork || [], false, form.trackingMode);
+                                            const updatedRows = newRows.map(r => ({...r, sequences: r.sequences || []}));
+                                            setForm({ ...form, scopeOfWork: updatedRows });
                                         }}
+
                                     />
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">Starting SOW Name</label>
+                                    <label className="form-label">Starting {form.trackingMode === 'seq' ? 'SEQ' : 'SOW'} Name</label>
                                     <input
                                         className="form-control"
                                         type="text"
-                                        placeholder="e.g. SOWLO1"
+                                        placeholder={form.trackingMode === 'seq' ? 'e.g. SEQ01' : 'e.g. SOWLO1'}
                                         value={sowNameInput}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             setSowNameInput(val);
-                                            const newRows = generateSowRows(sowInput, val, form.scopeOfWork || [], false);
-                                            setForm({ ...form, scopeOfWork: newRows });
+                                            const newRows = generateSowRows(sowInput, val, form.scopeOfWork || [], false, form.trackingMode);
+                                            // Initialize sequences if they don't exist
+                                            const updatedRows = newRows.map(r => ({...r, sequences: r.sequences || []}));
+                                            setForm({ ...form, scopeOfWork: updatedRows });
                                         }}
                                     />
                                 </div>
@@ -756,74 +828,162 @@ export default function AdminProjects() {
                                 <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                            Configure Scope of Work Details
+                                            Configure {form.trackingMode === 'seq' ? 'Sequence' : 'Scope of Work'} Details
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {form.scopeOfWork.map((item, idx) => (
-                                            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                                                <div style={{ flex: 2 }}>
-                                                    <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
-                                                    <input
-                                                        className="form-control form-control-sm"
-                                                        value={item.name}
-                                                        onChange={(e) => {
-                                                            const newSow = [...(form.scopeOfWork || [])];
-                                                            newSow[idx] = { ...newSow[idx], name: e.target.value };
+                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <div style={{ flex: 2 }}>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
+                                                        <input
+                                                            className="form-control form-control-sm"
+                                                            value={item.name}
+                                                            onChange={(e) => {
+                                                                const newSow = [...(form.scopeOfWork || [])];
+                                                                newSow[idx] = { ...newSow[idx], name: e.target.value };
+                                                                setForm({ ...form, scopeOfWork: newSow });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ flex: 1.8 }}>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={item.percentage || ''}
+                                                            onChange={(e) => {
+                                                                const newSow = [...(form.scopeOfWork || [])];
+                                                                newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                setForm({ ...form, scopeOfWork: newSow });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ flex: 1.2 }}>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={item.approval || ''}
+                                                            onChange={(e) => {
+                                                                const newSow = [...(form.scopeOfWork || [])];
+                                                                newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
+                                                                setForm({ ...form, scopeOfWork: newSow });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ flex: 1.2 }}>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={item.fabrication || ''}
+                                                            onChange={(e) => {
+                                                                const newSow = [...(form.scopeOfWork || [])];
+                                                                newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
+                                                                setForm({ ...form, scopeOfWork: newSow });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newSow = (form.scopeOfWork || []).filter((_, i) => i !== idx);
                                                             setForm({ ...form, scopeOfWork: newSow });
                                                         }}
-                                                    />
+                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4, marginTop: 14, fontSize: 14, fontWeight: 700 }}
+                                                        title={`Remove ${form.trackingMode === 'seq' ? 'SEQ' : 'SOW'} item`}
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
-                                                <div style={{ flex: 1.8 }}>
-                                                    <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-control form-control-sm"
-                                                        value={item.percentage || ''}
-                                                        onChange={(e) => {
-                                                            const newSow = [...(form.scopeOfWork || [])];
-                                                            newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
-                                                            setForm({ ...form, scopeOfWork: newSow });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div style={{ flex: 1.2 }}>
-                                                    <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-control form-control-sm"
-                                                        value={item.approval || ''}
-                                                        onChange={(e) => {
-                                                            const newSow = [...(form.scopeOfWork || [])];
-                                                            newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
-                                                            setForm({ ...form, scopeOfWork: newSow });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div style={{ flex: 1.2 }}>
-                                                    <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-control form-control-sm"
-                                                        value={item.fabrication || ''}
-                                                        onChange={(e) => {
-                                                            const newSow = [...(form.scopeOfWork || [])];
-                                                            newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
-                                                            setForm({ ...form, scopeOfWork: newSow });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newSow = (form.scopeOfWork || []).filter((_, i) => i !== idx);
-                                                        setForm({ ...form, scopeOfWork: newSow });
-                                                    }}
-                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4, marginTop: 14, fontSize: 14, fontWeight: 700 }}
-                                                    title="Remove SOW item"
-                                                >
-                                                    ✕
-                                                </button>
+                                                
+                                                {/* Nested Sequences UI for SOW mode */}
+                                                {form.trackingMode === 'sow' && (
+                                                    <div style={{ marginTop: 8, padding: '10px', background: '#f1f5f9', borderRadius: 4, border: '1px dashed #cbd5e1' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                            <span style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>Sequences for {item.name || `SOW ${idx + 1}`}</span>
+                                                            <AddSeqInline 
+                                                                onAdd={(count) => {
+                                                                    const newSow = [...(form.scopeOfWork || [])];
+                                                                    const currentSeqs = newSow[idx].sequences || [];
+                                                                    
+                                                                    let globalSeqCount = 1;
+                                                                    for(let i=0; i<idx; i++) {
+                                                                        globalSeqCount += (newSow[i].sequences?.length || 0);
+                                                                    }
+                                                                    globalSeqCount += currentSeqs.length;
+                                                                    
+                                                                    const newSeqs = [];
+                                                                    for(let i = 0; i < count; i++) {
+                                                                        newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                    }
+                                                                    
+                                                                    newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
+                                                                    setForm({ ...form, scopeOfWork: newSow });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {(item.sequences && item.sequences.length > 0) ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                {item.sequences.map((seq, seqIdx) => (
+                                                                    <div key={seqIdx} style={{ display: 'flex', gap: 10, alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #cbd5e1' }}>
+                                                                        <div style={{ flex: 1 }}>
+                                                                            <label className="form-label" style={{ fontSize: 10 }}>Sequence Name</label>
+                                                                            <input
+                                                                                className="form-control form-control-sm"
+                                                                                value={seq.name}
+                                                                                onChange={(e) => {
+                                                                                    const newSow = [...(form.scopeOfWork || [])];
+                                                                                    newSow[idx].sequences[seqIdx].name = e.target.value;
+                                                                                    setForm({ ...form, scopeOfWork: newSow });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <div style={{ width: 120 }}>
+                                                                            <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
+                                                                            <input
+                                                                                className="form-control form-control-sm"
+                                                                                type="date"
+                                                                                value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
+                                                                                onChange={(e) => {
+                                                                                    const newSow = [...(form.scopeOfWork || [])];
+                                                                                    newSow[idx].sequences[seqIdx].approvalDate = e.target.value;
+                                                                                    setForm({ ...form, scopeOfWork: newSow });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <div style={{ width: 120 }}>
+                                                                            <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
+                                                                            <input
+                                                                                className="form-control form-control-sm"
+                                                                                type="date"
+                                                                                value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
+                                                                                onChange={(e) => {
+                                                                                    const newSow = [...(form.scopeOfWork || [])];
+                                                                                    newSow[idx].sequences[seqIdx].fabricationDate = e.target.value;
+                                                                                    setForm({ ...form, scopeOfWork: newSow });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span 
+                                                                            style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', marginTop: 22 }}
+                                                                            onClick={() => {
+                                                                                const newSow = [...(form.scopeOfWork || [])];
+                                                                                newSow[idx].sequences = newSow[idx].sequences.filter((_, i) => i !== seqIdx);
+                                                                                setForm({ ...form, scopeOfWork: newSow });
+                                                                            }}
+                                                                            title="Remove Sequence"
+                                                                        >×</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No sequences added.</div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -856,88 +1016,6 @@ export default function AdminProjects() {
                                     {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                                 </select>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Number of Sequences <span style={{ color: 'red' }}>*</span></label>
-                                <input
-                                    className="form-control"
-                                    type="number"
-                                    placeholder="e.g. 10"
-                                    value={seqInput}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setSeqInput(val);
-                                        const count = parseInt(val);
-                                        if (isNaN(count)) return;
-
-                                        const effectiveCount = Math.max(0, count);
-                                        setForm(f => ({ ...f, sequenceCount: val }));
-
-                                        setSequenceNames(prev => {
-                                            if (effectiveCount > prev.length) {
-                                                const next = [...prev];
-                                                const today = new Date().toISOString().split('T')[0];
-                                                for (let i = prev.length; i < effectiveCount; i++) {
-                                                    next.push({
-                                                        name: '',
-                                                        approvalDate: today,
-                                                        fabricationDate: ''
-                                                    });
-                                                }
-                                                return next;
-                                            } else {
-                                                return prev.slice(0, effectiveCount);
-                                            }
-                                        });
-                                    }}
-                                />
-                            </div>
-                            {sequenceNames.length > 0 && (
-                                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {sequenceNames.map((s, idx) => (
-                                        <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
-                                            <div style={{ flex: 1 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Seq {idx + 1} Name</label>
-                                                <input
-                                                    className="form-control form-control-sm"
-                                                    placeholder={`Seq ${idx + 1}`}
-                                                    value={s.name}
-                                                    onChange={(e) => {
-                                                        const newNames = [...sequenceNames];
-                                                        newNames[idx] = { ...newNames[idx], name: e.target.value };
-                                                        setSequenceNames(newNames);
-                                                    }}
-                                                />
-                                            </div>
-                                            <div style={{ width: 140 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                <input
-                                                    className="form-control form-control-sm"
-                                                    type="date"
-                                                    value={s.approvalDate ? s.approvalDate.split('T')[0] : ''}
-                                                    onChange={(e) => {
-                                                        const newNames = [...sequenceNames];
-                                                        newNames[idx] = { ...newNames[idx], approvalDate: e.target.value };
-                                                        setSequenceNames(newNames);
-                                                    }}
-                                                />
-                                            </div>
-                                            <div style={{ width: 140 }}>
-                                                <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
-                                                <input
-                                                    className="form-control form-control-sm"
-                                                    type="date"
-                                                    value={s.fabricationDate ? s.fabricationDate.split('T')[0] : ''}
-                                                    onChange={(e) => {
-                                                        const newNames = [...sequenceNames];
-                                                        newNames[idx] = { ...newNames[idx], fabricationDate: e.target.value };
-                                                        setSequenceNames(newNames);
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
 
                             <div style={{ marginTop: 24, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
@@ -1006,8 +1084,7 @@ export default function AdminProjects() {
                                             missing.push('Last Transmittal Number');
                                         }
                                         if (!form.location) missing.push('Location');
-                                        if (!form.scopeOfWork || form.scopeOfWork.length === 0) missing.push('Scope of Work');
-                                        if (sequenceNames.length === 0) missing.push('Number of Sequences');
+                                        if (!form.scopeOfWork || form.scopeOfWork.length === 0) missing.push(form.trackingMode === 'seq' ? 'Sequences' : 'Scope of Work');
 
                                         if (missing.length > 0) {
                                             const msgText = 'Please fill in the following required field(s):\n• ' + missing.join('\n• ');
@@ -1127,58 +1204,146 @@ export default function AdminProjects() {
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                   {editTarget.scopeOfWork.map((item, idx) => (
-                                                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                                                          <div style={{ flex: 2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
-                                                              <input
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.name}
-                                                                  disabled
-                                                              />
+                                                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                                                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                              <div style={{ flex: 2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
+                                                                  <input
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.name}
+                                                                      disabled
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.8 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.percentage || ''}
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                          setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.approval || ''}
+                                                                      min="0"
+                                                                      max="100"
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
+                                                                          setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.fabrication || ''}
+                                                                      min="0"
+                                                                      max="100"
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
+                                                                          setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
                                                           </div>
-                                                          <div style={{ flex: 1.8 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.percentage || ''}
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                  }}
-                                                              />
-                                                          </div>
-                                                          <div style={{ flex: 1.2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.approval || ''}
-                                                                  min="0"
-                                                                  max="100"
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                  }}
-                                                              />
-                                                          </div>
-                                                          <div style={{ flex: 1.2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.fabrication || ''}
-                                                                  min="0"
-                                                                  max="100"
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, scopeOfWork: newSow });
-                                                                  }}
-                                                              />
-                                                          </div>
+                                                          
+                                                          {/* Nested Sequences UI for SOW mode */}
+                                                          {(!editTarget.trackingMode || editTarget.trackingMode === 'sow') && (
+                                                              <div style={{ marginTop: 8, padding: '10px', background: '#f1f5f9', borderRadius: 4, border: '1px dashed #cbd5e1' }}>
+                                                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                                      <span style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>Sequences for {item.name || `SOW ${idx + 1}`}</span>
+                                                                      <AddSeqInline 
+                                                                          onAdd={(count) => {
+                                                                              const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                              const currentSeqs = newSow[idx].sequences || [];
+                                                                              
+                                                                              let globalSeqCount = 1;
+                                                                              for(let i=0; i<idx; i++) {
+                                                                                  globalSeqCount += (newSow[i].sequences?.length || 0);
+                                                                              }
+                                                                              globalSeqCount += currentSeqs.length;
+                                                                              
+                                                                              const newSeqs = [];
+                                                                              for(let i = 0; i < count; i++) {
+                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                              }
+                                                                              
+                                                                              newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
+                                                                              setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                          }}
+                                                                      />
+                                                                  </div>
+                                                                  {(item.sequences && item.sequences.length > 0) ? (
+                                                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                          {item.sequences.map((seq, seqIdx) => (
+                                                                              <div key={seqIdx} style={{ display: 'flex', gap: 10, alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #cbd5e1' }}>
+                                                                                  <div style={{ flex: 1 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Sequence Name</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          value={seq.name}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].name = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <div style={{ width: 120 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          type="date"
+                                                                                          value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].approvalDate = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <div style={{ width: 120 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          type="date"
+                                                                                          value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].fabricationDate = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <span 
+                                                                                      style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', marginTop: 22 }}
+                                                                                      onClick={() => {
+                                                                                          const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                          newSow[idx].sequences = newSow[idx].sequences.filter((_, i) => i !== seqIdx);
+                                                                                          setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                                      }}
+                                                                                      title="Remove Sequence"
+                                                                                  >×</span>
+                                                                              </div>
+                                                                          ))}
+                                                                      </div>
+                                                                  ) : (
+                                                                      <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No sequences added.</div>
+                                                                  )}
+                                                              </div>
+                                                          )}
                                                       </div>
                                                   ))}
                                               </div>
@@ -1240,78 +1405,171 @@ export default function AdminProjects() {
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                   {editTarget.additionalScopeOfWork.map((item, idx) => (
-                                                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                                                          <div style={{ flex: 2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
-                                                              <input
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.name}
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], name: e.target.value };
-                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
-                                                                  }}
-                                                              />
+                                                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                                                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                              <div style={{ flex: 2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Name</label>
+                                                                  <input
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.name}
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], name: e.target.value };
+                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.8 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.percentage || ''}
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
+                                                                          
+                                                                          let newOriginalSow = [...(editTarget.scopeOfWork || [])];
+                                                                          if (newOriginalSow.length > 0) {
+                                                                              const totalAdd = newSow.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                                                                              const remaining = 100 - totalAdd;
+                                                                              const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
+                                                                              newOriginalSow = newOriginalSow.map((row, innerIdx) => {
+                                                                                  if (innerIdx === newOriginalSow.length - 1) {
+                                                                                      const sumOthers = defaultPct * (newOriginalSow.length - 1);
+                                                                                      const rem = Math.round((remaining - sumOthers) * 10) / 10;
+                                                                                      return { ...row, percentage: rem };
+                                                                                  }
+                                                                                  return { ...row, percentage: defaultPct };
+                                                                              });
+                                                                          }
+                                                                          
+                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow, scopeOfWork: newOriginalSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.approval || ''}
+                                                                      min="0"
+                                                                      max="100"
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
+                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
+                                                              <div style={{ flex: 1.2 }}>
+                                                                  <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
+                                                                  <input
+                                                                      type="number"
+                                                                      className="form-control form-control-sm"
+                                                                      value={item.fabrication || ''}
+                                                                      min="0"
+                                                                      max="100"
+                                                                      onChange={(e) => {
+                                                                          const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                          newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
+                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                      }}
+                                                                  />
+                                                              </div>
                                                           </div>
-                                                          <div style={{ flex: 1.8 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Percentage of Total Work (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.percentage || ''}
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
-                                                                      
-                                                                      let newOriginalSow = [...(editTarget.scopeOfWork || [])];
-                                                                      if (newOriginalSow.length > 0) {
-                                                                          const totalAdd = newSow.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-                                                                          const remaining = 100 - totalAdd;
-                                                                          const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
-                                                                          newOriginalSow = newOriginalSow.map((row, innerIdx) => {
-                                                                              if (innerIdx === newOriginalSow.length - 1) {
-                                                                                  const sumOthers = defaultPct * (newOriginalSow.length - 1);
-                                                                                  const rem = Math.round((remaining - sumOthers) * 10) / 10;
-                                                                                  return { ...row, percentage: rem };
+                                                          
+                                                          {/* Nested Sequences UI for Additional SOW */}
+                                                          {(!editTarget.trackingMode || editTarget.trackingMode === 'sow') && (
+                                                              <div style={{ marginTop: 8, padding: '10px', background: '#f1f5f9', borderRadius: 4, border: '1px dashed #cbd5e1' }}>
+                                                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                                      <span style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>Sequences for {item.name || `Additional SOW ${idx + 1}`}</span>
+                                                                      <AddSeqInline 
+                                                                          onAdd={(count) => {
+                                                                              const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                              const currentSeqs = newSow[idx].sequences || [];
+                                                                              
+                                                                              let globalSeqCount = 1;
+                                                                              // Count from main SOW
+                                                                              for(let i=0; i<(editTarget.scopeOfWork?.length || 0); i++) {
+                                                                                  globalSeqCount += (editTarget.scopeOfWork?.[i].sequences?.length || 0);
                                                                               }
-                                                                              return { ...row, percentage: defaultPct };
-                                                                          });
-                                                                      }
-                                                                      
-                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow, scopeOfWork: newOriginalSow });
-                                                                  }}
-                                                              />
-                                                          </div>
-                                                          <div style={{ flex: 1.2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Approval (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.approval || ''}
-                                                                  min="0"
-                                                                  max="100"
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], approval: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
-                                                                  }}
-                                                              />
-                                                          </div>
-                                                          <div style={{ flex: 1.2 }}>
-                                                              <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 2 }}>Fabrication (%)</label>
-                                                              <input
-                                                                  type="number"
-                                                                  className="form-control form-control-sm"
-                                                                  value={item.fabrication || ''}
-                                                                  min="0"
-                                                                  max="100"
-                                                                  onChange={(e) => {
-                                                                      const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                      newSow[idx] = { ...newSow[idx], fabrication: Number(e.target.value) };
-                                                                      setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
-                                                                  }}
-                                                              />
-                                                          </div>
+                                                                              // Count from previous additional SOWs
+                                                                              for(let i=0; i<idx; i++) {
+                                                                                  globalSeqCount += (newSow[i].sequences?.length || 0);
+                                                                              }
+                                                                              globalSeqCount += currentSeqs.length;
+                                                                              
+                                                                              const newSeqs = [];
+                                                                              for(let i = 0; i < count; i++) {
+                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                              }
+                                                                              
+                                                                              newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
+                                                                              setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                          }}
+                                                                      />
+                                                                  </div>
+                                                                  {(item.sequences && item.sequences.length > 0) ? (
+                                                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                          {item.sequences.map((seq, seqIdx) => (
+                                                                              <div key={seqIdx} style={{ display: 'flex', gap: 10, alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #cbd5e1' }}>
+                                                                                  <div style={{ flex: 1 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Sequence Name</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          value={seq.name}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].name = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <div style={{ width: 120 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          type="date"
+                                                                                          value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].approvalDate = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <div style={{ width: 120 }}>
+                                                                                      <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
+                                                                                      <input
+                                                                                          className="form-control form-control-sm"
+                                                                                          type="date"
+                                                                                          value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
+                                                                                          onChange={(e) => {
+                                                                                              const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                                              newSow[idx].sequences[seqIdx].fabricationDate = e.target.value;
+                                                                                              setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                                          }}
+                                                                                      />
+                                                                                  </div>
+                                                                                  <span 
+                                                                                      style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', marginTop: 22 }}
+                                                                                      onClick={() => {
+                                                                                          const newSow = [...(editTarget.additionalScopeOfWork || [])];
+                                                                                          newSow[idx].sequences = newSow[idx].sequences.filter((_, i) => i !== seqIdx);
+                                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
+                                                                                      }}
+                                                                                      title="Remove Sequence"
+                                                                                  >×</span>
+                                                                              </div>
+                                                                          ))}
+                                                                      </div>
+                                                                  ) : (
+                                                                      <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No sequences added.</div>
+                                                                  )}
+                                                              </div>
+                                                          )}
                                                       </div>
                                                   ))}
                                               </div>
