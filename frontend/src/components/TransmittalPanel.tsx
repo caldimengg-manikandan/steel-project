@@ -4,7 +4,8 @@ import {
     generateTransmittal,
     previewTransmittal,
     getTransmittalExcelUrl,
-    getDrawingLogExcelUrl
+    getDrawingLogExcelUrl,
+    voidTransmittal
 } from '../services/transmittalApi';
 import { useMessage } from '../context/MessageContext';
 import { formatDate } from '../utils/dateUtils';
@@ -34,6 +35,13 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
         fetchTransmittals();
     }, [fetchTransmittals]);
 
+    useEffect(() => {
+        const pendingT = transmittals.find(t => t.isPending);
+        if (pendingT && canEdit && !generating) {
+            handleGenerate(pendingT.transmittalNumber);
+        }
+    }, [transmittals, canEdit, generating]);
+
     const handleGenerate = async (targetTransmittalNumber?: number) => {
         try {
             setGenerating(true);
@@ -44,7 +52,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                 const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
                 if (data.transmittal) {
                     showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
-                    fetchTransmittals();
+                    await fetchTransmittals();
                 } else {
                     showMessage('Notice', data.message || 'No drawings found to transmit.', 'info');
                 }
@@ -64,7 +72,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                     const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
                     if (data.transmittal) {
                         showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
-                        fetchTransmittals();
+                        await fetchTransmittals();
                     } else {
                         showMessage('Notice', data.message || 'No new drawings to transmit.', 'info');
                     }
@@ -83,6 +91,21 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     };
 
 
+
+    const handleVoid = async (transmittalId: string, transmittalNumber: number) => {
+        showConfirm('Void Transmittal', `Are you sure you want to void TR-${String(transmittalNumber).padStart(3, '0')}? This will remove its drawings from the drawing log.`, async () => {
+            try {
+                setGenerating(true);
+                await voidTransmittal(projectId, transmittalId);
+                showMessage('Success', 'Transmittal voided successfully.', 'success');
+                fetchTransmittals();
+            } catch (err: any) {
+                setError(err.message || 'Failed to void transmittal');
+            } finally {
+                setGenerating(false);
+            }
+        });
+    };
 
     return (
         <div className="card" style={{ padding: 'var(--space-lg)' }}>
@@ -139,12 +162,15 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                 <th>Transmittal No</th>
                                 <th>Sequences</th>
                                 <th>Date</th>
+                                <th>Log Updated</th>
                                 <th>Drawings</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {(selectedFilters.length > 0 ? transmittals.filter(t => t.sequences?.some((seq: string) => selectedFilters.includes(seq))) : transmittals).map(t => {
+                            {(selectedFilters.length > 0 ? transmittals.filter(t => t.sequences?.some((seq: string) => selectedFilters.includes(seq))) : transmittals)
+                                .filter(t => !t.isVoided)
+                                .map(t => {
                                 const drawingCount = t.drawings ? t.drawings.length : ((t.newCount || 0) + (t.revisedCount || 0) + (t.unchangedCount || 0));
                                 if (t.isPending) {
                                     return (
@@ -167,6 +193,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                 )}
                                             </td>
                                             <td className="text-muted">{formatDate(t.createdAt)}</td>
+                                            <td className="text-muted">{formatDate(t.updatedAt || t.createdAt)}</td>
                                             <td>
                                                 <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                                     • {drawingCount}
@@ -174,9 +201,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                             </td>
                                             <td>
                                                 {canEdit ? (
-                                                    <button className="btn btn-primary btn-sm" onClick={() => handleGenerate(t.transmittalNumber)} disabled={generating}>
-                                                        {generating ? 'Processing...' : '⚡ Generate Excel'}
-                                                    </button>
+                                                    <span style={{ fontSize: 12, color: '#2563eb', fontWeight: 600 }}>Auto-Generating...</span>
                                                 ) : (
                                                     <span style={{ fontSize: 11, color: '#64748b' }}>Awaiting Generation</span>
                                                 )}
@@ -185,12 +210,10 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                     );
                                 }
                                 return (
-                                    <tr key={t._id}>
-                                        <td style={{ fontWeight: 600 }}>
-                                            <a href={getTransmittalExcelUrl(projectId, t._id)} download style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Click to download Excel">
-                                                TR-{String(t.transmittalNumber).padStart(3, '0')}
-                                                <IconDownload width={14} height={14} />
-                                            </a>
+                                    <tr key={t._id} style={{ opacity: t.isVoided ? 0.5 : 1, textDecoration: t.isVoided ? 'line-through' : 'none', background: t.isVoided ? '#f8fafc' : 'transparent' }}>
+                                        <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                            TR-{String(t.transmittalNumber).padStart(3, '0')}
+                                            {t.isVoided && <span style={{ marginLeft: 8, fontSize: 10, background: '#fee2e2', color: '#b91c1c', padding: '2px 5px', borderRadius: 4, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>}
                                         </td>
                                         <td>
                                             {t.sequences && t.sequences.length > 0 ? (
@@ -205,17 +228,35 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                 <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
                                             )}
                                         </td>
-                                        <td className="text-muted">{formatDate(t.createdAt)}</td>
+                                        <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.createdAt)}</td>
+                                        <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.updatedAt || t.createdAt)}</td>
                                         <td>
-                                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, filter: t.isVoided ? 'grayscale(100%)' : 'none' }}>
                                                 • {drawingCount}
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                                    <IconDownload width={14} height={14} /> Download
-                                                </a>
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', textDecoration: 'none' }}>
+                                                {!t.isVoided && (
+                                                    <>
+                                                        <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                                                            <IconDownload width={14} height={14} /> Transmittal
+                                                        </a>
+                                                        <a href={getDrawingLogExcelUrl(projectId, t.transmittalNumber)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                                                            <IconDownload width={14} height={14} /> Log
+                                                        </a>
+                                                        {canEdit && (
+                                                            <button 
+                                                                className="btn btn-sm" 
+                                                                style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+                                                                onClick={() => handleVoid(t._id, t.transmittalNumber)}
+                                                                disabled={generating}
+                                                            >
+                                                                Void
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

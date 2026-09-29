@@ -280,6 +280,37 @@ exports.reprocess = async (req, res) => {
     });
 };
 
+// ── Resolve Duplicate Extraction ──────────────────────────
+exports.resolveDuplicate = async (req, res) => {
+    const { projectId, id } = req.params;
+    const adminId = req.principal.adminId;
+    const { action } = req.body; // 'proceed' or 'skip'
+
+    if (!['proceed', 'skip'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action. Must be proceed or skip.' });
+    }
+
+    const doc = await DrawingExtraction.findOne({
+        _id: id,
+        projectId,
+        createdByAdminId: adminId
+    });
+
+    if (!doc) {
+        return res.status(404).json({ error: 'Extraction not found.' });
+    }
+
+    if (doc.status !== 'duplicate_pending') {
+        return res.status(400).json({ error: 'Extraction is not pending duplicate resolution.' });
+    }
+
+    const newStatus = action === 'proceed' ? 'completed' : 'skipped';
+    doc.status = newStatus;
+    await doc.save();
+
+    res.json({ message: `Duplicate resolved as ${newStatus}`, status: newStatus });
+};
+
 // ── View PDF (Stream from GridFS/Disk) ─────────────────────
 exports.viewPdf = async (req, res) => {
     const { projectId, id } = req.params;
@@ -433,6 +464,7 @@ exports.downloadExcel = async (req, res) => {
             targetTransmittal = {
                 transmittalNumber: maxTarget,
                 drawings: batchToUse.map(e => ({
+                    extractionId: e._id,
                     drawingNumber: e.extractedFields?.drawingNumber || e.originalFileName || '',
                     drawingTitle: e.extractedFields?.drawingTitle || e.extractedFields?.drawingDescription || '',
                     revision: e.extractedFields?.revision || '0',
@@ -568,4 +600,39 @@ exports.deleteExtraction = async (req, res) => {
     }
 
     res.json({ message: 'Extraction deleted.' });
+};
+
+// ── Resolve Duplicate ──────────────────────────────────────
+exports.resolveDuplicate = async (req, res) => {
+    const { projectId, id } = req.params;
+    const { action } = req.body;
+    const adminId = req.principal.adminId;
+
+    if (!['proceed', 'skip'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action. Must be proceed or skip.' });
+    }
+
+    try {
+        const doc = await DrawingExtraction.findOne({
+            _id: id,
+            projectId,
+            createdByAdminId: adminId
+        });
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Extraction not found.' });
+        }
+
+        if (doc.status !== 'duplicate_pending') {
+            return res.status(400).json({ error: 'Extraction is not in duplicate_pending status.' });
+        }
+
+        doc.status = action === 'proceed' ? 'completed' : 'skipped';
+        await doc.save();
+
+        res.json({ message: `Duplicate resolved as ${action}`, status: doc.status });
+    } catch (err) {
+        console.error('[ExtractionController] resolveDuplicate error:', err);
+        res.status(500).json({ error: 'Internal server error resolving duplicate' });
+    }
 };

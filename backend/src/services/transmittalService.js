@@ -659,9 +659,29 @@ async function getTransmittals(projectId) {
  * @param {string} adminId
  * @returns {Promise<object|null>}
  */
-async function getDrawingLog(projectId) {
+async function getDrawingLog(projectId, upToTransmittalNumber = null) {
     let log = await DrawingLog.findOne({ projectId }).lean();
-    const extractions = await DrawingExtraction.find({ projectId, status: 'completed' }).sort({ createdAt: 1 }).lean();
+    let extractions = await DrawingExtraction.find({ projectId, status: 'completed' }).sort({ createdAt: 1 }).lean();
+    
+    // Filter out extractions belonging to voided transmittals, or transmittals > upToTransmittalNumber
+    const voidedTransmittals = await Transmittal.find({ projectId, isVoided: true }, 'transmittalNumber').lean();
+    const voidedNumbers = voidedTransmittals.map(t => t.transmittalNumber);
+    
+    // If we are looking back in time, or if there are voided transmittals,
+    // we MUST ignore the cached DrawingLog and rebuild entirely from extractions.
+    if (upToTransmittalNumber !== null || voidedNumbers.length > 0) {
+        log = null;
+    }
+    
+    extractions = extractions.filter(ex => {
+        if (ex.targetTransmittalNumber && voidedNumbers.includes(ex.targetTransmittalNumber)) {
+            return false;
+        }
+        if (upToTransmittalNumber !== null && ex.targetTransmittalNumber > upToTransmittalNumber) {
+            return false;
+        }
+        return true;
+    });
 
     if ((!log || !log.drawings || log.drawings.length === 0) && extractions.length === 0) {
         return log || null;

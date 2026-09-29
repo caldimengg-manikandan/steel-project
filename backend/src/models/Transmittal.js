@@ -78,6 +78,9 @@ const transmittalSchema = new mongoose.Schema(
         // ── Link to generated Excel file ─────────────────────────
         excelPath: { type: String, default: '' },
         excelUrl: { type: String, default: '' },
+        
+        // ── Void status ──────────────────────────────────────────
+        isVoided: { type: Boolean, default: false },
     },
     {
         timestamps: true,

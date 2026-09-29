@@ -35,10 +35,55 @@ const RfiExtraction = require('../models/RfiExtraction');
 exports.browse = async (req, res) => {
     try {
         const requestedPath = req.query.path || '';
-        const entries = await storageGateway.listDirectory(requestedPath);
+        let entries = [];
+        try {
+            entries = await storageGateway.listDirectory(requestedPath);
+        } catch(err) {
+            console.warn('[FileGateway] Storage Agent browse failed, falling back to DB:', err.message);
+        }
 
-        // Fetch uploadedBy usernames from DB for file items
-        const fileNames = entries.filter(e => e.type !== 'directory').map(e => e.name);
+        // Database Fallback: Reconstruct folder view from Extraction records
+        // Helpful if Storage Agent API Key is lost or disconnected.
+        if (requestedPath) {
+            const pathRegex = new RegExp('^' + requestedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/');
+            const [drawingDocs, rfiDocs] = await Promise.all([
+                DrawingExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean(),
+                RfiExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean()
+            ]);
+            
+            const dbEntriesMap = {};
+            entries.forEach(e => { dbEntriesMap[e.name] = e; });
+            
+            const mergeDocs = (docs) => {
+                docs.forEach(d => {
+                    if (!d.storageGatewayPath) return;
+                    const relPath = d.storageGatewayPath.replace(requestedPath + '/', '');
+                    if (!relPath || relPath.startsWith('/')) return;
+                    
+                    const parts = relPath.split('/');
+                    const name = parts[0];
+                    const isFile = parts.length === 1;
+
+                    if (!dbEntriesMap[name]) {
+                        dbEntriesMap[name] = {
+                            name: name,
+                            type: isFile ? 'file' : 'directory',
+                            size: isFile ? (d.fileSize || 0) : null,
+                            modified: (d.createdAt || new Date()).toISOString(),
+                            uploadedBy: d.uploadedBy
+                        };
+                    }
+                });
+            };
+            
+            mergeDocs(drawingDocs);
+            mergeDocs(rfiDocs);
+            
+            entries = Object.values(dbEntriesMap);
+        }
+
+        // Fetch uploadedBy usernames from DB for file items that don't have it yet
+        const fileNames = entries.filter(e => e.type !== 'directory' && !e.uploadedBy).map(e => e.name);
         if (fileNames.length > 0) {
             const [drawingDocs, rfiDocs] = await Promise.all([
                 DrawingExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
@@ -50,7 +95,7 @@ exports.browse = async (req, res) => {
             rfiDocs.forEach(r => { userMap[r.originalFileName] = r.uploadedBy; });
 
             entries.forEach(e => {
-                if (e.type !== 'directory' && userMap[e.name]) {
+                if (e.type !== 'directory' && !e.uploadedBy && userMap[e.name]) {
                     e.uploadedBy = userMap[e.name];
                 }
             });

@@ -50,4 +50,7 @@ router.get('/:transmittalId', requirePermission('viewer'), ctrl.getTransmittal);
 // Delete a transmittal (admin only)
 router.delete('/:transmittalId', requirePermission('admin'), ctrl.deleteTransmittal);
 
+// Void a transmittal
+router.put('/:transmittalId/void', requirePermission('editor'), ctrl.voidTransmittal);
+
 module.exports = router;

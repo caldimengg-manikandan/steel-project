@@ -22,6 +22,7 @@ import {
     deleteExtraction,
     checkDuplicates,
     reprocessExtraction,
+    resolveDuplicateExtraction,
     getExcelDownloadUrl,
     reserveTransmittalNumber,
 } from '../services/extractionApi';
@@ -162,6 +163,8 @@ function StatusBadge({ status }: { status: ExtractionStatus }) {
         processing: { label: 'Processing', color: '#2563eb', bg: '#eff6ff', icon: <SpinnerIcon /> },
         completed: { label: 'Completed', color: '#16a34a', bg: '#f0fdf4', icon: <CheckIcon /> },
         failed: { label: 'Failed', color: '#dc2626', bg: '#fef2f2', icon: <ErrorIcon /> },
+        duplicate_pending: { label: 'Duplicate Found', color: '#d97706', bg: '#fef3c7', icon: <ErrorIcon /> },
+        skipped: { label: 'Skipped', color: '#94a3b8', bg: '#f8fafc', icon: <CheckIcon /> },
     };
     const { label, color, bg, icon } = cfg[status];
     return (
@@ -536,6 +539,18 @@ export default function DrawingExtractionPanel({
         }
     }
 
+    async function handleResolveDuplicate(e: DrawingExtraction, action: 'proceed' | 'skip') {
+        try {
+            const result = await resolveDuplicateExtraction(projectId, e._id, action);
+            setExtractions((prev) =>
+                prev.map((x) => x._id === e._id ? { ...x, status: result.status as ExtractionStatus } : x)
+            );
+            showMessage('Resolved', result.message, 'success');
+        } catch (err: unknown) {
+            showMessage('Resolution Failed', err instanceof Error ? err.message : String(err), 'error');
+        }
+    }
+
     async function handleDelete(e: DrawingExtraction) {
         showConfirm('Delete Extraction', `Are you sure you want to delete the extraction for "${e.originalFileName}"? This action cannot be undone.`, async () => {
             try {
@@ -763,6 +778,7 @@ export default function DrawingExtractionPanel({
                             extraction={ex}
                             onReprocess={() => handleReprocess(ex)}
                             onDelete={() => handleDelete(ex)}
+                            onResolveDuplicate={(action) => handleResolveDuplicate(ex, action)}
                             canUpload={canUpload}
                         />
                     ))}
@@ -989,10 +1005,11 @@ interface CardProps {
     extraction: DrawingExtraction;
     onReprocess: () => void;
     onDelete: () => void;
+    onResolveDuplicate: (action: 'proceed' | 'skip') => void;
     canUpload: boolean;
 }
 
-function ExtractionCard({ extraction: ex, onReprocess, onDelete, canUpload }: CardProps) {
+function ExtractionCard({ extraction: ex, onReprocess, onDelete, onResolveDuplicate, canUpload }: CardProps) {
     const f = ex.extractedFields;
     const ok = ex.status === 'completed';
 
@@ -1072,6 +1089,26 @@ function ExtractionCard({ extraction: ex, onReprocess, onDelete, canUpload }: Ca
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                     {/* {ok && <ConfidenceMeter value={ex.extractionConfidence} />} */}
                     <StatusBadge status={ex.status} />
+                    
+                    {ex.status === 'duplicate_pending' && canUpload && (
+                        <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                            <button
+                                className="btn btn-sm btn-success"
+                                onClick={(e) => { e.stopPropagation(); onResolveDuplicate('proceed'); }}
+                                style={{ fontSize: 11, padding: '4px 8px' }}
+                            >
+                                Proceed
+                            </button>
+                            <button
+                                className="btn btn-sm btn-ghost"
+                                onClick={(e) => { e.stopPropagation(); onResolveDuplicate('skip'); }}
+                                style={{ fontSize: 11, padding: '4px 8px', color: '#64748b' }}
+                            >
+                                Skip
+                            </button>
+                        </div>
+                    )}
+
                     {ex.status === 'failed' && canUpload && (
                         <button
                             className="btn btn-ghost btn-sm"

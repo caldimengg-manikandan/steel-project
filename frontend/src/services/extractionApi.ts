@@ -145,3 +145,20 @@ export async function reserveTransmittalNumber(
     });
     return handleResponse(res);
 }
+
+// ── Resolve Duplicate Extraction ──────────────────────────
+export async function resolveDuplicateExtraction(
+    projectId: string,
+    extractionId: string,
+    action: 'proceed' | 'skip'
+): Promise<{ message: string; status: string }> {
+    const res = await fetch(`${BASE}/extractions/${String(projectId)}/${extractionId}/resolve-duplicate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
+    });
+    return handleResponse(res);
+}

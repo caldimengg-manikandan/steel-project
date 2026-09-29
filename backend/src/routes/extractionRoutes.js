@@ -76,6 +76,9 @@ router.get('/:id', requirePermission('viewer'), ctrl.getExtraction);
 // Reprocess a failed extraction (Requires Editor)
 router.post('/:id/reprocess', requirePermission('editor'), ctrl.reprocess);
 
+// Resolve duplicate extraction (Requires Editor)
+router.post('/:id/resolve-duplicate', requirePermission('editor'), ctrl.resolveDuplicate);
+
 // Delete an extraction (Requires Admin only)
 router.delete('/:id', requirePermission('admin'), ctrl.deleteExtraction);
 

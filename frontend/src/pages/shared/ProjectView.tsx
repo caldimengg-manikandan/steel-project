@@ -12,7 +12,6 @@ import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
-import { calculateSowProgress } from '../../utils/sowCalculator';
 
 
 export default function ProjectView() {
@@ -309,9 +308,8 @@ export default function ProjectView() {
                 const seqTotal = seqs.length;
                 const seqDone = seqs.filter((s: any) => s.status === 'Completed').length;
                 const seqPct = seqTotal > 0 ? Math.round((seqDone / seqTotal) * 100) : 0;
-                const sowProg = calculateSowProgress(project.scopeOfWork);
-                const fabPct = project.fabricationPercentage !== undefined ? project.fabricationPercentage : sowProg.fabricationPercentage;
-                const appPct = project.approvalPercentage !== undefined ? project.approvalPercentage : sowProg.approvalPercentage;
+                const fabPct = project.fabricationPercentage !== undefined ? project.fabricationPercentage : 0;
+                const appPct = project.approvalPercentage !== undefined ? project.approvalPercentage : 0;
 
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>

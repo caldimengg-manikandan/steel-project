@@ -257,8 +257,10 @@ exports.getDrawingLog = async (req, res) => {
 exports.downloadDrawingLogExcel = async (req, res) => {
     const { projectId } = req.params;
     const adminId = req.principal.adminId;
+    const { upToTransmittalNumber } = req.query;
 
-    const log = await getDrawingLog(projectId);
+    const limitToNumber = upToTransmittalNumber ? parseInt(upToTransmittalNumber, 10) : null;
+    const log = await getDrawingLog(projectId, limitToNumber);
 
     if (!log || !log.drawings || log.drawings.length === 0) {
         return res.status(404).json({ error: 'Drawing Log is empty or not found.' });
@@ -422,4 +424,26 @@ exports.deleteTransmittal = async (req, res) => {
     }
 
     res.json({ message: `Transmittal TR-${String(doc.transmittalNumber).padStart(3, '0')} deleted.` });
+};
+
+/**
+ * PUT /api/transmittals/:projectId/:transmittalId/void
+ * Void a transmittal. It remains in the database but is marked as voided.
+ */
+exports.voidTransmittal = async (req, res) => {
+    const { projectId, transmittalId } = req.params;
+    
+    const transmittal = await Transmittal.findOne({ _id: transmittalId, projectId });
+    if (!transmittal) {
+        return res.status(404).json({ error: 'Transmittal not found.' });
+    }
+    
+    if (transmittal.isVoided) {
+        return res.status(400).json({ error: 'Transmittal is already voided.' });
+    }
+    
+    transmittal.isVoided = true;
+    await transmittal.save();
+    
+    res.json({ message: 'Transmittal voided successfully.', transmittal });
 };

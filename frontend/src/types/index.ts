@@ -160,7 +160,7 @@ export interface ActivityEntry {
 // Drawing Extraction Types (AI Agentic Extraction Feature)
 // ============================================================
 
-export type ExtractionStatus = 'queued' | 'processing' | 'completed' | 'failed';
+export type ExtractionStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'duplicate_pending' | 'skipped';
 
 export interface ExtractedFields {
     drawingNumber: string;
