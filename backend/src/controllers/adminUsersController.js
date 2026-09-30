@@ -126,6 +126,7 @@ async function updateUser(req, res) {
         if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
         if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) return res.status(400).json({ error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number.' });
         user.password_hash = password;   // hook will re-hash
+        user.markModified('password_hash');
     }
 
     await user.save();
