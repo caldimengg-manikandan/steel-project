@@ -89,14 +89,37 @@ export interface Project {
         approval?: number; 
         fabrication?: number; 
         status?: string; 
+        approvalDate?: string;
+        fabricationDate?: string;
+        sequences?: Array<{
+            name: string;
+            percentage?: number;
+            approval?: number;
+            fabrication?: number;
+            status?: string;
+            approvalDate?: string;
+            fabricationDate?: string;
+        }>;
     }>;
     additionalScopeOfWork?: Array<{ 
         name: string; 
         percentage?: number; 
         approval?: number; 
         fabrication?: number; 
-        status?: string; 
+        status?: string;
+        approvalDate?: string;
+        fabricationDate?: string; 
+        sequences?: Array<{
+            name: string;
+            percentage?: number;
+            approval?: number;
+            fabrication?: number;
+            status?: string;
+            approvalDate?: string;
+            fabricationDate?: string;
+        }>;
     }>;
+    trackingMode?: string;
     openRfiCount?: number;
     closedRfiCount?: number;
     totalCO?: number;

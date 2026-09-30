@@ -1287,7 +1287,7 @@ export default function AdminProjects() {
                                                                   </div>
                                                                   {(item.sequences && item.sequences.length > 0) ? (
                                                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                          {item.sequences.map((seq, seqIdx) => (
+                                                                          {item.sequences?.map((seq: any, seqIdx: number) => (
                                                                               <div key={seqIdx} style={{ display: 'flex', gap: 10, alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #cbd5e1' }}>
                                                                                   <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Sequence Name</label>
@@ -1296,7 +1296,7 @@ export default function AdminProjects() {
                                                                                           value={seq.name}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].name = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].name = e.target.value;
                                                                                               setEditTarget({ ...editTarget, scopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1309,7 +1309,7 @@ export default function AdminProjects() {
                                                                                           value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].approvalDate = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].approvalDate = e.target.value;
                                                                                               setEditTarget({ ...editTarget, scopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1322,7 +1322,7 @@ export default function AdminProjects() {
                                                                                           value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].fabricationDate = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].fabricationDate = e.target.value;
                                                                                               setEditTarget({ ...editTarget, scopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1331,7 +1331,7 @@ export default function AdminProjects() {
                                                                                       style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', marginTop: 22 }}
                                                                                       onClick={() => {
                                                                                           const newSow = [...(editTarget.scopeOfWork || [])];
-                                                                                          newSow[idx].sequences = newSow[idx].sequences.filter((_, i) => i !== seqIdx);
+                                                                                          newSow[idx].sequences = newSow[idx].sequences!.filter((_: any, i: number) => i !== seqIdx);
                                                                                           setEditTarget({ ...editTarget, scopeOfWork: newSow });
                                                                                       }}
                                                                                       title="Remove Sequence"
@@ -1513,7 +1513,7 @@ export default function AdminProjects() {
                                                                   </div>
                                                                   {(item.sequences && item.sequences.length > 0) ? (
                                                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                          {item.sequences.map((seq, seqIdx) => (
+                                                                          {item.sequences?.map((seq: any, seqIdx: number) => (
                                                                               <div key={seqIdx} style={{ display: 'flex', gap: 10, alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #cbd5e1' }}>
                                                                                   <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Sequence Name</label>
@@ -1522,7 +1522,7 @@ export default function AdminProjects() {
                                                                                           value={seq.name}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].name = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].name = e.target.value;
                                                                                               setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1535,7 +1535,7 @@ export default function AdminProjects() {
                                                                                           value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].approvalDate = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].approvalDate = e.target.value;
                                                                                               setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1548,7 +1548,7 @@ export default function AdminProjects() {
                                                                                           value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
                                                                                           onChange={(e) => {
                                                                                               const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                                              newSow[idx].sequences[seqIdx].fabricationDate = e.target.value;
+                                                                                              newSow[idx].sequences![seqIdx].fabricationDate = e.target.value;
                                                                                               setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
                                                                                           }}
                                                                                       />
@@ -1557,7 +1557,7 @@ export default function AdminProjects() {
                                                                                       style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', marginTop: 22 }}
                                                                                       onClick={() => {
                                                                                           const newSow = [...(editTarget.additionalScopeOfWork || [])];
-                                                                                          newSow[idx].sequences = newSow[idx].sequences.filter((_, i) => i !== seqIdx);
+                                                                                          newSow[idx].sequences = newSow[idx].sequences!.filter((_: any, i: number) => i !== seqIdx);
                                                                                           setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
                                                                                       }}
                                                                                       title="Remove Sequence"
