@@ -161,8 +161,7 @@ async function attachProjectStats(projects) {
             pendingAmount: 0 
         };
         const approx = pObj.approximateDrawingsCount || 0;
-        
-        const allSows = [...(pObj.scopeOfWork || []), ...(pObj.additionalScopeOfWork || [])];
+        const allSows = pObj.scopeOfWork || [];
         const sowProgress = calculateSowProgress(allSows);
 
         const nameLower = (pObj.name || '').toLowerCase().trim();

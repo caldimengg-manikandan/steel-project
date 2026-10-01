@@ -65,6 +65,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
+const adminTeamRoutes = require('./routes/adminTeamRoutes');
 
 // Auth middleware
 const { verifyToken: authMiddleware } = require('./middleware/auth');
@@ -152,6 +153,7 @@ const path = require('path');
 // ── API Routes ─────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/teams', adminTeamRoutes);
 app.use('/api/admin/projects', adminProjectRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/admin/reports', adminReportsRoutes);

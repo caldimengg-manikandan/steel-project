@@ -173,32 +173,74 @@ const generateAdditionalSowRows = (countVal: string, nameVal: string, currentRow
 };
 
 const AddSeqInline = ({ onAdd }: { onAdd: (count: number) => void }) => {
-    const [count, setCount] = useState('1');
-    return (
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#475569', fontWeight: 500, marginRight: 2 }}>Number of Sequences:</span>
-            <input 
-                type="number" 
-                className="form-control form-control-sm" 
-                style={{ width: 50, padding: '2px 6px', fontSize: 11, height: 24, textAlign: 'center' }}
-                value={count}
-                min={1}
-                onChange={(e) => setCount(e.target.value)}
-            />
+    const [isAdding, setIsAdding] = useState(false);
+    const [count, setCount] = useState('');
+
+    if (!isAdding) {
+        return (
             <button 
                 type="button" 
                 className="btn btn-secondary btn-sm"
-                style={{ padding: '2px 8px', fontSize: 11, height: 24 }}
-                onClick={() => {
-                    const num = parseInt(count);
-                    if (!isNaN(num) && num > 0) {
-                        onAdd(num);
-                        setCount('1');
-                    }
-                }}
+                onClick={() => setIsAdding(true)}
             >
                 + Add Seq
             </button>
+        );
+    }
+
+    return (
+        <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+            <label className="form-label">Number of Sequences <span style={{ color: 'red' }}>*</span></label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                    type="number" 
+                    className="form-control" 
+                    placeholder="e.g. 2"
+                    value={count}
+                    min={1}
+                    autoFocus
+                    onChange={(e) => setCount(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const num = parseInt(count);
+                            if (!isNaN(num) && num > 0) {
+                                onAdd(num);
+                                setCount('');
+                                setIsAdding(false);
+                            }
+                        } else if (e.key === 'Escape') {
+                            setIsAdding(false);
+                            setCount('');
+                        }
+                    }}
+                />
+                <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => {
+                        const num = parseInt(count);
+                        if (!isNaN(num) && num > 0) {
+                            onAdd(num);
+                            setCount('');
+                            setIsAdding(false);
+                        }
+                    }}
+                >
+                    Add
+                </button>
+                <button 
+                    type="button" 
+                    className="btn btn-light"
+                    style={{ border: '1px solid #cbd5e1' }}
+                    onClick={() => {
+                        setIsAdding(false);
+                        setCount('');
+                    }}
+                >
+                    Cancel
+                </button>
+            </div>
         </div>
     );
 };
@@ -366,12 +408,11 @@ export default function AdminProjects() {
 
         if (editMode === 'full') {
             const sumPercentage = (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-            const addSumPercentage = (editTarget.additionalScopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-            const totalSowPercentage = sumPercentage + addSumPercentage;
+            const totalSowPercentage = sumPercentage;
             
-            const hasSow = (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0) || (editTarget.additionalScopeOfWork && editTarget.additionalScopeOfWork.length > 0);
+            const hasSow = (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0);
             if (hasSow && totalSowPercentage !== 100) {
-                const msgText = `The sum of Percentage of Total Work (%) across ALL Scope of Work entries (original + additional) must equal exactly 100. Current sum is ${totalSowPercentage}.`;
+                const msgText = `The sum of Percentage of Total Work (%) across ALL Scope of Work entries must equal exactly 100. Current sum is ${totalSowPercentage}.`;
                 setModalError('');
                 showMessage('Invalid Scope of Work', msgText, 'warning');
                 return;
@@ -617,7 +658,7 @@ export default function AdminProjects() {
             {/* ── Create Modal ── */}
             {showCreate && (
                 <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}>
-                    <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal modal-lg" style={{ maxWidth: '1050px', width: '95vw' }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">Create New Project</span>
                             <button className="modal-close" onClick={() => setShowCreate(false)}><IconClose /></button>
@@ -941,7 +982,7 @@ export default function AdminProjects() {
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <div style={{ width: 120 }}>
+                                                                        <div style={{ flex: 1 }}>
                                                                             <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
                                                                             <input
                                                                                 className="form-control form-control-sm"
@@ -954,7 +995,7 @@ export default function AdminProjects() {
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <div style={{ width: 120 }}>
+                                                                        <div style={{ flex: 1 }}>
                                                                             <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                                             <input
                                                                                 className="form-control form-control-sm"
@@ -1117,7 +1158,7 @@ export default function AdminProjects() {
             {/* ── Edit Modal ── */}
             {editTarget && (
                 <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setEditTarget(null); setModalError(''); } }}>
-                    <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal modal-lg" style={{ maxWidth: '1050px', width: '95vw' }} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <span className="modal-title">{editMode === 'sequences' ? `Manage Sequences: ${editTarget.name}` : 'Edit Project'}</span>
                             <button className="modal-close" onClick={() => { setEditTarget(null); setModalError(''); }}><IconClose /></button>
@@ -1301,7 +1342,7 @@ export default function AdminProjects() {
                                                                                           }}
                                                                                       />
                                                                                   </div>
-                                                                                  <div style={{ width: 120 }}>
+                                                                                  <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
                                                                                       <input
                                                                                           className="form-control form-control-sm"
@@ -1314,7 +1355,7 @@ export default function AdminProjects() {
                                                                                           }}
                                                                                       />
                                                                                   </div>
-                                                                                  <div style={{ width: 120 }}>
+                                                                                  <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                                                       <input
                                                                                           className="form-control form-control-sm"
@@ -1429,22 +1470,7 @@ export default function AdminProjects() {
                                                                           const newSow = [...(editTarget.additionalScopeOfWork || [])];
                                                                           newSow[idx] = { ...newSow[idx], percentage: Number(e.target.value) };
                                                                           
-                                                                          let newOriginalSow = [...(editTarget.scopeOfWork || [])];
-                                                                          if (newOriginalSow.length > 0) {
-                                                                              const totalAdd = newSow.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-                                                                              const remaining = 100 - totalAdd;
-                                                                              const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
-                                                                              newOriginalSow = newOriginalSow.map((row, innerIdx) => {
-                                                                                  if (innerIdx === newOriginalSow.length - 1) {
-                                                                                      const sumOthers = defaultPct * (newOriginalSow.length - 1);
-                                                                                      const rem = Math.round((remaining - sumOthers) * 10) / 10;
-                                                                                      return { ...row, percentage: rem };
-                                                                                  }
-                                                                                  return { ...row, percentage: defaultPct };
-                                                                              });
-                                                                          }
-                                                                          
-                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow, scopeOfWork: newOriginalSow });
+                                                                          setEditTarget({ ...editTarget, additionalScopeOfWork: newSow });
                                                                       }}
                                                                   />
                                                               </div>
@@ -1527,7 +1553,7 @@ export default function AdminProjects() {
                                                                                           }}
                                                                                       />
                                                                                   </div>
-                                                                                  <div style={{ width: 120 }}>
+                                                                                  <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
                                                                                       <input
                                                                                           className="form-control form-control-sm"
@@ -1540,7 +1566,7 @@ export default function AdminProjects() {
                                                                                           }}
                                                                                       />
                                                                                   </div>
-                                                                                  <div style={{ width: 120 }}>
+                                                                                  <div style={{ flex: 1 }}>
                                                                                       <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
                                                                                       <input
                                                                                           className="form-control form-control-sm"

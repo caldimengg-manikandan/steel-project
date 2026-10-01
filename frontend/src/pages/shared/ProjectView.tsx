@@ -775,7 +775,7 @@ export default function ProjectView() {
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString() })}
+                                                            onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString(), approvalDate: seq.approvalDate || new Date().toISOString() })}
                                                             disabled={!canEditSequences}
                                                             style={{
                                                                 padding: '3px 10px',

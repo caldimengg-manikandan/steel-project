@@ -912,7 +912,7 @@ async function generateProjectStatusExcel(projectsData) {
     };
 
     projectsData.forEach((proj, idx) => {
-        const allSows = [...(proj.scopeOfWork || []), ...(proj.additionalScopeOfWork || [])];
+        const allSows = proj.scopeOfWork || [];
         const sowProg = calculateSowProgress(allSows);
         const approvalPercentage = proj.approvalPercentage !== undefined ? proj.approvalPercentage : sowProg.approvalPercentage;
         const fabricationPercentage = proj.fabricationPercentage !== undefined ? proj.fabricationPercentage : sowProg.fabricationPercentage;

@@ -75,9 +75,16 @@ async function createProject(req, res) {
     const adminId = req.principal.adminId;
     const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber } = req.body;
 
+    let finalSequences = sequences || [];
+    if (!Array.isArray(finalSequences) || finalSequences.length === 0) {
+        if (Array.isArray(scopeOfWork)) {
+            finalSequences = scopeOfWork.flatMap(sow => sow.sequences || []);
+        }
+    }
+
     // ---- New validation: sequences is mandatory ----
-    if (!Array.isArray(sequences) || sequences.length === 0) {
-        return res.status(400).json({ error: 'The "sequences" field is required and must contain at least one entry.' });
+    if (finalSequences.length === 0) {
+        return res.status(400).json({ error: 'The "sequences" field is required and must contain at least one entry (either directly or within Scope of Work).' });
     }
 
     if (!name || (!clientName && !clientId)) {
@@ -98,7 +105,7 @@ async function createProject(req, res) {
         status: status === 'active' ? 'in_progress' : (status || 'in_progress'),
         location: location || '',
         approximateDrawingsCount: Number(approximateDrawingsCount) || 0,
-        sequences: sequences || [],
+        sequences: finalSequences,
         scopeOfWork: scopeOfWork || [],
         connectionDesignVendor: connectionDesignVendor || '',
         connectionDesignContact: connectionDesignContact || '',
@@ -499,8 +506,7 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const stats = countMap[p._id.toString()] || {};
         const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
         const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
-        const matchingExt = externalProjects.find(ext => ext.name === p.name);
-        const allSows = [...(p.scopeOfWork || []), ...(p.additionalScopeOfWork || [])];
+        const allSows = p.scopeOfWork || [];
         const sowProg = calculateSowProgress(allSows);
 
         const appPct = sowProg.approvalPercentage;
