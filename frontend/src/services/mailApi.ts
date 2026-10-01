@@ -27,6 +27,18 @@ function authHeaders(): Record<string, string> {
 
 // ── Types ──────────────────────────────────────────────────
 
+export interface MailFolder {
+    id: string;
+    name: string;
+    icon: string; // icon identifier: 'inbox' | 'send' | 'spam' | 'draft' | 'trash' | 'archive' | string
+    type: 'system' | 'custom';
+    order: number;
+    count: number | null;
+    mappingId?: string;
+    remoteFolderId?: string;
+    provider?: string;
+}
+
 export interface MailAccount {
     _id: string;
     id?: string;
@@ -62,7 +74,9 @@ export interface MailMessage {
     providerId: string;
     subject: string;
     from: { name?: string; email: string };
-    to?: Array<{ name?: string; email: string }>;
+    to?: Array<{ name?: string; email: string }> | { name?: string; email: string };
+    toName?: string;
+    toAddress?: string;
     fromName?: string;
     fromAddress?: string;
     bodyHtml?: string;
@@ -73,6 +87,8 @@ export interface MailMessage {
     links?: Array<string | ExtractedLink>;
     forwardedTo?: string[];
     isForwarded?: boolean;
+    folder?: string;
+    isSpam?: boolean;
     snippetText?: string;
     provider?: string;
 }
@@ -194,6 +210,7 @@ export async function triggerSync(params: {
     accountId?: string;
     startDate?: string;
     endDate?: string;
+    folder?: string;
 }): Promise<{ job: SyncJob }> {
     const res = await fetch(`${BASE}/mail/sync`, {
         method: 'POST',
@@ -246,6 +263,7 @@ export async function listEmails(params: {
     endDate?: string;
     accountId?: string;
     provider?: string;
+    folder?: string;
     page?: number;
     limit?: number;
     offset?: number;
@@ -351,3 +369,67 @@ export async function getUnreadCount(): Promise<{ unreadCount: number }> {
     });
     return handleResponse(res);
 }
+
+// ── Folders ─────────────────────────────────────────────
+
+export async function listMailFolders(provider?: string): Promise<{ folders: MailFolder[] }> {
+    const q = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+    const res = await fetch(`${BASE}/mail/folders${q}`, {
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export interface RemoteFolder {
+    id: string;
+    name: string;
+    totalItemCount?: number;
+    unreadItemCount?: number;
+    isSystem?: boolean;
+    provider: 'MICROSOFT' | 'ZOHO';
+    isAdded?: boolean;
+}
+
+export async function listRemoteFolders(provider: string): Promise<{ folders: RemoteFolder[] }> {
+    const res = await fetch(`${BASE}/mail/remote-folders?provider=${encodeURIComponent(provider)}`, {
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export async function addCustomFolder(payload: {
+    provider: string;
+    remoteFolderId: string;
+    name: string;
+    icon?: string;
+}): Promise<{ success: boolean; folder: MailFolder }> {
+    const res = await fetch(`${BASE}/mail/custom-folders`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+export async function deleteCustomFolder(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${BASE}/mail/custom-folders/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: authHeaders(),
+    });
+    return handleResponse(res);
+}
+
+export async function updateEmailFolder(emailId: string, folder: string): Promise<{ success: boolean; id: string; folder: string; isSpam: boolean }> {
+    const res = await fetch(`${BASE}/mail/emails/${emailId}/folder`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ folder }),
+    });
+    return handleResponse(res);
+}
+

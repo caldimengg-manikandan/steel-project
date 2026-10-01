@@ -37,6 +37,8 @@ function normalizeGraphMessage(msg, mailboxId) {
         subject: msg.subject ?? null,
         fromName: msg.from?.emailAddress?.name ?? null,
         fromAddress: msg.from?.emailAddress?.address ?? '',
+        toAddress: msg.toRecipients?.[0]?.emailAddress?.address ?? null,
+        toName: msg.toRecipients?.[0]?.emailAddress?.name ?? null,
         toAddresses: msg.toRecipients?.map((r) => ({
             name: r.emailAddress?.name ?? null,
             address: r.emailAddress?.address ?? '',
@@ -58,30 +60,68 @@ function normalizeGraphMessage(msg, mailboxId) {
  * Fetch a page of messages for a mailbox using Graph.
  */
 async function fetchMessagesPage(accessToken, options) {
-    const { mailboxId, startDate, endDate, cursor, limit = 50 } = options;
+    const { mailboxId, startDate, endDate, cursor, limit = 50, folder } = options;
     const basePath = mailboxId === 'me' ? '/me' : `/users/${encodeURIComponent(mailboxId)}`;
+    const cleanFolder = folder ? String(folder).toLowerCase() : 'inbox';
     let url;
     if (cursor) {
         url = cursor;
     }
     else {
         const filters = [];
-        if (startDate) {
-            filters.push(`receivedDateTime ge ${startDate}`);
-        }
-        if (endDate) {
-            filters.push(`receivedDateTime le ${endDate}`);
+        if (cleanFolder !== 'spam' && cleanFolder !== 'drafts') {
+            if (startDate) {
+                filters.push(`receivedDateTime ge ${startDate}`);
+            }
+            if (endDate) {
+                filters.push(`receivedDateTime le ${endDate}`);
+            }
         }
         const filterQuery = filters.length > 0 ? `&$filter=${encodeURIComponent(filters.join(' and '))}` : '';
-        url = `${basePath}/messages?$top=${limit}&$select=${exports.MESSAGE_SELECT_FIELDS}&$orderby=receivedDateTime+asc${filterQuery}`;
+        let folderPath = '/mailFolders/inbox/messages';
+        if (options.remoteFolderId) {
+            folderPath = `/mailFolders/${encodeURIComponent(options.remoteFolderId)}/messages`;
+        } else if (cleanFolder === 'sent') {
+            folderPath = '/mailFolders/sentitems/messages';
+        } else if (cleanFolder === 'spam') {
+            folderPath = '/mailFolders/junkemail/messages';
+        } else if (cleanFolder === 'drafts' || cleanFolder === 'draft') {
+            folderPath = '/mailFolders/drafts/messages';
+        } else if (cleanFolder === 'all') {
+            folderPath = '/messages';
+        }
+        const orderQuery = (cleanFolder === 'spam' || cleanFolder === 'drafts') ? '&$orderby=receivedDateTime+desc' : '&$orderby=receivedDateTime+asc';
+        url = `${basePath}${folderPath}?$top=${limit}&$select=${exports.MESSAGE_SELECT_FIELDS}${orderQuery}${filterQuery}`;
     }
-    const response = await (0, graph_client_1.graphGet)(url, accessToken);
+    let response;
+    try {
+        response = await (0, graph_client_1.graphGet)(url, accessToken);
+    } catch (graphErr) {
+        // Only fallback to root /messages if folder is inbox or all.
+        // For sent, spam, and drafts, return empty messages if folder is not found or has an error.
+        if (cleanFolder === 'sent' || cleanFolder === 'spam' || cleanFolder === 'drafts') {
+            console.warn(`[ms:mail-fetcher] Folder ${cleanFolder} fetch error:`, graphErr.message);
+            return { messages: [], nextCursor: null, hasMore: false };
+        }
+        if (!cursor && url.includes('/mailFolders/')) {
+            const fallbackUrl = url.replace(/\/mailFolders\/[^\/]+\/messages/, '/messages');
+            response = await (0, graph_client_1.graphGet)(fallbackUrl, accessToken);
+        } else {
+            throw graphErr;
+        }
+    }
     const rawList = response.value ?? [];
-    const allMessages = rawList.map((m) => normalizeGraphMessage(m, mailboxId));
+    const allMessages = rawList.map((m) => {
+        const norm = normalizeGraphMessage(m, mailboxId);
+        norm.folder = (cleanFolder === 'draft' ? 'drafts' : cleanFolder);
+        if (cleanFolder === 'spam') norm.isSpam = true;
+        return norm;
+    });
     // Client-side window guard
     const startMs = startDate ? new Date(startDate).getTime() : undefined;
     const endMs = endDate ? new Date(endDate).getTime() : undefined;
     const messages = allMessages.filter((m) => {
+        if (cleanFolder === 'spam' || cleanFolder === 'drafts') return true;
         const time = new Date(m.receivedAt).getTime();
         if (endMs !== undefined && !isNaN(endMs) && time > endMs)
             return false;

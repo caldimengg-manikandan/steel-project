@@ -314,8 +314,9 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                     max-width: 100%;
                     height: auto;
                 }
-                /* Hide any unresolvable cid: references so broken image icon + machine alt text never appear */
-                img[src^="cid:"] {
+                /* Hide any unresolvable cid: or ImageDisplay references so broken image icon + machine alt text never appear */
+                img[src^="cid:"],
+                img[src*="ImageDisplay"] {
                     display: none !important;
                 }
                 a {

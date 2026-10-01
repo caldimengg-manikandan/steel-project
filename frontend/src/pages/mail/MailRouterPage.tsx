@@ -1,5 +1,7 @@
 import React, { Component, type ErrorInfo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { DateRangePicker } from 'rsuite';
+import 'rsuite/DateRangePicker/styles/index.css';
 import { useAuth } from '../../context/AuthContext';
 import {
     listMailAccounts, deleteMailAccount, setActiveMailAccount,
@@ -9,6 +11,7 @@ import {
     type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
 import { FileViewer, type FileViewerFile, prefetchFile, getCachedFile, setCachedFile } from '../../components/file-viewer';
+import MailSidebar from '../../components/MailSidebar';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -28,8 +31,16 @@ function formatDateTime(s: string) {
     } catch { return s; }
 }
 
+function formatDateToYMD(d: Date | null | undefined): string {
+    if (!d || isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function todayStr() {
-    return new Date().toISOString().substring(0, 10);
+    return formatDateToYMD(new Date());
 }
 
 function daysAgoStr(days: number) {
@@ -243,18 +254,6 @@ function getRoleLabel(roleKey: string): string {
     }
 }
 
-function getRoleIcon(roleKey: string): string {
-    switch (roleKey) {
-        case 'project_manager':
-            return '👔';
-        case 'team_lead':
-            return '🎖️';
-        case 'team_member':
-            return '👷';
-        default:
-            return '👤';
-    }
-}
 
 function ForwardModal({
     email, onClose, onSent,
@@ -316,8 +315,8 @@ function ForwardModal({
     const availableRoleOptions = useMemo(() => {
         const presentRoles = new Set(projectMembers.map(e => normalizeRole(e.role)));
         const standardOrder = ['project_manager', 'team_lead', 'team_member'];
-        const options: Array<{ id: string; label: string; icon: string; count: number }> = [
-            { id: 'all', label: 'All Roles', icon: '👥', count: projectMembers.length }
+        const options: Array<{ id: string; label: string; count: number }> = [
+            { id: 'all', label: 'All Roles', count: projectMembers.length }
         ];
 
         for (const r of standardOrder) {
@@ -325,7 +324,6 @@ function ForwardModal({
                 options.push({
                     id: r,
                     label: getRoleLabel(r),
-                    icon: getRoleIcon(r),
                     count: roleCounts[r] || 0,
                 });
             }
@@ -336,7 +334,6 @@ function ForwardModal({
                 options.push({
                     id: r,
                     label: getRoleLabel(r),
-                    icon: getRoleIcon(r),
                     count: roleCounts[r] || 0,
                 });
             }
@@ -441,7 +438,7 @@ function ForwardModal({
                         <div className="form-group" style={{ margin: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                 <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: 12.5 }}>
-                                    📁 Filter by Project
+                                    Filter by Project
                                 </label>
                                 {activeProject && (
                                     <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
@@ -455,7 +452,7 @@ function ForwardModal({
                                 onChange={e => setSelectedProjectId(e.target.value)}
                                 style={{ fontSize: 13, fontWeight: 500 }}
                             >
-                                <option value="all">🌐 All Projects ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length} members)</option>
+                                <option value="all">All Projects ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length} members)</option>
                                 {projects.map(p => (
                                     <option key={p.id} value={p.id}>
                                         📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} ({p.memberCount || 0})
@@ -468,7 +465,7 @@ function ForwardModal({
                         <div className="form-group" style={{ margin: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                 <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: 12.5 }}>
-                                    👤 Filter by Role
+                                    Filter by Role
                                 </label>
                                 {selectedRole !== 'all' && (
                                     <button
@@ -736,7 +733,6 @@ function ForwardModal({
                                         className={`role-chip ${isLeadOrPM ? 'editor' : 'viewer'}`}
                                         style={{ fontSize: 10.5, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                     >
-                                        <span>{getRoleIcon(roleKey)}</span>
                                         <span>{emp.role === 'project_manager' ? 'PM' : emp.role === 'team_lead' ? 'Team Lead' : emp.role === 'team_member' ? 'Team Member' : (emp.role || 'Member').replace(/_/g, ' ')}</span>
                                     </span>
                                 </label>
@@ -779,9 +775,27 @@ function EmailCard({
 }: {
     msg: MailMessage; active: boolean; onClick: () => void;
 }) {
+    const isSent = (msg as any).folder === 'sent';
+    const isSpam = Boolean((msg as any).folder === 'spam' || (msg as any).isSpam);
+
     const senderName = msg.from?.name || (msg as any).fromName;
     const senderEmail = msg.from?.email || (msg as any).fromAddress || '';
     const sender = senderName || senderEmail || 'Unknown';
+
+    // Extract recipient info for Sent folder view
+    const toRecip = (msg as any).to;
+    let recipientStr = '';
+    if (Array.isArray(toRecip) && toRecip.length > 0) {
+        recipientStr = toRecip.map(r => r.name || r.email).filter(Boolean).join(', ');
+    } else if (toRecip && typeof toRecip === 'object') {
+        recipientStr = toRecip.name || toRecip.email || '';
+    } else if ((msg as any).toName || (msg as any).toAddress) {
+        recipientStr = (msg as any).toName || (msg as any).toAddress || '';
+    }
+
+    const displaySender = isSent && recipientStr ? `To: ${recipientStr}` : sender;
+    const avatarInitials = isSent && recipientStr ? initials(recipientStr, '') : initials(senderName, senderEmail);
+
     const time = msg.receivedAt ? new Date(msg.receivedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
     const validAtts = (msg.attachments || []).filter(att => !(att as any).isInline);
     const attCount = validAtts.length;
@@ -808,12 +822,12 @@ function EmailCard({
             onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--color-bg-card)'; }}
         >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', minWidth: 0 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
-                    {initials(senderName, senderEmail)}
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSent ? '#059669' : isSpam ? '#dc2626' : 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
+                    {avatarInitials}
                 </div>
                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, width: '100%' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>{sender}</span>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>{displaySender}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize:   11.6, color: 'var(--color-text-muted)', flexShrink: 0 }}>{time}</span>
                             <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)', flexShrink: 0 }}>{msg.receivedAt?.slice(0, 10)}</span>
@@ -826,9 +840,10 @@ function EmailCard({
                         {snippet}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        {isSpam && <span style={{ fontSize: 11.5, background: 'var(--color-danger-bg)', color: 'var(--color-danger-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>⚠️ Spam</span>}
                         {hasAtt && <span style={{ fontSize: 11.5, background: 'var(--color-info-bg)', color: 'var(--color-info-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>📎 {attCount > 0 ? attCount : 'Attachment'}</span>}
                         {linkCount > 0 && <span style={{ fontSize: 11.5, background: 'var(--color-warning-bg)', color: 'var(--color-warning-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>🔗 {linkCount}</span>}
-                        {msg.isForwarded && <span style={{ fontSize: 11.5, background: 'var(--color-success-bg)', color: 'var(--color-success-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>✓ Forwarded</span>}
+                        {(msg.isForwarded || (msg as any).triageStatus === 'FORWARDED') && <span style={{ fontSize: 11.5, background: 'var(--color-success-bg)', color: 'var(--color-success-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>✓ Forwarded</span>}
                     </div>
                 </div>
             </div>
@@ -865,7 +880,10 @@ function linkifyText(text: string): React.ReactNode {
 function EmailDetail({
     email, accounts, onForwardClick, loadingAttachments = false,
 }: {
-    email: MailMessage; accounts: MailAccount[]; onForwardClick: () => void; loadingAttachments?: boolean;
+    email: MailMessage;
+    accounts: MailAccount[];
+    onForwardClick: () => void;
+    loadingAttachments?: boolean;
 }) {
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
     const [copiedAllLinks, setCopiedAllLinks] = useState(false);
@@ -878,6 +896,21 @@ function EmailDetail({
     const senderName = email.from?.name || (email as any).fromName;
     const senderEmail = email.from?.email || (email as any).fromAddress;
     const senderLabel = senderName && senderEmail ? `${senderName} <${senderEmail}>` : (senderName || senderEmail || 'Unknown');
+
+    const toRecip = (email as any).to;
+    let recipientLabel = '';
+    if (Array.isArray(toRecip) && toRecip.length > 0) {
+        recipientLabel = toRecip.map(r => r.name && r.email && r.name !== r.email ? `${r.name} <${r.email}>` : (r.name || r.email || '')).filter(Boolean).join(', ');
+    } else if (toRecip && typeof toRecip === 'object') {
+        recipientLabel = toRecip.name && toRecip.email && toRecip.name !== toRecip.email ? `${toRecip.name} <${toRecip.email}>` : (toRecip.name || toRecip.email || '');
+    } else if ((email as any).toName || (email as any).toAddress) {
+        const toAddr = (email as any).toAddress || '';
+        const toN = (email as any).toName || '';
+        recipientLabel = toN && toAddr && toN !== toAddr ? `${toN} <${toAddr}>` : (toN || toAddr);
+    }
+
+    const isSpam = Boolean((email as any).folder === 'spam' || (email as any).isSpam);
+    const isSent = (email as any).folder === 'sent';
 
     const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !(att as any).isInline);
     const hasAttachmentsFlag = Boolean(
@@ -903,8 +936,9 @@ function EmailDetail({
                     max-width: 100%;
                     height: auto;
                 }
-                /* Hide any unresolvable cid: references so broken image icon + machine alt text never appear */
-                img[src^="cid:"] {
+                /* Hide any unresolvable cid: or ImageDisplay references so broken image icon + machine alt text never appear */
+                img[src^="cid:"],
+                img[src*="ImageDisplay"] {
                     display: none !important;
                 }
                 a {
@@ -981,17 +1015,33 @@ function EmailDetail({
                 {/* Header */}
                 <div style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-                        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', paddingLeft: 10, margin: 0, lineHeight: 1.35, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
-                            {email.subject || '(No subject)'}
-                        </h2>
-                        <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            Forward to Detailers
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                            <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', paddingLeft: 10, margin: 0, lineHeight: 1.35, wordBreak: 'break-word' }}>
+                                {email.subject || '(No subject)'}
+                            </h2>
+                            {isSpam && (
+                                <span style={{ fontSize: 12, background: 'var(--color-danger-bg)', color: 'var(--color-danger-mid)', padding: '2px 8px', borderRadius: 4, fontWeight: 600, flexShrink: 0 }}>
+                                    ⚠️ Spam
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                Forward to Detailers
+                            </button>
+                        </div>
                     </div>
                     <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13.5 }}>
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>From</span>
                             <span>{senderLabel}</span>
+
+                            {recipientLabel && (
+                                <>
+                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>To</span>
+                                    <span>{recipientLabel}</span>
+                                </>
+                            )}
 
                             <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Received</span>
                             <span>{formatDateTime(email.receivedAt)}</span>
@@ -1466,12 +1516,19 @@ export default function MailRouterPage() {
         return 'MICROSOFT';
     });
     const [selectedEmail, setSelectedEmail] = useState<MailMessage | null>(null);
+    // Active sidebar folder — 'inbox' is the default view (all emails)
+    const [activeFolder, setActiveFolder] = useState<string>('inbox');
     const [search, setSearch] = useState('');
-    const [startDate, setStartDate] = useState(todayStr());
-    const [endDate, setEndDate] = useState(todayStr());
-    const [draftStartDate, setDraftStartDate] = useState(todayStr());
-    const [draftEndDate, setDraftEndDate] = useState(todayStr());
-    const toDateRef = useRef<HTMLInputElement>(null);
+    // Single unified date range — both dates must be selected before a fetch fires
+    const today = new Date();
+    const [dateRange, setDateRange] = useState<[Date, Date]>([today, today]);
+    // Derived string helpers used by fetchEmails / handleSync
+    const startDate = (dateRange && dateRange[0] && !isNaN(dateRange[0].getTime()))
+        ? formatDateToYMD(dateRange[0])
+        : todayStr();
+    const endDate   = (dateRange && dateRange[1] && !isNaN(dateRange[1].getTime()))
+        ? formatDateToYMD(dateRange[1])
+        : todayStr();
 
     const [totalEmails, setTotalEmails] = useState<number>(0);
     const [hasMore, setHasMore] = useState<boolean>(false);
@@ -1505,57 +1562,38 @@ export default function MailRouterPage() {
     } | null>(null);
 
     const currentTabRef = useRef<'ZOHO' | 'MICROSOFT'>(activeTab);
+    const currentFolderRef = useRef<string>(activeFolder);
+    const [foldersRefreshKey, setFoldersRefreshKey] = useState<number>(0);
     const latestRequestIdRef = useRef<number>(0);
     const lastRunAtRef = useRef<string | undefined>(undefined);
 
-    // Keep currentTabRef perfectly in sync with activeTab
+    // Keep currentTabRef and currentFolderRef in sync with state
     useEffect(() => {
         currentTabRef.current = activeTab;
     }, [activeTab]);
 
-    // Handle "From" date selection
-    // Rule: Selecting From date alone must NOT trigger email fetch or sync.
-    // Instantly pops up the "To" date picker.
-    const handleFromDateChange = (val: string) => {
-        if (!val) return;
-        setDraftStartDate(val);
-        if (draftEndDate && val > draftEndDate) {
-            setDraftEndDate(val);
-        }
-        setTimeout(() => {
-            if (toDateRef.current) {
-                try {
-                    toDateRef.current.focus();
-                    if (typeof (toDateRef.current as any).showPicker === 'function') {
-                        (toDateRef.current as any).showPicker();
-                    }
-                } catch {
-                    toDateRef.current?.focus();
-                }
-            }
-        }, 50);
-    };
+    useEffect(() => {
+        currentFolderRef.current = activeFolder;
+    }, [activeFolder]);
 
-    // Handle "To" date selection
-    // Rule: The date range should only be applied after From is selected, To is selected, and range is valid.
-    const handleToDateChange = (val: string) => {
-        if (!val) return;
-        setDraftEndDate(val);
-        if (draftStartDate && val >= draftStartDate) {
-            setError('');
-            if (draftStartDate !== startDate || val !== endDate) {
-                setStartDate(draftStartDate);
-                setEndDate(val);
-            }
-        } else if (draftStartDate && val < draftStartDate) {
-            setError('Invalid date range: "From" date cannot be after "To" date.');
-        }
+    // DateRangePicker fires onChange only when the user has picked both dates.
+    // This replaces the old draft→committed two-step flow cleanly.
+    const handleDateRangeChange = (range: [Date, Date] | null) => {
+        if (!range) return;
+        setError('');
+        setDateRange(range);
     };
 
     // Fetch lightweight email list with deduplication and progressive limit (50 emails per page)
     const fetchEmails = useCallback(async (force = false) => {
         const targetTab = currentTabRef.current;
-        const queryKey = `${targetTab}_${startDate}_${endDate}`;
+        const targetFolder = currentFolderRef.current;
+        const isSpam = targetFolder === 'spam';
+        const isHistory = targetFolder === 'history';
+        const isDrafts = targetFolder === 'drafts' || targetFolder === 'draft';
+        const isOutbox = targetFolder === 'outbox';
+        const isNoDateFilter = isSpam || isHistory || isDrafts || isOutbox;
+        const queryKey = isNoDateFilter ? `${targetTab}_${targetFolder}` : `${targetTab}_${targetFolder}_${startDate}_${endDate}`;
 
         if (!force && lastFetchedKeyRef.current === queryKey) {
             return;
@@ -1570,14 +1608,15 @@ export default function MailRouterPage() {
 
         try {
             const d = await listEmails({
-                startDate,
-                endDate,
+                startDate: isNoDateFilter ? undefined : startDate,
+                endDate: isNoDateFilter ? undefined : endDate,
                 provider: targetTab,
+                folder: targetFolder,
                 limit: 50,
                 offset: 0,
             });
 
-            if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab) {
+            if (reqId !== latestRequestIdRef.current || currentTabRef.current !== targetTab || currentFolderRef.current !== targetFolder) {
                 return;
             }
 
@@ -1606,7 +1645,7 @@ export default function MailRouterPage() {
                 setLoadingEmails(false);
             }
         }
-    }, [startDate, endDate]);
+    }, [startDate, endDate, activeFolder]);
 
     // Progressive pagination: load next 50 emails
     const loadMoreEmails = useCallback(async () => {
@@ -1615,11 +1654,18 @@ export default function MailRouterPage() {
         setLoadingMore(true);
         try {
             const targetTab = currentTabRef.current;
+            const targetFolder = currentFolderRef.current;
+            const isSpam = targetFolder === 'spam';
+            const isHistory = targetFolder === 'history';
+            const isDrafts = targetFolder === 'drafts' || targetFolder === 'draft';
+            const isOutbox = targetFolder === 'outbox';
+            const isNoDateFilter = isSpam || isHistory || isDrafts || isOutbox;
             const currentCount = emails.length;
             const d = await listEmails({
-                startDate,
-                endDate,
+                startDate: isNoDateFilter ? undefined : startDate,
+                endDate: isNoDateFilter ? undefined : endDate,
                 provider: targetTab,
+                folder: targetFolder,
                 limit: 50,
                 offset: currentCount,
             });
@@ -1639,7 +1685,7 @@ export default function MailRouterPage() {
             loadingMoreRef.current = false;
             setLoadingMore(false);
         }
-    }, [hasMore, emails.length, startDate, endDate]);
+    }, [hasMore, emails.length, startDate, endDate, activeFolder]);
 
     // Autosync status polling: avoids duplicate fetches and does not interfere with active manual sync
     const refreshAutoSyncStatus = useCallback(async () => {
@@ -1729,9 +1775,30 @@ export default function MailRouterPage() {
         fetchSyncJobs();
     }, [fetchAccounts, fetchSyncJobs]);
 
+    const handleSelectFolder = useCallback((folderId: string) => {
+        if (folderId === activeFolder) {
+            // Re-clicking active folder explicitly forces a fresh refresh
+            lastFetchedKeyRef.current = null;
+            inFlightFetchRef.current = null;
+            fetchEmails(true);
+            setFoldersRefreshKey(k => k + 1);
+            return;
+        }
+        currentFolderRef.current = folderId;
+        latestRequestIdRef.current++;
+        lastFetchedKeyRef.current = null;
+        inFlightFetchRef.current = null;
+        setActiveFolder(folderId);
+        setEmails([]);
+        setSelectedEmail(null);
+        setHasMore(false);
+        setTotalEmails(0);
+        setFoldersRefreshKey(k => k + 1);
+    }, [activeFolder, fetchEmails]);
+
     useEffect(() => {
-        fetchEmails();
-    }, [activeTab, fetchEmails]);
+        fetchEmails(true);
+    }, [activeTab, activeFolder, fetchEmails]);
 
     useEffect(() => {
         const connected = searchParams.get('connected');
@@ -1742,6 +1809,10 @@ export default function MailRouterPage() {
             if (providerParam === 'MICROSOFT' || providerParam === 'ZOHO') {
                 currentTabRef.current = providerParam;
                 setActiveTab(providerParam);
+                if (providerParam === 'MICROSOFT' && currentFolderRef.current === 'outbox') {
+                    currentFolderRef.current = 'inbox';
+                    setActiveFolder('inbox');
+                }
                 localStorage.setItem(LAST_USED_PROVIDER_KEY, providerParam);
             }
             fetchAccounts();
@@ -1765,6 +1836,10 @@ export default function MailRouterPage() {
         lastFetchedKeyRef.current = null;
         inFlightFetchRef.current = null;
         setActiveTab(provider);
+        if (provider === 'MICROSOFT' && currentFolderRef.current === 'outbox') {
+            currentFolderRef.current = 'inbox';
+            setActiveFolder('inbox');
+        }
         setEmails([]);
         setSelectedEmail(null);
         setHasMore(false);
@@ -1806,8 +1881,8 @@ export default function MailRouterPage() {
         if (syncInProgressRef.current || syncing) return;
         if (cooldownRef.current > 0 && !customStart) return;
 
-        const s = customStart || draftStartDate || startDate;
-        const e = customEnd || draftEndDate || endDate;
+        const s = customStart || startDate;
+        const e = customEnd || endDate;
 
         if (!s || !e || s > e) {
             setError('Please select a valid date range before syncing (From date must be on or before To date).');
@@ -1815,6 +1890,12 @@ export default function MailRouterPage() {
         }
 
         const currentMailbox = accounts.find(a => a.provider === activeTab);
+        if (activeFolder === 'history') {
+            await fetchEmails(true);
+            setFoldersRefreshKey(k => k + 1);
+            return;
+        }
+
         if (!currentMailbox) {
             setError(`Please connect your ${activeTab === 'MICROSOFT' ? 'Outlook' : 'Zoho Mail'} mailbox first.`);
             return;
@@ -1827,13 +1908,23 @@ export default function MailRouterPage() {
         try {
             // Keep active range aligned with synced range
             if (s !== startDate || e !== endDate) {
-                setStartDate(s);
-                setEndDate(e);
+                const sDate = new Date(s + 'T00:00:00');
+                const eDate = new Date(e + 'T00:00:00');
+                if (!isNaN(sDate.getTime()) && !isNaN(eDate.getTime())) {
+                    setDateRange([sDate, eDate]);
+                }
             }
             const accountId = currentMailbox._id;
-            await triggerSync({ accountId, startDate: s, endDate: e });
+            const isNoDateFolder = activeFolder === 'spam' || activeFolder === 'drafts' || activeFolder === 'draft' || activeFolder === 'outbox';
+            await triggerSync({
+                accountId,
+                startDate: isNoDateFolder ? undefined : s,
+                endDate: isNoDateFolder ? undefined : e,
+                folder: activeFolder,
+            });
             await fetchEmails(true);
             await fetchSyncJobs();
+            setFoldersRefreshKey(k => k + 1);
         } catch (e: any) {
             setError(e.message || 'Sync failed');
         } finally {
@@ -1842,7 +1933,7 @@ export default function MailRouterPage() {
             setCooldownRemaining(15);
             cooldownRef.current = 15;
         }
-    }, [accounts, activeTab, draftStartDate, draftEndDate, startDate, endDate, syncing, fetchEmails, fetchSyncJobs]);
+    }, [accounts, activeTab, startDate, endDate, syncing, fetchEmails, fetchSyncJobs, activeFolder]);
 
     async function handleDisconnect() {
         if (!showDisconnect) return;
@@ -1866,19 +1957,54 @@ export default function MailRouterPage() {
 
     const latestJob = syncJobs[0];
 
+    // Filter emails by active provider, folder, and search query
     const filteredEmails = emails
         .filter(e => !e.provider || e.provider === activeTab)
+        .filter(e => {
+            if (activeFolder === 'sent') {
+                return (e as any).folder === 'sent';
+            }
+            if (activeFolder === 'spam') {
+                return Boolean((e as any).folder === 'spam' || (e as any).isSpam);
+            }
+            if (activeFolder === 'drafts' || activeFolder === 'draft') {
+                return (e as any).folder === 'drafts' || (e as any).folder === 'draft';
+            }
+            if (activeFolder === 'outbox') {
+                return (e as any).folder === 'outbox';
+            }
+            if (activeFolder === 'history') {
+                return Boolean((e as any).isForwarded || (e as any).triageStatus === 'FORWARDED');
+            }
+            if (activeFolder !== 'inbox') {
+                return (e as any).folder === activeFolder;
+            }
+            // 'inbox' or default: show inbox (or non-spam & non-sent & non-draft & non-outbox & non-custom)
+            return (
+                (e as any).folder !== 'spam' &&
+                (e as any).folder !== 'sent' &&
+                (e as any).folder !== 'drafts' &&
+                (e as any).folder !== 'draft' &&
+                (e as any).folder !== 'outbox' &&
+                !(e as any).isSpam &&
+                ((e as any).folder === 'inbox' || !(e as any).folder)
+            );
+        })
         .filter(e => {
             if (!search) return true;
             const s = search.toLowerCase();
             return (
                 (e.from?.email || '').toLowerCase().includes(s) ||
                 (e.from?.name || '').toLowerCase().includes(s) ||
+                ((e as any).toAddress || (e as any).to?.email || '').toLowerCase().includes(s) ||
+                ((e as any).toName || (e as any).to?.name || '').toLowerCase().includes(s) ||
                 (e.subject || '').toLowerCase().includes(s) ||
                 (e.snippetText || '').toLowerCase().includes(s) ||
                 (e.bodyText || '').toLowerCase().includes(s)
             );
         });
+
+
 
     const [loadingAttachments, setLoadingAttachments] = useState(false);
     // Track which email IDs we've already resolved attachments for so we never re-spin
@@ -1948,7 +2074,84 @@ export default function MailRouterPage() {
 
     return (
         <>
-            <style>{`@keyframes mail-spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`
+                @keyframes mail-spin { to { transform: rotate(360deg); } }
+
+                /* ── rsuite DateRangePicker — design system integration ── */
+                /* Trigger button sizing & border to match app form controls  */
+                .rs-picker-daterange .rs-picker-toggle {
+                    height: 32px !important;
+                    padding: 0 10px !important;
+                    font-size: 13px !important;
+                    border-radius: var(--radius-md) !important;
+                    border: 1.5px solid var(--color-border) !important;
+                    background: var(--color-bg-card) !important;
+                    color: var(--color-text-primary) !important;
+                    transition: border-color 0.13s ease, box-shadow 0.13s ease !important;
+                    display: flex !important;
+                    align-items: center !important;
+                }
+                .rs-picker-daterange .rs-picker-toggle:hover,
+                .rs-picker-daterange.rs-picker-focused .rs-picker-toggle {
+                    border-color: var(--color-primary) !important;
+                    box-shadow: 0 0 0 2px var(--color-primary-glow) !important;
+                }
+                .rs-picker-daterange .rs-picker-toggle-value {
+                    color: var(--color-text-primary) !important;
+                    font-weight: 500 !important;
+                }
+                .rs-picker-daterange .rs-picker-toggle-caret,
+                .rs-picker-daterange .rs-picker-toggle-clean {
+                    color: var(--color-text-muted) !important;
+                    top: 50% !important;
+                    transform: translateY(-50%) !important;
+                }
+                /* Dropdown panel */
+                .rs-picker-daterange-panel,
+                .rs-picker-popup {
+                    border: 1px solid var(--color-border) !important;
+                    border-radius: var(--radius-lg) !important;
+                    box-shadow: var(--shadow-lg) !important;
+                    background: var(--color-bg-card) !important;
+                    font-family: var(--font-family) !important;
+                    font-size: 13px !important;
+                }
+                /* Calendar header */
+                .rs-calendar-header-title,
+                .rs-calendar-header-title:hover {
+                    color: var(--color-text-primary) !important;
+                    font-weight: 700 !important;
+                }
+                .rs-calendar-header-backward,
+                .rs-calendar-header-forward {
+                    color: var(--color-text-muted) !important;
+                }
+                /* Today highlight */
+                .rs-calendar-table-cell-is-today .rs-calendar-table-cell-content {
+                    border: 1.5px solid var(--color-primary) !important;
+                }
+                /* Selected range */
+                .rs-calendar-table-cell-selected .rs-calendar-table-cell-content {
+                    background: var(--color-primary) !important;
+                    color: #fff !important;
+                    border-radius: var(--radius-md) !important;
+                }
+                .rs-calendar-table-cell-in-range::before {
+                    background: var(--color-primary-glow) !important;
+                }
+                /* Toolbar OK button */
+                .rs-picker-toolbar .rs-btn-primary {
+                    background: var(--color-primary) !important;
+                    border-color: var(--color-primary) !important;
+                    color: #fff !important;
+                    border-radius: var(--radius-md) !important;
+                    font-size: 12.5px !important;
+                    font-weight: 600 !important;
+                }
+                .rs-picker-toolbar .rs-btn-primary:hover {
+                    background: var(--color-primary-dark) !important;
+                }
+            `}</style>
 
             {/* Modals */}
             {showConnect && <ConnectModal onClose={() => setShowConnect(false)} />}
@@ -1979,7 +2182,6 @@ export default function MailRouterPage() {
                             <h1 className="page-title" style={{ fontSize: 22 }}>Mail Router</h1>
                             <p className="page-subtitle" style={{ fontSize: 13 }}>Connect mailboxes, sync emails, and forward instructions to detailers</p>
                         </div>
-
                         {/* Provider tabs */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             {(['MICROSOFT', 'ZOHO'] as const).map((provider, idx) => {
@@ -2072,56 +2274,65 @@ export default function MailRouterPage() {
 
                     {/* Controls */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <label style={{ fontSize: 12.5, color: 'var(--color-text-muted)', fontWeight: 600 }}>From</label>
-                            <input
-                                type="date"
-                                className="form-control"
-                                style={{ width: 145, fontSize: 12.5 }}
-                                value={draftStartDate}
-                                onChange={e => handleFromDateChange(e.target.value)}
-                            />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <label style={{ fontSize: 12.5, color: 'var(--color-text-muted)', fontWeight: 600 }}>To</label>
-                            <input
-                                ref={toDateRef}
-                                type="date"
-                                className="form-control"
-                                style={{ width: 145, fontSize: 12.5 }}
-                                value={draftEndDate}
-                                onChange={e => handleToDateChange(e.target.value)}
-                                min={draftStartDate || undefined}
-                            />
-                        </div>
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => handleSync()}
-                            disabled={syncing || cooldownRemaining > 0}
-                            style={{
-                                textAlign: "center",
-                                fontSize: 13,
-                                minWidth: 115,
-                                opacity: (syncing || cooldownRemaining > 0) ? 0.5 : 1,
-                                cursor: (syncing || cooldownRemaining > 0) ? 'not-allowed' : 'pointer',
-                                transition: 'opacity 0.2s ease, background-color 0.2s ease',
-                            }}
-                        >
-                            {syncing ? (
-                                <><Spinner size={14} /> Syncing…</>
-                            ) : cooldownRemaining > 0 ? (
-                                `Sync (${cooldownRemaining}s)`
-                            ) : (
-                                'Sync Emails'
-                            )}
-                        </button>
+                        {/* rsuite DateRangePicker — replaces the old two separate date inputs */}
+                        <button className="btn btn-secondary" onClick={() => fetchEmails(true)} disabled={loadingEmails} title="Refresh">
+                            {loadingEmails ? <Spinner size={13} /> : '↻'}
+                        </button> 
+                        <DateRangePicker
+                            value={dateRange}
+                            onChange={handleDateRangeChange}
+                            format="dd MMM yyyy"
+                            character=" – "
+                            showOneCalendar
+                            cleanable={false}
+                            placeholder="Select date range"
+                            size="sm"
+                            style={{ width: 240, height: 30 }}
+                        />
+                        {activeFolder === 'history' ? (
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => fetchEmails(true)}
+                                disabled={loadingEmails}
+                                title="History emails are indexed directly from your local database"
+                                style={{
+                                    textAlign: "center",
+                                    fontSize: 13,
+                                    minWidth: 125,
+                                    cursor: loadingEmails ? 'not-allowed' : 'pointer',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {loadingEmails ? <><Spinner size={14} /> Refreshing…</> : '↻ Refresh History'}
+                            </button>
+                        ) : (
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => handleSync()}
+                                disabled={syncing || cooldownRemaining > 0}
+                                style={{
+                                    textAlign: "center",
+                                    fontSize: 13,
+                                    minWidth: 115,
+                                    opacity: (syncing || cooldownRemaining > 0) ? 0.5 : 1,
+                                    cursor: (syncing || cooldownRemaining > 0) ? 'not-allowed' : 'pointer',
+                                    transition: 'opacity 0.2s ease, background-color 0.2s ease',
+                                }}
+                            >
+                                {syncing ? (
+                                    <><Spinner size={14} /> Syncing {activeFolder}…</>
+                                ) : cooldownRemaining > 0 ? (
+                                    `Sync (${cooldownRemaining}s)`
+                                ) : (
+                                    `Sync ${activeFolder.charAt(0).toUpperCase() + activeFolder.slice(1)}`
+                                )}
+                            </button>
+                        )}
                         <div className="search-input-wrapper" style={{ flex: 1, minWidth: 180 }}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             <input className="form-control" placeholder="Search sender, subject, snippet…" value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 32, fontSize: 13 }} />
                         </div>
-                        <button className="btn btn-secondary" onClick={() => fetchEmails(true)} disabled={loadingEmails} title="Refresh">
-                            {loadingEmails ? <Spinner size={13} /> : '↻'}
-                        </button> 
+
                         <button
                             className="btn btn-danger btn-l"
                             title="Clear downloaded emails from database (leaves user accounts and mailbox connections intact)"
@@ -2136,6 +2347,7 @@ export default function MailRouterPage() {
                                         await fetchEmails(true);
                                         await fetchSyncJobs();
                                         setSuccessMsg('Downloaded emails cleared successfully.');
+                                        setFoldersRefreshKey(k => k + 1);
                                     } catch (err: any) {
                                         setError(err.message || 'Failed to clear emails');
                                     }
@@ -2148,7 +2360,21 @@ export default function MailRouterPage() {
                 </div>
 
                 {/* ── Master-detail (Fills remaining height, scrolls independently) ── */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+                {/*
+                 * OVERLAY SIDEBAR LAYOUT:
+                 * The outer wrapper is position:relative.
+                 * MailSidebar's inner panel is position:absolute so it expands
+                 * over the content on hover WITHOUT pushing anything to the right.
+                 * The sidebar root only consumes 48px of layout width when collapsed.
+                 */}
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+                    {/* Gmail-style hover sidebar */}
+                    <MailSidebar
+                        activeFolder={activeFolder}
+                        onFolderSelect={handleSelectFolder}
+                        refreshTrigger={foldersRefreshKey}
+                        provider={activeTab}
+                    />
                     {/* Left: email list (independent vertical scroll) */}
                     <div
                         style={{
@@ -2177,8 +2403,42 @@ export default function MailRouterPage() {
                             </div>
                         ) : filteredEmails.length === 0 ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                                No emails in this date window<br />
-                                <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Emails</strong> to fetch latest mails</span>
+                                {activeFolder === 'sent' ? (
+                                    <>
+                                        No sent emails in this date window<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Sent</strong> to fetch latest outgoing mails</span>
+                                    </>
+                                ) : activeFolder === 'spam' ? (
+                                    <>
+                                        No spam emails found<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Mails flagged as junk by your provider or present in the Spam/Junk folder will appear here.</span>
+                                    </>
+                                ) : activeFolder === 'history' ? (
+                                    <>
+                                        No forwarded emails found in history<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Emails forwarded to detailers will appear here.</span>
+                                    </>
+                                ) : activeFolder === 'drafts' ? (
+                                    <>
+                                        No drafts found<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Drafts</strong> to fetch latest draft messages</span>
+                                    </>
+                                ) : activeFolder === 'outbox' ? (
+                                    <>
+                                        No outbox messages<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Outbox</strong> to check pending outgoing mails</span>
+                                    </>
+                                ) : activeFolder !== 'inbox' ? (
+                                    <>
+                                        No emails found in this folder<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync {activeFolder.charAt(0).toUpperCase() + activeFolder.slice(1)}</strong> to fetch latest mails</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        No emails in this date window<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Inbox</strong> to fetch latest mails</span>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <>

@@ -16,6 +16,7 @@ const errors_1 = require("../../errors");
 exports.ZOHO_DEFAULT_SCOPES = [
     'ZohoMail.messages.READ',
     'ZohoMail.accounts.READ',
+    'ZohoMail.folders.READ',
 ];
 function getZohoConfig() {
     const clientId = process.env.ZOHO_CLIENT_ID || '';

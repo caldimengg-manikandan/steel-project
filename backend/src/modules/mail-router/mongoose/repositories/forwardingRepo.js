@@ -48,8 +48,8 @@ async function createForwarding(emailId, forwardedBy, recipientIds, note, projec
     createdDocs.push(doc);
   }
 
-  // Update email triage status to FORWARDED
-  await Email.findByIdAndUpdate(emailId, { triageStatus: 'FORWARDED' });
+  // Update email triage status to FORWARDED and set isForwarded flag
+  await Email.findByIdAndUpdate(emailId, { triageStatus: 'FORWARDED', isForwarded: true });
 
   return {
     success: true,
