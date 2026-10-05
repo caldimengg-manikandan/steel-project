@@ -31,10 +31,19 @@ const activeSyncPromisesByAccount = new Map();
  * Trigger mail synchronisation for an account/provider across a UTC window.
  */
 async function runMailSync(options) {
-  const { userId, startDate, endDate, account } = options;
+  const { userId, startDate, endDate, account, folder } = options;
   const providerType = account?.provider || options.provider || 'MICROSOFT';
   const accountId = account?._id || account?.id;
-  const lockKey = accountId ? String(accountId) : `${userId}_${providerType}`;
+  const cleanFolder = folder ? String(folder).toLowerCase() : 'inbox';
+  if (cleanFolder === 'history') {
+    console.log('[mail-router:sync] Skipping remote sync for local history folder.');
+    return { id: 'history_local', status: 'COMPLETED', message: 'History folder is indexed locally from forwarded emails.' };
+  }
+  if (cleanFolder === 'outbox' && providerType === 'MICROSOFT') {
+    console.log('[mail-router:sync] Skipping outbox sync for Microsoft (not present in modern Outlook).');
+    return { id: 'outbox_ms_skipped', status: 'COMPLETED', message: 'Modern Microsoft Outlook does not have an outbox folder.' };
+  }
+  const lockKey = accountId ? `${accountId}_${cleanFolder}` : `${userId}_${providerType}_${cleanFolder}`;
 
   if (activeSyncPromisesByAccount.has(lockKey)) {
     console.log(`[mail-router:sync] Sync operation already in-flight for account ${lockKey}. Joining existing job.`);
@@ -54,8 +63,9 @@ async function runMailSync(options) {
 }
 
 async function executeMailSync(options) {
-  const { userId, startDate, endDate, account } = options;
+  const { userId, startDate, endDate, account, folder } = options;
   const providerType = account?.provider || options.provider || 'MICROSOFT';
+  const cleanFolder = folder ? String(folder).toLowerCase() : 'inbox';
   const mailProvider = getMailProvider(providerType);
 
   // Resolve the UTC window
@@ -80,14 +90,34 @@ async function executeMailSync(options) {
   const startTime = Date.now();
   const jobId = String(job.id || job._id);
 
+  // If this is a custom folder, resolve its remoteFolderId from MailFolder mapping if not already provided
+  let resolvedRemoteFolderId = options.remoteFolderId;
+  if (!resolvedRemoteFolderId && cleanFolder && !['inbox', 'sent', 'spam', 'drafts', 'draft', 'outbox', 'history'].includes(cleanFolder)) {
+    try {
+      const MailFolder = require('../models/MailFolder');
+      const customFolderDoc = await MailFolder.findOne({
+        userId,
+        provider: providerType,
+        folderId: cleanFolder,
+      }).lean();
+      if (customFolderDoc) {
+        resolvedRemoteFolderId = customFolderDoc.remoteFolderId;
+      }
+    } catch (mfErr) {
+      console.warn('[mail-router:sync] Failed to lookup custom folder mapping:', mfErr.message);
+    }
+  }
+
   try {
     while (true) {
       const pageResult = await mailProvider.listMessages(
         {
           mailboxId: syncAccount.providerUserId,
-          startDate: window.start,
-          endDate: window.end,
+          startDate: cleanFolder === 'spam' ? undefined : window.start,
+          endDate: cleanFolder === 'spam' ? undefined : window.end,
           cursor: isFirstPage ? undefined : cursor || undefined,
+          folder: cleanFolder,
+          remoteFolderId: resolvedRemoteFolderId,
         },
         syncAccount
       );
@@ -101,20 +131,31 @@ async function executeMailSync(options) {
           message,
           jobId,
           syncAccount._id || syncAccount.id,
-          syncAccount.userId
+          syncAccount.userId,
+          cleanFolder,
+          resolvedRemoteFolderId
         );
         messagesSynced += 1;
 
-        const hasInlineCids = /cid:[^\s"'>]+/i.test(message.bodyHtml || '');
-        if (message.hasAttachments || hasInlineCids) {
+        const hasInline = /cid:[^\s"'>]+/i.test(message.bodyHtml || '') || /ImageDisplay/i.test(message.bodyHtml || '');
+        if (message.hasAttachments || hasInline) {
           const emailDbId = savedEmail._id || savedEmail.id;
           await syncAttachmentsForMessage(mailProvider, syncAccount, message, emailDbId);
 
-          if (hasInlineCids) {
+          if (hasInline) {
             try {
-              const fullAtts = await Attachment.find({ emailId: emailDbId }).lean();
-              const { html: resolvedHtml } = resolveInlineImages(savedEmail.bodyHtml, fullAtts);
-              if (resolvedHtml && resolvedHtml !== savedEmail.bodyHtml) {
+              const mongoose = require('mongoose');
+              const emailIds = [emailDbId];
+              if (typeof emailDbId === 'string' && mongoose.Types.ObjectId.isValid(emailDbId)) {
+                emailIds.push(new mongoose.Types.ObjectId(emailDbId));
+              } else if (emailDbId && emailDbId.toString) {
+                emailIds.push(emailDbId.toString());
+              }
+              const fullAtts = await Attachment.find({ emailId: { $in: emailIds } }).lean();
+              const currentEmail = await Email.findById(emailDbId).select('bodyHtml').lean();
+              const sourceHtml = currentEmail?.bodyHtml || savedEmail.bodyHtml;
+              const { html: resolvedHtml } = resolveInlineImages(sourceHtml, fullAtts);
+              if (resolvedHtml && resolvedHtml !== sourceHtml) {
                 await updateEmailBodyHtml(emailDbId, resolvedHtml);
               }
             } catch (inlineErr) {
@@ -180,6 +221,19 @@ function isInlineCidImage(att, bodyHtml) {
   const isImg = (att.contentType && att.contentType.toLowerCase().startsWith('image/')) ||
                 /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i.test(filename);
 
+  // 0. Zoho ImageDisplay reference in HTML body
+  if (html.includes('imagedisplay')) {
+    if (cleanCid && (html.includes(cleanCid) || html.includes(encodeURIComponent(cleanCid)))) {
+      return true;
+    }
+    if (filename && (html.includes(filename) || html.includes(encodeURIComponent(filename)))) {
+      return true;
+    }
+    if (att.isInline && isImg) {
+      return true;
+    }
+  }
+
   // 1. Explicit CID reference in HTML body
   if (cleanCid && (html.includes(`cid:${cleanCid}`) || html.includes(`cid:&quot;${cleanCid}&quot;`))) {
     return true;
@@ -222,6 +276,8 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
       return;
     }
 
+    let hasNewInlineContent = false;
+
     for (const att of attachmentList) {
       const providerAttachmentId = att.providerAttachmentId || att.id;
       if (!providerAttachmentId) continue;
@@ -242,9 +298,10 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
       // Download ONLY if it is an inline/CID image and not already cached
       if (isInline && !isAlreadyCached) {
         try {
-          const download = await provider.downloadAttachment(message.providerMessageId, providerAttachmentId, account);
+          const download = await provider.downloadAttachment(message.providerMessageId, providerAttachmentId, account, att.contentId);
           if (download && download.content) {
             contentToSave = download.content;
+            hasNewInlineContent = true;
           }
         } catch (downloadErr) {
           console.warn(
@@ -266,6 +323,23 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
         contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
         ...(contentToSave ? { content: contentToSave } : {}),
       });
+    }
+
+    // If message HTML contains inline references and we have inline content, resolve and persist updated bodyHtml
+    if (message.bodyHtml && (message.bodyHtml.includes('cid:') || message.bodyHtml.includes('ImageDisplay'))) {
+      try {
+        const { resolveInlineImages } = require('./inlineImageService');
+        const Email = require('../models/Email');
+        const fullAtts = await Attachment.find({ emailId, content: { $exists: true, $ne: null } }).lean();
+        if (fullAtts.length > 0) {
+          const { html: resolvedHtml } = resolveInlineImages(message.bodyHtml, fullAtts);
+          if (resolvedHtml && resolvedHtml !== message.bodyHtml) {
+            await Email.updateOne({ _id: emailId }, { bodyHtml: resolvedHtml });
+          }
+        }
+      } catch (inlineErr) {
+        console.warn(`[mail-router:sync] Inline image resolution failed for ${emailId}:`, inlineErr.message);
+      }
     }
   } catch (err) {
     console.warn(`[mail-router:sync] Attachment list sync failed for message ${message.providerMessageId}:`, err);

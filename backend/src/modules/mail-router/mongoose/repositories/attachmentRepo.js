@@ -16,8 +16,16 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
     content = thirdArg || attachmentMeta.content || null;
   }
 
+  const mongoose = require('mongoose');
+  const ids = [emailId];
+  if (typeof emailId === 'string' && mongoose.Types.ObjectId.isValid(emailId)) {
+    ids.push(new mongoose.Types.ObjectId(emailId));
+  } else if (emailId && emailId.toString) {
+    ids.push(emailId.toString());
+  }
+
   const filter = {
-    emailId,
+    emailId: { $in: ids },
     providerAttachmentId: attachmentMeta.providerAttachmentId || attachmentMeta.id,
   };
 

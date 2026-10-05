@@ -36,7 +36,7 @@ const emailSchema = new mongoose.Schema(
     },
     mailboxAddress: {
       type: String,
-      required: true,
+      default: '',
     },
     fromName: {
       type: String,
@@ -44,6 +44,12 @@ const emailSchema = new mongoose.Schema(
     fromAddress: {
       type: String,
       required: true,
+    },
+    toName: {
+      type: String,
+    },
+    toAddress: {
+      type: String,
     },
     subject: {
       type: String,
@@ -79,6 +85,25 @@ const emailSchema = new mongoose.Schema(
       enum: ['NEW', 'REVIEWED', 'FORWARDED', 'ARCHIVED'],
       default: 'NEW',
     },
+    folder: {
+      type: String,
+      default: 'inbox',
+      index: true,
+    },
+    remoteFolderId: {
+      type: String,
+      index: true,
+    },
+    isSpam: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isForwarded: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     // Native Steel Detailing project extension
     projectId: {
       type: mongoose.Schema.Types.Mixed,
@@ -96,6 +121,10 @@ emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ provider: 1, receivedAt: -1 });
 emailSchema.index({ accountId: 1, receivedAt: -1 });
 emailSchema.index({ provider: 1, receivedAt: -1, accountId: 1 });
+emailSchema.index({ isForwarded: 1, receivedAt: -1 });
+emailSchema.index({ userId: 1, isForwarded: 1, receivedAt: -1 });
+emailSchema.index({ provider: 1, isForwarded: 1, receivedAt: -1 });
+emailSchema.index({ triageStatus: 1, receivedAt: -1 });
 
 module.exports = mongoose.model('Email', emailSchema);
 

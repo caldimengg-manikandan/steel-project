@@ -137,6 +137,353 @@ function requireRoles(...allowedRoles) {
 // Mailbox Connections, Syncing, and Triage Workspace
 // =============================================================================
 
+// ── Mail Folder Definitions (backend-driven, extensible) ──────────────────────
+//
+// SYSTEM_FOLDERS defines the canonical list of available mail folders.
+// Each entry is the single source of truth for folder metadata.
+// To add a new folder (e.g. Drafts, Archive), simply add an entry here.
+// The route below merges live email counts into these definitions at request time.
+//
+// Supported fields:
+//   id       – unique stable identifier used as a filter key
+//   name     – human-readable label shown in the UI
+//   icon     – emoji / icon identifier rendered by the frontend
+//   type     – 'system' | 'custom' (used for ordering/grouping)
+//   filter   – optional MongoDB query fragment for counting (omit = no count possible)
+//   order    – integer sort position in the sidebar
+
+const SYSTEM_FOLDERS = [
+  {
+    id: 'inbox',
+    name: 'Inbox',
+    icon: 'inbox',
+    type: 'system',
+    order: 0,
+    filter: {
+      folder: { $nin: ['sent', 'spam', 'trash', 'drafts', 'draft', 'outbox', 'archive'] },
+      isSpam: { $ne: true },
+    },
+  },
+  {
+    id: 'sent',
+    name: 'Sent',
+    icon: 'send',
+    type: 'system',
+    order: 1,
+    filter: {
+      folder: 'sent',
+    },
+  },
+  {
+    id: 'drafts',
+    name: 'Drafts',
+    icon: 'drafts',
+    type: 'system',
+    order: 2,
+    filter: {
+      folder: { $in: ['drafts', 'draft'] },
+    },
+  },
+  {
+    id: 'outbox',
+    name: 'Outbox',
+    icon: 'outbox',
+    type: 'system',
+    order: 3,
+    provider: 'ZOHO', // Outbox is supported only for Zoho Mail
+    filter: {
+      folder: 'outbox',
+    },
+  },
+  {
+    id: 'spam',
+    name: 'Spam',
+    icon: 'spam',
+    type: 'system',
+    order: 4,
+    filter: {
+      $or: [
+        { folder: 'spam' },
+        { isSpam: true },
+      ],
+    },
+  },
+  {
+    id: 'history',
+    name: 'History',
+    icon: 'history',
+    type: 'system',
+    order: 5,
+    filter: {
+      $or: [
+        { isForwarded: true },
+        { triageStatus: 'FORWARDED' },
+      ],
+    },
+  },
+];
+
+// GET /api/mail-router/folders — Return available mail folders with live counts
+router.get('/folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const targetProvider = req.query.provider ? String(req.query.provider).toUpperCase() : null;
+
+    // Resolve account IDs for the current user so we can scope counts properly
+    const userAccounts = await listMailAccountsByUser(userId);
+    const filteredAccounts = targetProvider
+      ? userAccounts.filter((a) => a.provider === targetProvider)
+      : userAccounts;
+    const accountIds = filteredAccounts.map((a) => a._id);
+
+    // Base filter: emails belonging to this user (scoped to provider if specified)
+    const userFilter = {
+      $or: [
+        { userId, ...(targetProvider ? { provider: targetProvider } : {}) },
+        { accountId: { $in: accountIds } },
+        { accountId: { $in: accountIds.map(String) } },
+      ],
+    };
+
+    // Filter folder definitions based on provider:
+    // Outbox is only present in Zoho Mail (not in modern Outlook)
+    const eligibleFolderDefs = SYSTEM_FOLDERS.filter((f) => {
+      if (f.provider && targetProvider && f.provider !== targetProvider) {
+        return false;
+      }
+      if (f.id === 'outbox' && targetProvider === 'MICROSOFT') {
+        return false;
+      }
+      return true;
+    });
+
+    // Build system folder list with live counts
+    const folders = await Promise.all(
+      eligibleFolderDefs.map(async ({ filter: folderFilter, ...def }) => {
+        let count = 0;
+
+        if (folderFilter) {
+          try {
+            count = await Email.countDocuments({ ...userFilter, ...folderFilter });
+          } catch {
+            count = 0;
+          }
+        }
+
+        return {
+          id: def.id,
+          name: def.name,
+          icon: def.icon,
+          type: def.type,
+          order: def.order,
+          count,
+        };
+      })
+    );
+
+    // Fetch custom folders mapped by user (scoped to targetProvider if specified)
+    const MailFolder = require('../mongoose/models/MailFolder');
+    const customFolderQuery = { userId };
+    if (targetProvider) {
+      customFolderQuery.provider = targetProvider;
+    }
+    const customFolders = await MailFolder.find(customFolderQuery).sort({ order: 1, createdAt: 1 }).lean();
+
+    const customFolderItems = await Promise.all(
+      customFolders.map(async (cf) => {
+        let count = 0;
+        try {
+          count = await Email.countDocuments({ ...userFilter, folder: cf.folderId });
+        } catch {
+          count = 0;
+        }
+        return {
+          id: cf.folderId,
+          name: cf.name,
+          icon: cf.icon || 'folder',
+          type: 'custom',
+          order: cf.order || 10,
+          provider: cf.provider,
+          remoteFolderId: cf.remoteFolderId,
+          mappingId: cf._id,
+          count,
+        };
+      })
+    );
+
+    const allFolders = [...folders, ...customFolderItems];
+    allFolders.sort((a, b) => a.order - b.order);
+
+    return res.json({ folders: allFolders });
+  } catch (err) {
+    console.error('[mailRouter:folders] Error fetching folders:', err);
+    return res.status(500).json({ error: err.message || 'Failed to list mail folders' });
+  }
+});
+
+// GET /api/mail-router/remote-folders — Fetch available remote folders from connected mailbox
+router.get('/remote-folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const provider = req.query.provider ? String(req.query.provider).toUpperCase() : null;
+    if (!provider || !['MICROSOFT', 'ZOHO'].includes(provider)) {
+      return res.status(400).json({ error: 'Valid provider parameter (MICROSOFT or ZOHO) is required.' });
+    }
+
+    const account = await getMailAccountForUserAndProvider(userId, provider);
+    if (!account) {
+      return res.status(404).json({ error: `No connected ${provider} account found. Please connect your mailbox first.` });
+    }
+
+    const mailProvider = getMailProvider(provider);
+    const remoteFolders = await mailProvider.listRemoteFolders(account);
+
+    // Cross-reference with existing custom folders in MailFolder
+    const MailFolder = require('../mongoose/models/MailFolder');
+    const existingCustom = await MailFolder.find({ userId, provider }).lean();
+    const existingRemoteIds = new Set(existingCustom.map((c) => String(c.remoteFolderId)));
+
+    const folders = (remoteFolders || []).map((rf) => ({
+      ...rf,
+      isAdded: existingRemoteIds.has(String(rf.id)),
+    }));
+
+    return res.json({ folders });
+  } catch (err) {
+    console.error('[mailRouter:remote-folders] Error fetching remote folders:', err);
+    return res.status(500).json({ error: err.message || 'Failed to list remote folders from provider' });
+  }
+});
+
+// POST /api/mail-router/custom-folders — Dynamically map a remote folder into the app
+router.post('/custom-folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const { provider, remoteFolderId, name, icon } = req.body;
+
+    if (!provider || !['MICROSOFT', 'ZOHO'].includes(String(provider).toUpperCase())) {
+      return res.status(400).json({ error: 'Valid provider (MICROSOFT or ZOHO) is required.' });
+    }
+    if (!remoteFolderId || typeof remoteFolderId !== 'string' || !remoteFolderId.trim()) {
+      return res.status(400).json({ error: 'Remote folder ID is required.' });
+    }
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Folder display name is required.' });
+    }
+
+    const normProvider = String(provider).toUpperCase();
+    const cleanName = name.trim();
+    const cleanRemoteFolderId = remoteFolderId.trim();
+
+    const account = await getMailAccountForUserAndProvider(userId, normProvider);
+    if (!account) {
+      return res.status(404).json({ error: `No connected ${normProvider} account found.` });
+    }
+
+    const MailFolder = require('../mongoose/models/MailFolder');
+
+    // 1. Prevent duplicate remoteFolderId mapping for the same user and provider
+    const existingRemote = await MailFolder.findOne({
+      userId,
+      provider: normProvider,
+      remoteFolderId: cleanRemoteFolderId,
+    }).lean();
+
+    if (existingRemote) {
+      return res.status(409).json({
+        error: `Folder "${existingRemote.name}" is already added to the sidebar.`,
+        folder: existingRemote,
+      });
+    }
+
+    // 2. Generate a collision-free slug for folderId
+    let baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 30);
+    if (!baseSlug || ['inbox', 'sent', 'spam', 'drafts', 'draft', 'outbox', 'history', 'trash', 'archive'].includes(baseSlug)) {
+      baseSlug = `cf_${baseSlug || 'folder'}`;
+    }
+
+    let folderId = baseSlug;
+    let counter = 1;
+    while (await MailFolder.findOne({ userId, provider: normProvider, folderId }).lean()) {
+      folderId = `${baseSlug}_${counter++}`;
+    }
+
+    // 3. Save custom folder mapping
+    const newFolder = await MailFolder.create({
+      userId,
+      accountId: account._id,
+      provider: normProvider,
+      folderId,
+      name: cleanName,
+      remoteFolderId: cleanRemoteFolderId,
+      icon: icon || 'folder',
+      order: 10,
+    });
+
+    // 4. Trigger initial background sync for this folder non-blockingly
+    (async () => {
+      try {
+        const { runMailSync } = require('../mongoose/services/mailSyncService');
+        await runMailSync({
+          userId,
+          account,
+          provider: normProvider,
+          folder: folderId,
+          remoteFolderId: cleanRemoteFolderId,
+        });
+      } catch (syncErr) {
+        console.warn(`[mailRouter:custom-folders] Initial sync for folder ${folderId} failed:`, syncErr.message);
+      }
+    })();
+
+    return res.status(201).json({
+      success: true,
+      folder: {
+        id: newFolder.folderId,
+        name: newFolder.name,
+        icon: newFolder.icon,
+        type: 'custom',
+        order: newFolder.order,
+        provider: newFolder.provider,
+        remoteFolderId: newFolder.remoteFolderId,
+        mappingId: newFolder._id,
+        count: 0,
+      },
+    });
+  } catch (err) {
+    console.error('[mailRouter:custom-folders] Error creating custom folder mapping:', err);
+    return res.status(500).json({ error: err.message || 'Failed to create folder mapping' });
+  }
+});
+
+// DELETE /api/mail-router/custom-folders/:id — Remove a custom folder mapping
+router.delete('/custom-folders/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const { id } = req.params;
+
+    const MailFolder = require('../mongoose/models/MailFolder');
+    const mongoose = require('mongoose');
+
+    let deleted = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deleted = await MailFolder.findOneAndDelete({ _id: id, userId });
+    }
+    if (!deleted) {
+      deleted = await MailFolder.findOneAndDelete({ folderId: id, userId });
+    }
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Folder mapping not found.' });
+    }
+
+    return res.json({ success: true, message: `Folder "${deleted.name}" removed from sidebar.` });
+  } catch (err) {
+    console.error('[mailRouter:custom-folders] Error deleting custom folder:', err);
+    return res.status(500).json({ error: err.message || 'Failed to delete custom folder mapping' });
+  }
+});
+
 // ── Mailbox Connection Management ────────────────────────────────────────────
 
 // GET /api/mail-router/accounts — List user's connected mailboxes (Zoho & MS)
@@ -419,7 +766,15 @@ router.get('/auth/zoho/callback', async (req, res) => {
 
 // POST /api/mail-router/sync — Trigger email synchronization
 router.post('/sync', requireRoles(...MANAGER_ROLES), async (req, res) => {
-  const { accountId, provider, startDate, endDate } = req.body || {};
+  const { accountId, provider, startDate, endDate, folder } = req.body || {};
+
+  // History is a local DB-indexed folder of forwarded emails; do not make remote mailbox calls
+  if (folder && String(folder).toLowerCase() === 'history') {
+    return res.json({
+      message: 'History folder is indexed locally from forwarded emails. Remote mailbox fetch skipped.',
+      jobs: [],
+    });
+  }
 
   try {
     let targetAccounts = [];
@@ -458,6 +813,7 @@ router.post('/sync', requireRoles(...MANAGER_ROLES), async (req, res) => {
           provider: account.provider,
           startDate,
           endDate,
+          folder: folder ? String(folder).toLowerCase() : undefined,
         });
 
         syncResults.push({
@@ -528,12 +884,13 @@ router.post('/autosync/trigger', requireRoles(...MANAGER_ROLES), async (req, res
 
 // GET /api/mail-router/emails — List emails in date range for active provider
 router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
-  const { startDate, endDate, provider, limit: qLimit, offset: qOffset, page: qPage } = req.query;
+  const { startDate, endDate, provider, limit: qLimit, offset: qOffset, page: qPage, folder } = req.query;
 
   try {
     const cleanStartDate = startDate && startDate !== 'undefined' && startDate !== 'null' ? String(startDate) : undefined;
     const cleanEndDate = endDate && endDate !== 'undefined' && endDate !== 'null' ? String(endDate) : undefined;
     let targetProvider = provider && provider !== 'undefined' && provider !== 'null' ? String(provider).toUpperCase() : undefined;
+    const cleanFolder = folder && folder !== 'undefined' && folder !== 'null' ? String(folder).toLowerCase() : undefined;
 
     const limit = Math.min(parseInt(qLimit || '200', 10), 500);
     const page = parseInt(qPage || '0', 10);
@@ -553,7 +910,8 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
       targetProvider,
       req.authUser.id,
       limit,
-      offset
+      offset,
+      cleanFolder
     );
 
     // Batch-load attachment metadata (non-inline drawings/files) for all emails in one fast indexed query
@@ -576,6 +934,7 @@ router.get('/emails', requireRoles(...MANAGER_ROLES), async (req, res) => {
       return {
         ...e,
         from: e.from || { name: e.fromName || e.fromAddress, email: e.fromAddress },
+        to: e.to || (e.toAddress ? { name: e.toName || e.toAddress, email: e.toAddress } : undefined),
         isForwarded: e.isForwarded ?? (e.triageStatus === 'FORWARDED'),
         snippetText: e.snippetText || e.bodyPreview || '',
         hasAttachments: Boolean(e.hasAttachments || emailAtts.length > 0),
@@ -652,14 +1011,84 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
     const Email = require('../mongoose/models/Email');
     const { resolveInlineImages } = require('../mongoose/services/inlineImageService');
 
-    // Only load attachment binary buffers if the HTML body actually contains cid: references
-    const hasCid = Boolean(email.bodyHtml && email.bodyHtml.includes('cid:'));
-    const [attachments, fullAttachments] = await Promise.all([
+    const mongoose = require('mongoose');
+    const emailIds = [emailId];
+    if (typeof emailId === 'string' && mongoose.Types.ObjectId.isValid(emailId)) {
+      emailIds.push(new mongoose.Types.ObjectId(emailId));
+    } else if (emailId && emailId.toString) {
+      emailIds.push(emailId.toString());
+    }
+
+    // Only load attachment binary buffers if the HTML body actually contains cid: or ImageDisplay references
+    const hasCid = Boolean(email.bodyHtml && (email.bodyHtml.includes('cid:') || email.bodyHtml.includes('ImageDisplay')));
+    let [attachments, fullAttachments] = await Promise.all([
       listAttachmentsByEmail(emailId),
       hasCid
-        ? Attachment.find({ emailId, $or: [{ isInline: true }, { contentId: { $exists: true, $ne: null } }] }).lean()
+        ? Attachment.find({ emailId: { $in: emailIds }, $or: [{ isInline: true }, { contentId: { $exists: true, $ne: null } }, { contentType: /^image\// }] }).lean()
         : Promise.resolve([]),
     ]);
+
+    // If HTML has inline image references but no cached attachment binary content is present,
+    // on-demand fetch and cache inline images so they render immediately
+    const hasCachedContent = fullAttachments.some(a => a.content && a.content.length > 0);
+    if (hasCid && !hasCachedContent && email.accountId && email.providerMessageId) {
+      try {
+        const account = await getMailAccountById(email.accountId);
+        if (account) {
+          const { getMailProvider } = require('../services/mail/provider-factory');
+          const provider = getMailProvider(email.provider);
+          const attList = await provider.listAttachments(email.providerMessageId, account);
+          if (attList && Array.isArray(attList) && attList.length > 0) {
+            const { upsertAttachment } = require('../mongoose/repositories/attachmentRepo');
+            for (const att of attList) {
+              const providerAttachmentId = att.providerAttachmentId || att.id;
+              if (!providerAttachmentId) continue;
+              const isImg = (att.contentType && att.contentType.startsWith('image/')) ||
+                /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i.test(att.filename || '');
+              const matchesBody = att.isInline ||
+                (email.bodyHtml && (
+                  (att.contentId && email.bodyHtml.includes(att.contentId)) ||
+                  (att.filename && email.bodyHtml.includes(att.filename)) ||
+                  email.bodyHtml.includes('ImageDisplay')
+                ));
+
+              let downloadedContent = null;
+              if (isImg && matchesBody) {
+                try {
+                  const dl = await provider.downloadAttachment(email.providerMessageId, providerAttachmentId, account, att.contentId);
+                  if (dl && dl.content) {
+                    downloadedContent = dl.content;
+                  }
+                } catch (dlErr) {
+                  console.warn(`[mailRouter:lazy-att] Download failed for ${att.filename}:`, dlErr.message);
+                }
+              }
+
+              const savedAtt = await upsertAttachment({
+                emailId,
+                providerAttachmentId,
+                filename: att.filename || 'attachment',
+                contentType: att.contentType || 'application/octet-stream',
+                sizeBytes: att.sizeBytes ?? null,
+                isInline: Boolean(att.isInline),
+                contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
+                ...(downloadedContent ? { content: downloadedContent } : {}),
+              });
+
+              if (downloadedContent) {
+                fullAttachments.push({
+                  ...(savedAtt.toObject ? savedAtt.toObject() : savedAtt),
+                  content: downloadedContent,
+                });
+              }
+            }
+            attachments = await listAttachmentsByEmail(emailId);
+          }
+        }
+      } catch (lazyErr) {
+        console.warn(`[mailRouter:lazy-att] On-demand inline attachment sync failed for ${emailId}:`, lazyErr.message);
+      }
+    }
 
     const { html: resolvedHtml, inlineAttachmentIds } = resolveInlineImages(email.bodyHtml, fullAttachments);
     if (resolvedHtml && resolvedHtml !== email.bodyHtml && email._id) {
@@ -702,6 +1131,32 @@ router.post('/emails/:id/forward', requireRoles(...MANAGER_ROLES), async (req, r
   } catch (err) {
     console.error('[mailRouter:forward] Forwarding error:', err);
     return res.status(500).json({ error: err.message || 'Failed to forward email' });
+  }
+});
+
+// PATCH /api/mail-router/emails/:id/folder — Move email to a different folder (e.g. spam, inbox)
+router.patch('/emails/:id/folder', requireRoles(...MANAGER_ROLES), async (req, res) => {
+  const { folder } = req.body || {};
+  const validFolders = ['inbox', 'sent', 'spam', 'drafts', 'trash', 'archive'];
+  const cleanFolder = String(folder || '').toLowerCase().trim();
+
+  if (!cleanFolder || !validFolders.includes(cleanFolder)) {
+    return res.status(400).json({ error: `Invalid folder. Must be one of: ${validFolders.join(', ')}` });
+  }
+
+  try {
+    const updateFields = {
+      folder: cleanFolder,
+      isSpam: cleanFolder === 'spam',
+    };
+
+    const updated = await Email.findByIdAndUpdate(req.params.id, { $set: updateFields }, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Email not found.' });
+
+    return res.json({ success: true, id: updated._id, folder: updated.folder, isSpam: updated.isSpam });
+  } catch (err) {
+    console.error('[mailRouter:updateFolder] Error updating email folder:', err);
+    return res.status(500).json({ error: err.message || 'Failed to update email folder' });
   }
 });
 

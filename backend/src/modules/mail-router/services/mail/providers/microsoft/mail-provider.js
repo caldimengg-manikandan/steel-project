@@ -209,6 +209,61 @@ class MicrosoftMailProvider {
         const mailboxId = resolveMicrosoftMailboxId(auth, account);
         return (0, attachments_1.downloadAttachmentContent)(auth.accessToken, mailboxId, messageId, attachmentId);
     }
+    async listRemoteFolders(account) {
+        const auth = await this.authenticate(account);
+        const mailboxId = resolveMicrosoftMailboxId(auth, account);
+        const basePath = mailboxId === 'me' ? '/me' : `/users/${encodeURIComponent(mailboxId)}`;
+        const url = `https://graph.microsoft.com/v1.0${basePath}/mailFolders?$top=100&$select=id,displayName,totalItemCount,unreadItemCount,childFolderCount`;
+        const res = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${auth.accessToken}`,
+                Accept: 'application/json',
+            },
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Failed to list Microsoft mail folders: ${res.status} ${errText}`);
+        }
+        const data = await res.json();
+        const systemNames = ['inbox', 'drafts', 'sent items', 'deleted items', 'junk email', 'outbox', 'archive', 'conversation history'];
+        const results = [];
+        for (const f of data.value || []) {
+            const lower = (f.displayName || '').toLowerCase().trim();
+            results.push({
+                id: f.id,
+                name: f.displayName,
+                totalItemCount: f.totalItemCount || 0,
+                unreadItemCount: f.unreadItemCount || 0,
+                isSystem: systemNames.includes(lower),
+                provider: 'MICROSOFT',
+            });
+            if (f.childFolderCount > 0) {
+                try {
+                    const childUrl = `https://graph.microsoft.com/v1.0${basePath}/mailFolders/${encodeURIComponent(f.id)}/childFolders?$top=50&$select=id,displayName,totalItemCount,unreadItemCount`;
+                    const childRes = await fetch(childUrl, {
+                        headers: { Authorization: `Bearer ${auth.accessToken}`, Accept: 'application/json' },
+                    });
+                    if (childRes.ok) {
+                        const childData = await childRes.json();
+                        for (const cf of childData.value || []) {
+                            const cLower = (cf.displayName || '').toLowerCase().trim();
+                            results.push({
+                                id: cf.id,
+                                name: `${f.displayName} / ${cf.displayName}`,
+                                totalItemCount: cf.totalItemCount || 0,
+                                unreadItemCount: cf.unreadItemCount || 0,
+                                isSystem: systemNames.includes(cLower),
+                                provider: 'MICROSOFT',
+                            });
+                        }
+                    }
+                } catch {
+                    // child folders fetch ignored
+                }
+            }
+        }
+        return results;
+    }
 }
 exports.MicrosoftMailProvider = MicrosoftMailProvider;
 exports.microsoftMailProvider = new MicrosoftMailProvider();

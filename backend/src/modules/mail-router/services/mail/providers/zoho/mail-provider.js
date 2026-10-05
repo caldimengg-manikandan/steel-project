@@ -123,12 +123,44 @@ class ZohoMailProvider {
         const baseUrl = account?.providerMetadata?.apiUrl || undefined;
         return (0, attachments_1.fetchZohoAttachmentList)(token, accountId, folderId, messageId, baseUrl);
     }
-    async downloadAttachment(messageId, attachmentId, account) {
+    async downloadAttachment(messageId, attachmentId, account, contentId) {
         const token = await this.resolveToken(account);
         const accountId = await this.resolveAccountId(token, account);
         const folderId = account?.providerMetadata?.folderId || '0';
         const baseUrl = account?.providerMetadata?.apiUrl || undefined;
-        return (0, attachments_1.downloadZohoAttachment)(token, accountId, folderId, messageId, attachmentId, baseUrl);
+        return (0, attachments_1.downloadZohoAttachment)(token, accountId, folderId, messageId, attachmentId, baseUrl, contentId);
+    }
+    async listRemoteFolders(account) {
+        const token = await this.resolveToken(account);
+        const accountId = await this.resolveAccountId(token, account);
+        const baseUrl = account?.providerMetadata?.apiUrl || 'https://mail.zoho.com/api';
+        let folders = [];
+        try {
+            const res = await (0, zoho_client_1.zohoGet)(`/accounts/${accountId}/folders`, token, baseUrl);
+            folders = res.data || [];
+        } catch (err) {
+            console.warn('[mail:zoho:provider] Failed to list Zoho folders via API:', err.message);
+            return [
+                { id: 'inbox', name: 'Inbox', isSystem: true, provider: 'ZOHO' },
+                { id: 'sent', name: 'Sent', isSystem: true, provider: 'ZOHO' },
+                { id: 'drafts', name: 'Drafts', isSystem: true, provider: 'ZOHO' },
+                { id: 'outbox', name: 'Outbox', isSystem: true, provider: 'ZOHO' },
+                { id: 'spam', name: 'Spam', isSystem: true, provider: 'ZOHO' },
+                { id: 'trash', name: 'Trash', isSystem: true, provider: 'ZOHO' },
+            ];
+        }
+        const systemNames = ['inbox', 'drafts', 'sent', 'templates', 'spam', 'trash', 'outbox'];
+        return folders.map((f) => {
+            const lower = (f.folderName || f.folderPath || '').toLowerCase().trim();
+            return {
+                id: String(f.folderId),
+                name: f.folderName || f.folderPath,
+                totalItemCount: f.messageCount || 0,
+                unreadItemCount: f.unreadMessageCount || 0,
+                isSystem: systemNames.includes(lower),
+                provider: 'ZOHO',
+            };
+        });
     }
 }
 exports.ZohoMailProvider = ZohoMailProvider;
