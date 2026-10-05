@@ -527,7 +527,7 @@ function ForwardModal({
                             >
                                 {availableRoleOptions.map(opt => (
                                     <option key={opt.id} value={opt.id}>
-                                        {opt.icon} {opt.label} ({opt.count})
+                                        {opt.label} ({opt.count})
                                     </option>
                                 ))}
                             </select>
@@ -561,7 +561,6 @@ function ForwardModal({
                                         transition: 'all 0.12s ease',
                                     }}
                                 >
-                                    <span>{opt.icon}</span>
                                     <span>{opt.label}</span>
                                     <span style={{
                                         fontSize: 10.5,
@@ -1609,7 +1608,7 @@ function ForwardToTeamsModal({
             setSending(true);
             setError('');
             await forwardEmail(
-                email._id || email.id,
+                (email._id || email.id) as string,
                 Array.from(selectedMembers),
                 note,
                 undefined,

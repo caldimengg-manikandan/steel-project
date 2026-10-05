@@ -431,9 +431,9 @@ export default function AdminUsers() {
                                                              role: (u.role as any) || 'team_member',
                                                              password: '',
                                                              division: u.division || '',
-                                                             project_manager: typeof u.project_manager === 'object' ? u.project_manager?._id : (u.project_manager || ''),
-                                                             assistant_project_manager: typeof u.assistant_project_manager === 'object' ? u.assistant_project_manager?._id : (u.assistant_project_manager || ''),
-                                                             team_lead: typeof u.team_lead === 'object' ? u.team_lead?._id : (u.team_lead || '')
+                                                             project_manager: typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : (u.project_manager || ''),
+                                                             assistant_project_manager: typeof u.assistant_project_manager === 'object' ? (u.assistant_project_manager as any)?._id : (u.assistant_project_manager || ''),
+                                                             team_lead: typeof u.team_lead === 'object' ? (u.team_lead as any)?._id : (u.team_lead || '')
                                                          });
                                                      }}
                                                      title="Edit User & Role"
