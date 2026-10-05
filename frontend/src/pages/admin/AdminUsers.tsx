@@ -13,15 +13,23 @@ interface CreateUserForm {
     email: string; 
     password: string; 
     displayName: string;
-    role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+    role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+    division: string;
+    project_manager: string;
+    assistant_project_manager: string;
+    team_lead: string;
 }
 const DEFAULT_FORM: CreateUserForm = {
     username: '',
     email: '',
     password: '',
     displayName: '',
-    role: ''
-};;
+    role: '',
+    division: '',
+    project_manager: '',
+    assistant_project_manager: '',
+    team_lead: ''
+};
 
 export default function AdminUsers() {
     const { showMessage, showConfirm } = useMessage();
@@ -44,13 +52,21 @@ export default function AdminUsers() {
     const [editForm, setEditForm] = useState<{
         displayName: string;
         email: string;
-        role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+        role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
         password?: string;
+        division: string;
+        project_manager: string;
+        assistant_project_manager: string;
+        team_lead: string;
     }>({
         displayName: '',
         email: '',
         role: 'team_member',
-        password: ''
+        password: '',
+        division: '',
+        project_manager: '',
+        assistant_project_manager: '',
+        team_lead: ''
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -158,7 +174,11 @@ export default function AdminUsers() {
             const updateData: any = {
                 displayName: editForm.displayName,
                 email: editForm.email,
-                role: editForm.role || 'team_member'
+                role: editForm.role || 'team_member',
+                division: editForm.division,
+                project_manager: editForm.project_manager,
+                assistant_project_manager: editForm.assistant_project_manager,
+                team_lead: editForm.team_lead
             };
             if (editForm.password && editForm.password.trim()) {
                 updateData.password = editForm.password;
@@ -409,7 +429,11 @@ export default function AdminUsers() {
                                                              displayName: u.displayName || '',
                                                              email: u.email || '',
                                                              role: (u.role as any) || 'team_member',
-                                                             password: ''
+                                                             password: '',
+                                                             division: u.division || '',
+                                                             project_manager: typeof u.project_manager === 'object' ? u.project_manager?._id : (u.project_manager || ''),
+                                                             assistant_project_manager: typeof u.assistant_project_manager === 'object' ? u.assistant_project_manager?._id : (u.assistant_project_manager || ''),
+                                                             team_lead: typeof u.team_lead === 'object' ? u.team_lead?._id : (u.team_lead || '')
                                                          });
                                                      }}
                                                      title="Edit User & Role"
@@ -473,8 +497,8 @@ export default function AdminUsers() {
                                     <td>{t.lead?.username}</td>
                                     <td>{t.members?.length || 0} Members</td>
                                     <td>
-                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={async () => {
-                                            if (await showConfirm('Delete Team', 'Are you sure you want to delete this team?')) {
+                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
+                                            showConfirm('Delete Team', 'Are you sure you want to delete this team?', async () => {
                                                 try {
                                                     await adminDeleteTeam(t._id || t.id);
                                                     setTeams(teams.filter(team => (team._id || team.id) !== (t._id || t.id)));
@@ -482,7 +506,7 @@ export default function AdminUsers() {
                                                 } catch(err: any) {
                                                     showMessage('Error', err.message, 'error');
                                                 }
-                                            }
+                                            });
                                         }}>
                                             <IconTrash />
                                         </button>
@@ -695,17 +719,59 @@ export default function AdminUsers() {
                                     </div>
                                 </div>
 
+                                {/* Division */}
+                                <div className="form-group">
+                                    <label className="form-label required">Division</label>
+                                    <select className="form-control" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}>
+                                        <option value="">Select division</option>
+                                        <option value="Tekla">Tekla</option>
+                                        <option value="SDS2">SDS2</option>
+                                    </select>
+                                </div>
+
                                 {/* Account Role */}
                                 <div className="form-group">
                                     <label className="form-label required">Account Role</label>
-                                    <select className="form-control" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
+                                    <select className="form-control" value={form.role} onChange={e => {
+                                        setForm({ ...form, role: e.target.value as any, project_manager: '', assistant_project_manager: '', team_lead: '' });
+                                    }}>
                                         <option value="">Select role</option>
                                         <option value="superadmin">Super Admin — Full system access</option>
                                         <option value="project_manager">Project Manager — Full system access</option>
+                                        <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
                                     </select>
                                 </div>
+
+                                {/* Managers Selection */}
+                                {(form.role === 'team_member' || form.role === 'team_lead' || form.role === 'assistant_project_manager') && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Project Manager</label>
+                                        <select className="form-control" value={form.project_manager} onChange={e => setForm({ ...form, project_manager: e.target.value })}>
+                                            <option value="">Select Project Manager</option>
+                                            {users.filter(u => u.role === 'project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {(form.role === 'team_member' || form.role === 'team_lead') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Assistant Project Manager</label>
+                                        <select className="form-control" value={form.assistant_project_manager} onChange={e => setForm({ ...form, assistant_project_manager: e.target.value })}>
+                                            <option value="">Select Assistant Project Manager</option>
+                                            {users.filter(u => u.role === 'assistant_project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {form.role === 'team_member' && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Team Lead</label>
+                                        <select className="form-control" value={form.team_lead} onChange={e => setForm({ ...form, team_lead: e.target.value })}>
+                                            <option value="">Select Team Lead</option>
+                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Actions */}
                                 <div className="form-actions" style={{ marginTop: 24 }}>
@@ -746,10 +812,50 @@ export default function AdminUsers() {
                                     >
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
+                                        <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="project_manager">Project Manager — Full system access</option>
                                         <option value="superadmin">Superadmin — Full system access</option>
                                     </select>
                                 </div>
+
+                                {/* Division */}
+                                <div className="form-group">
+                                    <label className="form-label required">Division</label>
+                                    <select className="form-control" value={editForm.division} onChange={e => setEditForm({ ...editForm, division: e.target.value })}>
+                                        <option value="">Select division</option>
+                                        <option value="Tekla">Tekla</option>
+                                        <option value="SDS2">SDS2</option>
+                                    </select>
+                                </div>
+
+                                {/* Managers Selection */}
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead' || editForm.role === 'assistant_project_manager') && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Project Manager</label>
+                                        <select className="form-control" value={editForm.project_manager} onChange={e => setEditForm({ ...editForm, project_manager: e.target.value })}>
+                                            <option value="">Select Project Manager</option>
+                                            {users.filter(u => u.role === 'project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Assistant Project Manager</label>
+                                        <select className="form-control" value={editForm.assistant_project_manager} onChange={e => setEditForm({ ...editForm, assistant_project_manager: e.target.value })}>
+                                            <option value="">Select Assistant Project Manager</option>
+                                            {users.filter(u => u.role === 'assistant_project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {editForm.role === 'team_member' && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Team Lead</label>
+                                        <select className="form-control" value={editForm.team_lead} onChange={e => setEditForm({ ...editForm, team_lead: e.target.value })}>
+                                            <option value="">Select Team Lead</option>
+                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Email Address */}
                                 <div className="form-group">

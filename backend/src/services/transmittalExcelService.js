@@ -416,17 +416,37 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
 
     // ── Group Drawings by SOW ──
     const groupedBySow = {};
+    
+    // Always include a MASTER LOG with all drawings
+    groupedBySow['MASTER LOG'] = [...drawings];
+
+    let hasSow = false;
     drawings.forEach(d => {
         const ext = extMap[d.drawingNumber];
         const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
-        let sowKey = resolveSowKey(fullPath, validSowNames, sowPrefixes) || 'General';
-
-        if (!groupedBySow[sowKey]) groupedBySow[sowKey] = [];
-        groupedBySow[sowKey].push(d);
+        let sowKey = resolveSowKey(fullPath, validSowNames, sowPrefixes);
+        if (sowKey) hasSow = true;
     });
 
+    if (hasSow) {
+        drawings.forEach(d => {
+            const ext = extMap[d.drawingNumber];
+            const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
+            let sowKey = resolveSowKey(fullPath, validSowNames, sowPrefixes) || 'General';
+
+            if (!groupedBySow[sowKey]) groupedBySow[sowKey] = [];
+            groupedBySow[sowKey].push(d);
+        });
+    }
+
     const { normalizeRevision } = require('./transmittalService');
-    const sortedSows = Object.keys(groupedBySow).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    const sortedSows = Object.keys(groupedBySow).sort((a, b) => {
+        if (a === 'MASTER LOG') return -1;
+        if (b === 'MASTER LOG') return 1;
+        if (a === 'General') return 1;
+        if (b === 'General') return -1;
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    });
 
     for (const sow of sortedSows) {
         const sowDrawings = groupedBySow[sow];

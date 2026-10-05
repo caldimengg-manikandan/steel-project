@@ -59,9 +59,8 @@ exports.generateTransmittal = async (req, res) => {
     const { extractionIds, targetTransmittalNumber: bodyTargetNum } = req.body;
 
     // ── Determine which transmittal numbers to process ──────
-    // If a specific number is requested, only process that one.
-    // Otherwise, find all pending groups (extractions with targetTransmittalNumber set).
-    let targetNumbers = [];
+    try {
+        let targetNumbers = [];
 
     if (bodyTargetNum != null) {
         targetNumbers = [parseInt(bodyTargetNum, 10)];
@@ -140,14 +139,18 @@ exports.generateTransmittal = async (req, res) => {
         console.error('[TransmittalService] Failed to upload transmittal/drawing log to Storage Gateway:', gwErr.message);
     }
 
-    const transmittalNums = results.map(r => `TR-${String(r.summary.transmittalNumber).padStart(3, '0')}`).join(', ');
-    res.status(201).json({
-        message: `${transmittalNums} generated successfully.`,
-        transmittal: results[results.length - 1].transmittal,
-        drawingLog: results[results.length - 1].drawingLog,
-        summary: results[results.length - 1].summary,
-        allResults: results.map(r => r.summary),
-    });
+        const transmittalNums = results.map(r => `TR-${String(r.summary.transmittalNumber).padStart(3, '0')}`).join(', ');
+        res.status(201).json({
+            message: `${transmittalNums} generated successfully.`,
+            transmittal: results[results.length - 1].transmittal,
+            drawingLog: results[results.length - 1].drawingLog,
+            summary: results[results.length - 1].summary,
+            allResults: results.map(r => r.summary),
+        });
+    } catch (err) {
+        console.error('[Generate Transmittal Error]:', err);
+        res.status(500).json({ error: err.message || 'An error occurred while generating the transmittal.' });
+    }
 };
 
 
@@ -175,6 +178,7 @@ exports.listTransmittals = async (req, res) => {
                 _id: '$targetTransmittalNumber', 
                 count: { $sum: 1 }, 
                 completedCount: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+                inProgressCount: { $sum: { $cond: [{ $in: ['$status', ['queued', 'processing']] }, 1, 0] } },
                 sequences: { $push: '$sequences' } 
             } }
         ]);
@@ -195,10 +199,13 @@ exports.listTransmittals = async (req, res) => {
                 transmittals.unshift({
                     _id: `pending-${currentCount}`,
                     transmittalNumber: currentCount,
-                    newCount: target.completedCount || target.count,
+                    newCount: target.completedCount || 0,
+                    totalCount: target.count,
+                    inProgressCount: target.inProgressCount || 0,
                     revisedCount: 0,
                     createdAt: new Date(),
                     isPending: true,
+                    isReadyToGenerate: target.inProgressCount === 0 && target.count > 0,
                     sequences: Array.from(pendingSeqs),
                 });
             }

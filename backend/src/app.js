@@ -166,6 +166,7 @@ app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/files', fileGatewayRoutes);
+app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 app.use('/api/admin/activity-logs', activityLogRoutes);
 app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
 app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));

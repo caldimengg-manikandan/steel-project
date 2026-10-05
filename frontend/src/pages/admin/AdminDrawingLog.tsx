@@ -116,7 +116,7 @@ export default function AdminDrawingLog() {
                                         <div className="client-icon-box">
                                             <IconFolder />
                                         </div>
-                                        <div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
                                             <div className="client-name" title={project.name}>{project.name}</div>
                                             <span className={`client-status-badge status-${project.status || 'active'}`}>
                                                 {project.status || 'active'}

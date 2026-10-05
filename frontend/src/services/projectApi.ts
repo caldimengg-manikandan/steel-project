@@ -212,6 +212,36 @@ export async function updateProjectScopeOfWork(projectId: string, scopeOfWork: A
     return handleResponse(res);
 }
 
+/**
+ * Update project additional scope of work (Unified Admin/User)
+ */
+export async function updateProjectAdditionalScopeOfWork(projectId: string, additionalScopeOfWork: Array<{ 
+    name: string; 
+    percentage?: number; 
+    approval?: number; 
+    fabrication?: number; 
+    status?: string; 
+}>): Promise<{ project: Project }> {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additionalScopeOfWork }),
+    });
+
+    if (res.status === 403) {
+        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ additionalScopeOfWork }),
+        });
+        return handleResponse(resUser);
+    }
+    
+    return handleResponse(res);
+}
+
 interface CreateProjectForm {
     name: string;
     clientName: string;

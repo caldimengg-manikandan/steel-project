@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getProjectById, updateProjectSequences, updateProjectScopeOfWork } from '../../services/projectApi';
+import { getProjectById, updateProjectSequences, updateProjectScopeOfWork, updateProjectAdditionalScopeOfWork } from '../../services/projectApi';
 import { useMessage } from '../../context/MessageContext';
 import type { Project, ProjectPermission } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
@@ -125,6 +125,51 @@ export default function ProjectView() {
         fetchData();
     }, [fetchData]);
 
+    const derivedSequences = useMemo(() => {
+        const seqs: any[] = [];
+        if (project?.trackingMode === 'sow') {
+            let hasAnySeq = false;
+            if (project.scopeOfWork) {
+                project.scopeOfWork.forEach((sow: any) => { if (sow.sequences && sow.sequences.length > 0) hasAnySeq = true; });
+            }
+            if (project.additionalScopeOfWork) {
+                project.additionalScopeOfWork.forEach((sow: any) => { if (sow.sequences && sow.sequences.length > 0) hasAnySeq = true; });
+            }
+
+            if (hasAnySeq) {
+                if (project.scopeOfWork) {
+                    project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
+                        if (sow.sequences) {
+                            sow.sequences.forEach((seq: any, seqIdx: number) => {
+                                seqs.push({ ...seq, source: 'sow', sowIndex: sowIdx, seqIndex: seqIdx, name: `${seq.name} (${sow.name})` });
+                            });
+                        }
+                    });
+                }
+                if (project.additionalScopeOfWork) {
+                    project.additionalScopeOfWork.forEach((sow: any, sowIdx: number) => {
+                        if (sow.sequences) {
+                            sow.sequences.forEach((seq: any, seqIdx: number) => {
+                                seqs.push({ ...seq, source: 'additionalSow', sowIndex: sowIdx, seqIndex: seqIdx, name: `${seq.name} (${sow.name})` });
+                            });
+                        }
+                    });
+                }
+            } else {
+                if (project.scopeOfWork) {
+                    project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
+                        seqs.push({ ...sow, source: 'sow-fallback', sowIndex: sowIdx, name: sow.name });
+                    });
+                }
+            }
+        } else if (project?.sequences) {
+            project.sequences.forEach((seq: any, idx: number) => {
+                seqs.push({ ...seq, source: 'project', seqIndex: idx });
+            });
+        }
+        return seqs;
+    }, [project]);
+
     // ── Reusable upload helper ────────────────────────────────
     const doUpload = async (filesToUpload: File[]) => {
         const pId = project?._id || project?.id;
@@ -134,7 +179,7 @@ export default function ProjectView() {
         }
 
         // Sequence Validation
-        if (project.sequences && project.sequences.length > 0 && selectedSequences.length === 0) {
+        if (derivedSequences.length > 0 && selectedSequences.length === 0) {
             showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
             return;
         }
@@ -559,14 +604,13 @@ export default function ProjectView() {
                         projectId={(project?._id || project?.id) as string}
                         projectName={project.name}
                         canUpload={canUpload}
-                        sequences={project.sequences}
+                        sequences={derivedSequences}
                     />
                 </div>
             )}
 
-            {/* ── Transmittals Tab ── */}
             {activeTab === 'transmittals' && (
-                <TransmittalPanel projectId={(project?._id || project?.id) as string} canEdit={canUpload} sequences={project.sequences} />
+                <TransmittalPanel projectId={(project?._id || project?.id) as string} canEdit={canUpload} sequences={derivedSequences} />
             )}
 
             {/* ── Revision History Tab ── */}
@@ -681,18 +725,264 @@ export default function ProjectView() {
                             )}
                         </div>
 
-                        {/* ── Sequence Progress Section ── */}
+
+
+                        {/* ── Scope of Work Progress Section ── */}
+                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                                Scope of Work Progress
+                            </h3>
+
+                            {(!project.scopeOfWork || project.scopeOfWork.length === 0) ? (
+                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No Scope of Work items defined for this project.</div>
+                            ) : (
+                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {project.scopeOfWork.map((sow: any, idx: number) => {
+                                                const rawStatus = sow.status || 'Yet to Start';
+                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
+
+                                                const sowPct = Number(sow.percentage) || 0;
+                                                const appPctVal = Number(sow.approval) || 0;
+                                                const fabPctVal = Number(sow.fabrication) || 0;
+
+                                                const handleStatusChange = async (newStatus: string) => {
+                                                    if (!id || !project) return;
+                                                    if (!canEditSow) {
+                                                        showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
+                                                        return;
+                                                    }
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    try {
+                                                        await updateProjectScopeOfWork(id, updatedSow);
+                                                        await fetchData(true);
+                                                    } catch (err: any) {
+                                                        showMessage('Error', `Failed to update SOW status: ${err.message}`, 'error');
+                                                        await fetchData(true);
+                                                    }
+                                                };
+
+                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
+                                                    if (!id || !project) return;
+                                                    if (!canEditSow) return;
+                                                    const clamped = Math.min(100, Math.max(0, val));
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    try {
+                                                        await updateProjectScopeOfWork(id, updatedSow);
+                                                    } catch (err: any) {
+                                                        showMessage('Error', `Failed to update SOW: ${err.message}`, 'error');
+                                                        await fetchData(true);
+                                                    }
+                                                };
+
+                                                return (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                            {sow.name}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
+                                                            {sowPct}%
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={appPctVal}
+                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
+                                                                        style={{ 
+                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                            fontSize: 13, fontWeight: 600 
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${appPctVal}%`
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={fabPctVal}
+                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
+                                                                        style={{ 
+                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                            fontSize: 13, fontWeight: 600 
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${fabPctVal}%`
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                            <select
+                                                                value={rawStatus}
+                                                                onChange={(e) => handleStatusChange(e.target.value)}
+                                                                disabled={!canEditSow}
+                                                                style={{
+                                                                    padding: '4px 8px', borderRadius: 'var(--radius-md)',
+                                                                    fontSize: 12, fontWeight: 600, cursor: canEditSow ? 'pointer' : 'not-allowed',
+                                                                    border: rawStatus === 'Completed' ? '1px solid var(--color-success)' : rawStatus === 'In Progress' ? '1px solid var(--color-info)' : '1px solid var(--color-border)',
+                                                                    background: rawStatus === 'Completed' ? 'var(--color-success-bg)' : rawStatus === 'In Progress' ? 'var(--color-info-bg)' : 'var(--color-bg-page)',
+                                                                    color: rawStatus === 'Completed' ? 'var(--color-success-mid)' : rawStatus === 'In Progress' ? 'var(--color-info-mid)' : 'var(--color-text-muted)',
+                                                                }}
+                                                            >
+                                                                <option value="Yet to Start">Yet to Start</option>
+                                                                <option value="In Progress">In Progress</option>
+                                                                <option value="Completed">Completed</option>
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Additional Scope of Work Progress Section ── */}
+                        {project.additionalScopeOfWork && project.additionalScopeOfWork.length > 0 && (
+                            <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                                    Additional Scope of Work
+                                </h3>
+                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
+                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {project.additionalScopeOfWork.map((sow: any, idx: number) => {
+                                                const rawStatus = sow.status || 'Yet to Start';
+                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
+                                                
+                                                const sowPct = Number(sow.percentage) || 0;
+                                                const appPctVal = Number(sow.approval) || 0;
+                                                const fabPctVal = Number(sow.fabrication) || 0;
+                                                
+                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
+                                                    if (!id || !project) return;
+                                                    if (!canEditSow) return;
+                                                    const clamped = Math.min(100, Math.max(0, val));
+                                                    const updatedSow = [...(project.additionalScopeOfWork || [])];
+                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
+                                                    setProject({ ...project, additionalScopeOfWork: updatedSow });
+                                                    try {
+                                                        await updateProjectAdditionalScopeOfWork(id, updatedSow);
+                                                    } catch (err: any) {
+                                                        showMessage('Error', `Failed to update Additional SOW: ${err.message}`, 'error');
+                                                        await fetchData(true);
+                                                    }
+                                                };
+                                                
+                                                return (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                            {sow.name}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
+                                                            {sowPct}%
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={appPctVal}
+                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
+                                                                        style={{ 
+                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                            fontSize: 13, fontWeight: 600 
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${appPctVal}%`
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                                                            {canEditSow ? (
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="100"
+                                                                        value={fabPctVal}
+                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
+                                                                        style={{ 
+                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                            fontSize: 13, fontWeight: 600 
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${fabPctVal}%`
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Sequence Progress Section (Moved Below SOW) ── */}
                         <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
                             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                                 Sequence Progress
                             </h3>
 
-                                                            {!project.sequences || project.sequences.length === 0 ? (
+                            {!derivedSequences || derivedSequences.length === 0 ? (
                                 <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-                                    {project.sequences.map((seq, idx) => {
+                                    {derivedSequences.map((seq, idx) => {
                                         const isDone = seq.status === 'Completed';
                                         const canEditSequences = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
                                         const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
@@ -701,11 +991,39 @@ export default function ProjectView() {
                                                 showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
                                                 return;
                                             }
-                                            const newSeqs = [...(project.sequences || [])];
-                                            newSeqs[idx] = { ...newSeqs[idx], ...updates };
-                                            setProject({ ...project, sequences: newSeqs });
+                                            
                                             try {
-                                                await updateProjectSequences(id, newSeqs);
+                                                if (seq.source === 'sow') {
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
+                                                    updatedSeqs[seq.seqIndex] = { ...updatedSeqs[seq.seqIndex], ...updates };
+                                                    updatedSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    await updateProjectScopeOfWork(id, updatedSow);
+                                                } else if (seq.source === 'additionalSow') {
+                                                    const updatedAddSow = [...(project.additionalScopeOfWork || [])];
+                                                    const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
+                                                    updatedSeqs[seq.seqIndex] = { ...updatedSeqs[seq.seqIndex], ...updates };
+                                                    updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    setProject({ ...project, additionalScopeOfWork: updatedAddSow });
+                                                    await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
+                                                } else if (seq.source === 'project') {
+                                                    const newSeqs = [...(project.sequences || [])];
+                                                    newSeqs[seq.seqIndex] = { ...newSeqs[seq.seqIndex], ...updates };
+                                                    setProject({ ...project, sequences: newSeqs });
+                                                    await updateProjectSequences(id, newSeqs);
+                                                } else if (seq.source === 'sow-fallback') {
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    const targetSow = updatedSow[seq.sowIndex];
+                                                    updatedSow[seq.sowIndex] = { 
+                                                        ...targetSow, 
+                                                        status: updates.status === 'Completed' ? 'Completed' : (targetSow.status === 'Completed' ? 'In Progress' : targetSow.status),
+                                                        approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
+                                                        fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
+                                                    };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    await updateProjectScopeOfWork(id, updatedSow);
+                                                }
                                                 await fetchData(true);
                                             } catch (err: any) {
                                                 showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
@@ -826,139 +1144,6 @@ export default function ProjectView() {
                                     })}
                                 </div>
                             )}
-
-                        {/* ── Scope of Work Progress Section ── */}
-                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                                Scope of Work Progress
-                            </h3>
-
-                            {(!project.scopeOfWork || project.scopeOfWork.length === 0) ? (
-                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No Scope of Work items defined for this project.</div>
-                            ) : (
-                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--color-border-light)' }}>
-                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {project.scopeOfWork.map((sow: any, idx: number) => {
-                                                const rawStatus = sow.status || 'Yet to Start';
-                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
-
-                                                const sowPct = Number(sow.percentage) || 0;
-                                                const appPctVal = Number(sow.approval) || 0;
-                                                const fabPctVal = Number(sow.fabrication) || 0;
-
-                                                const handleStatusChange = async (newStatus: string) => {
-                                                    if (!id || !project) return;
-                                                    if (!canEditSow) {
-                                                        showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
-                                                        return;
-                                                    }
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    try {
-                                                        await updateProjectScopeOfWork(id, updatedSow);
-                                                        await fetchData(true);
-                                                    } catch (err: any) {
-                                                        showMessage('Error', `Failed to update SOW status: ${err.message}`, 'error');
-                                                        await fetchData(true);
-                                                    }
-                                                };
-
-                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
-                                                    if (!id || !project) return;
-                                                    if (!canEditSow) return;
-                                                    const clamped = Math.min(100, Math.max(0, val));
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    try {
-                                                        await updateProjectScopeOfWork(id, updatedSow);
-                                                    } catch (err: any) {
-                                                        showMessage('Error', `Failed to update SOW: ${err.message}`, 'error');
-                                                        await fetchData(true);
-                                                    }
-                                                };
-
-                                                return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                            {sow.name}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
-                                                            {sowPct}%
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={appPctVal}
-                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
-                                                                        style={{ width: 60, padding: '3px 6px', textAlign: 'center', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 700, color: '#2563eb' }}
-                                                                    />
-                                                                    <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${appPctVal}%`
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={fabPctVal}
-                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
-                                                                        style={{ width: 60, padding: '3px 6px', textAlign: 'center', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 700, color: '#16a34a' }}
-                                                                    />
-                                                                    <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${fabPctVal}%`
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                                            <select
-                                                                value={rawStatus}
-                                                                onChange={(e) => handleStatusChange(e.target.value)}
-                                                                disabled={!canEditSow}
-                                                                style={{
-                                                                    padding: '5px 10px', borderRadius: 20,
-                                                                    fontSize: 12, fontWeight: 750, cursor: canEditSow ? 'pointer' : 'not-allowed',
-                                                                    border: rawStatus === 'Completed' ? '1px solid #86efac' : rawStatus === 'In Progress' ? '1px solid #93c5fd' : '1px solid #cbd5e1',
-                                                                    background: rawStatus === 'Completed' ? '#f0fdf4' : rawStatus === 'In Progress' ? '#eff6ff' : '#f8fafc',
-                                                                    color: rawStatus === 'Completed' ? '#16a34a' : rawStatus === 'In Progress' ? '#2563eb' : '#64748b',
-                                                                }}
-                                                            >
-                                                                <option value="Yet to Start">Yet to Start</option>
-                                                                <option value="In Progress">In Progress</option>
-                                                                <option value="Completed">Completed</option>
-                                                            </select>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-
                         </div>
                     </div>
                 </div>
@@ -1054,11 +1239,11 @@ export default function ProjectView() {
                                 </label>
                             </div>
 
-                            {project.sequences && project.sequences.length > 0 && (
+                            {derivedSequences.length > 0 && (
                                 <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
                                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                                        {project.sequences.map((seq: any, idx: number) => (
+                                        {derivedSequences.map((seq: any, idx: number) => (
                                             <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
                                                 <input
                                                     type="checkbox"
