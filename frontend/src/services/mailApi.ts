@@ -314,7 +314,7 @@ export async function forwardEmail(
 
 // ── Employees & Projects ───────────────────────────────────
 
-export async function listEmployees(): Promise<{ employees: Employee[]; projects?: ProjectInfo[] }> {
+export async function listEmployees(): Promise<{ employees: Employee[]; projects?: ProjectInfo[]; teams?: any[] }> {
     const res = await fetch(`${BASE}/mail/employees`, {
         credentials: 'include',
         headers: authHeaders(),

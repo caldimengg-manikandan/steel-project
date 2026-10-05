@@ -262,7 +262,9 @@ function ForwardModal({
 }) {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [projects, setProjects] = useState<ProjectInfo[]>([]);
+    const [teams, setTeams] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+    const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
     const [selectedRole, setSelectedRole] = useState<string>('all');
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -277,6 +279,7 @@ function ForwardModal({
             .then(d => {
                 setEmployees(d.employees || []);
                 setProjects(d.projects || []);
+                setTeams(d.teams || []);
             })
             .catch(() => {})
             .finally(() => setLoading(false));
@@ -287,19 +290,35 @@ function ForwardModal({
         ? null
         : projects.find(p => (p.id === selectedProjectId || (p as any)._id === selectedProjectId));
 
-    // Filter employees by project (strictly PMs, TLs, and team members; excluding admin/superadmin)
+    // Filter employees by project and team (strictly PMs, TLs, and team members; excluding admin/superadmin)
     const projectMembers = useMemo(() => {
         return employees.filter(emp => {
             const role = String(emp.role || '').toLowerCase();
             if (role === 'admin' || role === 'superadmin') return false;
 
-            if (selectedProjectId === 'all') return true;
             const empId = emp.id || emp._id || '';
-            if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) return true;
-            if (activeProject && activeProject.assignedUserIds && activeProject.assignedUserIds.includes(empId)) return true;
-            return false;
+
+            // Filter by team
+            if (selectedTeamId !== 'all') {
+                const team = teams.find(t => String(t.id) === selectedTeamId);
+                if (team) {
+                    const isLead = String(team.lead) === empId;
+                    const isMember = team.members && team.members.includes(empId);
+                    if (!isLead && !isMember) return false;
+                }
+            }
+
+            // Filter by project
+            if (selectedProjectId !== 'all') {
+                let inProj = false;
+                if (emp.projectIds && emp.projectIds.includes(selectedProjectId)) inProj = true;
+                if (activeProject && activeProject.assignedUserIds && activeProject.assignedUserIds.includes(empId)) inProj = true;
+                if (!inProj) return false;
+            }
+
+            return true;
         });
-    }, [employees, selectedProjectId, activeProject]);
+    }, [employees, selectedProjectId, activeProject, selectedTeamId, teams]);
 
     // Role counts within the current project
     const roleCounts = useMemo(() => {
@@ -432,8 +451,8 @@ function ForwardModal({
                         <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>From: {email.from?.name || email.from?.email}</div>
                     </div>
 
-                    {/* Project & Role Filter Selectors */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)', gap: 10, marginBottom: 8 }}>
+                    {/* Project, Team & Role Filter Selectors */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 10, marginBottom: 8 }}>
                         {/* Project Selector */}
                         <div className="form-group" style={{ margin: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -452,10 +471,32 @@ function ForwardModal({
                                 onChange={e => setSelectedProjectId(e.target.value)}
                                 style={{ fontSize: 13, fontWeight: 500 }}
                             >
-                                <option value="all">All Projects ({employees.filter(e => !['admin', 'superadmin'].includes(String(e.role || '').toLowerCase())).length} members)</option>
+                                <option value="all">All Projects</option>
                                 {projects.map(p => (
                                     <option key={p.id} value={p.id}>
                                         📁 {p.name} {p.clientName ? `(${p.clientName})` : ''} ({p.memberCount || 0})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Team Selector */}
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: 12.5 }}>
+                                    Filter by Team
+                                </label>
+                            </div>
+                            <select
+                                className="form-control"
+                                value={selectedTeamId}
+                                onChange={e => setSelectedTeamId(e.target.value)}
+                                style={{ fontSize: 13, fontWeight: 500 }}
+                            >
+                                <option value="all">All Teams</option>
+                                {teams && teams.map(t => (
+                                    <option key={t.id} value={t.id}>
+                                        👥 {t.name}
                                     </option>
                                 ))}
                             </select>
@@ -878,11 +919,12 @@ function linkifyText(text: string): React.ReactNode {
 
 
 function EmailDetail({
-    email, accounts, onForwardClick, loadingAttachments = false,
+    email, accounts, onForwardClick, onForwardToTeamsClick, loadingAttachments = false,
 }: {
     email: MailMessage;
     accounts: MailAccount[];
     onForwardClick: () => void;
+    onForwardToTeamsClick?: () => void;
     loadingAttachments?: boolean;
 }) {
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -1026,6 +1068,11 @@ function EmailDetail({
                             )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            {onForwardToTeamsClick && (
+                                <button className="btn btn-secondary" onClick={onForwardToTeamsClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                    Forward to Teams
+                                </button>
+                            )}
                             <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                                 Forward to Detailers
                             </button>
@@ -1505,6 +1552,150 @@ function EmailDetail({
 // LocalStorage key for persisting last used mailbox
 const LAST_USED_PROVIDER_KEY = 'mailRouter_lastUsedProvider';
 
+// ── Forward to Teams Modal ────────────────────────────────────────────
+
+function ForwardToTeamsModal({
+    email, onClose, onSent,
+}: {
+    email: MailMessage; onClose: () => void; onSent: () => void;
+}) {
+    const [teams, setTeams] = useState<any[]>([]);
+    const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
+    const [note, setNote] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        setLoading(true);
+        listEmployees()
+            .then(d => {
+                setTeams(d.teams || []);
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, []);
+
+    const toggleTeam = (id: string) => {
+        const next = new Set(selectedTeams);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedTeams(next);
+    };
+
+    const handleSend = async () => {
+        if (selectedTeams.size === 0) {
+            setError('Please select at least one team.');
+            return;
+        }
+
+        const selectedMembers = new Set<string>();
+        for (const tid of Array.from(selectedTeams)) {
+            const team = teams.find(t => String(t.id) === tid);
+            if (team) {
+                if (team.lead) selectedMembers.add(String(team.lead));
+                if (team.members) {
+                    team.members.forEach((m: any) => selectedMembers.add(String(m)));
+                }
+            }
+        }
+
+        if (selectedMembers.size === 0) {
+            setError('The selected teams have no members.');
+            return;
+        }
+
+        try {
+            setSending(true);
+            setError('');
+            await forwardEmail(
+                email._id || email.id,
+                Array.from(selectedMembers),
+                note,
+                undefined,
+                undefined
+            );
+            onSent();
+        } catch (e: any) {
+            setError(e.message || 'Forward failed');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <span className="modal-title">📤 Forward to Teams</span>
+                    <button className="modal-close" onClick={onClose}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div className="modal-body">
+                    <div style={{ background: 'var(--color-table-row-alt)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Forwarding message:</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>{email.subject || '(No subject)'}</div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Select Teams</label>
+                        {loading ? (
+                            <div style={{ padding: 20, textAlign: 'center' }}><Spinner /></div>
+                        ) : (
+                            <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+                                {teams.length === 0 ? (
+                                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-muted)' }}>No teams available</div>
+                                ) : (
+                                    teams.map(t => (
+                                        <div key={t.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border-light)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => toggleTeam(String(t.id))}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedTeams.has(String(t.id))}
+                                                readOnly
+                                                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                            />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 600 }}>{t.name}</div>
+                                                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                                    {((t.members?.length || 0) + (t.lead ? 1 : 0))} member{((t.members?.length || 0) + (t.lead ? 1 : 0)) !== 1 ? 's' : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: 14 }}>
+                        <label className="form-label">Notes / Instructions</label>
+                        <textarea 
+                            className="form-control" 
+                            rows={3} 
+                            placeholder="Optional notes for the team..."
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="info-box warning" style={{ marginTop: 14 }}>
+                            {error}
+                        </div>
+                    )}
+                </div>
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button className="btn btn-secondary" onClick={onClose} disabled={sending}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSend} disabled={sending || selectedTeams.size === 0}>
+                        {sending ? <Spinner /> : 'Forward Email'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function MailRouterPage() {
     const { user } = useAuth();
     const [accounts, setAccounts] = useState<MailAccount[]>([]);
@@ -1548,6 +1739,7 @@ export default function MailRouterPage() {
     const [showDisconnect, setShowDisconnect] = useState<MailAccount | null>(null);
     const [disconnecting, setDisconnecting] = useState(false);
     const [showForward, setShowForward] = useState<MailMessage | null>(null);
+    const [showForwardToTeams, setShowForwardToTeams] = useState<MailMessage | null>(null);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const [error, setError] = useState('');
@@ -2173,6 +2365,16 @@ export default function MailRouterPage() {
                     }}
                 />
             )}
+            {showForwardToTeams && (
+                <ForwardToTeamsModal
+                    email={showForwardToTeams}
+                    onClose={() => setShowForwardToTeams(null)}
+                    onSent={() => {
+                        setShowForwardToTeams(null);
+                        setEmails(prev => prev.map(e => e._id === showForwardToTeams._id ? { ...e, isForwarded: true } : e));
+                    }}
+                />
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%', overflow: 'hidden', flex: 1 }}>
                 {/* ── Page Header (Sticky/Pinned at top) ──── */}
@@ -2483,6 +2685,7 @@ export default function MailRouterPage() {
                                     email={selectedEmail}
                                     accounts={accounts}
                                     onForwardClick={() => setShowForward(selectedEmail)}
+                                    onForwardToTeamsClick={() => setShowForwardToTeams(selectedEmail)}
                                     loadingAttachments={loadingAttachments}
                                 />
                             </DetailErrorBoundary>

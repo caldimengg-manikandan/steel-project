@@ -293,8 +293,9 @@ const CSS = `
     justify-content: space-between;
     padding: 10px 12px;
     border-radius: 8px;
-    border: 1px solid var(--color-border, #334155);
-    background: var(--color-bg, #0f172a);
+    border: 1px solid var(--color-border, #e2e8f0);
+    background: var(--color-surface, #ffffff);
+    color: var(--color-text, #1e293b);
     cursor: pointer;
     transition: all 0.14s ease;
 }

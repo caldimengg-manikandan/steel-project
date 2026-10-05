@@ -66,6 +66,42 @@ export default function UserRfi() {
     const [uploadError, setUploadError] = useState('');
     const [uploadSuccess, setUploadSuccess] = useState('');
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+    const getSowNameForSequence = (seqName: string) => {
+        if (!seqName) return '';
+        const name = seqName.trim().toLowerCase();
+        if (selectedProject?.scopeOfWork) {
+            for (const sow of selectedProject.scopeOfWork) {
+                if (sow.sequences?.some((s: any) => s.name && s.name.trim().toLowerCase() === name)) return sow.name;
+            }
+        }
+        if (selectedProject?.additionalScopeOfWork) {
+            for (const sow of selectedProject.additionalScopeOfWork) {
+                if (sow.sequences?.some((s: any) => s.name && s.name.trim().toLowerCase() === name)) return sow.name;
+            }
+        }
+        return '';
+    };
+
+    const getSequencesOrSows = () => {
+        if (selectedProject?.sequences && selectedProject.sequences.length > 0) {
+            return selectedProject.sequences;
+        }
+        const fallback: any[] = [];
+        if (selectedProject?.scopeOfWork) {
+            selectedProject.scopeOfWork.forEach((sow: any) => {
+                if (sow.name) fallback.push({ name: sow.name });
+            });
+        }
+        if (selectedProject?.additionalScopeOfWork) {
+            selectedProject.additionalScopeOfWork.forEach((sow: any) => {
+                if (sow.name) fallback.push({ name: sow.name });
+            });
+        }
+        return fallback;
+    };
+
+    const sequencesToDisplay = getSequencesOrSows();
     const [expanded, setExpanded] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -158,7 +194,7 @@ export default function UserRfi() {
         }
 
         // Sequence Validation
-        if (selectedProject.sequences && selectedProject.sequences.length > 0 && selectedSequences.length === 0) {
+        if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
             showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
             setUploadError('Sequence selection is required.');
             return;
@@ -545,7 +581,7 @@ export default function UserRfi() {
                                                                 }}
                                                                 style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
                                                             />
-                                                            {seq.name}
+                                                            {seq.name}{getSowNameForSequence(seq.name) ? ` (${getSowNameForSequence(seq.name)})` : ''}
                                                         </label>
                                                     ))}
                                                 </div>
@@ -562,7 +598,7 @@ export default function UserRfi() {
                                                         showMessage('No Files Selected', 'Please select at least one PDF file to upload.', 'error');
                                                         return;
                                                     }
-                                                    if (selectedProject.sequences && selectedProject.sequences.length > 0 && selectedSequences.length === 0) {
+                                                    if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
                                                         showMessage('Sequence Required', 'Sequence selection is required for RFI extraction. Please check at least one sequence.', 'error');
                                                         return;
                                                     }
@@ -598,7 +634,7 @@ export default function UserRfi() {
                                         style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: '100%', color: 'var(--color-text-primary)' }}
                                     />
                                 </div>
-                                {selectedProject.sequences && selectedProject.sequences.length > 0 && (
+                                {sequencesToDisplay.length > 0 && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--color-border-light)', paddingLeft: 12 }}>
                                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Filter:</span>
                                         <select
@@ -612,7 +648,7 @@ export default function UserRfi() {
                                             }}
                                         >
                                             <option value="">All Sequences</option>
-                                            {selectedProject.sequences.map((s: any, idx: number) => <option key={idx} value={s.name}>{s.name}</option>)}
+                                            {sequencesToDisplay.map((s: any, idx: number) => <option key={idx} value={s.name}>{s.name}{getSowNameForSequence(s.name) ? ` (${getSowNameForSequence(s.name)})` : ''}</option>)}
                                         </select>
                                     </div>
                                 )}

@@ -530,9 +530,33 @@ async function listEmployees(adminId = null) {
     };
   });
 
+  let TeamModel = mongoose.models.Team;
+  if (!TeamModel) {
+    try { TeamModel = require('../../../../models/Team'); } catch { TeamModel = null; }
+  }
+
+  let teams = [];
+  try {
+    if (TeamModel) {
+      teams = await TeamModel.find({}).lean();
+    } else if (mongoose.connection && mongoose.connection.db) {
+      teams = await mongoose.connection.db.collection('teams').find({}).toArray();
+    }
+  } catch (err) {
+    console.warn('[forwardingRepo:listEmployees] Error querying teams:', err);
+  }
+
+  const formattedTeams = teams.map(t => ({
+    id: String(t._id),
+    name: t.name,
+    lead: String(t.lead),
+    members: (t.members || []).map(m => String(m))
+  }));
+
   return {
     employees: formattedEmployees,
     projects: formattedProjects,
+    teams: formattedTeams
   };
 }
 
