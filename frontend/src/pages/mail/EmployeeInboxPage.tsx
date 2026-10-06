@@ -985,7 +985,7 @@ export default function EmployeeInboxPage() {
                                     });
                                 }
                             })
-                            .catch(() => {})
+                            .catch(() => { })
                             .finally(() => setLoadingDetail(false));
                     }
                 }
