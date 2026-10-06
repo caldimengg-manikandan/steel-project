@@ -372,8 +372,12 @@ export async function getUnreadCount(): Promise<{ unreadCount: number }> {
 
 // ── Folders ─────────────────────────────────────────────
 
-export async function listMailFolders(provider?: string): Promise<{ folders: MailFolder[] }> {
-    const q = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+export async function listMailFolders(provider?: string, startDate?: string, endDate?: string): Promise<{ folders: MailFolder[] }> {
+    const params = new URLSearchParams();
+    if (provider) params.set('provider', provider);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const q = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/mail/folders${q}`, {
         credentials: 'include',
         headers: authHeaders(),

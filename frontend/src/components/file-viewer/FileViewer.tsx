@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import type { FileViewerProps, FileType } from './types';
+import type { FileViewerProps, FileType, FileViewerFile } from './types';
 import { detectFileType, formatBytes, downloadFile, getOfficeBadge } from './utils';
 import { getCachedFile, setCachedFile } from './fileCache';
 import './FileViewer.css';
@@ -9,21 +9,95 @@ const PdfViewer = React.lazy(() => import('./viewers/PdfViewer'));
 const DocxViewer = React.lazy(() => import('./viewers/DocxViewer'));
 const SpreadsheetViewer = React.lazy(() => import('./viewers/SpreadsheetViewer'));
 const CsvViewer = React.lazy(() => import('./viewers/CsvViewer'));
+const TxtViewer = React.lazy(() => import('./viewers/TxtViewer'));
 const ImageViewer = React.lazy(() => import('./viewers/ImageViewer'));
 const VideoViewer = React.lazy(() => import('./viewers/VideoViewer'));
 const AudioViewer = React.lazy(() => import('./viewers/AudioViewer'));
 const PptxViewer = React.lazy(() => import('./viewers/PptxViewer'));
 const UnsupportedViewer = React.lazy(() => import('./viewers/UnsupportedViewer'));
 
-export default function FileViewer({ file, onClose }: FileViewerProps) {
-    if (!file) return null;
+export default function FileViewer({ file: initialFile, files, onClose, onFileChange }: FileViewerProps) {
+    const [activeFile, setActiveFile] = useState<FileViewerFile | null>(initialFile);
+
+    useEffect(() => {
+        setActiveFile(initialFile);
+    }, [initialFile]);
+
+    const file = activeFile || initialFile;
+
+    const fileList = useMemo(() => {
+        if (files && files.length > 0) return files;
+        return file ? [file] : [];
+    }, [files, file]);
+
+    const currentIndex = useMemo(() => {
+        if (!file || fileList.length === 0) return -1;
+        const idxById = file.id ? fileList.findIndex(f => f.id === file.id) : -1;
+        if (idxById !== -1) return idxById;
+        return fileList.findIndex(f => f.url === file.url || f.filename === file.filename);
+    }, [fileList, file]);
+
+    const hasPrev = currentIndex > 0;
+    const hasNext = currentIndex >= 0 && currentIndex < fileList.length - 1;
+
+    const prevFile = hasPrev ? fileList[currentIndex - 1] : null;
+    const nextFile = hasNext ? fileList[currentIndex + 1] : null;
+
+    const navigateTo = useCallback((targetIndex: number) => {
+        if (targetIndex < 0 || targetIndex >= fileList.length) return;
+        const nextTarget = fileList[targetIndex];
+        if (!nextTarget) return;
+        setActiveFile(nextTarget);
+        if (onFileChange) {
+            onFileChange(nextTarget);
+        }
+    }, [fileList, onFileChange]);
+
+    const handlePrev = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (hasPrev) {
+            navigateTo(currentIndex - 1);
+        }
+    }, [hasPrev, currentIndex, navigateTo]);
+
+    const handleNext = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (hasNext) {
+            navigateTo(currentIndex + 1);
+        }
+    }, [hasNext, currentIndex, navigateTo]);
 
     const fileType: FileType = useMemo(
-        () => detectFileType(file.filename, file.contentType),
-        [file.filename, file.contentType]
+        () => file ? detectFileType(file.filename, file.contentType) : 'unsupported',
+        [file?.filename, file?.contentType]
     );
 
     const badge = useMemo(() => getOfficeBadge(fileType), [fileType]);
+
+    // Keyboard navigation: Alt+Left / Alt+Right anywhere, or ArrowLeft / ArrowRight for non-paginated files
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeTag = document.activeElement?.tagName.toLowerCase();
+            if (activeTag === 'input' || activeTag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable) {
+                return;
+            }
+
+            if (e.key === 'ArrowLeft' && (e.altKey || (fileType !== 'pdf' && fileType !== 'pptx'))) {
+                if (hasPrev) {
+                    e.preventDefault();
+                    handlePrev();
+                }
+            } else if (e.key === 'ArrowRight' && (e.altKey || (fileType !== 'pdf' && fileType !== 'pptx'))) {
+                if (hasNext) {
+                    e.preventDefault();
+                    handleNext();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [hasPrev, hasNext, handlePrev, handleNext, fileType]);
 
     // Toolbar & Viewer state
     const [zoom, setZoom] = useState<number>(100);
@@ -55,7 +129,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
     const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
     const [downloadLoaded, setDownloadLoaded] = useState<number>(0);
-    const [downloadTotal, setDownloadTotal] = useState<number>(file.sizeBytes || 0);
+    const [downloadTotal, setDownloadTotal] = useState<number>(file?.sizeBytes || 0);
     const [downloadStatusText, setDownloadStatusText] = useState<string>('Connecting to server...');
     const [downloadError, setDownloadError] = useState<string>('');
     const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
@@ -77,7 +151,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         setActiveSheet('');
         setSearchQuery('');
         setRotation(0);
-    }, [file.url, fileType]);
+    }, [file?.url, fileType]);
 
     // Download file buffer with real-time progress
     useEffect(() => {
@@ -86,7 +160,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         // Reset state for new file
         setDownloadError('');
         setDownloadLoaded(0);
-        setDownloadTotal(file.sizeBytes || 0);
+        setDownloadTotal(file?.sizeBytes || 0);
 
         // Check in-memory cache first for instant opening
         const cached = getCachedFile(file.url);
@@ -191,9 +265,10 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
             clearTimeout(slowTimer);
             xhr.abort();
         };
-    }, [file.url, file.sizeBytes, file.contentType, fileType]);
+    }, [file?.url, file?.sizeBytes, file?.contentType, fileType]);
 
     const handleDownloadCurrentFile = useCallback(() => {
+        if (!file) return;
         if (fileBlobUrl) {
             const a = document.createElement('a');
             a.href = fileBlobUrl;
@@ -204,7 +279,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         } else {
             downloadFile(file.url, file.filename);
         }
-    }, [fileBlobUrl, file.url, file.filename]);
+    }, [fileBlobUrl, file]);
 
     // Keep pageInput synced with pageNumber
     useEffect(() => {
@@ -345,10 +420,10 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
 
     const toggleFullscreen = useCallback(() => {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen?.().catch(() => {});
+            document.documentElement.requestFullscreen?.().catch(() => { });
             setIsFullscreen(true);
         } else {
-            document.exitFullscreen?.().catch(() => {});
+            document.exitFullscreen?.().catch(() => { });
             setIsFullscreen(false);
         }
     }, []);
@@ -409,6 +484,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
         setActiveSheet(defaultSheet);
     }, []);
 
+    if (!file) return null;
+
     return (
         <div className="m365-viewer-backdrop" onClick={onClose}>
             <div
@@ -431,6 +508,14 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                         {file.sizeBytes !== undefined && (
                             <span className="m365-file-size">
                                 • {formatBytes(file.sizeBytes)}
+                            </span>
+                        )}
+                        {fileList.length > 1 && (
+                            <span
+                                className="m365-attachment-counter"
+                                title={`Viewing attachment ${currentIndex + 1} of ${fileList.length}`}
+                            >
+                                {currentIndex + 1} of {fileList.length}
                             </span>
                         )}
                     </div>
@@ -514,13 +599,13 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                             </>
                         )}
 
-                        {/* CSV Search Filter */}
-                        {fileType === 'csv' && (
+                        {/* CSV & TXT Search Filter */}
+                        {(fileType === 'csv' || fileType === 'txt') && (
                             <>
                                 <input
                                     type="text"
                                     className="m365-search-input"
-                                    placeholder="🔍 Filter CSV..."
+                                    placeholder={fileType === 'txt' ? "🔍 Search text..." : "🔍 Filter CSV..."}
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                 />
@@ -528,8 +613,8 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                             </>
                         )}
 
-                        {/* Zoom Controls (PDF, DOCX, XLSX, CSV, Image) */}
-                        {['pdf', 'docx', 'xlsx', 'csv', 'image'].includes(fileType) && (
+                        {/* Zoom Controls (PDF, DOCX, XLSX, CSV, TXT, Image) */}
+                        {['pdf', 'docx', 'xlsx', 'csv', 'txt', 'image'].includes(fileType) && (
                             <>
                                 <button
                                     type="button"
@@ -877,7 +962,7 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                             fallback={
                                 <div className="m365-loading-state">
                                     <div className="m365-loading-spinner" />
-                                    <div style={{ fontWeight: 600, color: '#000000' }}>Initializing document viewer...</div>
+                                    <div style={{ fontWeight: 600, color: '#000000' }}>Initializing document...</div>
                                 </div>
                             }
                         >
@@ -938,6 +1023,22 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
 
                             {fileType === 'csv' && (
                                 <CsvViewer
+                                    file={file}
+                                    fileBuffer={fileBuffer}
+                                    fileBlobUrl={fileBlobUrl}
+                                    zoom={zoom}
+                                    onZoomChange={setZoom}
+                                    fitMode={fitMode}
+                                    onFitModeChange={setFitMode}
+                                    isFullscreen={isFullscreen}
+                                    onToggleFullscreen={toggleFullscreen}
+                                    searchQuery={searchQuery}
+                                    onSearchQueryChange={setSearchQuery}
+                                />
+                            )}
+
+                            {fileType === 'txt' && (
+                                <TxtViewer
                                     file={file}
                                     fileBuffer={fileBuffer}
                                     fileBlobUrl={fileBlobUrl}
@@ -1031,6 +1132,35 @@ export default function FileViewer({ file, onClose }: FileViewerProps) {
                         </Suspense>
                     )}
                 </div>
+
+                {/* ── Unified Floating Attachment Navigation Controls (< and >) ── */}
+                {hasPrev && (
+                    <button
+                        type="button"
+                        className="m365-nav-floating-btn m365-nav-prev"
+                        onClick={handlePrev}
+                        title={prevFile ? `Previous Attachment (${currentIndex} of ${fileList.length}): ${prevFile.filename}` : 'Previous Attachment'}
+                        aria-label="Previous Attachment"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                            <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                    </button>
+                )}
+
+                {hasNext && (
+                    <button
+                        type="button"
+                        className="m365-nav-floating-btn m365-nav-next"
+                        onClick={handleNext}
+                        title={nextFile ? `Next Attachment (${currentIndex + 2} of ${fileList.length}): ${nextFile.filename}` : 'Next Attachment'}
+                        aria-label="Next Attachment"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </button>
+                )}
             </div>
         </div>
     );

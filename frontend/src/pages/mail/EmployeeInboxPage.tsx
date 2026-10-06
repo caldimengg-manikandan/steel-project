@@ -77,6 +77,7 @@ function getFileIcon(filename: string): string {
     if (['ppt', 'pptx', 'potx', 'ppsx', 'pptm'].includes(ext)) return '📽️';
     if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼️';
     if (['doc', 'docx'].includes(ext)) return '📝';
+    if (['txt', 'log', 'text', 'ini', 'cfg', 'conf', 'md', 'json', 'xml', 'sql'].includes(ext)) return '📃';
     return '📎';
 }
 
@@ -286,6 +287,17 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
         ? email.attachments
         : (item.attachments || [])
     ).filter(att => !((att as any).isInline && (att as any).contentId));
+    const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
+        return allAttachments.map(rawAtt => {
+            const att = normalizeAttachment(rawAtt);
+            return {
+                id: att.id,
+                filename: att.filename,
+                url: getAttachmentUrl(att.id),
+                sizeBytes: att.sizeBytes,
+            };
+        }).filter(f => Boolean(f.id));
+    }, [allAttachments]);
 
     const hasAttachmentsFlag = Boolean(
         (item as any).hasAttachments ||
@@ -526,7 +538,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
 
                                 {!isAttLoading && hasAttachmentsFlag && allAttachments.length === 0 && (
                                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
-                                        No file attachments
+                                        No links or file attachments
                                     </span>
                                 )}
 
@@ -908,7 +920,14 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
             </div>
 
             {/* Microsoft 365 File Viewer Modal */}
-            <FileViewer file={previewFile} onClose={() => setPreviewFile(null)} />
+            {previewFile && (
+                <FileViewer
+                    file={previewFile}
+                    files={attachmentFiles}
+                    onClose={() => setPreviewFile(null)}
+                    onFileChange={setPreviewFile}
+                />
+            )}
         </div>
     );
 }

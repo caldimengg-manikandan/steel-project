@@ -247,15 +247,16 @@ const CSS = `
     padding: 16px;
 }
 .msb-modal-card {
-    background: var(--color-bg-card, #1e293b);
-    border: 1px solid var(--color-border, #334155);
+    background: var(--color-bg-card, #ffffff);
+    color: var(--color-text-primary, #0f1623);
+    border: 1px solid var(--color-border, #d0d7e3);
     border-radius: 12px;
     width: 100%;
     max-width: 480px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
     overflow: hidden;
     animation: msb-scale-in 0.18s ease-out;
 }
@@ -268,7 +269,7 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--color-border, #334155);
+    border-bottom: 1px solid var(--color-border, #d0d7e3);
 }
 .msb-modal-body {
     padding: 16px 20px;
@@ -284,31 +285,35 @@ const CSS = `
     justify-content: flex-end;
     gap: 10px;
     padding: 14px 20px;
-    border-top: 1px solid var(--color-border, #334155);
-    background: rgba(0,0,0,0.15);
+    border-top: 1px solid var(--color-border, #d0d7e3);
+    background: var(--color-table-row-alt, #f9fafc);
 }
 .msb-remote-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px;
+    padding: 10px 14px;
     border-radius: 8px;
-    border: 1px solid var(--color-border, #334155);
-    background: var(--color-bg, #0f172a);
+    border: 1px solid var(--color-border, #d0d7e3);
+    background: var(--color-bg-card, #ffffff);
+    color: var(--color-text-primary, #0f1623);
     cursor: pointer;
     transition: all 0.14s ease;
 }
 .msb-remote-row:hover:not(.disabled) {
-    border-color: var(--color-primary, #3b82f6);
-    background: rgba(59, 130, 246, 0.08);
+    border-color: var(--color-primary, #1e4fd8);
+    background: var(--color-primary-glow, rgba(30, 79, 216, 0.08));
 }
 .msb-remote-row.selected {
-    border-color: var(--color-primary, #3b82f6);
-    background: rgba(59, 130, 246, 0.16);
+    border-color: var(--color-primary, #1e4fd8);
+    background: var(--color-primary-glow, rgba(30, 79, 216, 0.14));
+    color: var(--color-primary, #1e4fd8);
 }
 .msb-remote-row.disabled {
-    opacity: 0.55;
+    opacity: 0.6;
+    background: var(--color-bg-page, #f1f4f9);
     cursor: not-allowed;
+    color: var(--color-text-muted, #6b7280);
 }
 `;
 
@@ -318,9 +323,11 @@ interface Props {
     onFolderSelect: (id: string) => void;
     refreshTrigger?: number;
     provider?: 'MICROSOFT' | 'ZOHO';
+    startDate?: string;
+    endDate?: string;
 }
 
-export default function MailSidebar({ activeFolder, onFolderSelect, refreshTrigger, provider }: Props) {
+export default function MailSidebar({ activeFolder, onFolderSelect, refreshTrigger, provider, startDate, endDate }: Props) {
     const [open,    setOpen]    = useState(false);
     const [folders, setFolders] = useState<MailFolder[]>([]);
     const [loading, setLoading] = useState(true);
@@ -338,16 +345,16 @@ export default function MailSidebar({ activeFolder, onFolderSelect, refreshTrigg
 
     const load = useCallback(async () => {
         try {
-            const d = await listMailFolders(provider);
+            const d = await listMailFolders(provider, startDate, endDate);
             setFolders(d.folders || []);
         } catch {
             setErrored(true);
         } finally {
             setLoading(false);
         }
-    }, [provider]);
+    }, [provider, startDate, endDate]);
 
-    useEffect(() => { load(); }, [load, refreshTrigger, provider]);
+    useEffect(() => { load(); }, [load, refreshTrigger, provider, startDate, endDate]);
 
     // Ensure outbox is strictly omitted if provider is MICROSOFT
     const displayedFolders = (folders || []).filter(f => {
@@ -622,8 +629,8 @@ export default function MailSidebar({ activeFolder, onFolderSelect, refreshTrigg
                                             marginTop: 6,
                                             padding: 12,
                                             borderRadius: 8,
-                                            background: 'rgba(255, 255, 255, 0.03)',
-                                            border: '1px solid var(--color-border)',
+                                            background: 'var(--color-table-row-alt, #f9fafc)',
+                                            border: '1px solid var(--color-border, #d0d7e3)',
                                         }}>
                                             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--color-text-muted)' }}>
                                                 Display Name in Sidebar

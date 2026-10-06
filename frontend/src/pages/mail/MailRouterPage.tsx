@@ -90,6 +90,7 @@ function getFileIcon(filename: string): string {
     if (['ppt', 'pptx', 'potx', 'ppsx', 'pptm'].includes(ext)) return '📽️';
     if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼️';
     if (['doc', 'docx'].includes(ext)) return '📝';
+    if (['txt', 'log', 'text', 'ini', 'cfg', 'conf', 'md', 'json', 'xml', 'sql'].includes(ext)) return '📃';
     return '📎';
 }
 
@@ -855,7 +856,6 @@ function EmailCard({
                         {snippet}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                        {isSpam && <span style={{ fontSize: 11.5, background: 'var(--color-danger-bg)', color: 'var(--color-danger-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>⚠️ Spam</span>}
                         {hasAtt && <span style={{ fontSize: 11.5, background: 'var(--color-info-bg)', color: 'var(--color-info-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>📎 {attCount > 0 ? attCount : 'Attachment'}</span>}
                         {linkCount > 0 && <span style={{ fontSize: 11.5, background: 'var(--color-warning-bg)', color: 'var(--color-warning-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>🔗 {linkCount}</span>}
                         {(msg.isForwarded || (msg as any).triageStatus === 'FORWARDED') && <span style={{ fontSize: 11.5, background: 'var(--color-success-bg)', color: 'var(--color-success-mid)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>✓ Forwarded</span>}
@@ -928,6 +928,17 @@ function EmailDetail({
     const isSent = (email as any).folder === 'sent';
 
     const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !((att as any).isInline && (att as any).contentId));
+    const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
+        return allAttachments.map(rawAtt => {
+            const att = normalizeAttachment(rawAtt);
+            return {
+                id: att.id,
+                filename: att.filename,
+                url: getAttachmentUrl(att.id),
+                sizeBytes: att.sizeBytes,
+            };
+        }).filter(f => Boolean(f.id));
+    }, [allAttachments]);
     const hasAttachmentsFlag = Boolean(
         email.hasAttachments ||
         (email as any).attachmentCount > 0 ||
@@ -1034,11 +1045,6 @@ function EmailDetail({
                             <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text-primary)', paddingLeft: 10, margin: 0, lineHeight: 1.35, wordBreak: 'break-word' }}>
                                 {email.subject || '(No subject)'}
                             </h2>
-                            {isSpam && (
-                                <span style={{ fontSize: 12, background: 'var(--color-danger-bg)', color: 'var(--color-danger-mid)', padding: '2px 8px', borderRadius: 4, fontWeight: 600, flexShrink: 0 }}>
-                                    ⚠️ Spam
-                                </span>
-                            )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <button className="btn btn-primary" onClick={onForwardClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -1129,7 +1135,7 @@ function EmailDetail({
 
                                 {!isAttLoading && hasAttachmentsFlag && allAttachments.length === 0 && (
                                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
-                                        No file attachments
+                                        No links or file attachments
                                     </span>
                                 )}
 
@@ -1518,7 +1524,14 @@ function EmailDetail({
             </div>
 
             {/* Microsoft 365 File Viewer Modal */}
-            <FileViewer file={previewFile} onClose={() => setPreviewFile(null)} />
+            {previewFile && (
+                <FileViewer
+                    file={previewFile}
+                    files={attachmentFiles}
+                    onClose={() => setPreviewFile(null)}
+                    onFileChange={setPreviewFile}
+                />
+            )}
         </div>
     );
 }
@@ -2397,6 +2410,8 @@ export default function MailRouterPage() {
                         onFolderSelect={handleSelectFolder}
                         refreshTrigger={foldersRefreshKey}
                         provider={activeTab}
+                        startDate={startDate}
+                        endDate={endDate}
                     />
                     {/* Left: email list (independent vertical scroll) */}
                     <div
