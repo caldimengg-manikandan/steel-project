@@ -1028,12 +1028,39 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
         : Promise.resolve([]),
     ]);
 
-    // If HTML has inline image references but no cached attachment binary content is present,
-    // on-demand fetch and cache inline images so they render immediately
+    // Check if HTML needs inline image fetching OR if email has attachments that are not yet stored in MongoDB
     const hasCachedContent = fullAttachments.some(a => a.content && a.content.length > 0);
-    if (hasCid && !hasCachedContent && email.accountId && email.providerMessageId) {
+    const hasUnresolvedAttachments = Boolean(
+      (email.hasAttachments || email.attachmentCount > 0 || email.attachmentsCount > 0) &&
+      attachments.length === 0
+    );
+    const needsInlineImageFetch = Boolean(hasCid && !hasCachedContent);
+
+    if ((hasUnresolvedAttachments || needsInlineImageFetch) && email.providerMessageId) {
       try {
-        const account = await getMailAccountById(email.accountId);
+        const MailAccount = require('../mongoose/models/MailAccount');
+        let account = null;
+        if (email.accountId) {
+          account = await getMailAccountById(email.accountId);
+        }
+        if (!account && email.mailboxAddress) {
+          account = await MailAccount.findOne({
+            email: email.mailboxAddress.toLowerCase(),
+            provider: email.provider,
+          }).lean();
+        }
+        if (!account && email.userId) {
+          account = await MailAccount.findOne({
+            userId: email.userId,
+            provider: email.provider,
+          }).lean();
+        }
+        if (!account) {
+          account = await MailAccount.findOne({
+            provider: email.provider,
+          }).lean();
+        }
+
         if (account) {
           const { getMailProvider } = require('../services/mail/provider-factory');
           const provider = getMailProvider(email.provider);
@@ -1053,14 +1080,15 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
                 ));
 
               let downloadedContent = null;
-              if (isImg && matchesBody) {
+              // Download only inline/body images for rendering the email preview; regular files are deferred to on-demand download
+              if (isImg && matchesBody && hasCid) {
                 try {
                   const dl = await provider.downloadAttachment(email.providerMessageId, providerAttachmentId, account, att.contentId);
                   if (dl && dl.content) {
                     downloadedContent = dl.content;
                   }
                 } catch (dlErr) {
-                  console.warn(`[mailRouter:lazy-att] Download failed for ${att.filename}:`, dlErr.message);
+                  console.warn(`[mailRouter:lazy-att] Download failed for inline image ${att.filename}:`, dlErr.message);
                 }
               }
 
@@ -1086,7 +1114,7 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
           }
         }
       } catch (lazyErr) {
-        console.warn(`[mailRouter:lazy-att] On-demand inline attachment sync failed for ${emailId}:`, lazyErr.message);
+        console.warn(`[mailRouter:lazy-att] On-demand attachment metadata sync failed for ${emailId}:`, lazyErr.message);
       }
     }
 
@@ -1096,8 +1124,9 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
     }
 
     const drawingAttachments = attachments.filter(a =>
-      !inlineAttachmentIds.includes(String(a._id || a.id)) && !a.isInline
+      !inlineAttachmentIds.includes(String(a._id || a.id))
     );
+    const effectiveAttachments = drawingAttachments.length > 0 ? drawingAttachments : attachments;
 
     const formattedEmail = {
       ...email,
@@ -1105,10 +1134,10 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
       bodyHtml: resolvedHtml || email.bodyHtml || '',
       isForwarded: email.isForwarded ?? (email.triageStatus === 'FORWARDED'),
       snippetText: email.snippetText || email.bodyPreview || (email.bodyText ? email.bodyText.slice(0, 150) : ''),
-      attachments: drawingAttachments,
-      hasAttachments: Boolean(drawingAttachments.length > 0),
+      attachments: effectiveAttachments,
+      hasAttachments: Boolean(effectiveAttachments.length > 0 || email.hasAttachments),
     };
-    return res.json({ email: formattedEmail, attachments: drawingAttachments });
+    return res.json({ email: formattedEmail, attachments: effectiveAttachments });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch email' });
   }
@@ -1230,9 +1259,47 @@ router.get('/inbox/:id', requireRoles(), async (req, res) => {
 
     // Get drawing / file attachments
     const actualEmailId = item.emailId || (item.email && item.email._id) || targetId;
-    const attachments = (item.attachments && item.attachments.length > 0)
+    let attachments = (item.attachments && item.attachments.length > 0)
       ? item.attachments
       : await listAttachmentsByEmail(actualEmailId);
+
+    // If attachments are still empty, but the forwarded email has attachments flagged, resolve metadata on-demand
+    if (attachments.length === 0 && (item.email?.hasAttachments || item.hasAttachments)) {
+      try {
+        const Email = require('../mongoose/models/Email');
+        const email = item.email || await Email.findById(actualEmailId).lean();
+        if (email && email.providerMessageId) {
+          const MailAccount = require('../mongoose/models/MailAccount');
+          let account = null;
+          if (email.accountId) account = await getMailAccountById(email.accountId);
+          if (!account) account = await MailAccount.findOne({ provider: email.provider }).lean();
+          if (account) {
+            const { getMailProvider } = require('../services/mail/provider-factory');
+            const provider = getMailProvider(email.provider);
+            const attList = await provider.listAttachments(email.providerMessageId, account);
+            if (attList && Array.isArray(attList) && attList.length > 0) {
+              const { upsertAttachment } = require('../mongoose/repositories/attachmentRepo');
+              for (const att of attList) {
+                const providerAttachmentId = att.providerAttachmentId || att.id;
+                if (!providerAttachmentId) continue;
+                await upsertAttachment({
+                  emailId: actualEmailId,
+                  providerAttachmentId,
+                  filename: att.filename || 'attachment',
+                  contentType: att.contentType || 'application/octet-stream',
+                  sizeBytes: att.sizeBytes ?? null,
+                  isInline: Boolean(att.isInline),
+                  contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
+                });
+              }
+              attachments = await listAttachmentsByEmail(actualEmailId);
+            }
+          }
+        }
+      } catch (inboxAttErr) {
+        console.warn('[mailRouter:inbox] On-demand attachment fetch failed:', inboxAttErr.message);
+      }
+    }
 
     return res.json({ item, attachments });
   } catch (err) {
