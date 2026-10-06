@@ -17,10 +17,14 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
   }
 
   const mongoose = require('mongoose');
-  const ids = [emailId];
-  if (typeof emailId === 'string' && mongoose.Types.ObjectId.isValid(emailId)) {
-    ids.push(new mongoose.Types.ObjectId(emailId));
-  } else if (emailId && emailId.toString) {
+  const targetEmailId = (typeof emailId === 'string' && mongoose.Types.ObjectId.isValid(emailId))
+    ? new mongoose.Types.ObjectId(emailId)
+    : (emailId && emailId._id) ? emailId._id : emailId;
+
+  const ids = [targetEmailId];
+  if (typeof emailId === 'string' && !ids.includes(emailId)) {
+    ids.push(emailId);
+  } else if (emailId && emailId.toString && !ids.includes(emailId.toString())) {
     ids.push(emailId.toString());
   }
 
@@ -30,6 +34,7 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
   };
 
   const update = {
+    emailId: targetEmailId,
     filename: attachmentMeta.filename || attachmentMeta.name,
     contentType: attachmentMeta.contentType || 'application/octet-stream',
     sizeBytes: attachmentMeta.sizeBytes || attachmentMeta.size || null,

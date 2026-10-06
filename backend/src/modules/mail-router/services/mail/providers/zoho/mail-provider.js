@@ -150,17 +150,72 @@ class ZohoMailProvider {
             ];
         }
         const systemNames = ['inbox', 'drafts', 'sent', 'templates', 'spam', 'trash', 'outbox'];
-        return folders.map((f) => {
-            const lower = (f.folderName || f.folderPath || '').toLowerCase().trim();
-            return {
-                id: String(f.folderId),
-                name: f.folderName || f.folderPath,
-                totalItemCount: f.messageCount || 0,
-                unreadItemCount: f.unreadMessageCount || 0,
-                isSystem: systemNames.includes(lower),
-                provider: 'ZOHO',
-            };
-        });
+
+        // Query unread count mapping from Zoho API
+        let unreadCounts = {};
+        try {
+            const unreadRes = await (0, zoho_client_1.zohoGet)(`/accounts/${accountId}/folders/unreadcount`, token, baseUrl);
+            unreadCounts = unreadRes?.data?.unreadCount || {};
+        } catch {
+            // unreadcount endpoint error ignored
+        }
+
+        let Email = null;
+        try {
+            Email = require('../../../../mongoose/models/Email');
+        } catch {
+            // Optional local fallback
+        }
+
+        // Concurrently resolve total message count for each folder
+        const folderStats = await Promise.all(
+            folders.map(async (f) => {
+                const folderIdStr = String(f.folderId);
+                const lower = (f.folderName || f.folderPath || '').toLowerCase().trim();
+                let messageCount = 0;
+
+                try {
+                    const msgRes = await (0, zoho_client_1.zohoGet)(
+                        `/accounts/${accountId}/messages/view?folderId=${encodeURIComponent(folderIdStr)}&limit=1000`,
+                        token,
+                        baseUrl
+                    );
+                    messageCount = Array.isArray(msgRes?.data) ? msgRes.data.length : 0;
+                } catch (cntErr) {
+                    console.warn(`[mail:zoho:provider] Failed to fetch message count for ${f.folderName}:`, cntErr.message);
+                }
+
+                // If remote count is 0 and we have local synced records, check DB as fallback
+                if (messageCount === 0 && Email && account?.userId) {
+                    try {
+                        const dbCount = await Email.countDocuments({
+                            userId: account.userId,
+                            provider: 'ZOHO',
+                            $or: [
+                                { remoteFolderId: folderIdStr },
+                                { folder: lower },
+                            ],
+                        });
+                        if (dbCount > 0) {
+                            messageCount = dbCount;
+                        }
+                    } catch {
+                        // ignore DB query error
+                    }
+                }
+
+                return {
+                    id: folderIdStr,
+                    name: f.folderName || f.folderPath,
+                    totalItemCount: messageCount,
+                    unreadItemCount: Number(unreadCounts[folderIdStr]) || 0,
+                    isSystem: systemNames.includes(lower),
+                    provider: 'ZOHO',
+                };
+            })
+        );
+
+        return folderStats;
     }
 }
 exports.ZohoMailProvider = ZohoMailProvider;

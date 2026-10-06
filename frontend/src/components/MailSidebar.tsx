@@ -608,7 +608,7 @@ export default function MailSidebar({ activeFolder, onFolderSelect, refreshTrigg
                                                                     fontSize: 11,
                                                                     color: 'var(--color-text-muted)',
                                                                 }}>
-                                                                    {rf.totalItemCount} emails
+                                                                    {rf.totalItemCount} {rf.totalItemCount === 1 ? 'email' : 'emails'}
                                                                 </span>
                                                             ) : null}
                                                         </div>

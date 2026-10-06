@@ -251,7 +251,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
     const [copiedNote, setCopiedNote] = useState(false);
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
     const [copiedAllLinks, setCopiedAllLinks] = useState(false);
-    const [showAttachments, setShowAttachments] = useState(false);
+    const [showAttachments, setShowAttachments] = useState(true);
     const [showLinks, setShowLinks] = useState(false);
     const [linkFilter, setLinkFilter] = useState('');
     const [previewFile, setPreviewFile] = useState<FileViewerFile | null>(null);
@@ -285,7 +285,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
     const allAttachments: MailAttachment[] = ((email.attachments && email.attachments.length > 0)
         ? email.attachments
         : (item.attachments || [])
-    ).filter(att => !(att as any).isInline);
+    ).filter(att => !((att as any).isInline && (att as any).contentId));
 
     const hasAttachmentsFlag = Boolean(
         (item as any).hasAttachments ||
@@ -462,7 +462,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                 )}
 
                 {/* Collapsible Resources Bar (Attachments & Links) */}
-                {(allAttachments.length > 0 || validLinks.length > 0 || (hasAttachmentsFlag && isAttLoading)) && (
+                {(hasAttachmentsFlag || allAttachments.length > 0 || validLinks.length > 0 || isAttLoading) && (
                     <div style={{
                         marginBottom: 18,
                         borderRadius: 'var(--radius-md)',
@@ -483,8 +483,16 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                             gap: 10,
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginRight: 2 }}>
-                                    Resources:
+                                <span style={{
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    color: isAttLoading ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                    marginRight: 2,
+                                    transition: 'color 0.2s ease',
+                                }}>
+                                    {isAttLoading ? 'Resources Loading…' : 'Resources:'}
                                 </span>
 
                                 {hasAttachmentsFlag && isAttLoading && (
@@ -604,7 +612,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                                         isAttLoading
                                             ? 'Fetching attachments...'
                                             : allAttachments.length > 0
-                                                ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})`
+                                                ? `${allAttachments.length} ${allAttachments.length === 1 ? 'attachment' : 'attachments'}${totalAttBytes > 0 ? ` (${formatBytes(totalAttBytes)})` : ''}`
                                                 : null,
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
@@ -622,7 +630,7 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                                        File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
+                                        Attachments ({allAttachments.length}){totalAttBytes > 0 && <> • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span></>}
                                     </div>
                                 </div>
                                 <div style={{
@@ -1180,7 +1188,7 @@ export default function EmployeeInboxPage() {
                     <div style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', background: 'var(--color-bg-page)', display: 'flex', flexDirection: 'column' }}>
                         {selectedItem ? (
                             <InboxErrorBoundary>
-                                <InboxDetail item={selectedItem} loadingAttachments={loadingDetail} />
+                                <InboxDetail key={selectedItem._id || (selectedItem as any).id || (selectedItem as any).forwardingId || selectedItem.emailId} item={selectedItem} loadingAttachments={loadingDetail} />
                             </InboxErrorBoundary>
                         ) : loadingDetail ? (
                             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>

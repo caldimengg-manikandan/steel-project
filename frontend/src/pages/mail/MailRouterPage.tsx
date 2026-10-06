@@ -330,12 +330,25 @@ function ForwardModal({
         return counts;
     }, [projectMembers]);
 
+function getRoleIcon(roleKey: string): string {
+    switch (roleKey) {
+        case 'project_manager':
+            return '👑';
+        case 'team_lead':
+            return '⭐';
+        case 'team_member':
+            return '👤';
+        default:
+            return '👥';
+    }
+}
+
     // Available role options formatted for dropdown & quick pills
     const availableRoleOptions = useMemo(() => {
         const presentRoles = new Set(projectMembers.map(e => normalizeRole(e.role)));
         const standardOrder = ['project_manager', 'team_lead', 'team_member'];
-        const options: Array<{ id: string; label: string; count: number }> = [
-            { id: 'all', label: 'All Roles', count: projectMembers.length }
+        const options: Array<{ id: string; label: string; count: number; icon: string }> = [
+            { id: 'all', label: 'All Roles', count: projectMembers.length, icon: '👥' }
         ];
 
         for (const r of standardOrder) {
@@ -344,6 +357,7 @@ function ForwardModal({
                     id: r,
                     label: getRoleLabel(r),
                     count: roleCounts[r] || 0,
+                    icon: getRoleIcon(r),
                 });
             }
         }
@@ -354,6 +368,7 @@ function ForwardModal({
                     id: r,
                     label: getRoleLabel(r),
                     count: roleCounts[r] || 0,
+                    icon: getRoleIcon(r),
                 });
             }
         }
@@ -928,7 +943,7 @@ function EmailDetail({
 }) {
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
     const [copiedAllLinks, setCopiedAllLinks] = useState(false);
-    const [showAttachments, setShowAttachments] = useState(false);
+    const [showAttachments, setShowAttachments] = useState(true);
     const [showLinks, setShowLinks] = useState(false);
     const [linkFilter, setLinkFilter] = useState('');
     const [previewFile, setPreviewFile] = useState<FileViewerFile | null>(null);
@@ -953,7 +968,7 @@ function EmailDetail({
     const isSpam = Boolean((email as any).folder === 'spam' || (email as any).isSpam);
     const isSent = (email as any).folder === 'sent';
 
-    const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !(att as any).isInline);
+    const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !((att as any).isInline && (att as any).contentId));
     const hasAttachmentsFlag = Boolean(
         email.hasAttachments ||
         (email as any).attachmentCount > 0 ||
@@ -1096,7 +1111,7 @@ function EmailDetail({
                 </div>
 
                 {/* Collapsible Resources Bar (Attachments & Links) */}
-                {(allAttachments.length > 0 || validLinks.length > 0 || (hasAttachmentsFlag && isAttLoading)) && (
+                {(hasAttachmentsFlag || allAttachments.length > 0 || validLinks.length > 0 || isAttLoading) && (
                     <div style={{
                         marginBottom: 10,
                         borderRadius: 'var(--radius-md)',
@@ -1117,8 +1132,16 @@ function EmailDetail({
                             gap: 10,
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginRight: 2 }}>
-                                    Resources:
+                                <span style={{
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    color: isAttLoading ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                    marginRight: 2,
+                                    transition: 'color 0.2s ease',
+                                }}>
+                                    {isAttLoading ? 'Resources Loading…' : 'Resources:'}
                                 </span>
 
                                 {hasAttachmentsFlag && isAttLoading && (
@@ -1238,7 +1261,7 @@ function EmailDetail({
                                         isAttLoading
                                             ? 'Fetching attachments...'
                                             : allAttachments.length > 0
-                                                ? `${allAttachments.length} file${allAttachments.length > 1 ? 's' : ''} (${formatBytes(totalAttBytes)})`
+                                                ? `${allAttachments.length} ${allAttachments.length === 1 ? 'attachment' : 'attachments'}${totalAttBytes > 0 ? ` (${formatBytes(totalAttBytes)})` : ''}`
                                                 : null,
                                         validLinks.length > 0 ? `${validLinks.length} link${validLinks.length > 1 ? 's' : ''}` : null,
                                     ].filter(Boolean).join(' • ')}
@@ -1256,7 +1279,7 @@ function EmailDetail({
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                                        File Attachments ({allAttachments.length}) • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span>
+                                        Attachments ({allAttachments.length}){totalAttBytes > 0 && <> • <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>{formatBytes(totalAttBytes)}</span></>}
                                     </div>
                                 </div>
                                 <div style={{
@@ -2238,9 +2261,16 @@ export default function MailRouterPage() {
             return;
         }
 
-        // Check if we already have the hydrated version in memory cache
+        const hasAtt = Boolean(
+            selectedEmail.hasAttachments ||
+            (selectedEmail as any).attachmentCount > 0 ||
+            (selectedEmail as any).attachmentsCount > 0 ||
+            (selectedEmail.attachments && selectedEmail.attachments.length > 0)
+        );
+
+        // Check if we already have the fully hydrated version in memory cache with attachments resolved
         const cached = emailDetailCacheRef.current.get(String(id));
-        if (cached && cached.bodyHtml && !selectedEmail.bodyHtml) {
+        if (cached && cached.bodyHtml && (!hasAtt || (cached.attachments && cached.attachments.length > 0))) {
             setSelectedEmail(cached);
             setLoadingAttachments(false);
             return;
@@ -2252,14 +2282,7 @@ export default function MailRouterPage() {
             return;
         }
 
-        const hasAtt = Boolean(
-            selectedEmail.hasAttachments ||
-            (selectedEmail as any).attachmentCount > 0 ||
-            (selectedEmail as any).attachmentsCount > 0 ||
-            (selectedEmail.attachments && selectedEmail.attachments.length > 0)
-        );
-
-        setLoadingAttachments(hasAtt);
+        setLoadingAttachments(hasAtt && (!selectedEmail.attachments || selectedEmail.attachments.length === 0));
 
         let active = true;
         getEmail(id)
@@ -2290,7 +2313,7 @@ export default function MailRouterPage() {
         return () => {
             active = false;
         };
-    }, [selectedEmail?._id, selectedEmail?.id, selectedEmail?.bodyHtml]);
+    }, [selectedEmail?._id, selectedEmail?.id]);
 
     return (
         <>
@@ -2849,23 +2872,13 @@ export default function MailRouterPage() {
                                 {filteredEmails.map(msg => (
                                     <div
                                         key={msg._id}
-                                        draggable
-                                        onDragStart={e => {
-                                            e.dataTransfer.setData('emailId', String(msg._id || msg.id || ''));
-                                            e.dataTransfer.effectAllowed = 'copy';
+                                        msg={msg}
+                                        active={selectedEmail?._id === msg._id}
+                                        onClick={() => {
+                                            const cached = emailDetailCacheRef.current.get(String(msg._id));
+                                            setSelectedEmail(cached || msg);
                                         }}
-                                        style={{ cursor: 'grab' }}
-                                        title="Drag to a folder to organise"
-                                    >
-                                        <EmailCard
-                                            msg={msg}
-                                            active={selectedEmail?._id === msg._id}
-                                            onClick={() => {
-                                                const cached = emailDetailCacheRef.current.get(String(msg._id));
-                                                setSelectedEmail(cached || msg);
-                                            }}
-                                        />
-                                    </div>
+                                    />
                                 ))}
                                 {hasMore && (
                                     <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
