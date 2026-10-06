@@ -19,7 +19,20 @@ const UnsupportedViewer = React.lazy(() => import('./viewers/UnsupportedViewer')
 export default function FileViewer({ file: initialFile, files, onClose, onFileChange }: FileViewerProps) {
     const [activeFile, setActiveFile] = useState<FileViewerFile | null>(initialFile);
 
+    // Download and Progress State
+    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
+    const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+    const [downloadLoaded, setDownloadLoaded] = useState<number>(0);
+    const [downloadTotal, setDownloadTotal] = useState<number>(initialFile?.sizeBytes || 0);
+    const [downloadStatusText, setDownloadStatusText] = useState<string>('Connecting to server...');
+    const [downloadError, setDownloadError] = useState<string>('');
+    const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
+    const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
+
     useEffect(() => {
+        setFileBuffer(null);
+        setFileBlobUrl(null);
+        setDownloadStatus('idle');
         setActiveFile(initialFile);
     }, [initialFile]);
 
@@ -47,6 +60,9 @@ export default function FileViewer({ file: initialFile, files, onClose, onFileCh
         if (targetIndex < 0 || targetIndex >= fileList.length) return;
         const nextTarget = fileList[targetIndex];
         if (!nextTarget) return;
+        setFileBuffer(null);
+        setFileBlobUrl(null);
+        setDownloadStatus('idle');
         setActiveFile(nextTarget);
         if (onFileChange) {
             onFileChange(nextTarget);
@@ -125,16 +141,6 @@ export default function FileViewer({ file: initialFile, files, onClose, onFileCh
     // Image state
     const [rotation, setRotation] = useState(0);
 
-    // Download and Progress State
-    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
-    const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
-    const [downloadLoaded, setDownloadLoaded] = useState<number>(0);
-    const [downloadTotal, setDownloadTotal] = useState<number>(file?.sizeBytes || 0);
-    const [downloadStatusText, setDownloadStatusText] = useState<string>('Connecting to server...');
-    const [downloadError, setDownloadError] = useState<string>('');
-    const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
-    const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
-
     // Reset view state when opening a different file
     useEffect(() => {
         setZoom(100);
@@ -174,11 +180,15 @@ export default function FileViewer({ file: initialFile, files, onClose, onFileCh
 
         // For unsupported files, no need to download binary upfront
         if (fileType === 'unsupported') {
+            setFileBuffer(null);
+            setFileBlobUrl(null);
             setDownloadStatus('ready');
             return;
         }
 
         let isMounted = true;
+        setFileBuffer(null);
+        setFileBlobUrl(null);
         setDownloadStatus('downloading');
         setDownloadPercent(0);
         setDownloadStatusText('Connecting to server...');

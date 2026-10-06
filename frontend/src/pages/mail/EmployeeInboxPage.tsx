@@ -283,10 +283,12 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
     const senderEmail = email.from?.email || (email as any).fromAddress;
     const senderLabel = senderName && senderEmail ? `${senderName} <${senderEmail}>` : (senderName || senderEmail || 'Unknown sender');
 
-    const allAttachments: MailAttachment[] = ((email.attachments && email.attachments.length > 0)
-        ? email.attachments
-        : (item.attachments || [])
-    ).filter(att => !((att as any).isInline && (att as any).contentId));
+    const allAttachments: MailAttachment[] = React.useMemo(() => {
+        const raw = (email.attachments && email.attachments.length > 0)
+            ? email.attachments
+            : (item.attachments || []);
+        return raw.filter(att => !((att as any).isInline && (att as any).contentId));
+    }, [email.attachments, item.attachments]);
     const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
         return allAttachments.map(rawAtt => {
             const att = normalizeAttachment(rawAtt);

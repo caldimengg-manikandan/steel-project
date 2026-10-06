@@ -927,7 +927,9 @@ function EmailDetail({
     const isSpam = Boolean((email as any).folder === 'spam' || (email as any).isSpam);
     const isSent = (email as any).folder === 'sent';
 
-    const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !((att as any).isInline && (att as any).contentId));
+    const allAttachments: MailAttachment[] = React.useMemo(() => {
+        return (email.attachments || []).filter(att => !((att as any).isInline && (att as any).contentId));
+    }, [email.attachments]);
     const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
         return allAttachments.map(rawAtt => {
             const att = normalizeAttachment(rawAtt);
