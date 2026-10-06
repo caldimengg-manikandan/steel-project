@@ -1254,17 +1254,17 @@ body.pdf-panning-active * {
     top: 50%;
     transform: translateY(-50%);
     z-index: 99999;
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(0, 120, 212);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(203, 213, 225, 0.85);
-    color: #334155;
+    color: #ffffff;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
     cursor: pointer;
     transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1286,11 +1286,11 @@ body.pdf-panning-active * {
 }
 
 .m365-nav-floating-btn.m365-nav-prev {
-    left: 20px;
+    left: 10px;
 }
 
 .m365-nav-floating-btn.m365-nav-next {
-    right: 20px;
+    right: 10px;
 }
 
 .m365-attachment-counter {
