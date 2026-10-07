@@ -8,7 +8,7 @@ import {
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
 
-type TabId = 'access' | 'email' | 'ui' | 'branding' | 'audit';
+type TabId = 'access' | 'email' | 'ui' | 'branding' | 'security' | 'audit';
 
 interface TabItem {
     id: TabId;
@@ -22,6 +22,7 @@ const TABS: TabItem[] = [
     { id: 'email', label: 'Email Settings', icon: <IconNotification />, desc: 'SMTP sender config and recipient lists' },
     { id: 'ui', label: 'System Preference', icon: <IconSettings />, desc: 'Theme, timezone and language' },
     { id: 'branding', label: 'Company Profile', icon: <IconSettings />, desc: 'Logo and branding' },
+    { id: 'security', label: 'Security', icon: <IconActivity />, desc: 'Change your account password' },
     { id: 'audit', label: 'Logs & Audit', icon: <IconActivity />, desc: 'System activity and change history' },
 ];
 
@@ -117,6 +118,11 @@ export default function AdminSettings() {
     const [testingEmail, setTestingEmail] = useState(false);
     const [testEmailAddr, setTestEmailAddr] = useState('');
     const [loadingTestReport, setLoadingTestReport] = useState(false);
+
+    // Change password state
+    const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [savingPw, setSavingPw] = useState(false);
+    const [showPw, setShowPw] = useState({ current: false, newPw: false, confirm: false });
 
     const handleSendTestReport = async () => {
         setLoadingTestReport(true);
@@ -672,6 +678,111 @@ export default function AdminSettings() {
                     )}
 
 
+
+                    {activeTab === 'security' && (
+                        <Card title="Change Your Password">
+                            <div style={{ maxWidth: 480 }}>
+                                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 24 }}>
+                                    Update the password for your admin account. You will need to use the new password next time you log in.
+                                </p>
+                                <div className="form-group">
+                                    <label className="form-label required">Current Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="admin-current-password"
+                                            type={showPw.current ? 'text' : 'password'}
+                                            className="form-control"
+                                            placeholder="Enter current password"
+                                            value={pwForm.currentPassword}
+                                            onChange={e => setPwForm(p => ({ ...p, currentPassword: e.target.value }))}
+                                            style={{ paddingRight: '2.5rem' }}
+                                        />
+                                        <button type="button" onClick={() => setShowPw(p => ({ ...p, current: !p.current }))}
+                                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4, display: 'flex' }}>
+                                            {showPw.current
+                                                ? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                                : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label required">New Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="admin-new-password"
+                                            type={showPw.newPw ? 'text' : 'password'}
+                                            className="form-control"
+                                            placeholder="Minimum 6 characters"
+                                            value={pwForm.newPassword}
+                                            onChange={e => setPwForm(p => ({ ...p, newPassword: e.target.value }))}
+                                            style={{ paddingRight: '2.5rem' }}
+                                        />
+                                        <button type="button" onClick={() => setShowPw(p => ({ ...p, newPw: !p.newPw }))}
+                                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4, display: 'flex' }}>
+                                            {showPw.newPw
+                                                ? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                                : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label required">Confirm New Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="admin-confirm-password"
+                                            type={showPw.confirm ? 'text' : 'password'}
+                                            className="form-control"
+                                            placeholder="Re-enter new password"
+                                            value={pwForm.confirmPassword}
+                                            onChange={e => setPwForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                                            style={{ paddingRight: '2.5rem' }}
+                                        />
+                                        <button type="button" onClick={() => setShowPw(p => ({ ...p, confirm: !p.confirm }))}
+                                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4, display: 'flex' }}>
+                                            {showPw.confirm
+                                                ? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                                : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+                                        </button>
+                                    </div>
+                                    {pwForm.confirmPassword && pwForm.newPassword !== pwForm.confirmPassword && (
+                                        <div style={{ fontSize: 12, color: 'var(--color-danger, #ef4444)', marginTop: 4 }}>Passwords do not match.</div>
+                                    )}
+                                </div>
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={savingPw || !pwForm.currentPassword || !pwForm.newPassword || pwForm.newPassword !== pwForm.confirmPassword}
+                                    onClick={async () => {
+                                        if (pwForm.newPassword.length < 6) {
+                                            showMessage('Validation', 'New password must be at least 6 characters.', 'error');
+                                            return;
+                                        }
+                                        setSavingPw(true);
+                                        try {
+                                            const res = await fetch(`${BASE}/auth/change-password`, {
+                                                method: 'PATCH',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                credentials: 'include',
+                                                body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
+                                            });
+                                            const data = await res.json();
+                                            if (res.ok) {
+                                                showMessage('Success', 'Password updated successfully! Use it next time you log in.', 'success');
+                                                setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                                            } else {
+                                                showMessage('Failed', data.error || 'Failed to update password.', 'error');
+                                            }
+                                        } catch {
+                                            showMessage('Error', 'Network error. Please try again.', 'error');
+                                        } finally {
+                                            setSavingPw(false);
+                                        }
+                                    }}
+                                >
+                                    {savingPw ? 'Updating...' : 'Update Password'}
+                                </button>
+                            </div>
+                        </Card>
+                    )}
 
                     {activeTab === 'audit' && (
                         <Card title="System Activity Log" action={
