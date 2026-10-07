@@ -512,6 +512,8 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const appPct = sowProg.approvalPercentage;
         const fabPct = sowProg.fabricationPercentage;
 
+        const matchingExt = externalProjects.find(ep => String(ep._id) === String(p._id));
+
         return {
             ...p,
             totalDrawings: stats.totalDrawings || 0,

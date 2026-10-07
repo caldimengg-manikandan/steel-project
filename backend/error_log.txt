@@ -5161,3 +5161,18 @@
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async generateTransmittal (C:\steel-project(2)\steel-project\steel-project\backend\src\services\transmittalService.js:251:24)
     at async exports.generateTransmittal (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\transmittalController.js:89:24)
+2026-10-07T06:23:17.500Z: ReferenceError: matchingExt is not defined
+    at C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:529:24
+    at Array.map (<anonymous>)
+    at downloadAllProjectsStatusExcel (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:505:35)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-07T06:23:25.601Z: ReferenceError: matchingExt is not defined
+    at C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:529:24
+    at Array.map (<anonymous>)
+    at downloadAllProjectsStatusExcel (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:505:35)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-07T06:31:20.116Z: ReferenceError: matchingExt is not defined
+    at C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:529:24
+    at Array.map (<anonymous>)
+    at downloadAllProjectsStatusExcel (C:\steel-project(2)\steel-project\steel-project\backend\src\controllers\adminProjectsController.js:505:35)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
