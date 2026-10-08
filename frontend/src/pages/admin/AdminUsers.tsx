@@ -759,8 +759,8 @@ export default function AdminUsers() {
                                     <label className="form-label required">Division</label>
                                     <select className="form-control" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}>
                                         <option value="">Select division</option>
-                                        <option value="Tekla">Tekla</option>
                                         <option value="SDS2">SDS2</option>
+                                        <option value="Tekla">Tekla</option>
                                     </select>
                                 </div>
 
@@ -873,8 +873,8 @@ export default function AdminUsers() {
                                     <label className="form-label required">Division</label>
                                     <select className="form-control" value={editForm.division} onChange={e => setEditForm({ ...editForm, division: e.target.value })}>
                                         <option value="">Select division</option>
-                                        <option value="Tekla">Tekla</option>
                                         <option value="SDS2">SDS2</option>
+                                        <option value="Tekla">Tekla</option>
                                     </select>
                                 </div>
 
