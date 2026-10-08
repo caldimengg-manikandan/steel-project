@@ -810,7 +810,7 @@ export default function AdminUsers() {
                                 {/* Actions */}
                                 <div className="form-actions" style={{ marginTop: 24 }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary" disabled={creating || !form.username || !form.email || !form.password}>
+                                    <button type="submit" className="btn btn-primary" disabled={creating || !form.username || !form.employeeId || !form.password}>
                                         {creating ? 'Creating...' : 'Create User Account'}
                                     </button>
                                 </div>
