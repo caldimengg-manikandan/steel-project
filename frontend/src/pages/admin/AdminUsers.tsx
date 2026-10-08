@@ -779,7 +779,7 @@ export default function AdminUsers() {
                                 </div>
 
                                 {/* Managers Selection */}
-                                {(form.role === 'team_member' || form.role === 'team_lead' || form.role === 'assistant_project_manager') && (
+                                {(form.role === 'team_member' || form.role === 'team_lead' || form.role === 'assistant_team_lead' || form.role === 'assistant_project_manager') && (
                                     <div className="form-group">
                                         <label className="form-label required">Project Manager</label>
                                         <select className="form-control" value={form.project_manager} onChange={e => setForm({ ...form, project_manager: e.target.value })}>
@@ -788,7 +788,7 @@ export default function AdminUsers() {
                                         </select>
                                     </div>
                                 )}
-                                {(form.role === 'team_member' || form.role === 'team_lead') && (
+                                {(form.role === 'team_member' || form.role === 'team_lead' || form.role === 'assistant_team_lead') && (
                                     <div className="form-group">
                                         <label className="form-label">Assistant Project Manager</label>
                                         <select className="form-control" value={form.assistant_project_manager} onChange={e => setForm({ ...form, assistant_project_manager: e.target.value })}>
@@ -877,7 +877,7 @@ export default function AdminUsers() {
                                 </div>
 
                                 {/* Managers Selection */}
-                                {(editForm.role === 'team_member' || editForm.role === 'team_lead' || editForm.role === 'assistant_project_manager') && (
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead' || editForm.role === 'assistant_team_lead' || editForm.role === 'assistant_project_manager') && (
                                     <div className="form-group">
                                         <label className="form-label required">Project Manager</label>
                                         <select className="form-control" value={editForm.project_manager} onChange={e => setEditForm({ ...editForm, project_manager: e.target.value })}>
@@ -886,7 +886,7 @@ export default function AdminUsers() {
                                         </select>
                                     </div>
                                 )}
-                                {(editForm.role === 'team_member' || editForm.role === 'team_lead') && (
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead' || editForm.role === 'assistant_team_lead') && (
                                     <div className="form-group">
                                         <label className="form-label">Assistant Project Manager</label>
                                         <select className="form-control" value={editForm.assistant_project_manager} onChange={e => setEditForm({ ...editForm, assistant_project_manager: e.target.value })}>
