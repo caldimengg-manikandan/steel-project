@@ -46,6 +46,9 @@ async function upsertAttachment(firstArg, secondArg, thirdArg) {
   if (attachmentMeta.isInline !== undefined) {
     update.isInline = attachmentMeta.isInline;
   }
+  if (attachmentMeta.storageGatewayPath !== undefined) {
+    update.storageGatewayPath = attachmentMeta.storageGatewayPath;
+  }
 
   if (content) {
     update.content = content;

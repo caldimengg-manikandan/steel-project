@@ -40,6 +40,11 @@ const attachmentSchema = new mongoose.Schema(
     content: {
       type: Buffer, // Binary file data
     },
+    storageGatewayPath: {
+      type: String,
+      default: '',
+      index: true,
+    },
   },
   {
     timestamps: true,

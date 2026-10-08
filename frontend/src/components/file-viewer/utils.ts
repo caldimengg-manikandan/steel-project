@@ -14,6 +14,7 @@ export function detectFileType(filename: string, contentType?: string): FileType
     if (ct.includes('spreadsheetml') || ct.includes('ms-excel')) return 'xlsx';
     if (ct.includes('presentationml') || ct.includes('powerpoint')) return 'pptx';
     if (ct.includes('csv') || ct.includes('comma-separated')) return 'csv';
+    if (ct.startsWith('text/') || ct.includes('plain')) return 'txt';
     if (ct.startsWith('image/')) return 'image';
     if (ct.startsWith('video/')) return 'video';
     if (ct.startsWith('audio/')) return 'audio';
@@ -39,6 +40,24 @@ export function detectFileType(filename: string, contentType?: string): FileType
         case 'csv':
         case 'tsv':
             return 'csv';
+        case 'txt':
+        case 'log':
+        case 'text':
+        case 'ini':
+        case 'cfg':
+        case 'conf':
+        case 'md':
+        case 'markdown':
+        case 'json':
+        case 'xml':
+        case 'sql':
+        case 'env':
+        case 'yaml':
+        case 'yml':
+        case 'sh':
+        case 'bat':
+        case 'cmd':
+            return 'txt';
         case 'png':
         case 'jpg':
         case 'jpeg':
@@ -111,6 +130,8 @@ export function getOfficeBadge(type: FileType): { label: string; bg: string; col
             return { label: 'XLSX', bg: '#ecfdf5', color: '#047857' };
         case 'csv':
             return { label: 'CSV', bg: '#f0fdf4', color: '#15803d' };
+        case 'txt':
+            return { label: 'TXT', bg: '#f0f9ff', color: '#0284c7' };
         case 'pptx':
             return { label: 'PPTX', bg: '#fff1f0', color: '#c41d17' };
         case 'image':

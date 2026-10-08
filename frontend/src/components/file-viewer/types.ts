@@ -7,6 +7,7 @@ export type FileType =
     | 'docx'
     | 'xlsx'
     | 'csv'
+    | 'txt'
     | 'pptx'
     | 'image'
     | 'video'
@@ -23,7 +24,9 @@ export interface FileViewerFile {
 
 export interface FileViewerProps {
     file: FileViewerFile | null;
+    files?: FileViewerFile[];
     onClose: () => void;
+    onFileChange?: (file: FileViewerFile) => void;
 }
 
 export interface SubViewerProps {

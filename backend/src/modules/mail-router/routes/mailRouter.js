@@ -228,6 +228,21 @@ router.get('/folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
     const userId = req.authUser.id;
     const targetProvider = req.query.provider ? String(req.query.provider).toUpperCase() : null;
+    const { startDate, endDate } = req.query;
+
+    const hasStart = startDate && startDate !== 'undefined' && startDate !== 'null' && String(startDate).trim() !== '';
+    const hasEnd = endDate && endDate !== 'undefined' && endDate !== 'null' && String(endDate).trim() !== '';
+
+    let dateFilter = null;
+    if (hasStart || hasEnd) {
+      dateFilter = { receivedAt: {} };
+      if (hasStart) {
+        dateFilter.receivedAt.$gte = new Date(`${String(startDate).trim()}T00:00:00.000Z`);
+      }
+      if (hasEnd) {
+        dateFilter.receivedAt.$lte = new Date(`${String(endDate).trim()}T23:59:59.999Z`);
+      }
+    }
 
     // Resolve account IDs for the current user so we can scope counts properly
     const userAccounts = await listMailAccountsByUser(userId);
@@ -244,6 +259,15 @@ router.get('/folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
         { accountId: { $in: accountIds.map(String) } },
       ],
     };
+
+    // Fetch custom folders mapped by user (scoped to targetProvider if specified)
+    const MailFolder = require('../mongoose/models/MailFolder');
+    const customFolderQuery = { userId };
+    if (targetProvider) {
+      customFolderQuery.provider = targetProvider;
+    }
+    const customFolders = await MailFolder.find(customFolderQuery).sort({ order: 1, createdAt: 1 }).lean();
+    const customFolderSlugs = customFolders.map((c) => c.folderId);
 
     // Filter folder definitions based on provider:
     // Outbox is only present in Zoho Mail (not in modern Outlook)
@@ -264,7 +288,18 @@ router.get('/folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
 
         if (folderFilter) {
           try {
-            count = await Email.countDocuments({ ...userFilter, ...folderFilter });
+            const query = { ...userFilter, ...folderFilter };
+            // Exclude custom folders from inbox so custom folder emails are not double-counted
+            if (def.id === 'inbox' && customFolderSlugs.length > 0) {
+              query.folder = {
+                $nin: ['sent', 'spam', 'trash', 'drafts', 'draft', 'outbox', 'archive', ...customFolderSlugs],
+              };
+            }
+            // Apply selected date window filter to date-windowed folders (inbox, sent)
+            if (dateFilter && (def.id === 'inbox' || def.id === 'sent')) {
+              Object.assign(query, dateFilter);
+            }
+            count = await Email.countDocuments(query);
           } catch {
             count = 0;
           }
@@ -281,19 +316,16 @@ router.get('/folders', requireRoles(...MANAGER_ROLES), async (req, res) => {
       })
     );
 
-    // Fetch custom folders mapped by user (scoped to targetProvider if specified)
-    const MailFolder = require('../mongoose/models/MailFolder');
-    const customFolderQuery = { userId };
-    if (targetProvider) {
-      customFolderQuery.provider = targetProvider;
-    }
-    const customFolders = await MailFolder.find(customFolderQuery).sort({ order: 1, createdAt: 1 }).lean();
-
+    // Build custom folders list with date-windowed counts
     const customFolderItems = await Promise.all(
       customFolders.map(async (cf) => {
         let count = 0;
         try {
-          count = await Email.countDocuments({ ...userFilter, folder: cf.folderId });
+          const query = { ...userFilter, folder: cf.folderId };
+          if (dateFilter) {
+            Object.assign(query, dateFilter);
+          }
+          count = await Email.countDocuments(query);
         } catch {
           count = 0;
         }
@@ -1413,8 +1445,27 @@ async function fetchAndCacheAttachment(attachment) {
       console.warn(`[mailRouter:attachments] Could not write to disk cache:`, diskErr);
     }
 
-    // 6. Cache to MongoDB asynchronously in background only if file is <= 2MB (e.g. inline images / signatures)
-    // Larger files (blueprints, DWGs, multi-page PDFs) are safely served from disk cache to preserve MongoDB Atlas quota
+    // 6. Persist to Windows Server Storage (via Storage Gateway)
+    let savedStorageGatewayPath = '';
+    const storageGateway = require('../../../utils/storageGateway');
+    if (storageGateway && typeof storageGateway.uploadFile === 'function') {
+      try {
+        const date = new Date(attachment.createdAt || Date.now());
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const targetDir = `Mails/Attachments/${year}/${month}`;
+        const cleanExt = path.extname(downloaded.filename || attachment.filename || '') || '';
+        const baseName = path.basename(downloaded.filename || attachment.filename || 'attachment', cleanExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeFilename = `${attachmentIdStr}_${baseName}${cleanExt}`;
+
+        await storageGateway.uploadFile(targetDir, safeFilename, downloaded.content);
+        savedStorageGatewayPath = `${targetDir}/${safeFilename}`;
+        console.log(`[mailRouter:attachments] Persisted to Server Storage: ${savedStorageGatewayPath}`);
+      } catch (storageErr) {
+        console.warn(`[mailRouter:attachments] Could not persist to Storage Gateway:`, storageErr.message);
+      }
+    }
+
     const updateFields = {};
     if (downloaded.contentType) {
       updateFields.contentType = downloaded.contentType;
@@ -1428,7 +1479,14 @@ async function fetchAndCacheAttachment(attachment) {
       updateFields.sizeBytes = downloaded.content.length;
       attachment.sizeBytes = downloaded.content.length;
     }
-    if (downloaded.content.length <= 2 * 1024 * 1024) {
+    if (savedStorageGatewayPath) {
+      updateFields.storageGatewayPath = savedStorageGatewayPath;
+      attachment.storageGatewayPath = savedStorageGatewayPath;
+    }
+
+    // Cache to MongoDB Atlas only for small inline images (<= 500KB) if not already persisted to storage gateway
+    // This preserves MongoDB Atlas quota while keeping email body previews instant
+    if ((!savedStorageGatewayPath || attachment.isInline) && downloaded.content.length <= 500 * 1024) {
       updateFields.content = downloaded.content;
     }
 
@@ -1493,6 +1551,28 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
     if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
 
     const disposition = isDownload ? 'attachment' : 'inline';
+
+    // Step 0.5: If persisted on Windows Server Storage via Storage Gateway, stream directly!
+    const storageGateway = require('../../../utils/storageGateway');
+    if (attachment.storageGatewayPath && storageGateway && typeof storageGateway.getFileStream === 'function') {
+      try {
+        const fileStreamResult = await storageGateway.getFileStream(attachment.storageGatewayPath);
+        if (fileStreamResult && fileStreamResult.stream) {
+          const contentType = fileStreamResult.contentType || attachment.contentType || 'application/octet-stream';
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(attachment.filename || 'attachment')}"`);
+          if (fileStreamResult.contentLength) {
+            res.setHeader('Content-Length', fileStreamResult.contentLength);
+          }
+          res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+          res.setHeader('ETag', etag);
+          res.setHeader('X-Attachment-Cache', 'GATEWAY-HIT');
+          return fileStreamResult.stream.pipe(res);
+        }
+      } catch (streamErr) {
+        console.warn(`[mailRouter:attachments] Could not stream ${attachment.storageGatewayPath} from Storage Gateway, falling back:`, streamErr.message);
+      }
+    }
 
     if (attachment.content && attachment.content.length > 0) {
       // Save to local disk for future instant requests
