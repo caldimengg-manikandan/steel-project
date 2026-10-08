@@ -782,10 +782,6 @@ export default function MailSidebar({
                             {/* System Folders */}
                             {renderItems(systemFolders.length > 0 ? systemFolders : fallbackList)}
 
-                            {/* Divider */}
-                            <div className="msb-divider" />
-
-
                             {/* Remote folders (if any) */}
                             {remoteFoldersList.length > 0 && (
                                 <>
@@ -795,7 +791,6 @@ export default function MailSidebar({
                             )}
 
                             {/* Divider and + Add Folder from mailbox */}
-                            <div className="msb-divider" />
                             <div
                                 className="msb-item msb-add-item"
                                 onClick={handleOpenAddModal}
@@ -882,7 +877,7 @@ export default function MailSidebar({
                                 </>
                             ) : (
                                 <div className="msb-empty-hint">
-                                    No folders yet — click "+ New Folder" above, then drag emails into it
+                                    Click "+ New Folder" above, then drag emails into it
                                 </div>
                             )}
                         </>
@@ -898,7 +893,7 @@ export default function MailSidebar({
                             <div>
                                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
                                     {modalTab === 'custom'
-                                        ? '📁 Create New Folder'
+                                        ? 'Create New Folder'
                                         : `+ Add Folder from ${provider === 'MICROSOFT' ? 'Outlook' : 'Zoho Mail'}`}
                                 </h3>
                                 <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--color-text-muted, #94a3b8)' }}>
@@ -924,14 +919,14 @@ export default function MailSidebar({
                                     className={`msb-modal-tab${modalTab === 'custom' ? ' active' : ''}`}
                                     onClick={() => setModalTab('custom')}
                                 >
-                                    📁 Custom Folder
+                                    Custom Folder
                                 </button>
                                 <button
                                     type="button"
                                     className={`msb-modal-tab${modalTab === 'remote' ? ' active' : ''}`}
                                     onClick={handleSwitchToRemoteTab}
                                 >
-                                    ☁️ From {provider === 'MICROSOFT' ? 'Outlook' : 'Zoho'}
+                                    From {provider === 'MICROSOFT' ? 'Outlook' : 'Zoho'}
                                 </button>
                             </div>
                         </div>
@@ -956,26 +951,6 @@ export default function MailSidebar({
                                             }}
                                             style={{ fontSize: 13.5, padding: '9px 12px' }}
                                         />
-                                    </div>
-                                    <div style={{
-                                        padding: '12px 14px',
-                                        borderRadius: 8,
-                                        background: 'var(--color-bg-page, #f8fafc)',
-                                        border: '1px solid var(--color-border, #e2e8f0)',
-                                        fontSize: 12.5,
-                                        lineHeight: 1.5,
-                                        color: 'var(--color-text-muted, #64748b)',
-                                        display: 'flex',
-                                        gap: 10,
-                                        alignItems: 'flex-start',
-                                    }}>
-                                        <span style={{ fontSize: 16 }}>💡</span>
-                                        <div>
-                                            <strong>Drag &amp; Drop Organization:</strong>
-                                            <div style={{ marginTop: 2 }}>
-                                                Emails can be dragged directly into this folder from any mailbox view. Emails remain in their original mailbox and won't be deleted.
-                                            </div>
-                                        </div>
                                     </div>
                                 </>
                             ) : (

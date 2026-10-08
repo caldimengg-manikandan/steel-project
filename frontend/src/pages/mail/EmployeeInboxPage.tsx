@@ -1225,7 +1225,7 @@ export default function EmployeeInboxPage() {
                         <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)', flexShrink: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 6px 12px' }}>
                                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
-                                    📁 My Folders
+                                    My Folders
                                 </span>
                                 <button
                                     type="button"
@@ -1340,7 +1340,7 @@ export default function EmployeeInboxPage() {
                                 </div>
                             ) : (
                                 <div style={{ padding: '4px 12px 8px 12px', fontSize: 11.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                    No folders yet — create one above, then drag messages into it
+                                    Create one above, then drag messages into it
                                 </div>
                             )}
                         </div>
