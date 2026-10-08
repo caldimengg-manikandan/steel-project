@@ -114,11 +114,13 @@ export default function AdminUsers() {
         fetchData();
     }, [fetchData]);
 
-    const filtered = users.filter(
-        (u) =>
-            u.username.toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = users
+        .filter(
+            (u) =>
+                u.username.toLowerCase().includes(search.toLowerCase()) ||
+                (u.email || '').toLowerCase().includes(search.toLowerCase())
+        )
+        .sort((a, b) => a.username.localeCompare(b.username));
 
     async function handleCreateUser() {
         if (!form.username || !form.password) return;
@@ -802,7 +804,7 @@ export default function AdminUsers() {
                                         <label className="form-label required">Team Lead</label>
                                         <select className="form-control" value={form.team_lead} onChange={e => setForm({ ...form, team_lead: e.target.value })}>
                                             <option value="">Select Team Lead</option>
-                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                                         </select>
                                     </div>
                                 )}
@@ -900,7 +902,7 @@ export default function AdminUsers() {
                                         <label className="form-label required">Team Lead</label>
                                         <select className="form-control" value={editForm.team_lead} onChange={e => setEditForm({ ...editForm, team_lead: e.target.value })}>
                                             <option value="">Select Team Lead</option>
-                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                                         </select>
                                     </div>
                                 )}
