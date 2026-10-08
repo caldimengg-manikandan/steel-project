@@ -11,6 +11,7 @@ const { upsertEmail, updateEmailBodyHtml } = require('../repositories/emailRepo'
 const { upsertAttachment } = require('../repositories/attachmentRepo');
 const { resolveInlineImages } = require('./inlineImageService');
 const Attachment = require('../models/Attachment');
+const Email = require('../models/Email');
 const {
   createSyncJob,
   markJobRunning,

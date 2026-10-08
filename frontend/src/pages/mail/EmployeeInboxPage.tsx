@@ -287,6 +287,17 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
         ? email.attachments
         : (item.attachments || [])
     ).filter(att => !((att as any).isInline && (att as any).contentId));
+    const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
+        return allAttachments.map(rawAtt => {
+            const att = normalizeAttachment(rawAtt);
+            return {
+                id: att.id,
+                filename: att.filename,
+                url: getAttachmentUrl(att.id),
+                sizeBytes: att.sizeBytes,
+            };
+        }).filter(f => Boolean(f.id));
+    }, [allAttachments]);
 
     const hasAttachmentsFlag = Boolean(
         (item as any).hasAttachments ||

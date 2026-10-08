@@ -11,7 +11,7 @@ import {
     type MailAccount, type MailMessage, type SyncJob, type Employee, type ProjectInfo, type MailAttachment,
 } from '../../services/mailApi';
 import { FileViewer, type FileViewerFile, prefetchFile, getCachedFile, setCachedFile } from '../../components/file-viewer';
-import MailSidebar from '../../components/MailSidebar';
+import MailSidebar, { type CustomFolder, loadCustomFolders, saveCustomFolders } from '../../components/MailSidebar';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -862,6 +862,11 @@ function EmailCard({
 
     return (
         <div
+            draggable
+            onDragStart={e => {
+                e.dataTransfer.setData('emailId', String(msg._id || (msg as any).id || ''));
+                e.dataTransfer.effectAllowed = 'copyMove';
+            }}
             onClick={onClick}
             style={{
                 width: '100%',
@@ -969,6 +974,17 @@ function EmailDetail({
     const isSent = (email as any).folder === 'sent';
 
     const allAttachments: MailAttachment[] = (email.attachments || []).filter(att => !((att as any).isInline && (att as any).contentId));
+    const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
+        return allAttachments.map(rawAtt => {
+            const att = normalizeAttachment(rawAtt);
+            return {
+                id: att.id,
+                filename: att.filename,
+                url: getAttachmentUrl(att.id),
+                sizeBytes: att.sizeBytes,
+            };
+        }).filter(f => Boolean(f.id));
+    }, [allAttachments]);
     const hasAttachmentsFlag = Boolean(
         email.hasAttachments ||
         (email as any).attachmentCount > 0 ||
@@ -1720,17 +1736,7 @@ function ForwardToTeamsModal({
     );
 }
 
-// ── Custom Folder Types ───────────────────────────────────────
-type CustomFolder = { id: string; name: string; emailIds: string[] };
-const CUSTOM_FOLDERS_KEY = 'mailRouter_customFolders';
 
-function loadCustomFolders(): CustomFolder[] {
-    try { return JSON.parse(localStorage.getItem(CUSTOM_FOLDERS_KEY) || '[]'); }
-    catch { return []; }
-}
-function saveCustomFolders(folders: CustomFolder[]) {
-    localStorage.setItem(CUSTOM_FOLDERS_KEY, JSON.stringify(folders));
-}
 
 export default function MailRouterPage() {
     const { user } = useAuth();
@@ -1748,10 +1754,6 @@ export default function MailRouterPage() {
 
     // ── Custom folders ──────────────────────────────────────────
     const [customFolders, setCustomFolders] = useState<CustomFolder[]>(loadCustomFolders);
-    const [showCreateFolder, setShowCreateFolder] = useState(false);
-    const [newFolderName, setNewFolderName] = useState('');
-    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
-    const [folderDropSuccess, setFolderDropSuccess] = useState<string | null>(null);
     const activeCustomFolder = customFolders.find(f => f.id === activeFolder) || null;
     const [search, setSearch] = useState('');
     // Single unified date range — both dates must be selected before a fetch fires
@@ -2631,6 +2633,11 @@ export default function MailRouterPage() {
                         provider={activeTab}
                         startDate={startDate}
                         endDate={endDate}
+                        customFolders={customFolders}
+                        onCustomFoldersChange={(updated) => {
+                            setCustomFolders(updated);
+                            saveCustomFolders(updated);
+                        }}
                     />
                     {/* Left: email list (independent vertical scroll) */}
                     <div
@@ -2654,172 +2661,7 @@ export default function MailRouterPage() {
                             }
                         }}
                     >
-                        {/* ── Custom Folders Panel ── */}
-                        <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)', flexShrink: 0 }}>
-                            {/* Header row */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 6px 12px' }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
-                                    📁 My Folders
-                                </span>
-                                <button
-                                    type="button"
-                                    title="Create new folder"
-                                    onClick={() => { setShowCreateFolder(v => !v); setNewFolderName(''); }}
-                                    style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        fontSize: 11.5, fontWeight: 600, padding: '3px 10px',
-                                        borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--color-primary)',
-                                        background: 'var(--color-primary-glow)', color: 'var(--color-primary)',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    {showCreateFolder ? '✕ Cancel' : '+ New Folder'}
-                                </button>
-                            </div>
 
-                            {/* Create folder input */}
-                            {showCreateFolder && (
-                                <div style={{ padding: '4px 12px 8px 12px', display: 'flex', gap: 6 }}>
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="Folder name…"
-                                        value={newFolderName}
-                                        onChange={e => setNewFolderName(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && newFolderName.trim()) {
-                                                const folder: CustomFolder = {
-                                                    id: `cf_${Date.now()}`,
-                                                    name: newFolderName.trim(),
-                                                    emailIds: [],
-                                                };
-                                                const updated = [...customFolders, folder];
-                                                setCustomFolders(updated);
-                                                saveCustomFolders(updated);
-                                                setNewFolderName('');
-                                                setShowCreateFolder(false);
-                                            }
-                                        }}
-                                        style={{ fontSize: 12.5, flex: 1 }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary btn-sm"
-                                        disabled={!newFolderName.trim()}
-                                        onClick={() => {
-                                            if (!newFolderName.trim()) return;
-                                            const folder: CustomFolder = {
-                                                id: `cf_${Date.now()}`,
-                                                name: newFolderName.trim(),
-                                                emailIds: [],
-                                            };
-                                            const updated = [...customFolders, folder];
-                                            setCustomFolders(updated);
-                                            saveCustomFolders(updated);
-                                            setNewFolderName('');
-                                            setShowCreateFolder(false);
-                                        }}
-                                    >
-                                        Create
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Folder list — droppable targets */}
-                            {customFolders.length > 0 ? (
-                                <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-                                    {customFolders.map(folder => {
-                                        const isActive = activeFolder === folder.id;
-                                        const isDragOver = dragOverFolderId === folder.id;
-                                        const wasJustDropped = folderDropSuccess === folder.id;
-                                        return (
-                                            <div
-                                                key={folder.id}
-                                                onDragOver={e => { e.preventDefault(); setDragOverFolderId(folder.id); }}
-                                                onDragLeave={() => setDragOverFolderId(null)}
-                                                onDrop={e => {
-                                                    e.preventDefault();
-                                                    setDragOverFolderId(null);
-                                                    const emailId = e.dataTransfer.getData('emailId');
-                                                    if (!emailId) return;
-                                                    const updated = customFolders.map(f =>
-                                                        f.id === folder.id
-                                                            ? { ...f, emailIds: Array.from(new Set([...f.emailIds, emailId])) }
-                                                            : f
-                                                    );
-                                                    setCustomFolders(updated);
-                                                    saveCustomFolders(updated);
-                                                    setFolderDropSuccess(folder.id);
-                                                    setTimeout(() => setFolderDropSuccess(null), 1500);
-                                                }}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: 8,
-                                                    padding: '7px 12px',
-                                                    cursor: 'pointer',
-                                                    background: wasJustDropped
-                                                        ? 'var(--color-success-bg)'
-                                                        : isDragOver
-                                                        ? 'var(--color-primary-glow)'
-                                                        : isActive
-                                                        ? 'var(--color-primary-glow)'
-                                                        : 'transparent',
-                                                    borderLeft: `3px solid ${
-                                                        wasJustDropped ? 'var(--color-success-mid)'
-                                                        : isActive ? 'var(--color-primary)'
-                                                        : 'transparent'
-                                                    }`,
-                                                    borderBottom: '1px solid var(--color-border-light)',
-                                                    transition: 'background 0.12s',
-                                                    outline: isDragOver ? '1.5px dashed var(--color-primary)' : 'none',
-                                                    userSelect: 'none',
-                                                }}
-                                                onClick={() => handleSelectFolder(folder.id)}
-                                            >
-                                                <span style={{ fontSize: 13 }}>📁</span>
-                                                <span style={{ flex: 1, fontSize: 12.5, fontWeight: isActive ? 700 : 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {folder.name}
-                                                </span>
-                                                <span style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'var(--color-table-row-alt)', borderRadius: 10, padding: '1px 6px', flexShrink: 0 }}>
-                                                    {folder.emailIds.length}
-                                                </span>
-                                                {wasJustDropped && (
-                                                    <span style={{ fontSize: 11, color: 'var(--color-success-mid)', fontWeight: 700, flexShrink: 0 }}>✓ Added</span>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    title="Delete folder"
-                                                    onClick={e => {
-                                                        e.stopPropagation();
-                                                        if (!window.confirm(`Delete folder "${folder.name}"?`)) return;
-                                                        const updated = customFolders.filter(f => f.id !== folder.id);
-                                                        setCustomFolders(updated);
-                                                        saveCustomFolders(updated);
-                                                        if (activeFolder === folder.id) handleSelectFolder('inbox');
-                                                    }}
-                                                    style={{
-                                                        border: 'none', background: 'transparent',
-                                                        color: 'var(--color-text-muted)', cursor: 'pointer',
-                                                        fontSize: 13, padding: '0 2px', borderRadius: 4,
-                                                        flexShrink: 0, lineHeight: 1,
-                                                    }}
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {/* Drag hint */}
-                                    <div style={{ padding: '5px 12px 6px', fontSize: 10.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                        Drag &amp; drop an email onto a folder to organise it
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ padding: '4px 12px 8px 12px', fontSize: 11.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                    No folders yet — create one above, then drag emails into it
-                                </div>
-                            )}
-                        </div>
                         {loadingEmails ? (
                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
                                 <Spinner size={24} />
@@ -2874,7 +2716,7 @@ export default function MailRouterPage() {
                                     </div>
                                 )}
                                 {filteredEmails.map(msg => (
-                                    <div
+                                    <EmailCard
                                         key={msg._id}
                                         msg={msg}
                                         active={selectedEmail?._id === msg._id}
