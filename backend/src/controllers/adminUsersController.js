@@ -39,6 +39,7 @@ async function listUsers(req, res) {
             id: primaryAdmin._id.toString(),
             username: primaryAdmin.username,
             email: primaryAdmin.email,
+            employeeId: primaryAdmin.username, // admins might not have employeeId, use username
             displayName: primaryAdmin.displayName || primaryAdmin.username,
             role: primaryAdmin.role === 'admin' ? 'superadmin' : (primaryAdmin.role || 'superadmin'),
             status: primaryAdmin.status || 'active',
@@ -61,10 +62,10 @@ async function listUsers(req, res) {
  */
 async function createUser(req, res) {
     const adminId = req.principal.adminId;
-    const { username, email, password, displayName, role } = req.body;
+    const { employeeId, username, email, password, displayName, role } = req.body;
 
-    if (!username || !email || !password) {
-        return res.status(400).json({ error: 'username, email and password are required.' });
+    if (!employeeId || !username || !password) {
+        return res.status(400).json({ error: 'Employee ID, username, and password are required.' });
     }
 
     if (password.length < 8) {
@@ -74,10 +75,11 @@ async function createUser(req, res) {
         return res.status(400).json({ error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number.' });
     }
 
-    const VALID_ROLES = ['user', 'superadmin', 'project_manager', 'team_lead', 'team_member'];
+    const VALID_ROLES = ['user', 'superadmin', 'project_manager', 'assistant_project_manager', 'team_lead', 'assistant_team_lead', 'team_member'];
     const assignedRole = VALID_ROLES.includes(role) ? role : 'team_member';
 
     const user = await User.create({
+        employeeId,
         username,
         email,
         password_hash: password,   // pre-save hook hashes it
@@ -105,8 +107,9 @@ async function getUser(req, res) {
  */
 async function updateUser(req, res) {
     const user = req.scopedUser;
-    const { displayName, email, status, password, role } = req.body;
+    const { employeeId, displayName, email, status, password, role } = req.body;
 
+    if (employeeId !== undefined) user.employeeId = employeeId;
     if (displayName !== undefined) user.displayName = displayName;
     if (email !== undefined) user.email = email;
     if (status !== undefined) {
@@ -116,7 +119,7 @@ async function updateUser(req, res) {
         user.status = status;
     }
     if (role !== undefined) {
-        const VALID_ROLES = ['user', 'superadmin', 'project_manager', 'team_lead', 'team_member'];
+        const VALID_ROLES = ['user', 'superadmin', 'project_manager', 'assistant_project_manager', 'team_lead', 'assistant_team_lead', 'team_member'];
         if (!VALID_ROLES.includes(role)) {
             return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
         }

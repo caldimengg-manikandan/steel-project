@@ -177,8 +177,10 @@ initUploadDirectories();
 
 // â”€â”€ Serve uploaded files (PDFs, Excel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 // Also serve project root uploads folder if present (e.g. /var/www/steel-project/uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, '../../uploads')));
 // â”€â”€ Mail router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
     // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token

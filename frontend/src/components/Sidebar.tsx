@@ -39,9 +39,6 @@ const adminNav: NavItem[] = [
     { label: 'Dashboard', to: '/admin', icon: <IconDashboard /> },
     { label: 'Projects', to: '/admin/projects', icon: <IconFolder /> },
     { label: 'Project Status', to: '/admin/status', icon: <IconProjectStatus /> },
-    { label: 'Users', to: '/admin/users', icon: <IconUsers /> },
-    { label: 'Permissions', to: '/admin/permissions', icon: <IconPermissions /> },
-    { label: 'Clients', to: '/admin/clients', icon: <IconUsers /> },
     { label: 'RFI', to: '/admin/rfi', icon: <IconRfi /> },
     { 
         label: 'Reports', 
@@ -53,15 +50,13 @@ const adminNav: NavItem[] = [
             { label: 'RFI Logs', to: '/admin/rfi-report' },
             { label: 'Error Log', to: '/admin/error-log' }
         ]
-    },
-    { label: 'Settings', to: '/admin/settings', icon: <IconSettings /> },
+    }
 ];
 
 const userNav: NavItem[] = [
     { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
     { label: 'My Projects', to: '/dashboard/projects', icon: <IconFolder /> },
-    { label: 'RFI', to: '/dashboard/rfi', icon: <IconRfi /> },
-    { label: 'Settings', to: '/dashboard/settings', icon: <IconSettings /> },
+    { label: 'RFI', to: '/dashboard/rfi', icon: <IconRfi /> }
 ];
 
 interface SidebarProps {
@@ -96,14 +91,39 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         };
     }, []);
 
-    let baseNav = isFullAccess ? [...adminNav] : [...userNav];
+    let baseNav: NavItem[] = [];
 
-    // Inject mail nav items based on role
     if (isFullAccess) {
-        baseNav = [...baseNav, { label: 'Mail Router', to: '/mail-router', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> }];
+        baseNav = [
+            { label: 'Dashboard', to: '/admin', icon: <IconDashboard /> },
+            { label: 'Projects', to: '/admin/projects', icon: <IconFolder /> },
+            { label: 'RFI', to: '/admin/rfi', icon: <IconRfi /> },
+            { label: 'Project Status', to: '/admin/status', icon: <IconProjectStatus /> },
+            { label: 'Mail Router', to: '/mail-router', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> },
+            { label: 'My Inbox', to: '/inbox', badge: unreadCount || undefined, icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> },
+            { label: 'Clients', to: '/admin/clients', icon: <IconUsers /> },
+            { 
+                label: 'Reports', 
+                to: '/admin/reports', 
+                icon: <IconChart />,
+                subItems: [
+                    { label: 'Drawing Log', to: '/admin/drawing-log' },
+                    { label: 'Weekly Progress', to: '/admin/weekly-progress' },
+                    { label: 'RFI Logs', to: '/admin/rfi-report' },
+                    { label: 'Error Log', to: '/admin/error-log' }
+                ]
+            },
+            { label: 'Users', to: '/admin/users', icon: <IconUsers /> },
+            { label: 'Permissions', to: '/admin/permissions', icon: <IconPermissions /> },
+            { label: 'Settings', to: '/admin/settings', icon: <IconSettings /> }
+        ];
+    } else {
+        baseNav = [
+            ...userNav,
+            { label: 'My Inbox', to: '/inbox', badge: unreadCount || undefined, icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> },
+            { label: 'Settings', to: '/dashboard/settings', icon: <IconSettings /> }
+        ];
     }
-    // My Inbox for everyone — always append last
-    baseNav = [...baseNav, { label: 'My Inbox', to: '/inbox', badge: unreadCount || undefined, icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> }];
 
     // Filter based on global module toggles
     const navItems = baseNav.filter(item => {

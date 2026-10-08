@@ -10,17 +10,20 @@ import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit } from
 
 interface CreateUserForm {
     username: string; 
+    employeeId: string;
     email: string; 
     password: string; 
     displayName: string;
-    role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+    role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'assistant_team_lead' | 'team_member' | 'user' | '';
     division: string;
     project_manager: string;
     assistant_project_manager: string;
     team_lead: string;
+    assistant_team_lead?: string;
 }
 const DEFAULT_FORM: CreateUserForm = {
     username: '',
+    employeeId: '',
     email: '',
     password: '',
     displayName: '',
@@ -28,7 +31,8 @@ const DEFAULT_FORM: CreateUserForm = {
     division: '',
     project_manager: '',
     assistant_project_manager: '',
-    team_lead: ''
+    team_lead: '',
+    assistant_team_lead: ''
 };
 
 export default function AdminUsers() {
@@ -51,22 +55,26 @@ export default function AdminUsers() {
     const [editTarget, setEditTarget] = useState<User | null>(null);
     const [editForm, setEditForm] = useState<{
         displayName: string;
+        employeeId: string;
         email: string;
-        role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+        role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'assistant_team_lead' | 'team_member' | 'user' | '';
         password?: string;
         division: string;
         project_manager: string;
         assistant_project_manager: string;
         team_lead: string;
+        assistant_team_lead?: string;
     }>({
         displayName: '',
+        employeeId: '',
         email: '',
         role: 'team_member',
         password: '',
         division: '',
         project_manager: '',
         assistant_project_manager: '',
-        team_lead: ''
+        team_lead: '',
+        assistant_team_lead: ''
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -113,7 +121,7 @@ export default function AdminUsers() {
     );
 
     async function handleCreateUser() {
-        if (!form.username || !form.email || !form.password) return;
+        if (!form.username || !form.password) return;
         try {
             setCreating(true);
             const { user } = await adminCreateUser(form);
@@ -173,12 +181,14 @@ export default function AdminUsers() {
             setSavingEdit(true);
             const updateData: any = {
                 displayName: editForm.displayName,
+                employeeId: editForm.employeeId,
                 email: editForm.email,
                 role: editForm.role || 'team_member',
                 division: editForm.division,
                 project_manager: editForm.project_manager,
                 assistant_project_manager: editForm.assistant_project_manager,
-                team_lead: editForm.team_lead
+                team_lead: editForm.team_lead,
+                assistant_team_lead: editForm.assistant_team_lead
             };
             if (editForm.password && editForm.password.trim()) {
                 updateData.password = editForm.password;
@@ -357,6 +367,7 @@ export default function AdminUsers() {
                             <tr>
                                 <th style={{ width: 40 }}>#</th>
                                 <th>Username</th>
+                                <th>Employee ID</th>
                                 <th>Email</th>
                                 <th>Account Role</th>
                                 <th>Project Roles</th>
@@ -367,7 +378,7 @@ export default function AdminUsers() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="table-empty">No users found.</td></tr>
+                                <tr><td colSpan={8} className="table-empty">No users found.</td></tr>
                             ) : (
                                 filtered.map((u, i) => (
                                     <tr key={u.id}>
@@ -390,6 +401,7 @@ export default function AdminUsers() {
                                                 <span style={{ fontWeight: 700, fontSize: 14 }}>{u.username}</span>
                                             </div>
                                         </td>
+                                        <td><span className="font-mono text-muted">{u.employeeId || '-'}</span></td>
                                         <td style={{ color: 'var(--color-text-secondary)' }}>{u.email}</td>
                                         <td>
                                              <span style={{ 
@@ -398,7 +410,8 @@ export default function AdminUsers() {
                                                  fontSize: 12,
                                                  color: u.role === 'superadmin' ? 'var(--color-danger-mid)' : 
                                                         u.role === 'project_manager' ? 'var(--color-primary)' : 
-                                                        u.role === 'team_lead' ? 'var(--color-success-mid)' : 'var(--color-text-secondary)'
+                                                        u.role === 'team_lead' ? 'var(--color-success-mid)' : 
+                                                        u.role === 'assistant_team_lead' ? 'var(--color-info)' : 'var(--color-text-secondary)'
                                              }}>
                                                  {(!u.role || u.role === 'user') ? 'Team Member' : u.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                                              </span>
@@ -427,6 +440,7 @@ export default function AdminUsers() {
                                                          setEditTarget(u);
                                                          setEditForm({
                                                              displayName: u.displayName || '',
+                                                             employeeId: u.employeeId || '',
                                                              email: u.email || '',
                                                              role: (u.role as any) || 'team_member',
                                                              password: '',
@@ -648,9 +662,28 @@ export default function AdminUsers() {
                                     )}
                                 </div>
 
+                                {/* Employee ID */}
+                                <div className="form-group">
+                                    <label className="form-label required">Employee ID</label>
+                                    <input 
+                                        type="text"
+                                        name="portal-new-employee-id"
+                                        className="form-control" 
+                                        placeholder="e.g. EMP123"
+                                        autoComplete="off"
+                                        value={form.employeeId} 
+                                        onChange={e => setForm({ ...form, employeeId: e.target.value })} 
+                                    />
+                                    {duplicateFields.includes('employeeId') && (
+                                        <div className="text-danger" style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                            Employee ID already exists in this admin scope.
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Email Address */}
                                 <div className="form-group">
-                                    <label className="form-label required">Email Address</label>
+                                    <label className="form-label">Email Address (Optional)</label>
                                     <input 
                                         type="email"
                                         name="portal-new-email"
@@ -740,6 +773,7 @@ export default function AdminUsers() {
                                         <option value="project_manager">Project Manager — Full system access</option>
                                         <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
+                                        <option value="assistant_team_lead">Asst. Team Lead — Full system access</option>
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
                                     </select>
                                 </div>
@@ -802,6 +836,19 @@ export default function AdminUsers() {
                                 }}
                                 autoComplete="off"
                             >
+                                {/* Employee ID */}
+                                <div className="form-group">
+                                    <label className="form-label required">Employee ID</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="e.g. EMP123"
+                                        value={editForm.employeeId}
+                                        onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })}
+                                        required
+                                    />
+                                </div>
+
                                 {/* Account Role */}
                                 <div className="form-group">
                                     <label className="form-label required">Account Role</label>
@@ -811,6 +858,7 @@ export default function AdminUsers() {
                                         onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
                                     >
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
+                                        <option value="assistant_team_lead">Asst. Team Lead — Full system access</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
                                         <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="project_manager">Project Manager — Full system access</option>
@@ -859,7 +907,7 @@ export default function AdminUsers() {
 
                                 {/* Email Address */}
                                 <div className="form-group">
-                                    <label className="form-label required">Email Address</label>
+                                    <label className="form-label">Email Address (Optional)</label>
                                     <input
                                         type="email"
                                         className="form-control"

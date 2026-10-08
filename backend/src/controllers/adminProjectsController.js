@@ -512,7 +512,9 @@ async function downloadAllProjectsStatusExcel(req, res) {
         const appPct = sowProg.approvalPercentage;
         const fabPct = sowProg.fabricationPercentage;
 
-        const matchingExt = externalProjects.find(ep => String(ep._id) === String(p._id));
+        const matchingExt = externalProjects.find(ep => 
+            ep.name.trim().toLowerCase() === p.name.trim().toLowerCase()
+        );
 
         return {
             ...p,
@@ -532,6 +534,13 @@ async function downloadAllProjectsStatusExcel(req, res) {
             fabricationPercentage: fabPct,
             approvalPercentage: appPct,
             rawStatus: matchingExt ? matchingExt.rawStatus : '',
+            // Data from external project management app
+            financialYear: matchingExt ? matchingExt.financialYear : '',
+            projectCode: matchingExt ? matchingExt.projectCode : '',
+            division: matchingExt ? matchingExt.division : '',
+            projectManager: matchingExt ? matchingExt.projectManager : '',
+            clientName: matchingExt ? matchingExt.clientName : p.clientName,
+            name: matchingExt ? matchingExt.name : p.name,
         };
     });
 

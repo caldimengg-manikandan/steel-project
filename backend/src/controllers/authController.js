@@ -81,24 +81,24 @@ async function adminLogin(req, res) {
 
 /**
  * POST /api/auth/user/login
- * Body: { username, password }
+ * Body: { employeeId, password }
  */
 async function userLogin(req, res) {
     try {
-        const { username, password } = req.body;
-        console.log(`[AUTH] User login attempt: ${username}`);
+        const { employeeId, password } = req.body;
+        console.log(`[AUTH] User login attempt: ${employeeId}`);
 
-        if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
-            return res.status(400).json({ error: 'Username and password are required and must be strings.' });
+        if (!employeeId || !password || typeof employeeId !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ error: 'Employee ID and password are required and must be strings.' });
         }
 
-        // Find user by username across ALL admins
-        const user = await User.findOne({ username: username.trim().toLowerCase() })
+        // Find user by employeeId across ALL admins
+        const user = await User.findOne({ employeeId: employeeId.trim() })
             .select('+password_hash');
 
         if (!user) {
-            console.warn(`[AUTH] No user found with username: ${username}`);
-            return res.status(401).json({ error: 'Invalid username or password.' });
+            console.warn(`[AUTH] No user found with employeeId: ${employeeId}`);
+            return res.status(401).json({ error: 'Invalid Employee ID or password.' });
         }
 
         if (user.status !== 'active') {
@@ -107,8 +107,8 @@ async function userLogin(req, res) {
 
         const valid = await user.matchPassword(password);
         if (!valid) {
-            console.warn(`[AUTH] Invalid password for user: ${username}`);
-            return res.status(401).json({ error: 'Invalid username or password.' });
+            console.warn(`[AUTH] Invalid password for user: ${employeeId}`);
+            return res.status(401).json({ error: 'Invalid Employee ID or password.' });
         }
 
         if (!process.env.JWT_SECRET) {

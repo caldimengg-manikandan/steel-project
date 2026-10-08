@@ -10,7 +10,7 @@ import type { AuthUser } from '../types';
 
 interface AuthContextValue {
     user: AuthUser | null;
-    login: (username: string, password: string) => Promise<AuthUser | null>;
+    login: (identifier: string, password: string) => Promise<AuthUser | null>;
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         checkAuth();
     }, []);
 
-    const login = useCallback(async (username: string, password: string): Promise<AuthUser | null> => {
+    const login = useCallback(async (identifier: string, password: string): Promise<AuthUser | null> => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
         try {
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ username, password }),
+                body: JSON.stringify({ username: identifier, password }),
             });
 
             if (!res.ok) {
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ username, password }),
+                    body: JSON.stringify({ employeeId: identifier, password }),
                 });
             }
 

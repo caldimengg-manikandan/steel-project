@@ -7,7 +7,7 @@ export default function LoginPage() {
     const { login, user } = useAuth();
     const navigate = useNavigate();
 
-    const [username, setUsername] = useState('');
+    const [employeeId, setEmployeeId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -23,17 +23,17 @@ export default function LoginPage() {
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
         setError('');
-        if (!username.trim() || !password) {
-            setError('Username and password are required.');
+        if (!employeeId.trim() || !password) {
+            setError('Employee ID and password are required.');
             return;
         }
         setLoading(true);
         try {
-            const authUser = await login(username, password);
+            const authUser = await login(employeeId, password);
             if (authUser) {
                 navigate(FULL_ACCESS_ROLES.includes(authUser.role) ? '/admin' : '/dashboard');
             } else {
-                setError('Invalid username or password. Please try again.');
+                setError('Invalid Employee ID or password. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -61,16 +61,16 @@ export default function LoginPage() {
 
                 <form onSubmit={handleSubmit} noValidate>
                     <div className="form-group">
-                        <label className="form-label required" htmlFor="username">
-                            Username
+                        <label className="form-label required" htmlFor="employeeId">
+                            Employee ID
                         </label>
                         <input
-                            id="username"
+                            id="employeeId"
                             type="text"
                             className="form-control"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Enter your Employee ID"
+                            value={employeeId}
+                            onChange={(e) => setEmployeeId(e.target.value)}
                             autoComplete="username"
                             autoFocus
                             disabled={loading}

@@ -2,7 +2,7 @@
 // Types for Steel Detailing Document Management System
 // ============================================================
 
-export type UserRole = 'admin' | 'user' | 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member';
+export type UserRole = 'admin' | 'user' | 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'assistant_team_lead' | 'team_member';
 export type ProjectPermission = 'viewer' | 'editor' | 'admin';
 export type ProjectStatus = 'in_progress' | 'on_hold' | 'completed' | 'archived';
 export type UserStatus = 'active' | 'inactive';
@@ -27,6 +27,7 @@ export interface Client {
 export interface User {
     id: string;
     _id?: string;
+    employeeId?: string;
     username: string;
     email: string;
     displayName?: string;

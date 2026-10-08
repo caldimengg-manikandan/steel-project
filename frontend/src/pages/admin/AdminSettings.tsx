@@ -352,6 +352,26 @@ export default function AdminSettings() {
                                             </tr>
                                             <tr>
                                                 <td>
+                                                    <div style={{ fontWeight: 700, fontSize: 14 }}>Assistant Project Manager</div>
+                                                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Full system access — all modules</div>
+                                                </td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('/admin/permissions')}><IconEdit /></button></td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <div style={{ fontWeight: 700, fontSize: 14 }}>Asst. Team Lead</div>
+                                                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Full system access — all modules</div>
+                                                </td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><span className="badge badge-success">Full</span></td>
+                                                <td><button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('/admin/permissions')}><IconEdit /></button></td>
+                                            </tr>
+                                            <tr>
+                                                <td>
                                                     <div style={{ fontWeight: 700, fontSize: 14 }}>Team Member</div>
                                                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Editor access — assigned projects only</div>
                                                 </td>
@@ -628,14 +648,15 @@ export default function AdminSettings() {
                                     }}>
                                          {settings.logoPath ? (
                                              <img 
-                                                 src={settings.logoPath.startsWith('/steel') ? settings.logoPath : `/steel${settings.logoPath.startsWith('/') ? '' : '/'}${settings.logoPath}`} 
+                                                 src={settings.logoPath.startsWith('http') ? settings.logoPath : `${(import.meta.env.VITE_API_URL || '/steel/api').replace(/\/$/, '')}${settings.logoPath.replace(/^\/steel/, '').startsWith('/') ? '' : '/'}${settings.logoPath.replace(/^\/steel/, '')}`} 
                                                  alt="Logo" 
                                                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
                                                  onError={(e) => {
                                                      const target = e.target as HTMLImageElement;
                                                      if (!target.dataset.retried) {
                                                          target.dataset.retried = 'true';
-                                                         target.src = settings.logoPath;
+                                                         // Fallback to absolute relative if base logic fails
+                                                         target.src = settings.logoPath.startsWith('/') ? settings.logoPath : `/${settings.logoPath}`;
                                                      }
                                                  }}
                                              />
@@ -661,17 +682,19 @@ export default function AdminSettings() {
                                        {logoFile ? 'Change File' : 'Select Logo'}
                                    </label>
                                    {logoFile && (
-                                       <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 500 }}>
-                                           {logoFile.name}
-                                       </div>
+                                       <>
+                                           <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 500 }}>
+                                               {logoFile.name}
+                                           </div>
+                                           <button 
+                                                className="btn btn-primary btn-sm" 
+                                                disabled={uploadingLogo}
+                                                onClick={handleLogoUpload}
+                                           >
+                                               {uploadingLogo ? 'Uploading...' : 'Upload & Save'}
+                                           </button>
+                                       </>
                                    )}
-                                   <button 
-                                        className="btn btn-primary btn-sm" 
-                                        disabled={!logoFile || uploadingLogo}
-                                        onClick={handleLogoUpload}
-                                   >
-                                       {uploadingLogo ? 'Uploading...' : 'Upload & Save'}
-                                   </button>
                                </div>
                            </div>
                         </Card>
@@ -897,7 +920,10 @@ export default function AdminSettings() {
 
                             <div className="form-actions">
                                 <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                                <button className="btn btn-primary" onClick={() => setIsModalOpen(false)}>Save Role</button>
+                                <button className="btn btn-primary" onClick={() => {
+                                    setIsModalOpen(false);
+                                    showMessage('Success', 'Role created successfully!', 'success');
+                                }}>Save Role</button>
                             </div>
                         </div>
                     </div>

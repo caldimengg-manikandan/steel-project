@@ -22,12 +22,26 @@ const userSchema = new mongoose.Schema(
             maxlength: 40,
         },
 
+        employeeId: {
+            type: String,
+            required: [true, 'Employee ID is required'],
+            trim: true,
+            minlength: 1,
+            maxlength: 40,
+        },
+
         email: {
             type: String,
-            required: [true, 'Email is required'],
+            required: false,
             trim: true,
             lowercase: true,
-            match: [/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid email format'],
+            validate: {
+                validator: function(v) {
+                    if (!v) return true;
+                    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
+                },
+                message: 'Invalid email format'
+            }
         },
 
         password_hash: {
@@ -63,7 +77,7 @@ const userSchema = new mongoose.Schema(
 
         role: {
             type: String,
-            enum: ['user', 'superadmin', 'project_manager', 'assistant_project_manager', 'team_lead', 'team_member'],
+            enum: ['user', 'superadmin', 'project_manager', 'assistant_project_manager', 'team_lead', 'assistant_team_lead', 'team_member'],
             default: 'user',
         },
 
@@ -77,6 +91,10 @@ const userSchema = new mongoose.Schema(
             ref: 'User',
         },
         team_lead: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        assistant_team_lead: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
         },
@@ -96,8 +114,10 @@ const userSchema = new mongoose.Schema(
 /* ── Compound index: unique username per admin tenant ── */
 // Two different admins CAN have users with same username
 userSchema.index({ adminId: 1, username: 1 }, { unique: true });
+// Two different admins CAN have users with same employeeId
+userSchema.index({ adminId: 1, employeeId: 1 }, { unique: true });
 // Two different admins CAN have users with same email (firm-level)
-userSchema.index({ adminId: 1, email: 1 }, { unique: true });
+userSchema.index({ adminId: 1, email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string", $ne: "" } } });
 
 /* ── Hooks ─────────────────────────────────────────────── */
 
@@ -117,6 +137,7 @@ userSchema.methods.matchPassword = async function (plain) {
 userSchema.methods.toSafeObject = function () {
     return {
         _id: this._id,
+        employeeId: this.employeeId,
         username: this.username,
         email: this.email,
         displayName: this.displayName,
@@ -125,6 +146,7 @@ userSchema.methods.toSafeObject = function () {
         project_manager: this.project_manager,
         assistant_project_manager: this.assistant_project_manager,
         team_lead: this.team_lead,
+        assistant_team_lead: this.assistant_team_lead,
         status: this.status,
         adminId: this.adminId,
         createdAt: this.createdAt,

@@ -797,64 +797,21 @@ async function generateProjectStatusExcel(projectsData) {
     const today = new Date();
     const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
-    // ── Logo ──────────────────────────────────────────────────
-    try {
-        let finalLogo = LOGO_DEFAULT;
-        if (fs.existsSync(finalLogo)) {
-            const ext = path.extname(finalLogo).toLowerCase().replace(/^\./, '');
-            const extension = (ext === 'jpg' || ext === 'jpeg') ? 'jpeg' : (ext === 'gif' ? 'gif' : 'png');
-            const imageId = workbook.addImage({ filename: finalLogo, extension });
-            // Logo from A1 to E5
-            sheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 14, row: 5 } });
-        }
-    } catch (err) { console.error('[ExcelService] Logo error:', err.message); }
-
-    // Space for logo (rows 1-5)
-    for (let r = 1; r <= 5; r++) sheet.getRow(r).height = 18;
-    sheet.getRow(6).height = 6; // Thin spacer
-
-    // ── Pink Brand Header ──────────────────────────────────────
-    const brandRow = sheet.getRow(7);
-    brandRow.height = 32;
-    const brandCell = brandRow.getCell(1);
-    brandCell.value = 'CALDIM ENGINEERING PVT LTD - PROJECT STATUS (Chennai & Hosur)';
-    brandCell.style = {
-        font: { bold: true, size: 14, color: { argb: 'FF000000' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } }, // Pinkish
-        alignment: { vertical: 'middle', horizontal: 'center' },
-        border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
-    };
-    sheet.mergeCells(7, 1, 7, 14); // Merge across all 14 columns
-
-    // ── Date row (Generated on) ──────────────────────────────
-    const dateRow = sheet.getRow(8);
-    dateRow.height = 20;
-    const dateCell = dateRow.getCell(11); // Over PM/Approval area
-    dateCell.value = `Generated On: ${formattedDate}`;
-    dateCell.style = {
-        font: { italic: true, size: 9, color: { argb: 'FF555555' } },
-        alignment: { vertical: 'middle', horizontal: 'right' }
-    };
-    sheet.mergeCells(8, 11, 8, 14); 
-
-    sheet.getRow(10).height = 28; // spacer before headers
+    // Start directly with the column headers at row 1
 
     // ── Column Headers (Row 10) ───────────────────────────────
     const COLS = [
-        { header: 'CDE#', key: 'cdeNo', width: 10 },
-        { header: 'Branch', key: 'branch', width: 15 },
-        { header: 'FABRICATOR', key: 'fabricator', width: 22 },
-        { header: 'DIVISION', key: 'division', width: 15 },
-        { header: 'FAB%', key: 'fab', width: 10 },
-        { header: 'PROJECT NAME', key: 'projectName', width: 45 },
-        { header: 'CLIENT CONTACT', key: 'clientContact', width: 35 },
-        { header: 'CALDIM PM', key: 'pm', width: 20 },
-        { header: 'APPROVAL STATUS', key: 'approvalStatus', width: 20 },
-        { header: 'RFI STATUS', key: 'rfiStatus', width: 25 },
-        { header: 'FAB STATUS', key: 'fabStatus', width: 20 },
-        { header: 'Approved CO', key: 'approvedCo', width: 12 },
-        { header: 'PENDING CO', key: 'pendingCo', width: 12 },
-        { header: 'DECLINED CO', key: 'declinedCo', width: 12 },
+        { header: 'Financial Year', key: 'financialYear', width: 15 },
+        { header: 'Customer Name', key: 'customerName', width: 35 },
+        { header: 'Project Name', key: 'projectName', width: 45 },
+        { header: 'Project Code', key: 'projectCode', width: 15 },
+        { header: 'Office Location', key: 'officeLocation', width: 15 },
+        { header: 'Division', key: 'division', width: 15 },
+        { header: 'Project Manager', key: 'projectManager', width: 25 },
+        { header: '% Approval', key: 'approvalPercentage', width: 15 },
+        { header: '% Fab', key: 'fabPercentage', width: 15 },
+        { header: 'RFI status', key: 'rfiStatus', width: 25 },
+        { header: 'CO Status', key: 'coStatus', width: 25 },
     ];
 
     // Only set keys and widths to avoid ExcelJS automatically writing headers to Row 1
@@ -868,7 +825,7 @@ async function generateProjectStatusExcel(projectsData) {
         border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
     };
 
-    const headerRow = sheet.getRow(10);
+    const headerRow = sheet.getRow(1);
     headerRow.height = 28;
     COLS.forEach((col, idx) => {
         const cell = headerRow.getCell(idx + 1);
@@ -921,32 +878,24 @@ async function generateProjectStatusExcel(projectsData) {
         const formattedFabStatus = formatStatusTitleCase(rawStatusText);
 
         const dataRow = sheet.addRow({
-            cdeNo: '', // Placeholder
-            branch: proj.location || '', 
-            fabricator: proj.clientName || '',
-            division: '', // Placeholder
-            fab: `${fabricationPercentage}%`,
+            financialYear: proj.financialYear || '', 
+            customerName: proj.clientName || '',
             projectName: proj.name || '',
-            clientContact: proj.contactPerson?.name || '',
-            pm: '', // Placeholder
-            approvalStatus: `${approvalPercentage}%`,
+            projectCode: proj.projectCode || '', 
+            officeLocation: proj.location || '',
+            division: proj.division || '', 
+            projectManager: proj.projectManager || '', 
+            approvalPercentage: `${approvalPercentage}%`,
+            fabPercentage: `${fabricationPercentage}%`,
             rfiStatus: `Open: ${proj.openRfiCount || 0}, Closed: ${proj.closedRfiCount || 0}`,
-            fabStatus: formattedFabStatus,
-            approvedCo: proj.corStatus?.statusSummary?.Approved ?? proj.approvedCO ?? 0,
-            pendingCo: proj.corStatus?.statusSummary?.Submitted ?? proj.pendingCO ?? 0,
-            declinedCo: proj.corStatus?.statusSummary?.Declined ?? 0,
+            coStatus: `Approved: ${proj.corStatus?.statusSummary?.Approved ?? proj.approvedCO ?? 0}, Pending: ${proj.corStatus?.statusSummary?.Submitted ?? proj.pendingCO ?? 0}`,
         });
         dataRow.height = 25; // Increased height to fit wrapped text if any
         dataRow.eachCell((cell, colNum) => {
             cell.border = commonBorder;
-            // Project Name and Client Contact are columns 6 and 7
-            cell.alignment = { vertical: 'middle', horizontal: (colNum === 6 || colNum === 7) ? 'left' : 'center', wrapText: true };
+            // Project Name and Customer Name are columns 3 and 2
+            cell.alignment = { vertical: 'middle', horizontal: (colNum === 3 || colNum === 2) ? 'left' : 'center', wrapText: true };
         });
-
-        // Color-code the Fab Status cell (column 11)
-        const statusCell = dataRow.getCell(11);
-        const statusColor = STATUS_COLOR[proj.status] || 'FF000000';
-        statusCell.font = { bold: true, color: { argb: statusColor }, size: 9 };
 
         // Alternate row background
         if (idx % 2 === 1) {

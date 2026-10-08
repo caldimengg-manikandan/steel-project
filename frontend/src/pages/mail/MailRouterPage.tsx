@@ -2650,6 +2650,113 @@ export default function MailRouterPage() {
                             }
                         }}
                     >
+                        </div>
+                        {loadingEmails ? (
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
+                                <Spinner size={24} />
+                            </div>
+                        ) : filteredEmails.length === 0 ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
+                                {activeFolder === 'sent' ? (
+                                    <>
+                                        No sent emails in this date window<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Sent</strong> to fetch latest outgoing mails</span>
+                                    </>
+                                ) : activeFolder === 'spam' ? (
+                                    <>
+                                        No spam emails found<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Mails flagged as junk by your provider or present in the Spam/Junk folder will appear here.</span>
+                                    </>
+                                ) : activeFolder === 'history' ? (
+                                    <>
+                                        No forwarded emails found in history<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Emails forwarded to detailers will appear here.</span>
+                                    </>
+                                ) : activeFolder === 'drafts' ? (
+                                    <>
+                                        No drafts found<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Drafts</strong> to fetch latest draft messages</span>
+                                    </>
+                                ) : activeFolder === 'outbox' ? (
+                                    <>
+                                        No outbox messages<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Outbox</strong> to check pending outgoing mails</span>
+                                    </>
+                                ) : activeFolder !== 'inbox' ? (
+                                    <>
+                                        No emails found in this folder<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync {activeFolder.charAt(0).toUpperCase() + activeFolder.slice(1)}</strong> to fetch latest mails</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        No emails in this date window<br />
+                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Inbox</strong> to fetch latest mails</span>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                {/* Custom folder email filter notice */}
+                                {activeCustomFolder && (
+                                    <div style={{ padding: '7px 14px', background: 'var(--color-primary-glow)', borderBottom: '1px solid var(--color-border-light)', fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span>📁 {activeCustomFolder.name}</span>
+                                        <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 2 }}>— {activeCustomFolder.emailIds.length} email{activeCustomFolder.emailIds.length !== 1 ? 's' : ''}</span>
+                                        <button type="button" onClick={() => handleSelectFolder('inbox')} style={{ marginLeft: 'auto', fontSize: 11, border: 'none', background: 'transparent', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 700 }}>← Back to Inbox</button>
+                                    </div>
+                                )}
+                                {filteredEmails.map(msg => (
+                                    <EmailCard
+                                        key={msg._id}
+                                        msg={msg}
+                                        active={selectedEmail?._id === msg._id}
+                                        onClick={() => {
+                                            const cached = emailDetailCacheRef.current.get(String(msg._id));
+                                            setSelectedEmail(cached || msg);
+                                        }}
+                                    />
+                                ))}
+                                {hasMore && (
+                                    <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ width: '100%', fontSize: 12.5 }}
+                                            onClick={loadMoreEmails}
+                                            disabled={loadingMore}
+                                        >
+                                            {loadingMore ? <><Spinner size={12} /> Loading more…</> : `Load more emails (${emails.length} of ${totalEmails})`}
+                                        </button>
+                                    </div>
+                                )}
+                                {!hasMore && emails.length > 50 && (
+                                    <div style={{ padding: '10px 16px', textAlign: 'center', fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                        All {emails.length} emails loaded
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Right: email detail (independent vertical scroll) */}
+                    <div style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', background: 'var(--color-bg-page)', display: 'flex', flexDirection: 'column' }}>
+                        {selectedEmail ? (
+                            <DetailErrorBoundary>
+                                <EmailDetail
+                                    key={selectedEmail._id || selectedEmail.id}
+                                    email={selectedEmail}
+                                    accounts={accounts}
+                                    onForwardClick={() => setShowForward(selectedEmail)}
+                                    onForwardToTeamsClick={() => setShowForwardToTeams(selectedEmail)}
+                                    loadingAttachments={loadingAttachments}
+                                />
+                            </DetailErrorBoundary>
+                        ) : (
+                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
+                                <p style={{ fontSize: 14, fontWeight: 500 }}>Select an email from the left to view details and triage</p>
+                            </div>
+                        )}
+                    </div>
+                    {/* Right Sidebar: Custom Folders Panel */}
+                    <div style={{ width: 280, flexShrink: 0, height: '100%', minHeight: 0, borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-card)' }}>
                         {/* ── Custom Folders Panel ── */}
                         <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)', flexShrink: 0 }}>
                             {/* Header row */}
@@ -2815,110 +2922,6 @@ export default function MailRouterPage() {
                                     No folders yet — create one above, then drag emails into it
                                 </div>
                             )}
-                        </div>
-                        {loadingEmails ? (
-                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
-                                <Spinner size={24} />
-                            </div>
-                        ) : filteredEmails.length === 0 ? (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                                {activeFolder === 'sent' ? (
-                                    <>
-                                        No sent emails in this date window<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Sent</strong> to fetch latest outgoing mails</span>
-                                    </>
-                                ) : activeFolder === 'spam' ? (
-                                    <>
-                                        No spam emails found<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Mails flagged as junk by your provider or present in the Spam/Junk folder will appear here.</span>
-                                    </>
-                                ) : activeFolder === 'history' ? (
-                                    <>
-                                        No forwarded emails found in history<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Emails forwarded to detailers will appear here.</span>
-                                    </>
-                                ) : activeFolder === 'drafts' ? (
-                                    <>
-                                        No drafts found<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Drafts</strong> to fetch latest draft messages</span>
-                                    </>
-                                ) : activeFolder === 'outbox' ? (
-                                    <>
-                                        No outbox messages<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Outbox</strong> to check pending outgoing mails</span>
-                                    </>
-                                ) : activeFolder !== 'inbox' ? (
-                                    <>
-                                        No emails found in this folder<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync {activeFolder.charAt(0).toUpperCase() + activeFolder.slice(1)}</strong> to fetch latest mails</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        No emails in this date window<br />
-                                        <span style={{ fontSize: 12.5, marginTop: 4 }}>Click <strong>Sync Inbox</strong> to fetch latest mails</span>
-                                    </>
-                                )}
-                            </div>
-                        ) : (
-                            <>
-                                {/* Custom folder email filter notice */}
-                                {activeCustomFolder && (
-                                    <div style={{ padding: '7px 14px', background: 'var(--color-primary-glow)', borderBottom: '1px solid var(--color-border-light)', fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span>📁 {activeCustomFolder.name}</span>
-                                        <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 2 }}>— {activeCustomFolder.emailIds.length} email{activeCustomFolder.emailIds.length !== 1 ? 's' : ''}</span>
-                                        <button type="button" onClick={() => handleSelectFolder('inbox')} style={{ marginLeft: 'auto', fontSize: 11, border: 'none', background: 'transparent', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 700 }}>← Back to Inbox</button>
-                                    </div>
-                                )}
-                                {filteredEmails.map(msg => (
-                                    <div
-                                        key={msg._id}
-                                        msg={msg}
-                                        active={selectedEmail?._id === msg._id}
-                                        onClick={() => {
-                                            const cached = emailDetailCacheRef.current.get(String(msg._id));
-                                            setSelectedEmail(cached || msg);
-                                        }}
-                                    />
-                                ))}
-                                {hasMore && (
-                                    <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
-                                        <button
-                                            className="btn btn-secondary btn-sm"
-                                            style={{ width: '100%', fontSize: 12.5 }}
-                                            onClick={loadMoreEmails}
-                                            disabled={loadingMore}
-                                        >
-                                            {loadingMore ? <><Spinner size={12} /> Loading more…</> : `Load more emails (${emails.length} of ${totalEmails})`}
-                                        </button>
-                                    </div>
-                                )}
-                                {!hasMore && emails.length > 50 && (
-                                    <div style={{ padding: '10px 16px', textAlign: 'center', fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                        All {emails.length} emails loaded
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-
-                    {/* Right: email detail (independent vertical scroll) */}
-                    <div style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', background: 'var(--color-bg-page)', display: 'flex', flexDirection: 'column' }}>
-                        {selectedEmail ? (
-                            <DetailErrorBoundary>
-                                <EmailDetail
-                                    key={selectedEmail._id || selectedEmail.id}
-                                    email={selectedEmail}
-                                    accounts={accounts}
-                                    onForwardClick={() => setShowForward(selectedEmail)}
-                                    onForwardToTeamsClick={() => setShowForwardToTeams(selectedEmail)}
-                                    loadingAttachments={loadingAttachments}
-                                />
-                            </DetailErrorBoundary>
-                        ) : (
-                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                                <p style={{ fontSize: 14, fontWeight: 500 }}>Select an email from the left to view details and triage</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
