@@ -802,26 +802,26 @@ export default function AdminUsers() {
                                 {form.role === 'team_member' && (
                                     <div className="form-group">
                                         <label className="form-label required">Team Lead</label>
-                                        <div style={{ border: '1px solid #dcdfe6', borderRadius: 6, padding: '8px 12px', maxHeight: 150, overflowY: 'auto', backgroundColor: '#fff' }}>
-                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 ? (
-                                                <div style={{ color: '#909399', fontSize: 13 }}>No team leads available</div>
-                                            ) : (
-                                                users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
-                                                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 14, cursor: 'pointer' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={form.team_lead.includes(u.id)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setForm({ ...form, team_lead: [...form.team_lead, u.id] });
-                                                                } else {
-                                                                    setForm({ ...form, team_lead: form.team_lead.filter(id => id !== u.id) });
-                                                                }
-                                                            }}
-                                                        />
-                                                        {u.username}
-                                                    </label>
-                                                ))
+                                        <div className="form-control" style={{ minHeight: 80, maxHeight: 150, overflowY: 'auto', padding: '8px' }}>
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                                <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        style={{ margin: 0, width: 16, height: 16 }}
+                                                        checked={form.team_lead.includes(u.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setForm({ ...form, team_lead: [...form.team_lead, u.id] });
+                                                            } else {
+                                                                setForm({ ...form, team_lead: form.team_lead.filter(id => id !== u.id) });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span>{u.username}</span>
+                                                </label>
+                                            ))}
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 && (
+                                                <div style={{ color: '#666', fontStyle: 'italic', fontSize: 13 }}>No Team Leads available</div>
                                             )}
                                         </div>
                                     </div>
@@ -918,26 +918,26 @@ export default function AdminUsers() {
                                 {editForm.role === 'team_member' && (
                                     <div className="form-group">
                                         <label className="form-label required">Team Lead</label>
-                                        <div style={{ border: '1px solid #dcdfe6', borderRadius: 6, padding: '8px 12px', maxHeight: 150, overflowY: 'auto', backgroundColor: '#fff' }}>
-                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 ? (
-                                                <div style={{ color: '#909399', fontSize: 13 }}>No team leads available</div>
-                                            ) : (
-                                                users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
-                                                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 14, cursor: 'pointer' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={editForm.team_lead.includes(u.id)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setEditForm({ ...editForm, team_lead: [...editForm.team_lead, u.id] });
-                                                                } else {
-                                                                    setEditForm({ ...editForm, team_lead: editForm.team_lead.filter(id => id !== u.id) });
-                                                                }
-                                                            }}
-                                                        />
-                                                        {u.username}
-                                                    </label>
-                                                ))
+                                        <div className="form-control" style={{ minHeight: 80, maxHeight: 150, overflowY: 'auto', padding: '8px' }}>
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                                <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        style={{ margin: 0, width: 16, height: 16 }}
+                                                        checked={editForm.team_lead.includes(u.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setEditForm({ ...editForm, team_lead: [...editForm.team_lead, u.id] });
+                                                            } else {
+                                                                setEditForm({ ...editForm, team_lead: editForm.team_lead.filter(id => id !== u.id) });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span>{u.username}</span>
+                                                </label>
+                                            ))}
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 && (
+                                                <div style={{ color: '#666', fontStyle: 'italic', fontSize: 13 }}>No Team Leads available</div>
                                             )}
                                         </div>
                                     </div>
