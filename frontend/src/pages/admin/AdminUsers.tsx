@@ -768,7 +768,7 @@ export default function AdminUsers() {
                                 <div className="form-group">
                                     <label className="form-label required">Account Role</label>
                                     <select className="form-control" value={form.role} onChange={e => {
-                                        setForm({ ...form, role: e.target.value as any, project_manager: '', assistant_project_manager: '', team_lead: '' });
+                                        setForm({ ...form, role: e.target.value as any, project_manager: '', assistant_project_manager: '', team_lead: [] });
                                     }}>
                                         <option value="">Select role</option>
                                         <option value="superadmin">Super Admin — Full system access</option>
