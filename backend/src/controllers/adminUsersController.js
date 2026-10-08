@@ -87,10 +87,10 @@ async function createUser(req, res) {
         adminId,                   // ← injected — cannot be spoofed by client
         role: assignedRole,
         division,
-        project_manager,
-        assistant_project_manager,
-        team_lead,
-        assistant_team_lead,
+        project_manager: project_manager || null,
+        assistant_project_manager: assistant_project_manager || null,
+        team_lead: team_lead && team_lead.length ? team_lead : undefined,
+        assistant_team_lead: assistant_team_lead || null,
         status: 'active',
     });
 
