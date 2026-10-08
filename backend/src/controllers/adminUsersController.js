@@ -62,7 +62,7 @@ async function listUsers(req, res) {
  */
 async function createUser(req, res) {
     const adminId = req.principal.adminId;
-    const { employeeId, username, email, password, displayName, role } = req.body;
+    const { employeeId, username, email, password, displayName, role, division, project_manager, assistant_project_manager, team_lead, assistant_team_lead } = req.body;
 
     if (!employeeId || !username || !password) {
         return res.status(400).json({ error: 'Employee ID, username, and password are required.' });
@@ -86,6 +86,11 @@ async function createUser(req, res) {
         displayName: displayName || username,
         adminId,                   // ← injected — cannot be spoofed by client
         role: assignedRole,
+        division,
+        project_manager,
+        assistant_project_manager,
+        team_lead,
+        assistant_team_lead,
         status: 'active',
     });
 
@@ -107,11 +112,16 @@ async function getUser(req, res) {
  */
 async function updateUser(req, res) {
     const user = req.scopedUser;
-    const { employeeId, displayName, email, status, password, role } = req.body;
+    const { employeeId, displayName, email, status, password, role, division, project_manager, assistant_project_manager, team_lead, assistant_team_lead } = req.body;
 
     if (employeeId !== undefined) user.employeeId = employeeId;
     if (displayName !== undefined) user.displayName = displayName;
     if (email !== undefined) user.email = email;
+    if (division !== undefined) user.division = division;
+    if (project_manager !== undefined) user.project_manager = project_manager || null;
+    if (assistant_project_manager !== undefined) user.assistant_project_manager = assistant_project_manager || null;
+    if (team_lead !== undefined) user.team_lead = team_lead;
+    if (assistant_team_lead !== undefined) user.assistant_team_lead = assistant_team_lead || null;
     if (status !== undefined) {
         if (!['active', 'inactive'].includes(status)) {
             return res.status(400).json({ error: 'status must be active or inactive.' });

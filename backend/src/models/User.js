@@ -89,10 +89,10 @@ const userSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
         },
-        team_lead: {
+        team_lead: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-        },
+        }],
         assistant_team_lead: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

@@ -39,7 +39,8 @@ export interface User {
     division?: string;
     project_manager?: string;
     assistant_project_manager?: string;
-    team_lead?: string;
+    team_lead?: string | string[];
+    assistant_team_lead?: string;
 }
 
 export interface ProjectAssignment {

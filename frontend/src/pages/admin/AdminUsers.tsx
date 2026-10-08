@@ -18,7 +18,7 @@ interface CreateUserForm {
     division: string;
     project_manager: string;
     assistant_project_manager: string;
-    team_lead: string;
+    team_lead: string[];
     assistant_team_lead?: string;
 }
 const DEFAULT_FORM: CreateUserForm = {
@@ -31,7 +31,7 @@ const DEFAULT_FORM: CreateUserForm = {
     division: '',
     project_manager: '',
     assistant_project_manager: '',
-    team_lead: '',
+    team_lead: [],
     assistant_team_lead: ''
 };
 
@@ -62,7 +62,7 @@ export default function AdminUsers() {
         division: string;
         project_manager: string;
         assistant_project_manager: string;
-        team_lead: string;
+        team_lead: string[];
         assistant_team_lead?: string;
     }>({
         displayName: '',
@@ -73,7 +73,7 @@ export default function AdminUsers() {
         division: '',
         project_manager: '',
         assistant_project_manager: '',
-        team_lead: '',
+        team_lead: [],
         assistant_team_lead: ''
     });
     const [savingEdit, setSavingEdit] = useState(false);
@@ -449,7 +449,7 @@ export default function AdminUsers() {
                                                              division: u.division || '',
                                                              project_manager: typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : (u.project_manager || ''),
                                                              assistant_project_manager: typeof u.assistant_project_manager === 'object' ? (u.assistant_project_manager as any)?._id : (u.assistant_project_manager || ''),
-                                                             team_lead: typeof u.team_lead === 'object' ? (u.team_lead as any)?._id : (u.team_lead || '')
+                                                             team_lead: Array.isArray(u.team_lead) ? u.team_lead.map(tl => typeof tl === 'object' ? (tl as any)._id : tl) : (typeof u.team_lead === 'object' ? [(u.team_lead as any)._id] : (u.team_lead ? [u.team_lead as string] : []))
                                                          });
                                                      }}
                                                      title="Edit User & Role"
@@ -802,10 +802,28 @@ export default function AdminUsers() {
                                 {form.role === 'team_member' && (
                                     <div className="form-group">
                                         <label className="form-label required">Team Lead</label>
-                                        <select className="form-control" value={form.team_lead} onChange={e => setForm({ ...form, team_lead: e.target.value })}>
-                                            <option value="">Select Team Lead</option>
-                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-                                        </select>
+                                        <div style={{ border: '1px solid #dcdfe6', borderRadius: 6, padding: '8px 12px', maxHeight: 150, overflowY: 'auto', backgroundColor: '#fff' }}>
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 ? (
+                                                <div style={{ color: '#909399', fontSize: 13 }}>No team leads available</div>
+                                            ) : (
+                                                users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 14, cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={form.team_lead.includes(u.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setForm({ ...form, team_lead: [...form.team_lead, u.id] });
+                                                                } else {
+                                                                    setForm({ ...form, team_lead: form.team_lead.filter(id => id !== u.id) });
+                                                                }
+                                                            }}
+                                                        />
+                                                        {u.username}
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
@@ -900,10 +918,28 @@ export default function AdminUsers() {
                                 {editForm.role === 'team_member' && (
                                     <div className="form-group">
                                         <label className="form-label required">Team Lead</label>
-                                        <select className="form-control" value={editForm.team_lead} onChange={e => setEditForm({ ...editForm, team_lead: e.target.value })}>
-                                            <option value="">Select Team Lead</option>
-                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-                                        </select>
+                                        <div style={{ border: '1px solid #dcdfe6', borderRadius: 6, padding: '8px 12px', maxHeight: 150, overflowY: 'auto', backgroundColor: '#fff' }}>
+                                            {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length === 0 ? (
+                                                <div style={{ color: '#909399', fontSize: 13 }}>No team leads available</div>
+                                            ) : (
+                                                users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 14, cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={editForm.team_lead.includes(u.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setEditForm({ ...editForm, team_lead: [...editForm.team_lead, u.id] });
+                                                                } else {
+                                                                    setEditForm({ ...editForm, team_lead: editForm.team_lead.filter(id => id !== u.id) });
+                                                                }
+                                                            }}
+                                                        />
+                                                        {u.username}
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
