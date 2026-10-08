@@ -5,7 +5,7 @@
  */
 require('dotenv').config();
 
-// ── Sentry Initialization (Must be first) ───────────────────
+// â”€â”€ Sentry Initialization (Must be first) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const Sentry = require('@sentry/node');
 const SENTRY_DSN = process.env.SENTRY_DSN || '';
 
@@ -65,6 +65,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const fileGatewayRoutes = require('./routes/fileGatewayRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
+const adminTeamRoutes = require('./routes/adminTeamRoutes');
 
 // Auth middleware
 const { verifyToken: authMiddleware } = require('./middleware/auth');
@@ -91,7 +92,7 @@ if (process.env.CORS_ORIGIN) {
 }
 console.log('[DEBUG] Allowed Origins:', allowedOrigins);
 
-// ── App setup ─────────────────────────────────────────────
+// â”€â”€ App setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const app = express();
 
 if (process.env.NODE_ENV === 'production') {
@@ -102,7 +103,7 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
-        
+
         const isAllowed = allowedOrigins.some(o => {
             // Exact match
             if (o === origin) return true;
@@ -149,9 +150,10 @@ app.use((req, res, next) => {
 
 const path = require('path');
 
-// ── API Routes ─────────────────────────────────────────────
+// â”€â”€ API Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/teams', adminTeamRoutes);
 app.use('/api/admin/projects', adminProjectRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/admin/reports', adminReportsRoutes);
@@ -164,59 +166,60 @@ app.use('/api/rfis/:projectId', rfiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/files', fileGatewayRoutes);
+app.use('/api/drawing-log', require('./routes/drawingLogRoutes'));
 app.use('/api/admin/activity-logs', activityLogRoutes);
 app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
 app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));
 app.use('/api/error-log', require('./routes/errorLogRoutes'));
-// ── Ensure upload directories and permissions exist ─────────
+// â”€â”€ Ensure upload directories and permissions exist â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const { initUploadDirectories } = require('./utils/initDirectories');
 initUploadDirectories();
 
-// ── Serve uploaded files (PDFs, Excel) ─────────────────────
+// â”€â”€ Serve uploaded files (PDFs, Excel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Also serve project root uploads folder if present (e.g. /var/www/steel-project/uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
-// ── Mail router ───────────────────────────────────────────
+// â”€â”€ Mail router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
-  // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
-  if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
-    if (req.headers.authorization || req.query.token || req.cookies?.sdms_token) {
-      return authMiddleware(req, res, () => next());
+    // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
+    if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
+        if (req.headers.authorization || req.query.token || req.cookies?.sdms_token) {
+            return authMiddleware(req, res, () => next());
+        }
+        return next();
     }
-    return next();
-  }
-  return authMiddleware(req, res, next);
+    return authMiddleware(req, res, next);
 }, mailRouter);
-// ── Health check ───────────────────────────────────────────
+// â”€â”€ Health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ── 404 ────────────────────────────────────────────────────
+// â”€â”€ 404 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use((_req, res) => {
     res.status(404).json({ error: 'API endpoint not found.' });
 });
 
-// ── Global error handler ───────────────────────────────────
+// â”€â”€ Global error handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(errorHandler);
 
-// ── Auto-seeding logic removed ───────────────────────────────
+// â”€â”€ Auto-seeding logic removed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ── Start server ───────────────────────────────────────────
+// â”€â”€ Start server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PORT = process.env.PORT || 5000;
 
 const { startAiService } = require('./utils/aiServiceManager');
 
 connectDB().then(async () => {
     initGridFS();
-    
+
     // Validate remote Storage Agent connectivity safely
     try {
         const storageGateway = require('./utils/storageGateway');
         const rawUrl = storageGateway.AGENT_URL || '(not set)';
         const maskedUrl = rawUrl.replace(/(https?:\/\/)[^@]+@/, '$1***@');
         console.log(`[Storage] Resolved STORAGE_AGENT_URL = "${maskedUrl}" (STORAGE_ENABLED=${process.env.STORAGE_ENABLED !== 'false'})`);
-        
+
         const storageCheck = await storageGateway.validateRoot();
         if (storageCheck.skipped) {
             console.log('[Storage] Gateway disabled (STORAGE_ENABLED=false or URL missing)');
@@ -263,15 +266,11 @@ connectDB().then(async () => {
     const server = app.listen(PORT, async () => {
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
-        
+
         try {
-            let admin1 = await Admin.findOne({ username: 'admin1' });
-            if (admin1) {
-                admin1.password_hash = 'Admin1@2026';
-                await admin1.save();
-                console.log('[AUTH] admin1 password forcefully reset to Admin1@2026 for recovery.');
-            } else {
-                admin1 = await Admin.create({
+            const adminExists = await Admin.findOne({ username: 'admin1' });
+            if (!adminExists) {
+                await Admin.create({
                     username: 'admin1',
                     email: 'admin1@steeldetailing.com',
                     password_hash: 'Admin1@2026',
@@ -279,9 +278,9 @@ connectDB().then(async () => {
                     role: 'admin',
                     status: 'active'
                 });
-                console.log('[AUTH] admin1 account recreated with default password Admin1@2026.');
+                console.log('[AUTH] admin1 account created with default password Admin1@2026.');
             }
-        } catch(err) {
+        } catch (err) {
             console.error('[AUTH] Failed to verify admin1 on startup:', err.message);
         }
     });
@@ -294,3 +293,4 @@ connectDB().then(async () => {
 });
 
 module.exports = app; // Trigger restart to reload AI service with dynamic model loading support
+

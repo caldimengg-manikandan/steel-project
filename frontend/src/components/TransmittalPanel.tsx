@@ -19,9 +19,9 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     const [error, setError] = useState('');
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
 
-    const fetchTransmittals = useCallback(async () => {
+    const fetchTransmittals = useCallback(async (background = false) => {
         try {
-            setLoading(true);
+            if (!background) setLoading(true);
             const data = await listTransmittals(projectId);
             setTransmittals(data.transmittals || []);
         } catch (err: any) {
@@ -32,11 +32,20 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     }, [projectId]);
 
     useEffect(() => {
-        fetchTransmittals();
+        fetchTransmittals(false);
     }, [fetchTransmittals]);
 
     useEffect(() => {
-        const pendingT = transmittals.find(t => t.isPending);
+        // Auto-fetch every 10 seconds to update extraction progress
+        const interval = setInterval(() => {
+            if (!generating) fetchTransmittals(true);
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [fetchTransmittals, generating]);
+
+    useEffect(() => {
+        // Auto-generate ONLY when all extractions are completed
+        const pendingT = transmittals.find(t => t.isPending && t.isReadyToGenerate);
         if (pendingT && canEdit && !generating) {
             handleGenerate(pendingT.transmittalNumber);
         }
@@ -51,7 +60,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
             if (targetTransmittalNumber != null) {
                 const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
                 if (data.transmittal) {
-                    showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
                     await fetchTransmittals();
                 } else {
                     showMessage('Notice', data.message || 'No drawings found to transmit.', 'info');
@@ -71,7 +79,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                     setGenerating(true);
                     const data = await generateTransmittal(projectId, undefined, targetTransmittalNumber);
                     if (data.transmittal) {
-                        showMessage('Success', data.message || 'Transmittal generated successfully.', 'success');
                         await fetchTransmittals();
                     } else {
                         showMessage('Notice', data.message || 'No new drawings to transmit.', 'info');
@@ -169,7 +176,6 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                         </thead>
                         <tbody>
                             {(selectedFilters.length > 0 ? transmittals.filter(t => t.sequences?.some((seq: string) => selectedFilters.includes(seq))) : transmittals)
-                                .filter(t => !t.isVoided)
                                 .map(t => {
                                 const drawingCount = t.drawings ? t.drawings.length : ((t.newCount || 0) + (t.revisedCount || 0) + (t.unchangedCount || 0));
                                 if (t.isPending) {
@@ -200,10 +206,12 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                 </span>
                                             </td>
                                             <td>
-                                                {canEdit ? (
+                                                {canEdit && t.isReadyToGenerate ? (
                                                     <span style={{ fontSize: 12, color: '#2563eb', fontWeight: 600 }}>Auto-Generating...</span>
                                                 ) : (
-                                                    <span style={{ fontSize: 11, color: '#64748b' }}>Awaiting Generation</span>
+                                                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                                                        {t.totalCount ? `Extracting (${t.newCount}/${t.totalCount})...` : 'Awaiting Generation'}
+                                                    </span>
                                                 )}
                                             </td>
                                         </tr>

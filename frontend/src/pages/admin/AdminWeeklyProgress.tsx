@@ -134,7 +134,7 @@ export default function AdminWeeklyProgress() {
                                         <div className="client-icon-box">
                                             <IconFolder />
                                         </div>
-                                        <div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
                                             <div className="client-name" title={project.name}>{project.name}</div>
                                             <span className={`client-status-badge status-${project.status || 'active'}`}>
                                                 {project.status || 'active'}
@@ -163,7 +163,7 @@ export default function AdminWeeklyProgress() {
                                         View
                                     </button>
                                     <button
-                                        className="btn btn-primary btn-sm"
+                                        className="btn btn-primary-light btn-sm"
                                         onClick={() => handleSelectProject(project._id || project.id, 'edit')}
                                         style={{ flex: 1, justifyContent: 'center' }}
                                     >
@@ -171,7 +171,7 @@ export default function AdminWeeklyProgress() {
                                     </button>
                                     <button
                                         onClick={() => handleDownloadLatest(project._id || project.id)}
-                                        className="btn btn-ghost btn-sm"
+                                        className="btn btn-primary btn-sm"
                                         style={{ flex: 1, justifyContent: 'center' }}
                                     >
                                         Download

@@ -283,23 +283,10 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
     const senderEmail = email.from?.email || (email as any).fromAddress;
     const senderLabel = senderName && senderEmail ? `${senderName} <${senderEmail}>` : (senderName || senderEmail || 'Unknown sender');
 
-    const allAttachments: MailAttachment[] = React.useMemo(() => {
-        const raw = (email.attachments && email.attachments.length > 0)
-            ? email.attachments
-            : (item.attachments || []);
-        return raw.filter(att => !((att as any).isInline && (att as any).contentId));
-    }, [email.attachments, item.attachments]);
-    const attachmentFiles: FileViewerFile[] = React.useMemo(() => {
-        return allAttachments.map(rawAtt => {
-            const att = normalizeAttachment(rawAtt);
-            return {
-                id: att.id,
-                filename: att.filename,
-                url: getAttachmentUrl(att.id),
-                sizeBytes: att.sizeBytes,
-            };
-        }).filter(f => Boolean(f.id));
-    }, [allAttachments]);
+    const allAttachments: MailAttachment[] = ((email.attachments && email.attachments.length > 0)
+        ? email.attachments
+        : (item.attachments || [])
+    ).filter(att => !((att as any).isInline && (att as any).contentId));
 
     const hasAttachmentsFlag = Boolean(
         (item as any).hasAttachments ||
@@ -934,6 +921,18 @@ function InboxDetail({ item, loadingAttachments = false }: { item: InboxItem; lo
     );
 }
 
+// ── Custom Folder Types ─────────────────────────────────────────────────
+type InboxCustomFolder = { id: string; name: string; itemIds: string[] };
+const INBOX_FOLDERS_KEY = 'employeeInbox_customFolders';
+
+function loadInboxFolders(): InboxCustomFolder[] {
+    try { return JSON.parse(localStorage.getItem(INBOX_FOLDERS_KEY) || '[]'); }
+    catch { return []; }
+}
+function saveInboxFolders(folders: InboxCustomFolder[]) {
+    localStorage.setItem(INBOX_FOLDERS_KEY, JSON.stringify(folders));
+}
+
 // ── Main ──────────────────────────────────────────────────────
 
 const PAGE_SIZE = 25;
@@ -948,7 +947,15 @@ export default function EmployeeInboxPage() {
     const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState<'all' | 'unread'>('all');
+    const [filter, setFilter] = useState<'all' | 'unread' | string>('all');
+
+    // ── Custom folders ─────────────────────────────────────────
+    const [customFolders, setCustomFolders] = useState<InboxCustomFolder[]>(loadInboxFolders);
+    const [showCreateFolder, setShowCreateFolder] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+    const [folderDropSuccess, setFolderDropSuccess] = useState<string | null>(null);
+    const activeCustomFolder = customFolders.find(f => f.id === filter) || null;
 
     const fetchItems = useCallback(async () => {
         setLoading(true);
@@ -986,7 +993,7 @@ export default function EmployeeInboxPage() {
                                     });
                                 }
                             })
-                            .catch(() => {})
+                            .catch(() => { })
                             .finally(() => setLoadingDetail(false));
                     }
                 }
@@ -1040,6 +1047,11 @@ export default function EmployeeInboxPage() {
     }
 
     const displayItems = items.filter(item => {
+        // Custom folder filter
+        if (activeCustomFolder) {
+            const itemId = String(item._id || (item as any).id || '');
+            return activeCustomFolder.itemIds.includes(itemId);
+        }
         if (filter === 'unread' && item.isRead) return false;
         if (!search) return true;
         const s = search.toLowerCase();
@@ -1123,6 +1135,8 @@ export default function EmployeeInboxPage() {
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
                     {/* Left: inbox list (independent scroll) */}
                     <div style={{ width: 380, flexShrink: 0, height: '100%', minHeight: 0, borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-card)' }}>
+
+
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', minHeight: 0, overflowY: 'auto' }}>
                             {loading && items.length === 0 ? (
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)' }}>
@@ -1130,17 +1144,42 @@ export default function EmployeeInboxPage() {
                                 </div>
                             ) : displayItems.length === 0 ? (
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                                    <p>{filter === 'unread' ? 'No unread messages.' : 'Your inbox is empty.'}</p>
-                                    <p style={{ fontSize: 12, marginTop: 4 }}>Emails forwarded by your PM will appear here.</p>
+                                    <p>{activeCustomFolder ? `No messages in "${activeCustomFolder.name}"` : filter === 'unread' ? 'No unread messages.' : 'Your inbox is empty.'}</p>
+                                    <p style={{ fontSize: 12, marginTop: 4 }}>{activeCustomFolder ? 'Drag messages here from the list above.' : 'Emails forwarded by your PM will appear here.'}</p>
                                 </div>
-                            ) : displayItems.map(item => (
-                                <InboxRow
-                                    key={item._id || (item as any).id}
-                                    item={item}
-                                    active={selectedItem?._id === item._id || (selectedItem as any)?.id === item._id}
-                                    onClick={() => handleSelect(item)}
-                                />
-                            ))}
+                            ) : (
+                                // Show active folder banner if in custom folder
+                                <>
+                                    {activeCustomFolder && (
+                                        <div style={{ padding: '7px 14px', background: 'var(--color-primary-glow)', borderBottom: '1px solid var(--color-border-light)', fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                            <span>📁 {activeCustomFolder.name}</span>
+                                            <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 2 }}>— {activeCustomFolder.itemIds.length} message{activeCustomFolder.itemIds.length !== 1 ? 's' : ''}</span>
+                                            <button type="button" onClick={() => setFilter('all')} style={{ marginLeft: 'auto', fontSize: 11, border: 'none', background: 'transparent', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 700 }}>← All Messages</button>
+                                        </div>
+                                    )}
+                                    {displayItems.map(item => {
+                                        const itemId = String(item._id || (item as any).id || '');
+                                        return (
+                                            <div
+                                                key={item._id || (item as any).id}
+                                                draggable
+                                                onDragStart={e => {
+                                                    e.dataTransfer.setData('inboxItemId', itemId);
+                                                    e.dataTransfer.effectAllowed = 'copy';
+                                                }}
+                                                style={{ cursor: 'grab' }}
+                                                title="Drag to a folder to organise"
+                                            >
+                                                <InboxRow
+                                                    item={item}
+                                                    active={selectedItem?._id === item._id || (selectedItem as any)?.id === item._id}
+                                                    onClick={() => handleSelect(item)}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </>
+                            )}
                         </div>
 
                         {/* Pagination */}
@@ -1168,6 +1207,132 @@ export default function EmployeeInboxPage() {
                                 <p style={{ fontSize: 14, fontWeight: 500 }}>Select a message to view drawing instructions</p>
                             </div>
                         )}
+                    </div>
+
+                    {/* Right Sidebar: Custom Folders Panel */}
+                    <div style={{ width: 280, flexShrink: 0, height: '100%', minHeight: 0, borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-card)' }}>
+                        <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-page)', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 6px 12px' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
+                                    📁 My Folders
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowCreateFolder(v => !v); setNewFolderName(''); }}
+                                    style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                                        fontSize: 11.5, fontWeight: 600, padding: '3px 10px',
+                                        borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--color-primary)',
+                                        background: 'var(--color-primary-glow)', color: 'var(--color-primary)',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {showCreateFolder ? '✕ Cancel' : '+ New Folder'}
+                                </button>
+                            </div>
+
+                            {showCreateFolder && (
+                                <div style={{ padding: '4px 12px 8px 12px', display: 'flex', gap: 6 }}>
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="Folder name…"
+                                        value={newFolderName}
+                                        onChange={e => setNewFolderName(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newFolderName.trim()) {
+                                                const f: InboxCustomFolder = { id: `cf_${Date.now()}`, name: newFolderName.trim(), itemIds: [] };
+                                                const updated = [...customFolders, f];
+                                                setCustomFolders(updated); saveInboxFolders(updated);
+                                                setNewFolderName(''); setShowCreateFolder(false);
+                                            }
+                                        }}
+                                        style={{ fontSize: 12.5, flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        disabled={!newFolderName.trim()}
+                                        onClick={() => {
+                                            if (!newFolderName.trim()) return;
+                                            const f: InboxCustomFolder = { id: `cf_${Date.now()}`, name: newFolderName.trim(), itemIds: [] };
+                                            const updated = [...customFolders, f];
+                                            setCustomFolders(updated); saveInboxFolders(updated);
+                                            setNewFolderName(''); setShowCreateFolder(false);
+                                        }}
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            )}
+
+                            {customFolders.length > 0 ? (
+                                <div style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+                                    {customFolders.map(folder => {
+                                        const isActive = filter === folder.id;
+                                        const isDragOver = dragOverFolderId === folder.id;
+                                        const wasJustDropped = folderDropSuccess === folder.id;
+                                        return (
+                                            <div
+                                                key={folder.id}
+                                                onDragOver={e => { e.preventDefault(); setDragOverFolderId(folder.id); }}
+                                                onDragLeave={() => setDragOverFolderId(null)}
+                                                onDrop={e => {
+                                                    e.preventDefault(); setDragOverFolderId(null);
+                                                    const itemId = e.dataTransfer.getData('inboxItemId');
+                                                    if (!itemId) return;
+                                                    const updated = customFolders.map(f =>
+                                                        f.id === folder.id ? { ...f, itemIds: Array.from(new Set([...f.itemIds, itemId])) } : f
+                                                    );
+                                                    setCustomFolders(updated); saveInboxFolders(updated);
+                                                    setFolderDropSuccess(folder.id);
+                                                    setTimeout(() => setFolderDropSuccess(null), 1500);
+                                                }}
+                                                onClick={() => setFilter(isActive ? 'all' : folder.id)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 8,
+                                                    padding: '7px 12px', cursor: 'pointer',
+                                                    background: wasJustDropped ? 'var(--color-success-bg)' : isDragOver ? 'var(--color-primary-glow)' : isActive ? 'var(--color-primary-glow)' : 'transparent',
+                                                    borderLeft: `3px solid ${wasJustDropped ? 'var(--color-success-mid)' : isActive ? 'var(--color-primary)' : 'transparent'}`,
+                                                    borderBottom: '1px solid var(--color-border-light)',
+                                                    transition: 'background 0.12s',
+                                                    outline: isDragOver ? '1.5px dashed var(--color-primary)' : 'none',
+                                                    userSelect: 'none',
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13 }}>📁</span>
+                                                <span style={{ flex: 1, fontSize: 12.5, fontWeight: isActive ? 700 : 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {folder.name}
+                                                </span>
+                                                <span style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'var(--color-table-row-alt)', borderRadius: 10, padding: '1px 6px', flexShrink: 0 }}>
+                                                    {folder.itemIds.length}
+                                                </span>
+                                                {wasJustDropped && <span style={{ fontSize: 11, color: 'var(--color-success-mid)', fontWeight: 700, flexShrink: 0 }}>✓ Added</span>}
+                                                <button
+                                                    type="button"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        if (!window.confirm(`Delete folder "${folder.name}"?`)) return;
+                                                        const updated = customFolders.filter(f => f.id !== folder.id);
+                                                        setCustomFolders(updated); saveInboxFolders(updated);
+                                                        if (filter === folder.id) setFilter('all');
+                                                    }}
+                                                    style={{ border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 13, padding: '0 2px', borderRadius: 4, flexShrink: 0, lineHeight: 1 }}
+                                                >✕</button>
+                                            </div>
+                                        );
+                                    })}
+                                    <div style={{ padding: '5px 12px 6px', fontSize: 10.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                        Drag &amp; drop a message onto a folder to organise it
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ padding: '4px 12px 8px 12px', fontSize: 11.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                    No folders yet — create one above, then drag messages into it
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -13,11 +13,11 @@ try:
     ssh.connect(host, username=user, password=password)
     
     sftp = ssh.open_sftp()
-    sftp.put(r'c:\steel-project(2)\steel-project\steel-project\backend\src\controllers\fileGatewayController.js', '/var/www/steel-project/backend/src/controllers/fileGatewayController.js')
+    sftp.put(r'c:\steel-project(2)\steel-project\steel-project\backend\vps_env.txt', '/var/www/steel-project/backend/.env')
     sftp.close()
     
     commands = """
-    pm2 restart steel-dms
+    pm2 restart steel-dms --update-env
     """
     
     stdin, stdout, stderr = ssh.exec_command(commands)

@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { 
-    IconNotification, IconFolder, IconActivity 
+import {
+    IconNotification, IconFolder, IconActivity
 } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -47,30 +47,32 @@ function NotificationBell() {
 
     useEffect(() => {
         if (token) {
-            fetch('/steel/api/notifications', {
+            const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+            fetch(`${BASE}/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.notifications) {
-                    // Map backend data to UI icons
-                    const mapped = data.notifications.map((n: any) => ({
-                        ...n,
-                        id: n._id,
-                        icon: n.type === 'assignment' ? <IconFolder /> : <IconActivity />,
-                        time: formatDate(n.createdAt) === formatDate(new Date()) ? 'Today' : formatDate(n.createdAt)
-                    }));
-                    setNotifications(mapped);
-                }
-            })
-            .catch(err => console.error('Failed to fetch notifications:', err));
+                .then(res => res.json())
+                .then(data => {
+                    if (data.notifications) {
+                        // Map backend data to UI icons
+                        const mapped = data.notifications.map((n: any) => ({
+                            ...n,
+                            id: n._id,
+                            icon: n.type === 'assignment' ? <IconFolder /> : <IconActivity />,
+                            time: formatDate(n.createdAt) === formatDate(new Date()) ? 'Today' : formatDate(n.createdAt)
+                        }));
+                        setNotifications(mapped);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch notifications:', err));
         }
     }, [token]);
 
     const handleMarkAllRead = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
-            await fetch('/steel/api/notifications/mark-read', {
+            const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+            await fetch(`${BASE}/notifications/mark-read`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -82,10 +84,10 @@ function NotificationBell() {
 
     return (
         <div style={{ position: 'relative' }}>
-            <button 
-                className="btn-icon" 
+            <button
+                className="btn-icon"
                 onClick={() => setShowNotifications(!showNotifications)}
-                style={{ 
+                style={{
                     position: 'relative',
                     color: showNotifications ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                     background: showNotifications ? 'var(--color-primary-glow)' : 'transparent',
@@ -117,18 +119,18 @@ function NotificationBell() {
 
             {showNotifications && (
                 <>
-                    <div 
-                        style={{ position: 'fixed', inset: 0, zIndex: 999 }} 
-                        onClick={() => setShowNotifications(false)} 
+                    <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                        onClick={() => setShowNotifications(false)}
                     />
-                    <div 
-                        className="topbar-dropdown" 
-                        style={{ 
+                    <div
+                        className="topbar-dropdown"
+                        style={{
                             position: 'absolute',
                             top: '50px',
-                            right: '-10px', 
-                            width: '380px', 
-                            zIndex: 9999, 
+                            right: '-10px',
+                            width: '380px',
+                            zIndex: 9999,
                             display: 'block',
                             background: 'white',
                             boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
@@ -138,19 +140,19 @@ function NotificationBell() {
                             animation: 'dropdownScale 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                     >
-                        <div className="dropdown-header" style={{ 
+                        <div className="dropdown-header" style={{
                             padding: '16px 20px',
                             borderBottom: '1px solid #f1f5f9',
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
+                            display: 'flex',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             background: '#f8fafc'
                         }}>
                             <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>Notifications</span>
-                            <span style={{ 
-                                fontSize: '12px', 
-                                fontWeight: 500, 
-                                color: 'var(--color-primary)', 
+                            <span style={{
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                color: 'var(--color-primary)',
                                 cursor: 'pointer'
                             }}
                                 onClick={handleMarkAllRead}
@@ -158,18 +160,18 @@ function NotificationBell() {
                         </div>
                         <div className="dropdown-list" style={{ maxHeight: 380, overflowY: 'auto' }}>
                             {notifications.length > 0 ? notifications.map(n => (
-                                <div key={n.id} className="dropdown-item" style={{ 
-                                    padding: '16px 20px', 
-                                    display: 'flex', 
-                                    gap: 16, 
+                                <div key={n.id} className="dropdown-item" style={{
+                                    padding: '16px 20px',
+                                    display: 'flex',
+                                    gap: 16,
                                     borderBottom: '1px solid var(--color-border-light)',
                                     cursor: 'pointer',
                                     transition: 'background 0.2s'
                                 }}>
-                                    <div style={{ 
-                                        width: 40, 
-                                        height: 40, 
-                                        borderRadius: '12px', 
+                                    <div style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '12px',
                                         background: n.type === 'assignment' ? 'var(--color-primary-glow)' : 'var(--color-bg-page)',
                                         color: n.type === 'assignment' ? 'var(--color-primary)' : 'var(--color-text-muted)',
                                         display: 'flex',
@@ -197,8 +199,8 @@ function NotificationBell() {
                             )}
                         </div>
                         <div style={{ padding: '12px 20px', background: 'var(--color-bg-page)' }}>
-                            <button 
-                                className="btn-primary w-full" 
+                            <button
+                                className="btn-primary w-full"
                                 style={{ padding: '8px', fontSize: 13 }}
                                 onClick={() => {
                                     navigate('/dashboard/notifications');
@@ -325,9 +327,9 @@ export default function AppLayout() {
 
     return (
         <div className="app-shell">
-            <Sidebar 
-                collapsed={sidebarCollapsed} 
-                onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+            <Sidebar
+                collapsed={sidebarCollapsed}
+                onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
             <div className={`main-content ${sidebarCollapsed ? 'expanded' : ''} ${isMailRoute ? 'main-content-viewport' : ''}`}>
                 {/* Topbar */}
@@ -344,15 +346,15 @@ export default function AppLayout() {
                         <LiveClock />
                         <ThemeToggle />
                         <NotificationBell />
-                        
-                        <div 
+
+                        <div
                             className="topbar-profile"
                             onClick={() => setShowUserDropdown(!showUserDropdown)}
-                            style={{ 
+                            style={{
                                 position: 'relative',
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: 10, 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
                                 cursor: 'pointer',
                                 padding: '4px 8px',
                                 borderRadius: '12px',
@@ -363,7 +365,7 @@ export default function AppLayout() {
                                 {isAdmin ? 'Admin' : 'User'}
                             </span>
                             <div className="topbar-user-avatar" style={{ margin: 0 }}>{initials}</div>
-                            
+
                             {/* Dropdown Menu */}
                             {showUserDropdown && (
                                 <div style={{
@@ -386,9 +388,9 @@ export default function AppLayout() {
                                         <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>{user?.username}</div>
                                         <div style={{ fontSize: '10px', color: '#64748b' }}>{user?.email}</div>
                                     </div>
-                                    
-                                    <button 
-                                        className="btn btn-ghost" 
+
+                                    <button
+                                        className="btn btn-ghost"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             navigate(isAdmin ? '/admin/settings' : '/dashboard/settings');
@@ -403,8 +405,8 @@ export default function AppLayout() {
                                         Settings
                                     </button>
 
-                                    <button 
-                                        className="btn btn-ghost" 
+                                    <button
+                                        className="btn btn-ghost"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             showConfirm('Logout', 'Are you sure you want to log out of the system?', () => {

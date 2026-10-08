@@ -294,9 +294,9 @@ const CSS = `
     justify-content: space-between;
     padding: 10px 14px;
     border-radius: 8px;
-    border: 1px solid var(--color-border, #d0d7e3);
-    background: var(--color-bg-card, #ffffff);
-    color: var(--color-text-primary, #0f1623);
+    border: 1px solid var(--color-border, #e2e8f0);
+    background: var(--color-surface, #ffffff);
+    color: var(--color-text, #1e293b);
     cursor: pointer;
     transition: all 0.14s ease;
 }

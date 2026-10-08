@@ -1225,8 +1225,8 @@ router.patch('/emails/:id/folder', requireRoles(...MANAGER_ROLES), async (req, r
 router.get('/employees', requireRoles(...MANAGER_ROLES), async (req, res) => {
   try {
     const adminId = req.authUser.role === 'superadmin' ? null : (req.authUser.adminId || req.authUser.id);
-    const { employees, projects } = await listEmployees(adminId);
-    return res.json({ employees, projects });
+    const { employees, projects, teams } = await listEmployees(adminId);
+    return res.json({ employees, projects, teams });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch employees' });
   }

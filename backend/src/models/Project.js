@@ -142,7 +142,14 @@ const projectSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
-        // ── Sequence Progress ─────────────────────────────────
+        // ── Tracking Mode ─────────────────────────────────
+        trackingMode: {
+            type: String,
+            enum: ['sow', 'seq'],
+            default: 'sow'
+        },
+
+        // ── Sequence Progress (Legacy / Top-level if trackingMode = seq) ─────────────────────────────────
         sequences: {
             type: [{
                 name: { type: String, required: true },
@@ -161,7 +168,17 @@ const projectSchema = new mongoose.Schema(
                 percentage: { type: Number, default: 0 },
                 approval: { type: Number, default: 0 },
                 fabrication: { type: Number, default: 0 },
-                status: { type: String, default: 'Yet to Start' }
+                status: { type: String, default: 'Yet to Start' },
+                sequences: {
+                    type: [{
+                        name: { type: String, required: true },
+                        status: { type: String, enum: ['Completed', 'Not Completed'], default: 'Not Completed' },
+                        deadline: { type: Date },
+                        approvalDate: { type: Date, default: null },
+                        fabricationDate: { type: Date, default: null }
+                    }],
+                    default: []
+                }
             }],
             default: []
         },

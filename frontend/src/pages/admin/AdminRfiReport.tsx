@@ -118,7 +118,7 @@ export default function AdminRfiReport() {
                                         <div className="client-icon-box">
                                             <IconFolder />
                                         </div>
-                                        <div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
                                             <div className="client-name" title={project.name}>{project.name}</div>
                                             <span className={`client-status-badge status-${project.status || 'active'}`}>
                                                 {project.status || 'active'}
@@ -138,7 +138,7 @@ export default function AdminRfiReport() {
                                     </div>
                                 </div>
 
-                                <div className="client-card-footer" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                <div className="client-card-footer" style={{ display: 'flex', gap: 8 }}>
                                     <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => handleSelectProject(project._id || project.id, 'view')}
@@ -147,16 +147,16 @@ export default function AdminRfiReport() {
                                         View
                                     </button>
                                     <button
-                                        className="btn btn-primary btn-sm"
+                                        className="btn btn-primary-light btn-sm"
                                         onClick={() => handleSelectProject(project._id || project.id, 'edit')}
                                         style={{ flex: 1, justifyContent: 'center' }}
                                     >
                                         Edit
                                     </button>
                                     <button
-                                        className="btn btn-ghost btn-sm"
+                                        className="btn btn-primary btn-sm"
                                         onClick={() => window.open(getRfiReportDownloadUrl(project._id || project.id, 'latest'), '_blank')}
-                                        style={{ flex: '1 1 100%', justifyContent: 'center', marginTop: 4 }}
+                                        style={{ flex: 1, justifyContent: 'center' }}
                                         title="Download Latest RFI Log"
                                     >
                                         <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" style={{ marginRight: 6 }}>

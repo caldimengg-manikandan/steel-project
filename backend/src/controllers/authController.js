@@ -9,6 +9,7 @@
  * POST /api/auth/user/login
  */
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const { logActivity } = require('../utils/logger');
@@ -172,4 +173,53 @@ async function logout(req, res) {
     res.json({ message: 'Logged out successfully' });
 }
 
-module.exports = { adminLogin, userLogin, getMe, logout };
+/**
+ * PATCH /api/auth/change-password
+ * Body: { currentPassword, newPassword }
+ * Works for BOTH admins (role=admin) and regular users.
+ */
+async function changePassword(req, res) {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required.' });
+        }
+        if (typeof newPassword !== 'string' || newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+        }
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ error: 'New password must be different from the current password.' });
+        }
+
+        const principal = req.principal;
+        let account;
+
+        if (principal.role === 'admin') {
+            account = await Admin.findById(principal.id).select('+password_hash');
+        } else {
+            account = await User.findById(principal.id).select('+password_hash');
+        }
+
+        if (!account) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        const valid = await account.matchPassword(currentPassword);
+        if (!valid) {
+            return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+
+        // Set new password — the pre-save hook will hash it
+        account.password_hash = newPassword;
+        await account.save();
+
+        await logActivity(principal.username, 'Auth', 'Password changed');
+        res.json({ message: 'Password updated successfully.' });
+    } catch (err) {
+        console.error('[AUTH_ERROR] changePassword failed:', err);
+        throw err;
+    }
+}
+
+module.exports = { adminLogin, userLogin, getMe, logout, changePassword };

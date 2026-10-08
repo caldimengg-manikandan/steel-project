@@ -2,7 +2,7 @@
 // Types for Steel Detailing Document Management System
 // ============================================================
 
-export type UserRole = 'admin' | 'user' | 'superadmin' | 'project_manager' | 'team_lead' | 'team_member';
+export type UserRole = 'admin' | 'user' | 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member';
 export type ProjectPermission = 'viewer' | 'editor' | 'admin';
 export type ProjectStatus = 'in_progress' | 'on_hold' | 'completed' | 'archived';
 export type UserStatus = 'active' | 'inactive';
@@ -35,6 +35,10 @@ export interface User {
     createdAt: string;
     /** Multi-tenant key: the admin who owns this user */
     adminId: string;
+    division?: string;
+    project_manager?: string;
+    assistant_project_manager?: string;
+    team_lead?: string;
 }
 
 export interface ProjectAssignment {
@@ -89,14 +93,37 @@ export interface Project {
         approval?: number; 
         fabrication?: number; 
         status?: string; 
+        approvalDate?: string;
+        fabricationDate?: string;
+        sequences?: Array<{
+            name: string;
+            percentage?: number;
+            approval?: number;
+            fabrication?: number;
+            status?: string;
+            approvalDate?: string;
+            fabricationDate?: string;
+        }>;
     }>;
     additionalScopeOfWork?: Array<{ 
         name: string; 
         percentage?: number; 
         approval?: number; 
         fabrication?: number; 
-        status?: string; 
+        status?: string;
+        approvalDate?: string;
+        fabricationDate?: string; 
+        sequences?: Array<{
+            name: string;
+            percentage?: number;
+            approval?: number;
+            fabrication?: number;
+            status?: string;
+            approvalDate?: string;
+            fabricationDate?: string;
+        }>;
     }>;
+    trackingMode?: string;
     openRfiCount?: number;
     closedRfiCount?: number;
     totalCO?: number;

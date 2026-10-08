@@ -4,6 +4,7 @@ import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, admi
 import { formatDate } from '../../utils/dateUtils';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
+import { adminListTeams, adminCreateTeam, adminDeleteTeam, type Team } from '../../services/adminTeamApi';
 import { useMessage } from '../../context/MessageContext';
 import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit } from '../../components/Icons';
 
@@ -12,15 +13,23 @@ interface CreateUserForm {
     email: string; 
     password: string; 
     displayName: string;
-    role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+    role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+    division: string;
+    project_manager: string;
+    assistant_project_manager: string;
+    team_lead: string;
 }
 const DEFAULT_FORM: CreateUserForm = {
     username: '',
     email: '',
     password: '',
     displayName: '',
-    role: ''
-};;
+    role: '',
+    division: '',
+    project_manager: '',
+    assistant_project_manager: '',
+    team_lead: ''
+};
 
 export default function AdminUsers() {
     const { showMessage, showConfirm } = useMessage();
@@ -30,6 +39,10 @@ export default function AdminUsers() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
+    const [showCreateTeam, setShowCreateTeam] = useState(false);
+    const [teamForm, setTeamForm] = useState<{name: string, lead: string, members: string[]}>({name: '', lead: '', members: []});
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
@@ -39,13 +52,21 @@ export default function AdminUsers() {
     const [editForm, setEditForm] = useState<{
         displayName: string;
         email: string;
-        role: 'superadmin' | 'project_manager' | 'team_lead' | 'team_member' | 'user' | '';
+        role: 'superadmin' | 'project_manager' | 'assistant_project_manager' | 'team_lead' | 'team_member' | 'user' | '';
         password?: string;
+        division: string;
+        project_manager: string;
+        assistant_project_manager: string;
+        team_lead: string;
     }>({
         displayName: '',
         email: '',
         role: 'team_member',
-        password: ''
+        password: '',
+        division: '',
+        project_manager: '',
+        assistant_project_manager: '',
+        team_lead: ''
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -63,15 +84,17 @@ export default function AdminUsers() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [userData, projectData, clientData] = await Promise.all([
+            const [userData, projectData, clientData, teamsData] = await Promise.all([
                 adminListUsers(),
                 adminListProjects(),
-                adminListClients()
+                adminListClients(),
+                adminListTeams()
             ]);
 
             setUsers(userData.users.map((u: any) => ({ ...u, id: u._id || u.id })));
             setProjects(projectData.projects.map((p: any) => ({ ...p, id: p._id || p.id })));
             setClients(clientData.clients || []);
+            setTeams(teamsData || []);
         } catch (err: any) {
             setError(err.message || 'Failed to load data');
         } finally {
@@ -151,7 +174,11 @@ export default function AdminUsers() {
             const updateData: any = {
                 displayName: editForm.displayName,
                 email: editForm.email,
-                role: editForm.role || 'team_member'
+                role: editForm.role || 'team_member',
+                division: editForm.division,
+                project_manager: editForm.project_manager,
+                assistant_project_manager: editForm.assistant_project_manager,
+                team_lead: editForm.team_lead
             };
             if (editForm.password && editForm.password.trim()) {
                 updateData.password = editForm.password;
@@ -235,13 +262,44 @@ export default function AdminUsers() {
                     <p className="page-subtitle">Manage portal users, their accounts, and project access</p>
                 </div>
                 <div className="page-header-right" style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn btn-secondary" onClick={() => { setShowBulk(true); setBulkResult(null); setBulkFile(null); setBulkError(''); }}>
-                        <IconUpload /> Bulk Upload
-                    </button>
-                    <button className="btn btn-primary" onClick={() => { setShowCreate(true); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateFields([]); setDuplicateError(''); }}>
-                        <IconPlus /> New User
-                    </button>
+                    {activeTab === 'users' ? (
+                        <>
+                            <button className="btn btn-secondary" onClick={() => { setShowBulk(true); setBulkResult(null); setBulkFile(null); setBulkError(''); }}>
+                                <IconUpload /> Bulk Upload
+                            </button>
+                            <button className="btn btn-primary" onClick={() => { setShowCreate(true); setForm(DEFAULT_FORM); setShowPassword(false); setDuplicateFields([]); setDuplicateError(''); }}>
+                                <IconPlus /> New User
+                            </button>
+                        </>
+                    ) : (
+                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setTeamForm({name: '', lead: '', members: []}); }}>
+                            <IconPlus /> Create Team
+                        </button>
+                    )}
                 </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid var(--color-border-light)', marginBottom: 20 }}>
+                <button
+                    onClick={() => setActiveTab('users')}
+                    style={{
+                        background: 'none', border: 'none', padding: '10px 4px', fontSize: 14, fontWeight: 600,
+                        cursor: 'pointer', borderBottom: activeTab === 'users' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                        color: activeTab === 'users' ? 'var(--color-primary)' : 'var(--color-text-muted)'
+                    }}
+                >
+                    Users
+                </button>
+                <button
+                    onClick={() => setActiveTab('teams')}
+                    style={{
+                        background: 'none', border: 'none', padding: '10px 4px', fontSize: 14, fontWeight: 600,
+                        cursor: 'pointer', borderBottom: activeTab === 'teams' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                        color: activeTab === 'teams' ? 'var(--color-primary)' : 'var(--color-text-muted)'
+                    }}
+                >
+                    Teams
+                </button>
             </div>
 
             {error && (
@@ -251,6 +309,8 @@ export default function AdminUsers() {
                 </div>
             )}
 
+            {activeTab === 'users' ? (
+            <>
             {/* Stats */}
             <div className="stats-grid mb-lg" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                 {[
@@ -369,7 +429,11 @@ export default function AdminUsers() {
                                                              displayName: u.displayName || '',
                                                              email: u.email || '',
                                                              role: (u.role as any) || 'team_member',
-                                                             password: ''
+                                                             password: '',
+                                                             division: u.division || '',
+                                                             project_manager: typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : (u.project_manager || ''),
+                                                             assistant_project_manager: typeof u.assistant_project_manager === 'object' ? (u.assistant_project_manager as any)?._id : (u.assistant_project_manager || ''),
+                                                             team_lead: typeof u.team_lead === 'object' ? (u.team_lead as any)?._id : (u.team_lead || '')
                                                          });
                                                      }}
                                                      title="Edit User & Role"
@@ -412,6 +476,120 @@ export default function AdminUsers() {
                     </table>
                 )}
             </div>
+            </>
+            ) : (
+                <div className="card">
+                    <table className="table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>TEAM NAME</th>
+                                <th>TEAM LEAD</th>
+                                <th>MEMBERS</th>
+                                <th>ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {teams.map((t, idx) => (
+                                <tr key={t.id || t._id}>
+                                    <td>{idx + 1}</td>
+                                    <td>{t.name}</td>
+                                    <td>{t.lead?.username}</td>
+                                    <td>{t.members?.length || 0} Members</td>
+                                    <td>
+                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
+                                            showConfirm('Delete Team', 'Are you sure you want to delete this team?', async () => {
+                                                try {
+                                                    await adminDeleteTeam(t._id || t.id);
+                                                    setTeams(teams.filter(team => (team._id || team.id) !== (t._id || t.id)));
+                                                    showMessage('Success', 'Team deleted.', 'success');
+                                                } catch(err: any) {
+                                                    showMessage('Error', err.message, 'error');
+                                                }
+                                            });
+                                        }}>
+                                            <IconTrash />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {teams.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="text-center text-muted" style={{ padding: 40 }}>No teams created yet.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* ── Create Team Modal ── */}
+            {showCreateTeam && (
+                <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setShowCreateTeam(false) }}>
+                    <div className="modal" style={{ width: 500 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Create Team</span>
+                            <button className="modal-close" onClick={() => setShowCreateTeam(false)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label className="form-label">Team Name</label>
+                                <input className="form-control" value={teamForm.name} onChange={e => setTeamForm({...teamForm, name: e.target.value})} placeholder="Enter team name" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Team Lead</label>
+                                <select className="form-control" value={teamForm.lead} onChange={e => setTeamForm({...teamForm, lead: e.target.value})}>
+                                    <option value="">Select a Lead</option>
+                                    {users.filter(u => u.role === 'team_lead').map(u => (
+                                        <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Team Members</label>
+                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 150, overflowY: 'auto' }}>
+                                    {users.filter(u => u.role === 'team_member').map(u => (
+                                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={teamForm.members.includes(u.id)} 
+                                                onChange={(e) => {
+                                                    const m = new Set(teamForm.members);
+                                                    if (e.target.checked) m.add(u.id);
+                                                    else m.delete(u.id);
+                                                    setTeamForm({...teamForm, members: Array.from(m)});
+                                                }}
+                                            />
+                                            {u.username}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-ghost" onClick={() => setShowCreateTeam(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={async () => {
+                                if (!teamForm.name || !teamForm.lead) {
+                                    return showMessage('Error', 'Name and Lead are required', 'error');
+                                }
+                                try {
+                                    setCreating(true);
+                                    await adminCreateTeam(teamForm);
+                                    setShowCreateTeam(false);
+                                    fetchData();
+                                    showMessage('Success', 'Team created', 'success');
+                                } catch(err: any) {
+                                    showMessage('Error', err.message, 'error');
+                                } finally {
+                                    setCreating(false);
+                                }
+                            }} disabled={creating}>
+                                {creating ? 'Creating...' : 'Create Team'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Create User Modal ── */}
             {showCreate && (
@@ -541,17 +719,59 @@ export default function AdminUsers() {
                                     </div>
                                 </div>
 
+                                {/* Division */}
+                                <div className="form-group">
+                                    <label className="form-label required">Division</label>
+                                    <select className="form-control" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}>
+                                        <option value="">Select division</option>
+                                        <option value="Tekla">Tekla</option>
+                                        <option value="SDS2">SDS2</option>
+                                    </select>
+                                </div>
+
                                 {/* Account Role */}
                                 <div className="form-group">
                                     <label className="form-label required">Account Role</label>
-                                    <select className="form-control" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
+                                    <select className="form-control" value={form.role} onChange={e => {
+                                        setForm({ ...form, role: e.target.value as any, project_manager: '', assistant_project_manager: '', team_lead: '' });
+                                    }}>
                                         <option value="">Select role</option>
                                         <option value="superadmin">Super Admin — Full system access</option>
                                         <option value="project_manager">Project Manager — Full system access</option>
+                                        <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
                                     </select>
                                 </div>
+
+                                {/* Managers Selection */}
+                                {(form.role === 'team_member' || form.role === 'team_lead' || form.role === 'assistant_project_manager') && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Project Manager</label>
+                                        <select className="form-control" value={form.project_manager} onChange={e => setForm({ ...form, project_manager: e.target.value })}>
+                                            <option value="">Select Project Manager</option>
+                                            {users.filter(u => u.role === 'project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {(form.role === 'team_member' || form.role === 'team_lead') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Assistant Project Manager</label>
+                                        <select className="form-control" value={form.assistant_project_manager} onChange={e => setForm({ ...form, assistant_project_manager: e.target.value })}>
+                                            <option value="">Select Assistant Project Manager</option>
+                                            {users.filter(u => u.role === 'assistant_project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {form.role === 'team_member' && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Team Lead</label>
+                                        <select className="form-control" value={form.team_lead} onChange={e => setForm({ ...form, team_lead: e.target.value })}>
+                                            <option value="">Select Team Lead</option>
+                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Actions */}
                                 <div className="form-actions" style={{ marginTop: 24 }}>
@@ -592,10 +812,50 @@ export default function AdminUsers() {
                                     >
                                         <option value="team_member">Team Member — Editor access (assigned)</option>
                                         <option value="team_lead">Team Lead — Full system access</option>
+                                        <option value="assistant_project_manager">Assistant Project Manager — Full system access</option>
                                         <option value="project_manager">Project Manager — Full system access</option>
                                         <option value="superadmin">Superadmin — Full system access</option>
                                     </select>
                                 </div>
+
+                                {/* Division */}
+                                <div className="form-group">
+                                    <label className="form-label required">Division</label>
+                                    <select className="form-control" value={editForm.division} onChange={e => setEditForm({ ...editForm, division: e.target.value })}>
+                                        <option value="">Select division</option>
+                                        <option value="Tekla">Tekla</option>
+                                        <option value="SDS2">SDS2</option>
+                                    </select>
+                                </div>
+
+                                {/* Managers Selection */}
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead' || editForm.role === 'assistant_project_manager') && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Project Manager</label>
+                                        <select className="form-control" value={editForm.project_manager} onChange={e => setEditForm({ ...editForm, project_manager: e.target.value })}>
+                                            <option value="">Select Project Manager</option>
+                                            {users.filter(u => u.role === 'project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {(editForm.role === 'team_member' || editForm.role === 'team_lead') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Assistant Project Manager</label>
+                                        <select className="form-control" value={editForm.assistant_project_manager} onChange={e => setEditForm({ ...editForm, assistant_project_manager: e.target.value })}>
+                                            <option value="">Select Assistant Project Manager</option>
+                                            {users.filter(u => u.role === 'assistant_project_manager').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                {editForm.role === 'team_member' && (
+                                    <div className="form-group">
+                                        <label className="form-label required">Team Lead</label>
+                                        <select className="form-control" value={editForm.team_lead} onChange={e => setEditForm({ ...editForm, team_lead: e.target.value })}>
+                                            <option value="">Select Team Lead</option>
+                                            {users.filter(u => u.role === 'team_lead').map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Email Address */}
                                 <div className="form-group">

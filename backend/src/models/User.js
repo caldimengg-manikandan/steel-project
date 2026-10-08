@@ -56,10 +56,29 @@ const userSchema = new mongoose.Schema(
             default: '',
         },
 
+        division: {
+            type: String,
+            enum: ['Tekla', 'SDS2'],
+        },
+
         role: {
             type: String,
-            enum: ['user', 'superadmin', 'project_manager', 'team_lead', 'team_member'],
+            enum: ['user', 'superadmin', 'project_manager', 'assistant_project_manager', 'team_lead', 'team_member'],
             default: 'user',
+        },
+
+        // ── Hierarchy ─────────────────────────────────────────
+        project_manager: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        assistant_project_manager: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        team_lead: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
         },
 
         status: {
@@ -102,6 +121,10 @@ userSchema.methods.toSafeObject = function () {
         email: this.email,
         displayName: this.displayName,
         role: this.role,
+        division: this.division,
+        project_manager: this.project_manager,
+        assistant_project_manager: this.assistant_project_manager,
+        team_lead: this.team_lead,
         status: this.status,
         adminId: this.adminId,
         createdAt: this.createdAt,

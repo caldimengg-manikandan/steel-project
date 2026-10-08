@@ -757,6 +757,17 @@ tbody tr:hover {
   box-shadow: 0 2px 8px rgba(30, 79, 216, 0.4);
 }
 
+.btn-primary-light {
+  background: #bfdbfe;
+  color: var(--color-primary-dark);
+  border-color: transparent;
+}
+
+.btn-primary-light:hover {
+  background: #93c5fd;
+  color: var(--color-primary-dark);
+}
+
 .btn-secondary {
   background: var(--color-bg-card);
   color: var(--color-text-secondary);
@@ -1215,7 +1226,7 @@ textarea.form-control {
 
 /* ─── Project Header Bar ─────────────────────────────── */
 .project-header-bar {
-  background: #fff;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-lg) var(--space-xl);
@@ -3386,7 +3397,7 @@ textarea.form-control {
 
 /* ─── Project Header Bar ─────────────────────────────── */
 .project-header-bar {
-  background: #fff;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-lg) var(--space-xl);
