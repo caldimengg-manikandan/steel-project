@@ -86,7 +86,7 @@ async function createUser(req, res) {
         displayName: displayName || username,
         adminId,                   // ← injected — cannot be spoofed by client
         role: assignedRole,
-        division,
+        division: (assignedRole === 'superadmin' || !division) ? undefined : division,
         project_manager: project_manager || null,
         assistant_project_manager: assistant_project_manager || null,
         team_lead: team_lead && team_lead.length ? team_lead : undefined,
@@ -117,7 +117,9 @@ async function updateUser(req, res) {
     if (employeeId !== undefined) user.employeeId = employeeId;
     if (displayName !== undefined) user.displayName = displayName;
     if (email !== undefined) user.email = email;
-    if (division !== undefined) user.division = division;
+    if (division !== undefined) {
+        user.division = (role === 'superadmin' || user.role === 'superadmin' || !division) ? undefined : division;
+    }
     if (project_manager !== undefined) user.project_manager = project_manager || null;
     if (assistant_project_manager !== undefined) user.assistant_project_manager = assistant_project_manager || null;
     if (team_lead !== undefined) user.team_lead = team_lead;

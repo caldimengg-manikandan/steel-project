@@ -832,8 +832,8 @@ export default function AdminUsers() {
 
                                 {/* Division */}
                                 <div className="form-group">
-                                    <label className="form-label required">Division</label>
-                                    <select className="form-control" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}>
+                                    <label className={`form-label ${form.role !== 'superadmin' ? 'required' : ''}`}>Division</label>
+                                    <select className="form-control" value={form.division} onChange={e => setForm({ ...form, division: e.target.value })} required={form.role !== 'superadmin'}>
                                         <option value="">Select division</option>
                                         <option value="SDS2">SDS2</option>
                                         <option value="Tekla">Tekla</option>
@@ -964,8 +964,8 @@ export default function AdminUsers() {
 
                                 {/* Division */}
                                 <div className="form-group">
-                                    <label className="form-label required">Division</label>
-                                    <select className="form-control" value={editForm.division} onChange={e => setEditForm({ ...editForm, division: e.target.value })}>
+                                    <label className={`form-label ${editForm.role !== 'superadmin' ? 'required' : ''}`}>Division</label>
+                                    <select className="form-control" value={editForm.division} onChange={e => setEditForm({ ...editForm, division: e.target.value })} required={editForm.role !== 'superadmin'}>
                                         <option value="">Select division</option>
                                         <option value="SDS2">SDS2</option>
                                         <option value="Tekla">Tekla</option>
