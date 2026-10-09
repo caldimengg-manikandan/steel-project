@@ -13,7 +13,7 @@ const Admin = require('../models/Admin');
 const User = require('../models/User');
 
 // roles with full system access
-const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
 
 /**
  * verifyToken

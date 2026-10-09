@@ -38,7 +38,7 @@ const { calculateSowProgress } = require('../utils/sowCalculator');
 async function listProjects(req, res) {
     const { status, search } = req.query;
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
 
     const filter = {};

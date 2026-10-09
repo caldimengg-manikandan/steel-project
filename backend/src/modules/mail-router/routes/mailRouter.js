@@ -90,6 +90,8 @@ const FULL_ACCESS_ROLES = [
   'superadmin',
   'project_manager',
   'team_lead',
+  'assistant_project_manager',
+  'assistant_team_lead',
   'lead',
   'checker',
 ];

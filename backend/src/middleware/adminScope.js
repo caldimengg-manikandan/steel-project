@@ -204,7 +204,7 @@ async function scopeProjectAccess(req, res, next) {
         });
     }
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'pm', 'tl'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead', 'pm', 'tl'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
     let project = null;

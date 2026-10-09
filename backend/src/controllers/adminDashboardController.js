@@ -13,7 +13,7 @@ async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
     const mongoose = require('mongoose');
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
 
     const filter = {};

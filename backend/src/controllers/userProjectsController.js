@@ -23,7 +23,7 @@ async function listMyProjects(req, res) {
         queryUserId = new mongoose.Types.ObjectId(userId);
     }
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
 
     const query = {
