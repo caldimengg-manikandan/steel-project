@@ -44,3 +44,13 @@ export async function adminDeleteTeam(id: string) {
     });
     return handleResponse(res);
 }
+
+export async function adminUpdateTeam(id: string, payload: { name: string; lead: string[]; members: string[] }) {
+    const res = await fetch(`${BASE}/admin/teams/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+}

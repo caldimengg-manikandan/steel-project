@@ -4,7 +4,7 @@ import { adminListUsers, adminCreateUser, adminDeleteUser, adminUpdateUser, admi
 import { formatDate } from '../../utils/dateUtils';
 import { adminListProjects, adminAssignUser } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
-import { adminListTeams, adminCreateTeam, adminDeleteTeam, type Team } from '../../services/adminTeamApi';
+import { adminListTeams, adminCreateTeam, adminDeleteTeam, adminUpdateTeam, type Team } from '../../services/adminTeamApi';
 import { useMessage } from '../../context/MessageContext';
 import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit } from '../../components/Icons';
 
@@ -47,6 +47,9 @@ export default function AdminUsers() {
     const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
     const [showCreateTeam, setShowCreateTeam] = useState(false);
     const [teamForm, setTeamForm] = useState<{name: string, lead: string[], members: string[]}>({name: '', lead: [], members: []});
+    const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+    const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
+    const [teamSearch, setTeamSearch] = useState('');
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
@@ -284,7 +287,7 @@ export default function AdminUsers() {
                             </button>
                         </>
                     ) : (
-                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setTeamForm({name: '', lead: [], members: []}); }}>
+                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setEditingTeamId(null); setTeamSearch(''); setTeamForm({name: '', lead: [], members: []}); }}>
                             <IconPlus /> Create Team
                         </button>
                     )}
@@ -516,7 +519,22 @@ export default function AdminUsers() {
                                             : t.lead?.username}
                                     </td>
                                     <td>{t.members?.length || 0} Members</td>
-                                    <td>
+                                    <td style={{ display: 'flex', gap: 8 }}>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => setViewingTeam(t)}>
+                                            View
+                                        </button>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => {
+                                            setTeamForm({
+                                                name: t.name,
+                                                lead: Array.isArray(t.lead) ? t.lead.map((l: any) => l._id || l.id) : (t.lead ? [t.lead._id || t.lead.id] : []),
+                                                members: t.members?.map((m: any) => m._id || m.id) || []
+                                            });
+                                            setEditingTeamId(t._id || t.id);
+                                            setTeamSearch('');
+                                            setShowCreateTeam(true);
+                                        }}>
+                                            <IconEdit />
+                                        </button>
                                         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
                                             showConfirm('Delete Team', 'Are you sure you want to delete this team?', async () => {
                                                 try {
@@ -543,12 +561,12 @@ export default function AdminUsers() {
                 </div>
             )}
 
-            {/* ── Create Team Modal ── */}
+            {/* ── Create / Edit Team Modal ── */}
             {showCreateTeam && (
                 <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setShowCreateTeam(false) }}>
-                    <div className="modal" style={{ width: 500 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal" style={{ width: 800 }} onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <span className="modal-title">Create Team</span>
+                            <span className="modal-title">{editingTeamId ? 'Edit Team' : 'Create Team'}</span>
                             <button className="modal-close" onClick={() => setShowCreateTeam(false)}><IconClose /></button>
                         </div>
                         <div className="modal-body">
@@ -557,9 +575,12 @@ export default function AdminUsers() {
                                 <input className="form-control" value={teamForm.name} onChange={e => setTeamForm({...teamForm, name: e.target.value})} placeholder="Enter team name" />
                             </div>
                             <div className="form-group">
+                                <input className="form-control" value={teamSearch} onChange={e => setTeamSearch(e.target.value)} placeholder="Search employees..." style={{ marginBottom: 10 }} />
+                            </div>
+                            <div className="form-group">
                                 <label className="form-label required">Team Leads</label>
-                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 150, overflowY: 'auto' }}>
-                                    {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
+                                    {users.filter(u => (u.role === 'team_lead' || u.role === 'assistant_team_lead') && u.username.toLowerCase().includes(teamSearch.toLowerCase())).map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
@@ -578,8 +599,8 @@ export default function AdminUsers() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Team Members</label>
-                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 150, overflowY: 'auto' }}>
-                                    {users.filter(u => u.role === 'team_member').map(u => (
+                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
+                                    {users.filter(u => u.role === 'team_member' && u.username.toLowerCase().includes(teamSearch.toLowerCase())).map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
@@ -605,18 +626,53 @@ export default function AdminUsers() {
                                 }
                                 try {
                                     setCreating(true);
-                                    await adminCreateTeam(teamForm);
+                                    if (editingTeamId) {
+                                        await adminUpdateTeam(editingTeamId, teamForm);
+                                        showMessage('Success', 'Team updated', 'success');
+                                    } else {
+                                        await adminCreateTeam(teamForm);
+                                        showMessage('Success', 'Team created', 'success');
+                                    }
                                     setShowCreateTeam(false);
                                     fetchData();
-                                    showMessage('Success', 'Team created', 'success');
                                 } catch(err: any) {
                                     showMessage('Error', err.message, 'error');
                                 } finally {
                                     setCreating(false);
                                 }
                             }} disabled={creating}>
-                                {creating ? 'Creating...' : 'Create Team'}
+                                {creating ? 'Saving...' : (editingTeamId ? 'Update Team' : 'Create Team')}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── View Team Modal ── */}
+            {viewingTeam && (
+                <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setViewingTeam(null) }}>
+                    <div className="modal" style={{ width: 600 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Team: {viewingTeam.name}</span>
+                            <button className="modal-close" onClick={() => setViewingTeam(null)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body">
+                            <h4 style={{ margin: '0 0 10px 0' }}>Team Leads</h4>
+                            <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
+                                {Array.isArray(viewingTeam.lead) 
+                                    ? viewingTeam.lead.map((l: any) => <li key={l._id || l.id}>{l.username} ({l.email})</li>)
+                                    : (viewingTeam.lead ? <li key={viewingTeam.lead._id || viewingTeam.lead.id}>{viewingTeam.lead.username} ({viewingTeam.lead.email})</li> : <li>No lead assigned</li>)}
+                            </ul>
+                            <h4 style={{ margin: '0 0 10px 0' }}>Team Members</h4>
+                            <ul style={{ paddingLeft: 20 }}>
+                                {viewingTeam.members?.map((m: any) => (
+                                    <li key={m._id || m.id}>{m.username} ({m.email})</li>
+                                ))}
+                                {(!viewingTeam.members || viewingTeam.members.length === 0) && <li>No members</li>}
+                            </ul>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-primary" onClick={() => setViewingTeam(null)}>Close</button>
                         </div>
                     </div>
                 </div>

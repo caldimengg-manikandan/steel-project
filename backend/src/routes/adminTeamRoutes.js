@@ -8,6 +8,7 @@ router.use(requireAdmin);
 
 router.post('/', teamController.createTeam);
 router.get('/', teamController.getTeams);
+router.put('/:id', teamController.updateTeam);
 router.delete('/:id', teamController.deleteTeam);
 
 module.exports = router;
