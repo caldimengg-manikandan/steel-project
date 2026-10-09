@@ -510,7 +510,7 @@ export default function AdminUsers() {
                             </tr>
                         </thead>
                         <tbody>
-                            {teams.map((t, idx) => (
+                            {[...teams].sort((a, b) => a.name.localeCompare(b.name)).map((t, idx) => (
                                 <tr key={t.id || t._id}>
                                     <td>{idx + 1}</td>
                                     <td>{t.name}</td>
@@ -580,7 +580,9 @@ export default function AdminUsers() {
                                 <label className="form-label required">Team Leads</label>
                                 <input className="form-control" value={teamLeadSearch} onChange={e => setTeamLeadSearch(e.target.value)} placeholder="Search team leads..." style={{ marginBottom: 10 }} />
                                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
-                                    {users.filter(u => (u.role === 'team_lead' || u.role === 'assistant_team_lead') && u.username.toLowerCase().includes(teamLeadSearch.toLowerCase())).map(u => (
+                                    {users.filter(u => (u.role === 'team_lead' || u.role === 'assistant_team_lead') && u.username.toLowerCase().includes(teamLeadSearch.toLowerCase()))
+                                        .sort((a, b) => a.username.localeCompare(b.username))
+                                        .map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
@@ -601,7 +603,9 @@ export default function AdminUsers() {
                                 <label className="form-label">Team Members</label>
                                 <input className="form-control" value={teamMemberSearch} onChange={e => setTeamMemberSearch(e.target.value)} placeholder="Search team members..." style={{ marginBottom: 10 }} />
                                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
-                                    {users.filter(u => u.role === 'team_member' && u.username.toLowerCase().includes(teamMemberSearch.toLowerCase())).map(u => (
+                                    {users.filter(u => u.role === 'team_member' && u.username.toLowerCase().includes(teamMemberSearch.toLowerCase()))
+                                        .sort((a, b) => a.username.localeCompare(b.username))
+                                        .map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
