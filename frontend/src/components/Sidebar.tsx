@@ -66,7 +66,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const { user } = useAuth();
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     const { settings } = useSettings();
     const isFullAccess = FULL_ACCESS_ROLES.includes(user?.role || '');
     const location = useLocation();

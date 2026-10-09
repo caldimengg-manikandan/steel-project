@@ -322,7 +322,8 @@ export default function AppLayout() {
         (pathname.includes('/projects/') ? 'Project View' : 'CALDIM steel dwf');
 
     const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
-    const isAdmin = user?.role === 'admin';
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
+    const isAdmin = FULL_ACCESS_ROLES.includes(user?.role || '');
     const isMailRoute = pathname.startsWith('/mail-router') || pathname.startsWith('/inbox');
 
     return (

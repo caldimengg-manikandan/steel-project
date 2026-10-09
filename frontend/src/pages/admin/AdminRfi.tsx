@@ -106,7 +106,7 @@ export default function AdminRfi() {
     const [dragOver, setDragOver] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     const isAdmin = user?.role && FULL_ACCESS_ROLES.includes(user.role);
     const { showMessage, showConfirm } = useMessage();
 

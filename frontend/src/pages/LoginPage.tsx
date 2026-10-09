@@ -13,7 +13,7 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
     useEffect(() => {
         if (user) {
             navigate(FULL_ACCESS_ROLES.includes(user.role) ? '/admin' : '/dashboard', { replace: true });

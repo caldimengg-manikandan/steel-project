@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 
 // Roles that have full system access (equivalent to admin)
-const FULL_ACCESS_ROLES: UserRole[] = ['admin', 'superadmin', 'project_manager', 'team_lead'];
+const FULL_ACCESS_ROLES: UserRole[] = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
