@@ -59,8 +59,11 @@ async function getAdminStats(req, res) {
     const totalDrawings = await DrawingExtraction.countDocuments({ status: 'completed' });
     const recentProjects = combinedAll.slice(0, 10);
 
-    const totalUsers = users.length;
-    const activeUsers = users.filter(u => u.status === 'active').length;
+    // Include the primary admin in user totals (always matches listUsers behavior)
+    const adminCount = 1;
+    
+    const totalUsers = users.length + adminCount;
+    const activeUsers = users.filter(u => u.status === 'active').length + adminCount;
 
     // Aggregated Sequence Stats
     let totalSequences = 0;
