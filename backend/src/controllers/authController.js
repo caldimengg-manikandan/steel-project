@@ -119,7 +119,7 @@ async function userLogin(req, res) {
             id: user._id.toString(),
             username: user.username,
             email: user.email,
-            role: 'user',
+            role: user.role,
             adminId: user.adminId.toString(),
         });
 
