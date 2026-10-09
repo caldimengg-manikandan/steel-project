@@ -3,6 +3,7 @@ import { adminGetDashboardStats } from '../../services/adminUserApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatDate } from '../../utils/dateUtils';
 import type { Client } from '../../types';
 
@@ -39,6 +40,7 @@ export default function AdminDashboard() {
     const [clientFilter, setClientFilter] = useState('ALL');
     const navigate = useNavigate();
     const { settings } = useSettings();
+    const { user } = useAuth();
 
     const fetchStats = useCallback(async () => {
         try {
@@ -89,7 +91,7 @@ export default function AdminDashboard() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h2 className="page-title">Admin Dashboard</h2>
+                    <h2 className="page-title">Welcome back, {user?.username}</h2>
                     <p className="page-subtitle">Overview of your projects, users, and drawings</p>
                 </div>
             </div>
