@@ -410,24 +410,7 @@ export default function AdminSettings() {
                             }
                         };
 
-                        const handleTestEmail = async () => {
-                            setTestingEmail(true);
-                            try {
-                                const res = await fetch(`${BASE}/settings/email/test`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'include',
-                                    body: JSON.stringify({ testEmail: testEmailAddr || emailForm.smtpUser })
-                                });
-                                const data = await res.json();
-                                if (res.ok) showMessage('Success', data.message, 'success');
-                                else showMessage('Failed', data.error, 'error');
-                            } catch (e) {
-                                showMessage('Error', 'Network error.', 'error');
-                            } finally {
-                                setTestingEmail(false);
-                            }
-                        };
+
 
                         const renderEmailList = (role: 'superAdmin' | 'projectManager' | 'teamLead', label: string, roleKey: string) => (
                             <div style={{ marginBottom: 28 }}>
