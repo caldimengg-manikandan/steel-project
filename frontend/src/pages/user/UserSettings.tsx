@@ -225,9 +225,6 @@ export default function UserSettings() {
                             <SettingRow title="In-App Notifications" desc="Show an alert in the top bar bell when a new project is assigned to you">
                                 <Toggle enabled={localPrefs.inAppNotifications} onChange={(v) => handleLocalPrefChange('inAppNotifications', v)} />
                             </SettingRow>
-                            <SettingRow title="Weekly Dashboard Summary" desc="A summarized overview of your project progress">
-                                <Toggle enabled={localPrefs.weeklySummary} onChange={(v) => handleLocalPrefChange('weeklySummary', v)} />
-                            </SettingRow>
                         </Card>
                     )}
 

@@ -46,6 +46,14 @@ function NotificationBell() {
     const token = user?.token;
 
     useEffect(() => {
+        let inAppNotifications = true;
+        try {
+            const prefs = JSON.parse(localStorage.getItem('user_local_prefs') || '{}');
+            if (prefs.inAppNotifications === false) inAppNotifications = false;
+        } catch { }
+
+        if (!inAppNotifications) return;
+
         if (token) {
             const BASE = import.meta.env.VITE_API_URL || '/steel/api';
             fetch(`${BASE}/notifications`, {
@@ -81,6 +89,14 @@ function NotificationBell() {
             console.error('Failed to mark all read:', err);
         }
     };
+
+    let showBell = true;
+    try {
+        const prefs = JSON.parse(localStorage.getItem('user_local_prefs') || '{}');
+        if (prefs.inAppNotifications === false) showBell = false;
+    } catch { }
+
+    if (!showBell) return null;
 
     return (
         <div style={{ position: 'relative' }}>
