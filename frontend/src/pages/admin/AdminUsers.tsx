@@ -49,7 +49,8 @@ export default function AdminUsers() {
     const [teamForm, setTeamForm] = useState<{name: string, lead: string[], members: string[]}>({name: '', lead: [], members: []});
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
-    const [teamSearch, setTeamSearch] = useState('');
+    const [teamLeadSearch, setTeamLeadSearch] = useState('');
+    const [teamMemberSearch, setTeamMemberSearch] = useState('');
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
@@ -287,7 +288,7 @@ export default function AdminUsers() {
                             </button>
                         </>
                     ) : (
-                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setEditingTeamId(null); setTeamSearch(''); setTeamForm({name: '', lead: [], members: []}); }}>
+                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setEditingTeamId(null); setTeamLeadSearch(''); setTeamMemberSearch(''); setTeamForm({name: '', lead: [], members: []}); }}>
                             <IconPlus /> Create Team
                         </button>
                     )}
@@ -530,7 +531,8 @@ export default function AdminUsers() {
                                                 members: t.members?.map((m: any) => m._id || m.id) || []
                                             });
                                             setEditingTeamId(t._id || t.id);
-                                            setTeamSearch('');
+                                            setTeamLeadSearch('');
+                                            setTeamMemberSearch('');
                                             setShowCreateTeam(true);
                                         }}>
                                             <IconEdit />
@@ -575,12 +577,10 @@ export default function AdminUsers() {
                                 <input className="form-control" value={teamForm.name} onChange={e => setTeamForm({...teamForm, name: e.target.value})} placeholder="Enter team name" />
                             </div>
                             <div className="form-group">
-                                <input className="form-control" value={teamSearch} onChange={e => setTeamSearch(e.target.value)} placeholder="Search employees..." style={{ marginBottom: 10 }} />
-                            </div>
-                            <div className="form-group">
                                 <label className="form-label required">Team Leads</label>
+                                <input className="form-control" value={teamLeadSearch} onChange={e => setTeamLeadSearch(e.target.value)} placeholder="Search team leads..." style={{ marginBottom: 10 }} />
                                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
-                                    {users.filter(u => (u.role === 'team_lead' || u.role === 'assistant_team_lead') && u.username.toLowerCase().includes(teamSearch.toLowerCase())).map(u => (
+                                    {users.filter(u => (u.role === 'team_lead' || u.role === 'assistant_team_lead') && u.username.toLowerCase().includes(teamLeadSearch.toLowerCase())).map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
@@ -599,8 +599,9 @@ export default function AdminUsers() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Team Members</label>
+                                <input className="form-control" value={teamMemberSearch} onChange={e => setTeamMemberSearch(e.target.value)} placeholder="Search team members..." style={{ marginBottom: 10 }} />
                                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 250, overflowY: 'auto' }}>
-                                    {users.filter(u => u.role === 'team_member' && u.username.toLowerCase().includes(teamSearch.toLowerCase())).map(u => (
+                                    {users.filter(u => u.role === 'team_member' && u.username.toLowerCase().includes(teamMemberSearch.toLowerCase())).map(u => (
                                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <input 
                                                 type="checkbox" 
@@ -618,7 +619,7 @@ export default function AdminUsers() {
                                 </div>
                             </div>
                         </div>
-                        <div className="modal-footer">
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '0 var(--space-lg) var(--space-lg) var(--space-lg)' }}>
                             <button className="btn btn-ghost" onClick={() => setShowCreateTeam(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={async () => {
                                 if (!teamForm.name || teamForm.lead.length === 0) {
@@ -660,18 +661,18 @@ export default function AdminUsers() {
                             <h4 style={{ margin: '0 0 10px 0' }}>Team Leads</h4>
                             <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
                                 {Array.isArray(viewingTeam.lead) 
-                                    ? viewingTeam.lead.map((l: any) => <li key={l._id || l.id}>{l.username} ({l.email})</li>)
-                                    : (viewingTeam.lead ? <li key={viewingTeam.lead._id || viewingTeam.lead.id}>{viewingTeam.lead.username} ({viewingTeam.lead.email})</li> : <li>No lead assigned</li>)}
+                                    ? viewingTeam.lead.map((l: any) => <li key={l._id || l.id}>{l.username} {l.email ? `(${l.email})` : ''}</li>)
+                                    : (viewingTeam.lead ? <li key={viewingTeam.lead._id || viewingTeam.lead.id}>{viewingTeam.lead.username} {viewingTeam.lead.email ? `(${viewingTeam.lead.email})` : ''}</li> : <li>No lead assigned</li>)}
                             </ul>
                             <h4 style={{ margin: '0 0 10px 0' }}>Team Members</h4>
                             <ul style={{ paddingLeft: 20 }}>
                                 {viewingTeam.members?.map((m: any) => (
-                                    <li key={m._id || m.id}>{m.username} ({m.email})</li>
+                                    <li key={m._id || m.id}>{m.username} {m.email ? `(${m.email})` : ''}</li>
                                 ))}
                                 {(!viewingTeam.members || viewingTeam.members.length === 0) && <li>No members</li>}
                             </ul>
                         </div>
-                        <div className="modal-footer">
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 var(--space-lg) var(--space-lg) var(--space-lg)' }}>
                             <button className="btn btn-primary" onClick={() => setViewingTeam(null)}>Close</button>
                         </div>
                     </div>
