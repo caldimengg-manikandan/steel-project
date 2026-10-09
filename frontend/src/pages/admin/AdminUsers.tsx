@@ -948,10 +948,14 @@ export default function AdminUsers() {
                                     <label className="form-label">Email Address (Optional)</label>
                                     <input
                                         type="email"
+                                        name="portal-edit-email"
                                         className="form-control"
+                                        placeholder="e.g. john@example.com"
+                                        autoComplete="new-email"
+                                        pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                                        title="Please enter a valid email address."
                                         value={editForm.email}
                                         onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                                        required
                                     />
                                 </div>
 
