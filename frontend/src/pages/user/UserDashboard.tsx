@@ -37,9 +37,6 @@ export default function UserDashboard() {
     const activeCount = projects.filter((p) => p.status === 'in_progress').length;
     const drawingCount = projects.reduce((s, p) => s + (p.drawingCount || 0), 0);
     const clientCount = new Set(projects.map(p => p.clientName)).size;
-    const highestPerm =
-        projects.some((p) => p.permission === 'admin') ? 'Admin' :
-            projects.some((p) => p.permission === 'editor') ? 'Editor' : 'Viewer';
 
     return (
         <div>
@@ -83,9 +80,11 @@ export default function UserDashboard() {
                     </div>
 
                     <div className="stat-card accent-slate">
-                        <div className="stat-card-label">Access Level</div>
-                        <div className="stat-card-value" style={{ fontSize: 30 }}>{highestPerm}</div>
-                        <div className="stat-card-meta">Highest permission</div>
+                        <div className="stat-card-label">System Role</div>
+                        <div className="stat-card-value" style={{ fontSize: 24, textTransform: 'capitalize' }}>
+                            {(user?.role || 'team_member').replace(/_/g, ' ')}
+                        </div>
+                        <div className="stat-card-meta">Assigned account level</div>
                     </div>
                 </div>
             )}
