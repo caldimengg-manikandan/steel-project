@@ -12,7 +12,7 @@ export interface Team {
     _id: string;
     id: string;
     name: string;
-    lead: any[];
+    lead: any;
     members: any[];
     createdAt: string;
 }
