@@ -12,12 +12,12 @@ export interface Team {
     _id: string;
     id: string;
     name: string;
-    lead: any;
+    lead: any[];
     members: any[];
     createdAt: string;
 }
 
-export async function adminCreateTeam(payload: { name: string; lead: string; members: string[] }) {
+export async function adminCreateTeam(payload: { name: string; lead: string[]; members: string[] }) {
     const res = await fetch(`${BASE}/admin/teams`, {
         method: 'POST',
         credentials: 'include',

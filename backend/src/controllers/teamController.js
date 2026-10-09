@@ -4,8 +4,8 @@ exports.createTeam = async (req, res) => {
     try {
         const { name, lead, members } = req.body;
         
-        if (!name || !lead) {
-            return res.status(400).json({ error: 'Team name and lead are required' });
+        if (!name || !lead || (Array.isArray(lead) && lead.length === 0)) {
+            return res.status(400).json({ error: 'Team name and at least one lead are required' });
         }
 
         const existingTeam = await Team.findOne({ name });
@@ -15,7 +15,7 @@ exports.createTeam = async (req, res) => {
 
         const team = new Team({
             name,
-            lead,
+            lead: Array.isArray(lead) ? lead : [lead],
             members: members || []
         });
 

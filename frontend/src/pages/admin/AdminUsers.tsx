@@ -46,7 +46,7 @@ export default function AdminUsers() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
     const [showCreateTeam, setShowCreateTeam] = useState(false);
-    const [teamForm, setTeamForm] = useState<{name: string, lead: string, members: string[]}>({name: '', lead: '', members: []});
+    const [teamForm, setTeamForm] = useState<{name: string, lead: string[], members: string[]}>({name: '', lead: [], members: []});
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
     const [assignProject, setAssignProject] = useState('');
     const [assignRole, setAssignRole] = useState<'viewer' | 'editor' | 'admin'>('viewer');
@@ -284,7 +284,7 @@ export default function AdminUsers() {
                             </button>
                         </>
                     ) : (
-                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setTeamForm({name: '', lead: '', members: []}); }}>
+                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setTeamForm({name: '', lead: [], members: []}); }}>
                             <IconPlus /> Create Team
                         </button>
                     )}
@@ -510,7 +510,11 @@ export default function AdminUsers() {
                                 <tr key={t.id || t._id}>
                                     <td>{idx + 1}</td>
                                     <td>{t.name}</td>
-                                    <td>{t.lead?.username}</td>
+                                    <td>
+                                        {Array.isArray(t.lead) 
+                                            ? t.lead.map((l: any) => l.username).join(', ') 
+                                            : t.lead?.username}
+                                    </td>
                                     <td>{t.members?.length || 0} Members</td>
                                     <td>
                                         <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
@@ -553,13 +557,24 @@ export default function AdminUsers() {
                                 <input className="form-control" value={teamForm.name} onChange={e => setTeamForm({...teamForm, name: e.target.value})} placeholder="Enter team name" />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Team Lead</label>
-                                <select className="form-control" value={teamForm.lead} onChange={e => setTeamForm({...teamForm, lead: e.target.value})}>
-                                    <option value="">Select a Lead</option>
-                                    {users.filter(u => u.role === 'team_lead').map(u => (
-                                        <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
+                                <label className="form-label required">Team Leads</label>
+                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, maxHeight: 150, overflowY: 'auto' }}>
+                                    {users.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').map(u => (
+                                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={teamForm.lead.includes(u.id)} 
+                                                onChange={(e) => {
+                                                    const m = new Set(teamForm.lead);
+                                                    if (e.target.checked) m.add(u.id);
+                                                    else m.delete(u.id);
+                                                    setTeamForm({...teamForm, lead: Array.from(m)});
+                                                }}
+                                            />
+                                            {u.username} ({u.role})
+                                        </label>
                                     ))}
-                                </select>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Team Members</label>
@@ -585,8 +600,8 @@ export default function AdminUsers() {
                         <div className="modal-footer">
                             <button className="btn btn-ghost" onClick={() => setShowCreateTeam(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={async () => {
-                                if (!teamForm.name || !teamForm.lead) {
-                                    return showMessage('Error', 'Name and Lead are required', 'error');
+                                if (!teamForm.name || teamForm.lead.length === 0) {
+                                    return showMessage('Error', 'Name and at least one Lead are required', 'error');
                                 }
                                 try {
                                     setCreating(true);

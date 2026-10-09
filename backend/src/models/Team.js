@@ -7,11 +7,10 @@ const teamSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    lead: {
+    lead: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
+        ref: 'User'
+    }],
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
