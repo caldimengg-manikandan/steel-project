@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
     IconNotification, IconSettings, IconActivity
 } from '../../components/Icons';
@@ -94,6 +94,18 @@ export default function UserSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('notifications');
     const { settings, updateSettings } = useSettings();
     const { showMessage } = useMessage();
+
+    // Local preferences for toggles
+    const [localPrefs, setLocalPrefs] = useState(() => {
+        const saved = localStorage.getItem('user_local_prefs');
+        return saved ? JSON.parse(saved) : { inAppNotifications: true, weeklySummary: true };
+    });
+
+    const handleLocalPrefChange = (key: string, value: boolean) => {
+        const updated = { ...localPrefs, [key]: value };
+        setLocalPrefs(updated);
+        localStorage.setItem('user_local_prefs', JSON.stringify(updated));
+    };
 
     const handleSettingChange = (key: string, value: any) => {
         updateSettings({ [key]: value });
@@ -211,10 +223,10 @@ export default function UserSettings() {
                     {activeTab === 'notifications' && (
                         <Card title="Project Alerts">
                             <SettingRow title="In-App Notifications" desc="Show an alert in the top bar bell when a new project is assigned to you">
-                                <Toggle enabled={true} onChange={() => {}} />
+                                <Toggle enabled={localPrefs.inAppNotifications} onChange={(v) => handleLocalPrefChange('inAppNotifications', v)} />
                             </SettingRow>
                             <SettingRow title="Weekly Dashboard Summary" desc="A summarized overview of your project progress">
-                                <Toggle enabled={settings.weeklyProgresss} onChange={(v) => handleSettingChange('weeklyProgresss', v)} />
+                                <Toggle enabled={localPrefs.weeklySummary} onChange={(v) => handleLocalPrefChange('weeklySummary', v)} />
                             </SettingRow>
                         </Card>
                     )}
