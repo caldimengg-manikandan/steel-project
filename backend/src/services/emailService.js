@@ -18,20 +18,25 @@ async function getTransporter() {
         return null;
     }
 
-    const settings = await SystemSettings.findOne();
-    if (!settings || !settings.emailEnabled || !settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
+    const { SMTP_SERVER, SMTP_PORT, EMAIL_USER, EMAIL_PASS, SMTP_FROM_NAME } = process.env;
+
+    // Check if required .env variables exist
+    if (!SMTP_SERVER || !EMAIL_USER || !EMAIL_PASS) {
+        console.warn('[Email] SMTP settings not fully configured in .env');
         return null;
     }
 
+    const port = Number(SMTP_PORT) || 587;
+
     return {
         transporter: nodemailer.createTransport({
-            host: settings.smtpHost,
-            port: settings.smtpPort || 587,
-            secure: settings.smtpPort === 465,
-            auth: { user: settings.smtpUser, pass: settings.smtpPass }
+            host: SMTP_SERVER,
+            port: port,
+            secure: port === 465,
+            auth: { user: EMAIL_USER, pass: EMAIL_PASS }
         }),
-        from: `"${settings.smtpFromName || 'Steel Project'}" <${settings.smtpUser}>`,
-        settings
+        from: `"${SMTP_FROM_NAME || 'Steel Project'}" <${EMAIL_USER}>`,
+        settings: await SystemSettings.findOne() // Keep returning settings in case other functions need the recipient lists
     };
 }
 

@@ -115,34 +115,12 @@ export default function AdminSettings() {
     });
     const [emailInputs, setEmailInputs] = useState({ superAdmin: '', projectManager: '', teamLead: '' });
     const [savingEmail, setSavingEmail] = useState(false);
-    const [testingEmail, setTestingEmail] = useState(false);
-    const [testEmailAddr, setTestEmailAddr] = useState('');
-    const [loadingTestReport, setLoadingTestReport] = useState(false);
-
     // Change password state
     const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [savingPw, setSavingPw] = useState(false);
     const [showPw, setShowPw] = useState({ current: false, newPw: false, confirm: false });
 
-    const handleSendTestReport = async () => {
-        setLoadingTestReport(true);
-        try {
-            const res = await fetch(`${BASE}/settings/scheduler/test`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showMessage('Success', 'Project status email triggered successfully. Please check your inbox!', 'success');
-            } else {
-                showMessage('Failed', data.error || 'Failed to trigger test email', 'error');
-            }
-        } catch (e) {
-            showMessage('Error', 'Network error.', 'error');
-        } finally {
-            setLoadingTestReport(false);
-        }
-    };
+
 
     useEffect(() => {
         // Load email settings from existing settings
@@ -384,11 +362,7 @@ export default function AdminSettings() {
                                     </table>
                                 </div>
                             </Card>
-                            <Card title="User Activity Tracking">
-                                <SettingRow title="Log User Sessions" desc="Track when and where users log into the system">
-                                    <Toggle enabled={settings.activityLogging} onChange={(v) => handleSettingChange('activityLogging', v)} />
-                                </SettingRow>
-                            </Card>
+
                         </>
                     )}
 
@@ -531,62 +505,12 @@ export default function AdminSettings() {
                                                     onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
                                                 />
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto', alignSelf: 'flex-end' }}>
-                                                <button 
-                                                    type="button" 
-                                                    className="btn btn-secondary" 
-                                                    onClick={handleSendTestReport}
-                                                    disabled={loadingTestReport}
-                                                    style={{ height: 38 }}
-                                                >
-                                                    {loadingTestReport ? 'Sending...' : '📧 Send Test Report Now'}
-                                                </button>
-                                            </div>
+                                            
                                         </div>
                                     )}
                                 </Card>
 
-                                <Card title="SMTP Sender Configuration" action={
-                                    <SettingRow title="" desc="">
-                                        <Toggle enabled={emailForm.emailEnabled} onChange={v => setEmailForm(prev => ({ ...prev, emailEnabled: v }))} />
-                                    </SettingRow>
-                                }>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                                        <div className="form-group">
-                                            <label className="form-label">SMTP Host</label>
-                                            <input type="text" className="form-control" placeholder="e.g. smtp.gmail.com" value={emailForm.smtpHost} onChange={e => setEmailForm(p => ({ ...p, smtpHost: e.target.value }))} />
-                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>For Gmail: smtp.gmail.com | For Outlook: smtp.office365.com</div>
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">SMTP Port</label>
-                                            <input type="number" className="form-control" value={emailForm.smtpPort} onChange={e => setEmailForm(p => ({ ...p, smtpPort: Number(e.target.value) }))} />
-                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>587 (TLS) or 465 (SSL)</div>
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Sender Email Address</label>
-                                            <input type="email" className="form-control" placeholder="yourapp@gmail.com" value={emailForm.smtpUser} onChange={e => setEmailForm(p => ({ ...p, smtpUser: e.target.value }))} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">App Password / SMTP Password</label>
-                                            <input type="password" className="form-control" placeholder="Enter app password" value={emailForm.smtpPass} onChange={e => setEmailForm(p => ({ ...p, smtpPass: e.target.value }))} />
-                                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Use an App Password, not your regular login password</div>
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Display Name (From)</label>
-                                            <input type="text" className="form-control" placeholder="Steel Project" value={emailForm.smtpFromName} onChange={e => setEmailForm(p => ({ ...p, smtpFromName: e.target.value }))} />
-                                        </div>
-                                    </div>
 
-                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--color-border-light)' }}>
-                                        <input type="email" className="form-control" placeholder="Send test to..." value={testEmailAddr} onChange={e => setTestEmailAddr(e.target.value)} style={{ maxWidth: 280 }} />
-                                        <button className="btn btn-secondary btn-sm" onClick={handleTestEmail} disabled={testingEmail}>
-                                            {testingEmail ? 'Sending...' : '📧 Send Test Email'}
-                                        </button>
-                                        <button className="btn btn-primary" onClick={handleSaveEmail} disabled={savingEmail}>
-                                            {savingEmail ? 'Saving...' : 'Save Email Settings'}
-                                        </button>
-                                    </div>
-                                </Card>
 
                                 <Card title="Recipient Email Lists">
                                     {renderEmailList("superAdmin", "Super Admin", "superAdminEmails")}

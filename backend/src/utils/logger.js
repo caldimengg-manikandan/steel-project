@@ -9,6 +9,14 @@ const ActivityLog = require('../models/ActivityLog');
  */
 const logActivity = async (user, module, event) => {
     try {
+        const SystemSettings = require('../models/SystemSettings');
+        const settings = await SystemSettings.findOne().lean();
+        
+        // If activity logging is disabled, don't log
+        if (settings && settings.activityLogging === false) {
+            return;
+        }
+
         const log = new ActivityLog({
             user: user || 'System',
             module,
