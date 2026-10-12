@@ -190,7 +190,17 @@ const projectSchema = new mongoose.Schema(
                 percentage: { type: Number, default: 0 },
                 approval: { type: Number, default: 0 },
                 fabrication: { type: Number, default: 0 },
-                status: { type: String, default: 'Yet to Start' }
+                status: { type: String, default: 'Yet to Start' },
+                sequences: {
+                    type: [{
+                        name: { type: String, required: true },
+                        status: { type: String, enum: ['Completed', 'Not Completed'], default: 'Not Completed' },
+                        deadline: { type: Date },
+                        approvalDate: { type: Date, default: null },
+                        fabricationDate: { type: Date, default: null }
+                    }],
+                    default: []
+                }
             }],
             default: []
         },

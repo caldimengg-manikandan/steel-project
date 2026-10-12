@@ -354,14 +354,22 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setModalError('');
+            const today = new Date().toISOString().split('T')[0];
+            const preparedScopeOfWork = (form.scopeOfWork || []).map(s => ({
+                ...s,
+                sequences: (s.sequences || []).map((seq: any) => ({
+                    ...seq,
+                    approvalDate: seq.approvalDate || today
+                }))
+            }));
             const sequencesPayload = form.trackingMode === 'seq'
-                ? (form.scopeOfWork || []).map(s => ({
+                ? (preparedScopeOfWork || []).map((s: any) => ({
                     name: s.name,
                     status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
-                    approvalDate: s.sequences?.[0]?.approvalDate || null,
-                    fabricationDate: s.sequences?.[0]?.fabricationDate || null
+                    approvalDate: s.sequences?.[0]?.approvalDate || s.approvalDate || today,
+                    fabricationDate: s.sequences?.[0]?.fabricationDate || s.fabricationDate || null
                 }))
-                : (form.scopeOfWork || []).flatMap(s => s.sequences || []);
+                : (preparedScopeOfWork || []).flatMap(s => s.sequences || []);
 
             const { project } = await adminCreateProject({
                 name: form.name.trim(),
@@ -371,7 +379,7 @@ export default function AdminProjects() {
                 description: form.description.trim(),
                 status: form.status,
                 trackingMode: form.trackingMode,
-                scopeOfWork: form.scopeOfWork || [],
+                scopeOfWork: preparedScopeOfWork,
                 location: form.location,
                 sequences: sequencesPayload,
                 connectionDesignVendor: form.connectionDesignVendor,
@@ -432,16 +440,34 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setModalError('');
+            const today = new Date().toISOString().split('T')[0];
+            const preparedScopeOfWork = (editTarget.scopeOfWork || []).map(s => ({
+                ...s,
+                sequences: (s.sequences || []).map((seq: any) => ({
+                    ...seq,
+                    approvalDate: seq.approvalDate || today
+                }))
+            }));
+            const preparedAdditionalScopeOfWork = (editTarget.additionalScopeOfWork || []).map(s => ({
+                ...s,
+                sequences: (s.sequences || []).map((seq: any) => ({
+                    ...seq,
+                    approvalDate: seq.approvalDate || today
+                }))
+            }));
             const sequencesPayload = (editTarget.trackingMode === 'seq')
-                ? (editTarget.scopeOfWork || []).map(s => ({
+                ? (preparedScopeOfWork || []).map((s: any) => ({
                     name: s.name,
                     status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
-                    approvalDate: s.sequences?.[0]?.approvalDate || null,
-                    fabricationDate: s.sequences?.[0]?.fabricationDate || null
+                    approvalDate: s.sequences?.[0]?.approvalDate || s.approvalDate || today,
+                    fabricationDate: s.sequences?.[0]?.fabricationDate || s.fabricationDate || null
                 }))
                 : (editTarget.trackingMode === 'sow'
-                    ? (editTarget.scopeOfWork || []).flatMap(s => s.sequences || [])
-                    : editTarget.sequences);
+                    ? (preparedScopeOfWork || []).flatMap(s => s.sequences || [])
+                    : (editTarget.sequences || []).map((seq: any) => ({
+                        ...seq,
+                        approvalDate: seq.approvalDate || today
+                    })));
 
             const { project } = await adminUpdateProject(editTarget.id, {
                 name: editTarget.name,
@@ -450,8 +476,8 @@ export default function AdminProjects() {
                 contactPerson: editTarget.contactPerson,
                 description: editTarget.description,
                 status: editTarget.status,
-                scopeOfWork: editTarget.scopeOfWork || [],
-                additionalScopeOfWork: editTarget.additionalScopeOfWork || [],
+                scopeOfWork: preparedScopeOfWork,
+                additionalScopeOfWork: preparedAdditionalScopeOfWork,
                 location: editTarget.location,
                 sequences: sequencesPayload,
                 connectionDesignVendor: editTarget.connectionDesignVendor,
@@ -1003,9 +1029,15 @@ export default function AdminProjects() {
                                                                     }
                                                                     globalSeqCount += currentSeqs.length;
                                                                     
+                                                                    const today = new Date().toISOString().split('T')[0];
                                                                     const newSeqs = [];
                                                                     for(let i = 0; i < count; i++) {
-                                                                        newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                        newSeqs.push({
+                                                                            name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`,
+                                                                            status: 'Not Completed',
+                                                                            approvalDate: today,
+                                                                            fabricationDate: ''
+                                                                        });
                                                                     }
                                                                     
                                                                     newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
@@ -1391,7 +1423,7 @@ export default function AdminProjects() {
                                                                               
                                                                               const newSeqs = [];
                                                                               for(let i = 0; i < count; i++) {
-                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed', approvalDate: new Date().toISOString().split('T')[0], fabricationDate: '' });
                                                                               }
                                                                               
                                                                               newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
@@ -1636,7 +1668,7 @@ export default function AdminProjects() {
                                                                               
                                                                               const newSeqs = [];
                                                                               for(let i = 0; i < count; i++) {
-                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                                                  newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed', approvalDate: new Date().toISOString().split('T')[0], fabricationDate: '' });
                                                                               }
                                                                               
                                                                               newSow[idx] = { ...newSow[idx], sequences: [...currentSeqs, ...newSeqs] };
@@ -1826,7 +1858,7 @@ export default function AdminProjects() {
                                                         globalSeqCount += currentSeqs.length;
                                                         const newSeqs = [];
                                                         for (let i = 0; i < count; i++) {
-                                                            newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                            newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed', approvalDate: new Date().toISOString().split('T')[0], fabricationDate: '' });
                                                         }
                                                         newSow[sowIdx] = { ...newSow[sowIdx], sequences: [...currentSeqs, ...newSeqs] };
                                                         setEditTarget({ ...editTarget, scopeOfWork: newSow });

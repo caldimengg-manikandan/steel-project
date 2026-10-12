@@ -75,12 +75,25 @@ async function createProject(req, res) {
     const adminId = req.principal.adminId;
     const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber, trackingMode } = req.body;
 
+    const today = new Date();
     let finalSequences = sequences || [];
     if (!Array.isArray(finalSequences) || finalSequences.length === 0) {
         if (Array.isArray(scopeOfWork)) {
             finalSequences = scopeOfWork.flatMap(sow => sow.sequences || []);
         }
     }
+    finalSequences = finalSequences.map(seq => ({
+        ...seq,
+        approvalDate: seq.approvalDate || today
+    }));
+
+    const processedScopeOfWork = (scopeOfWork || []).map(sow => ({
+        ...sow,
+        sequences: Array.isArray(sow.sequences) ? sow.sequences.map(seq => ({
+            ...seq,
+            approvalDate: seq.approvalDate || today
+        })) : []
+    }));
 
     if (!name || (!clientName && !clientId)) {
         return res.status(400).json({ error: 'name and either clientName or clientId are required.' });
@@ -102,7 +115,7 @@ async function createProject(req, res) {
         approximateDrawingsCount: Number(approximateDrawingsCount) || 0,
         trackingMode: trackingMode || 'sow',
         sequences: finalSequences,
-        scopeOfWork: scopeOfWork || [],
+        scopeOfWork: processedScopeOfWork,
         connectionDesignVendor: connectionDesignVendor || '',
         connectionDesignContact: connectionDesignContact || '',
         connectionDesignEmail: connectionDesignEmail || '',
@@ -178,12 +191,13 @@ async function updateProject(req, res) {
     if (contactPerson !== undefined) project.contactPerson = contactPerson;
     if (description !== undefined) project.description = description;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
+    const today = new Date();
     if (sequences !== undefined && Array.isArray(sequences)) {
         project.sequences = sequences.map((s, idx) => ({
             name: (s.name || '').trim() || `Seq ${idx + 1}`,
             status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
             deadline: s.deadline || null,
-            approvalDate: s.approvalDate || null,
+            approvalDate: s.approvalDate || today,
             fabricationDate: s.fabricationDate || null
         }));
     }
@@ -193,7 +207,14 @@ async function updateProject(req, res) {
             percentage: Number(s.percentage) || 0,
             approval: Number(s.approval) || 0,
             fabrication: Number(s.fabrication) || 0,
-            status: s.status || 'Yet to Start'
+            status: s.status || 'Yet to Start',
+            sequences: Array.isArray(s.sequences) ? s.sequences.map((seq, seqIdx) => ({
+                name: (seq.name || '').trim() || `SEQ ${String(seqIdx + 1).padStart(2, '0')}`,
+                status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
+                deadline: seq.deadline || null,
+                approvalDate: seq.approvalDate || today,
+                fabricationDate: seq.fabricationDate || null
+            })) : []
         }));
     }
     if (req.body.additionalScopeOfWork !== undefined && Array.isArray(req.body.additionalScopeOfWork)) {
@@ -202,7 +223,14 @@ async function updateProject(req, res) {
             percentage: Number(s.percentage) || 0,
             approval: Number(s.approval) || 0,
             fabrication: Number(s.fabrication) || 0,
-            status: s.status || 'Yet to Start'
+            status: s.status || 'Yet to Start',
+            sequences: Array.isArray(s.sequences) ? s.sequences.map((seq, seqIdx) => ({
+                name: (seq.name || '').trim() || `SEQ ${String(seqIdx + 1).padStart(2, '0')}`,
+                status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
+                deadline: seq.deadline || null,
+                approvalDate: seq.approvalDate || today,
+                fabricationDate: seq.fabricationDate || null
+            })) : []
         }));
     }
     if (connectionDesignVendor !== undefined) project.connectionDesignVendor = connectionDesignVendor;
