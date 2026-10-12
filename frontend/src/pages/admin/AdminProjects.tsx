@@ -432,6 +432,17 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setModalError('');
+            const sequencesPayload = (editTarget.trackingMode === 'seq')
+                ? (editTarget.scopeOfWork || []).map(s => ({
+                    name: s.name,
+                    status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
+                    approvalDate: s.sequences?.[0]?.approvalDate || null,
+                    fabricationDate: s.sequences?.[0]?.fabricationDate || null
+                }))
+                : (editTarget.trackingMode === 'sow'
+                    ? (editTarget.scopeOfWork || []).flatMap(s => s.sequences || [])
+                    : editTarget.sequences);
+
             const { project } = await adminUpdateProject(editTarget.id, {
                 name: editTarget.name,
                 clientName: editTarget.clientName,
@@ -442,7 +453,7 @@ export default function AdminProjects() {
                 scopeOfWork: editTarget.scopeOfWork || [],
                 additionalScopeOfWork: editTarget.additionalScopeOfWork || [],
                 location: editTarget.location,
-                sequences: editTarget.sequences,
+                sequences: sequencesPayload,
                 connectionDesignVendor: editTarget.connectionDesignVendor,
                 connectionDesignContact: editTarget.connectionDesignContact,
                 connectionDesignEmail: editTarget.connectionDesignEmail
@@ -597,29 +608,55 @@ export default function AdminProjects() {
                                             </div>
                                         </td>
                                         <td>
-                                            <div
-                                                onClick={() => {
-                                                    setEditTarget({ ...p });
-                                                    setEditMode('sequences');
-                                                    setSeqInput((p.sequences?.length || 0).toString());
-                                                }}
-                                                title="Manage Sequences"
-                                                style={{
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 6,
-                                                    background: '#f8fafc',
-                                                    padding: '4px 12px',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e2e8f0',
-                                                    width: 'fit-content'
-                                                }}
-                                            >
-                                                <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
-                                                <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
-                                                <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
-                                            </div>
+                                            {p.trackingMode === 'sow' ? (
+                                                <div
+                                                    onClick={() => {
+                                                        setEditTarget({ ...p });
+                                                        setEditMode('sequences');
+                                                        setSeqInput((p.sequences?.length || 0).toString());
+                                                    }}
+                                                    title="Manage SOW Sequences"
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        background: '#f8fafc',
+                                                        padding: '4px 12px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid #e2e8f0',
+                                                        width: 'fit-content'
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
+                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
+                                                    <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    onClick={() => {
+                                                        setEditTarget({ ...p });
+                                                        setEditMode('full');
+                                                        setSeqInput((p.sequences?.length || 0).toString());
+                                                        setEditSowInput((p.additionalScopeOfWork?.length || 0).toString());
+                                                    }}
+                                                    title="Edit Sequence Project"
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        background: '#f8fafc',
+                                                        padding: '4px 12px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid #e2e8f0',
+                                                        width: 'fit-content'
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{(p.scopeOfWork && p.scopeOfWork.length > 0) ? p.scopeOfWork.length : (p.sequences?.length || 0)}</span>
+                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
                                             <span className={`badge ${getBadgeClass(p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status)}`}>
@@ -1251,7 +1288,7 @@ export default function AdminProjects() {
                                         <div style={{ marginTop: 16, padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                    Configure Scope of Work Progress
+                                                    {editTarget.trackingMode === 'seq' ? 'Configure Sequence Progress' : 'Configure Scope of Work Progress'}
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1767,101 +1804,106 @@ export default function AdminProjects() {
                                 </>
                             )}
 
-                            {(!editTarget.trackingMode || editTarget.trackingMode === 'seq') && (
-                                <>
-                                    <div className="form-group">
-                                        <label className="form-label">Number of Sequences</label>
-                                        <input
-                                            className="form-control"
-                                            type="number"
-                                            value={seqInput}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setSeqInput(val);
-                                                if (val === '') return;
 
-                                                const count = parseInt(val);
-                                                if (isNaN(count)) return;
 
-                                                const current = editTarget.sequences || [];
-                                                const orig = projects.find(p => p.id === editTarget.id)?.sequences || [];
-                                                const originalCount = orig.length;
-
-                                                // Lock the original sequences while allowing growth
-                                                const effectiveCount = Math.max(count, originalCount);
-
-                                                if (effectiveCount > current.length) {
-                                                    const newSeqs = [...current];
-                                                    const today = new Date().toISOString().split('T')[0];
-                                                    for (let i = current.length; i < effectiveCount; i++) {
-                                                        newSeqs.push({
-                                                            name: '',
-                                                            status: 'Not Completed',
-                                                            deadline: today,
-                                                            approvalDate: '',
-                                                            fabricationDate: ''
-                                                        });
-                                                    }
-                                                    setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                } else if (effectiveCount < current.length) {
-                                                    setEditTarget({ ...editTarget, sequences: current.slice(0, effectiveCount) });
-                                                }
-                                            }}
-                                        />
-                                    </div>
-
-                                    {editTarget.sequences && editTarget.sequences.length > 0 && (
-                                        <div className="form-group" style={{ marginTop: 20 }}>
-                                            <label className="form-label" style={{ fontWeight: 700, display: 'block', borderBottom: '1px solid var(--color-border)', paddingBottom: 8, marginBottom: 12 }}>
-                                                Configure Sequence Names & Deadlines
-                                            </label>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                                {editTarget.sequences.map((seq, idx) => (
-                                                    <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingBottom: 10, borderBottom: '1px dashed #f1f5f9' }}>
-                                                        <div style={{ flex: 1 }}>
-                                                            <label className="form-label" style={{ fontSize: 10 }}>Sequence {idx + 1} Name</label>
-                                                            <input
-                                                                className="form-control form-control-sm"
-                                                                value={seq.name}
-                                                                onChange={(e) => {
-                                                                    const newSeqs = [...editTarget.sequences];
-                                                                    newSeqs[idx] = { ...newSeqs[idx], name: e.target.value };
-                                                                    setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div style={{ width: 140 }}>
-                                                            <label className="form-label" style={{ fontSize: 10 }}>Approval Date</label>
-                                                            <input
-                                                                className="form-control form-control-sm"
-                                                                type="date"
-                                                                value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
-                                                                onChange={(e) => {
-                                                                    const newSeqs = [...editTarget.sequences];
-                                                                    newSeqs[idx] = { ...newSeqs[idx], approvalDate: e.target.value };
-                                                                    setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div style={{ width: 140 }}>
-                                                            <label className="form-label" style={{ fontSize: 10 }}>Fab Date</label>
-                                                            <input
-                                                                className="form-control form-control-sm"
-                                                                type="date"
-                                                                value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
-                                                                onChange={(e) => {
-                                                                    const newSeqs = [...editTarget.sequences];
-                                                                    newSeqs[idx] = { ...newSeqs[idx], fabricationDate: e.target.value };
-                                                                    setEditTarget({ ...editTarget, sequences: newSeqs });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                ))}
+                            {/* SOW Sequences Management (shows deadlines when managing sequences for SOW) */}
+                            {editTarget.trackingMode === 'sow' && editMode === 'sequences' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    {(editTarget.scopeOfWork || []).map((sow, sowIdx) => (
+                                        <div key={sowIdx} style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                                                    Sequences for {sow.name || `SOW ${sowIdx + 1}`}
+                                                </span>
+                                                <AddSeqInline 
+                                                    onAdd={(count) => {
+                                                        const newSow = [...(editTarget.scopeOfWork || [])];
+                                                        const currentSeqs = newSow[sowIdx].sequences || [];
+                                                        let globalSeqCount = 1;
+                                                        for (let i = 0; i < sowIdx; i++) {
+                                                            globalSeqCount += (newSow[i].sequences?.length || 0);
+                                                        }
+                                                        globalSeqCount += currentSeqs.length;
+                                                        const newSeqs = [];
+                                                        for (let i = 0; i < count; i++) {
+                                                            newSeqs.push({ name: `SEQ${String(globalSeqCount + i).padStart(2, '0')}`, status: 'Not Completed' });
+                                                        }
+                                                        newSow[sowIdx] = { ...newSow[sowIdx], sequences: [...currentSeqs, ...newSeqs] };
+                                                        setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                    }}
+                                                />
                                             </div>
+                                            {sow.sequences && sow.sequences.length > 0 ? (
+                                                <div style={{ overflowX: 'auto', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                                        <thead style={{ background: '#f1f5f9' }}>
+                                                            <tr>
+                                                                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#64748b' }}>Sequence Name</th>
+                                                                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#64748b' }}>Approval Date</th>
+                                                                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#64748b' }}>Fab Date</th>
+                                                                <th style={{ padding: '6px 10px', width: 40 }}></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {sow.sequences!.map((seq: any, seqIdx: number) => (
+                                                                <tr key={seqIdx} style={{ borderBottom: seqIdx === sow.sequences!.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
+                                                                    <td style={{ padding: '4px 10px' }}>
+                                                                        <input
+                                                                            className="form-control form-control-sm"
+                                                                            value={seq.name}
+                                                                            onChange={(e) => {
+                                                                                const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                newSow[sowIdx].sequences![seqIdx].name = e.target.value;
+                                                                                setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                            }}
+                                                                        />
+                                                                    </td>
+                                                                    <td style={{ padding: '4px 10px' }}>
+                                                                        <input
+                                                                            className="form-control form-control-sm"
+                                                                            type="date"
+                                                                            value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
+                                                                            onChange={(e) => {
+                                                                                const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                newSow[sowIdx].sequences![seqIdx].approvalDate = e.target.value;
+                                                                                setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                            }}
+                                                                        />
+                                                                    </td>
+                                                                    <td style={{ padding: '4px 10px' }}>
+                                                                        <input
+                                                                            className="form-control form-control-sm"
+                                                                            type="date"
+                                                                            value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
+                                                                            onChange={(e) => {
+                                                                                const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                newSow[sowIdx].sequences![seqIdx].fabricationDate = e.target.value;
+                                                                                setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                            }}
+                                                                        />
+                                                                    </td>
+                                                                    <td style={{ padding: '4px 10px', textAlign: 'center' }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newSow = [...(editTarget.scopeOfWork || [])];
+                                                                                newSow[sowIdx].sequences = (newSow[sowIdx].sequences || []).filter((_: any, i: number) => i !== seqIdx);
+                                                                                setEditTarget({ ...editTarget, scopeOfWork: newSow });
+                                                                            }}
+                                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}
+                                                                        >✕</button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', padding: '4px 0' }}>No sequences added for this SOW.</div>
+                                            )}
                                         </div>
-                                    )}
-                                </>
+                                    ))}
+                                </div>
                             )}
                             {modalError && (
                                 <div className="info-box danger mb-md" style={{ fontSize: 13, padding: '10px 14px' }}>
@@ -1872,7 +1914,7 @@ export default function AdminProjects() {
                                 <button className="btn btn-secondary" disabled={actionLoading} onClick={() => { setEditTarget(null); setModalError(''); }}>Cancel</button>
                                 <button
                                     className="btn btn-primary"
-                                    disabled={actionLoading || (parseInt(seqInput) || 0) < (projects.find(p => p.id === editTarget.id)?.sequences?.length || 0)}
+                                    disabled={actionLoading}
                                     onClick={handleEditSave}
                                 >
                                     {actionLoading ? 'Saving...' : 'Save Changes'}
