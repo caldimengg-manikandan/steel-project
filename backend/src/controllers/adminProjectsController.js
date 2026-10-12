@@ -73,18 +73,13 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber, trackingMode } = req.body;
 
     let finalSequences = sequences || [];
     if (!Array.isArray(finalSequences) || finalSequences.length === 0) {
         if (Array.isArray(scopeOfWork)) {
             finalSequences = scopeOfWork.flatMap(sow => sow.sequences || []);
         }
-    }
-
-    // ---- New validation: sequences is mandatory ----
-    if (finalSequences.length === 0) {
-        return res.status(400).json({ error: 'The "sequences" field is required and must contain at least one entry (either directly or within Scope of Work).' });
     }
 
     if (!name || (!clientName && !clientId)) {
@@ -105,6 +100,7 @@ async function createProject(req, res) {
         status: status === 'active' ? 'in_progress' : (status || 'in_progress'),
         location: location || '',
         approximateDrawingsCount: Number(approximateDrawingsCount) || 0,
+        trackingMode: trackingMode || 'sow',
         sequences: finalSequences,
         scopeOfWork: scopeOfWork || [],
         connectionDesignVendor: connectionDesignVendor || '',
@@ -212,6 +208,7 @@ async function updateProject(req, res) {
     if (connectionDesignVendor !== undefined) project.connectionDesignVendor = connectionDesignVendor;
     if (connectionDesignContact !== undefined) project.connectionDesignContact = connectionDesignContact;
     if (connectionDesignEmail !== undefined) project.connectionDesignEmail = connectionDesignEmail;
+    if (req.body.trackingMode !== undefined) project.trackingMode = req.body.trackingMode;
     if (req.body.year !== undefined) project.year = Number(req.body.year);
     if (status !== undefined) {
         const normalizedStatus = status === 'active' ? 'in_progress' : status;

@@ -102,11 +102,11 @@ const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], 
 
     if (newRows.length > 0) {
         const totalAmount = 100;
-        const defaultPct = Math.round((totalAmount / newRows.length) * 10) / 10;
+        const defaultPct = Math.round((totalAmount / newRows.length) * 100) / 100;
         newRows = newRows.map((row, idx) => {
             if (idx === newRows.length - 1) {
                 const sumOthers = defaultPct * (newRows.length - 1);
-                const remainder = Math.round((totalAmount - sumOthers) * 10) / 10;
+                const remainder = Math.round((totalAmount - sumOthers) * 100) / 100;
                 return { ...row, percentage: remainder };
             }
             return { ...row, percentage: defaultPct };
@@ -156,13 +156,13 @@ const generateAdditionalSowRows = (countVal: string, nameVal: string, currentRow
 
     let newOriginalSow = [...originalSowRows];
     if (newOriginalSow.length > 0) {
-        const totalAdd = newRows.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-        const remaining = 100 - totalAdd;
-        const defaultPct = Math.round((remaining / newOriginalSow.length) * 10) / 10;
+        const totalAdd = Math.round(newRows.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0) * 100) / 100;
+        const remaining = Math.round((100 - totalAdd) * 100) / 100;
+        const defaultPct = Math.round((remaining / newOriginalSow.length) * 100) / 100;
         newOriginalSow = newOriginalSow.map((row, idx) => {
             if (idx === newOriginalSow.length - 1) {
                 const sumOthers = defaultPct * (newOriginalSow.length - 1);
-                const rem = Math.round((remaining - sumOthers) * 10) / 10;
+                const rem = Math.round((remaining - sumOthers) * 100) / 100;
                 return { ...row, percentage: rem };
             }
             return { ...row, percentage: defaultPct };
@@ -354,6 +354,15 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setModalError('');
+            const sequencesPayload = form.trackingMode === 'seq'
+                ? (form.scopeOfWork || []).map(s => ({
+                    name: s.name,
+                    status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
+                    approvalDate: s.sequences?.[0]?.approvalDate || null,
+                    fabricationDate: s.sequences?.[0]?.fabricationDate || null
+                }))
+                : (form.scopeOfWork || []).flatMap(s => s.sequences || []);
+
             const { project } = await adminCreateProject({
                 name: form.name.trim(),
                 clientName: selectedClient.name,
@@ -364,7 +373,7 @@ export default function AdminProjects() {
                 trackingMode: form.trackingMode,
                 scopeOfWork: form.scopeOfWork || [],
                 location: form.location,
-                sequences: [], // Deprecated
+                sequences: sequencesPayload,
                 connectionDesignVendor: form.connectionDesignVendor,
                 connectionDesignContact: form.connectionDesignContact,
                 connectionDesignEmail: form.connectionDesignEmail,
@@ -408,8 +417,8 @@ export default function AdminProjects() {
         if (!editTarget) return;
 
         if (editMode === 'full') {
-            const sumPercentage = (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-            const totalSowPercentage = sumPercentage;
+            const rawSum = (editTarget.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+            const totalSowPercentage = Math.round(rawSum * 100) / 100;
             
             const hasSow = (editTarget.scopeOfWork && editTarget.scopeOfWork.length > 0);
             if (hasSow && totalSowPercentage !== 100) {
@@ -1135,7 +1144,8 @@ export default function AdminProjects() {
                                             return;
                                         }
 
-                                        const sumPercentage = (form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                                        const rawSum = (form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+                                        const sumPercentage = Math.round(rawSum * 100) / 100;
                                         if (form.scopeOfWork && form.scopeOfWork.length > 0 && sumPercentage !== 100) {
                                             const msgText = `The sum of Percentage of Total Work (%) across all SOWs must equal exactly 100. Current sum is ${sumPercentage}.`;
                                             setModalError('');
