@@ -30,7 +30,8 @@ function startAiService() {
     }
 
     // Determine Python binary
-    const pythonBin = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'py' : 'python3');
+    const { getPythonBin } = require('./pythonBin');
+    const pythonBin = getPythonBin();
     const args = [apiScript];
 
     console.log(`[AI_SERVICE] Starting AI service with: ${pythonBin} ${args.join(' ')}`);

@@ -8,24 +8,7 @@ const mongoose = require('mongoose');
 
 const SCRIPT_PATH = path.join(__dirname, '../scripts/extract_rfi.py');
 
-function getPythonBin() {
-    if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
-    // Check virtual environment paths on server
-    const venvPaths = [
-        path.join(__dirname, '../AiExtraction/.venv/bin/python'),
-        path.join(__dirname, '../AiExtraction/.venv/bin/python3'),
-        path.join(__dirname, '../../AiExtraction/.venv/bin/python'),
-        path.join(__dirname, '../../AiExtraction/.venv/bin/python3'),
-        '/var/www/steel-project/backend/AiExtraction/.venv/bin/python',
-        '/var/www/steel-project/backend/AiExtraction/.venv/bin/python3'
-    ];
-    for (const vp of venvPaths) {
-        if (fs.existsSync(vp)) {
-            return vp;
-        }
-    }
-    return process.platform === 'win32' ? 'py' : 'python3';
-}
+const { getPythonBin } = require('../utils/pythonBin');
 
 function _downloadFromGridFS(fileId, destPath) {
     return new Promise((resolve, reject) => {

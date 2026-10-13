@@ -26,8 +26,9 @@ const { downloadFile: downloadFromOneDrive } = require('../utils/onedrive');
 const { Readable } = require('stream');
 const storageGateway = require('../utils/storageGateway');
 
+const { getPythonBin } = require('../utils/pythonBin');
 const PYTHON_SCRIPT = path.join(__dirname, '../scripts/extract_drawing.py');
-const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+const PYTHON_BIN = getPythonBin();
 
 /**
  * _downloadFromGridFS
