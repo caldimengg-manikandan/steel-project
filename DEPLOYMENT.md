@@ -37,3 +37,18 @@ sudo systemctl restart nginx
 - **Python**: Ensure `.env` has `PYTHON_BIN=python3`.
 - **Database**: `MONGO_URI` must be the Atlas connection string.
 - **Nginx**: Configuration is located at `/etc/nginx/sites-available/caldimproducts.conf`.
+- **Instant Cache Reflection**: In `/etc/nginx/sites-available/caldimproducts.conf`, ensure `index.html` is never cached by browsers:
+  ```nginx
+  location /steel/assets/ {
+      alias /var/www/steel-project/frontend/dist/assets/;
+      expires 1y;
+      add_header Cache-Control "public, immutable";
+  }
+
+  location /steel {
+      alias /var/www/steel-project/frontend/dist;
+      try_files $uri $uri/ /steel/index.html;
+      add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
+      expires -1;
+  }
+  ```
