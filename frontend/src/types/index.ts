@@ -7,6 +7,19 @@ export type ProjectPermission = 'viewer' | 'editor' | 'admin';
 export type ProjectStatus = 'in_progress' | 'on_hold' | 'completed' | 'archived';
 export type UserStatus = 'active' | 'inactive';
 
+export const FULL_ACCESS_ROLES: UserRole[] = [
+    'admin',
+    'superadmin',
+    'project_manager',
+    'team_lead',
+    'assistant_project_manager',
+    'assistant_team_lead'
+];
+
+export function isFullAccessUser(role?: string | null): boolean {
+    return !!role && FULL_ACCESS_ROLES.includes(role as UserRole);
+}
+
 export interface ClientContact {
     name: string;
     email: string;

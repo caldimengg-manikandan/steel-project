@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getProjectById, updateProjectSequences, updateProjectScopeOfWork, updateProjectAdditionalScopeOfWork } from '../../services/projectApi';
 import { useMessage } from '../../context/MessageContext';
 import type { Project, ProjectPermission } from '../../types';
+import { isFullAccessUser } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
 import { listTransmittals } from '../../services/transmittalApi';
@@ -19,7 +20,7 @@ export default function ProjectView() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { showMessage } = useMessage();
-    const isAdmin = user?.role === 'admin';
+    const isAdmin = isFullAccessUser(user?.role);
 
     // DEBUG (Step 5): Log ID for troubleshooting
     useEffect(() => {

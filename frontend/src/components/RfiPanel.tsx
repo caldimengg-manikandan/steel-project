@@ -8,6 +8,7 @@ import {
     deleteRfiExtraction
 } from '../services/rfiApi';
 import { IconUpload, IconTrash } from './Icons';
+import { isFullAccessUser } from '../types';
 
 interface RfiExtractionPanelProps {
     projectId: string;
@@ -24,7 +25,7 @@ export default function RfiExtractionPanel({
 }: RfiExtractionPanelProps) {
 
     const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const isAdmin = isFullAccessUser(user?.role);
 
     const [extractions, setExtractions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);

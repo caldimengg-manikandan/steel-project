@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
 import { formatDate } from '../../utils/dateUtils';
+import { isFullAccessUser } from '../../types';
 
 // ── Inline SVG icons ──────────────────────────────────────
 const IconQuestion = () => (
@@ -177,7 +178,7 @@ export default function UserRfi() {
         return () => clearInterval(t);
     }, [extractions, uploading, loadExtractions]);
 
-    const canEdit = selectedProject?.myPermission === 'admin' || selectedProject?.myPermission === 'editor' || user?.role === 'admin';
+    const canEdit = selectedProject?.myPermission === 'admin' || selectedProject?.myPermission === 'editor' || isFullAccessUser(user?.role);
 
     const doUpload = async (files: File[]) => {
         if (!selectedProject || files.length === 0) return;
