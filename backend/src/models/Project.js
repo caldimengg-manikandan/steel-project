@@ -104,6 +104,11 @@ const projectSchema = new mongoose.Schema(
             trim: true,
         },
 
+        creationDate: {
+            type: String,
+            default: null,
+        },
+
         // ── User Assignments ──────────────────────────────────
         assignments: {
             type: [assignmentSchema],

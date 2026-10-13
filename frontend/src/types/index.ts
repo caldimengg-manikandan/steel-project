@@ -96,6 +96,7 @@ export interface Project {
     location: string;
     createdByUsername?: string;
     createdBy?: string;
+    creationDate?: string;
     createdAt: string;
     updatedAt: string;
     assignments: ProjectAssignment[];

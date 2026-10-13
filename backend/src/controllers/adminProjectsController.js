@@ -73,7 +73,7 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber, trackingMode } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber, trackingMode, creationDate } = req.body;
 
     const today = new Date();
     let finalSequences = sequences || [];
@@ -104,7 +104,7 @@ async function createProject(req, res) {
     // Pre-seed transmittalCount so first reserve = startNum
     const initialTransmittalCount = startNum - 1;
 
-    const project = await Project.create({
+    const projectPayload = {
         name,
         clientName: clientName || '',
         clientId: clientId || null,
@@ -124,16 +124,22 @@ async function createProject(req, res) {
         transmittalCount: initialTransmittalCount,
         createdByAdminId: adminId,
         createdByUsername: req.principal.username || '',
+        creationDate: creationDate || null,
         assignments: [
             {
                 userId: req.principal.id,
                 username: req.principal.username,
                 permission: 'admin',
-                assignedAt: new Date(),
+                assignedAt: creationDate ? new Date(creationDate) : new Date(),
             }
         ],
         drawingCount: 0,
-    });
+    };
+    if (creationDate) {
+        projectPayload.createdAt = new Date(creationDate);
+    }
+
+    const project = await Project.create(projectPayload);
 
     const Notification = require('../models/Notification');
     try {
@@ -187,7 +193,7 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
@@ -195,6 +201,12 @@ async function updateProject(req, res) {
     if (contactPerson !== undefined) project.contactPerson = contactPerson;
     if (description !== undefined) project.description = description;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
+    if (creationDate !== undefined) {
+        project.creationDate = creationDate || null;
+        if (creationDate) {
+            project.createdAt = new Date(creationDate);
+        }
+    }
     const today = new Date();
     if (sequences !== undefined && Array.isArray(sequences)) {
         project.sequences = sequences.map((s, idx) => ({

@@ -63,6 +63,7 @@ interface CreateProjectForm {
     connectionDesignEmail: string;
     year: string;
     lastTransmittalNumber: string;
+    creationDate: string;
 }
 const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], isAdditional: boolean = false, trackingMode: 'sow' | 'seq' = 'sow') => {
     const count = parseInt(countVal) || 0;
@@ -260,6 +261,7 @@ const DEFAULT_FORM: CreateProjectForm = {
     connectionDesignEmail: '',
     year: String(new Date().getFullYear()),
     lastTransmittalNumber: '0',
+    creationDate: '',
 };
 
 export default function AdminProjects() {
@@ -371,6 +373,11 @@ export default function AdminProjects() {
                 }))
                 : (preparedScopeOfWork || []).flatMap(s => s.sequences || []);
 
+            if (Number(form.year) <= 2025 && !form.creationDate) {
+                setModalError(`Please select the Date of Project Creation for this ${form.year} project.`);
+                return;
+            }
+
             const { project } = await adminCreateProject({
                 name: form.name.trim(),
                 clientName: selectedClient.name,
@@ -387,6 +394,7 @@ export default function AdminProjects() {
                 connectionDesignEmail: form.connectionDesignEmail,
                 year: Number(form.year),
                 startingTransmittalNumber: Number(form.year) <= 2026 ? (Number(form.lastTransmittalNumber) || 0) + 1 : 1,
+                creationDate: form.creationDate || undefined,
             } as any);
 
             const newProject = {
@@ -615,7 +623,7 @@ export default function AdminProjects() {
                                             </span>
                                         </td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {formatDate(p.createdAt)}
+                                            {formatDate(p.creationDate || p.createdAt)}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
@@ -838,9 +846,33 @@ export default function AdminProjects() {
                                     min="2000"
                                     max="2100"
                                     value={form.year}
-                                    onChange={(e) => setForm({ ...form, year: e.target.value, lastTransmittalNumber: '0' })}
+                                    onChange={(e) => {
+                                        const yr = e.target.value;
+                                        setForm({
+                                            ...form,
+                                            year: yr,
+                                            lastTransmittalNumber: '0',
+                                            creationDate: Number(yr) <= 2025 && Number(yr) >= 2000 ? (form.creationDate || `${yr}-01-01`) : ''
+                                        });
+                                    }}
                                 />
                             </div>
+
+                            {Number(form.year) <= 2025 && Number(form.year) >= 2000 && (
+                                <div className="form-group" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '14px 16px' }}>
+                                    <label className="form-label required" style={{ color: '#0369a1', fontWeight: 600 }}>Date of Project Creation</label>
+                                    <p style={{ fontSize: 12, color: '#0284c7', marginBottom: 8, marginTop: 2 }}>
+                                        Since this is a {form.year} project, enter the date of project creation.
+                                    </p>
+                                    <input
+                                        className="form-control"
+                                        type="date"
+                                        required
+                                        value={form.creationDate || ''}
+                                        onChange={(e) => setForm({ ...form, creationDate: e.target.value })}
+                                    />
+                                </div>
+                            )}
 
                             {Number(form.year) <= 2026 && Number(form.year) >= 2000 && (
                                 <div className="form-group" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 16px' }}>

@@ -284,6 +284,30 @@ export default function ProjectView() {
         }
     }
 
+    /** Format creation date or ISO string to friendly display without timezone offset errors */
+    function formatCreationDate(creationDate?: string, rawFallback?: string) {
+        if (creationDate) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(creationDate)) {
+                const [y, m, d] = creationDate.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            }
+            try {
+                return new Date(creationDate).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            } catch {
+                return creationDate;
+            }
+        }
+        return toIST(rawFallback || '');
+    }
+
     const assignedUsers = project?.assignments?.filter(a => a.permission !== 'admin') || [];
     const creatorName = project?.createdByUsername || project?.createdBy || (project?.assignments?.find(a => a.permission === 'admin')?.username) || '';
 
@@ -691,7 +715,7 @@ export default function ProjectView() {
                         <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
                             <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Created Date</div>
-                                <div className="text-muted">{toIST(project.createdAt)}</div>
+                                <div className="text-muted">{formatCreationDate(project.creationDate, project.createdAt)}</div>
                             </div>
                             {project.location && (
                                 <div>
