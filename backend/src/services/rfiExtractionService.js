@@ -7,7 +7,25 @@ const { downloadFile: downloadFromOneDrive } = require('../utils/onedrive');
 const mongoose = require('mongoose');
 
 const SCRIPT_PATH = path.join(__dirname, '../scripts/extract_rfi.py');
-const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'py' : 'python3');
+
+function getPythonBin() {
+    if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+    // Check virtual environment paths on server
+    const venvPaths = [
+        path.join(__dirname, '../AiExtraction/.venv/bin/python'),
+        path.join(__dirname, '../AiExtraction/.venv/bin/python3'),
+        path.join(__dirname, '../../AiExtraction/.venv/bin/python'),
+        path.join(__dirname, '../../AiExtraction/.venv/bin/python3'),
+        '/var/www/steel-project/backend/AiExtraction/.venv/bin/python',
+        '/var/www/steel-project/backend/AiExtraction/.venv/bin/python3'
+    ];
+    for (const vp of venvPaths) {
+        if (fs.existsSync(vp)) {
+            return vp;
+        }
+    }
+    return process.platform === 'win32' ? 'py' : 'python3';
+}
 
 function _downloadFromGridFS(fileId, destPath) {
     return new Promise((resolve, reject) => {
@@ -40,30 +58,42 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
         doc.status = 'processing';
         await doc.save();
 
-        // ── GridFS/OneDrive Check ────────────────────────────
         const os = require('os');
         const tempDir = path.join(os.tmpdir(), 'steel-dms-uploads');
 
-        if (mongoose.Types.ObjectId.isValid(fileRef)) {
-            // Likely GridFS (24 hex)
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            
-            const tempFileName = `temp_rfi_gridfs_${extractionId}_${Date.now()}.pdf`;
-            localPath = path.join(tempDir, tempFileName);
-            
-            console.log(`[RfiService] Downloading GridFS file ${fileRef} to ${localPath}`);
-            await _downloadFromGridFS(fileRef, localPath);
-            isTemp = true;
-        } else if (typeof fileRef === 'string' && fileRef.length > 20) {
-            // Likely OneDrive ID
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            
-            const tempFileName = `temp_rfi_onedrive_${extractionId}_${Date.now()}.pdf`;
-            localPath = path.join(tempDir, tempFileName);
-            
-            console.log(`[RfiService] Downloading OneDrive file ${fileRef} to ${localPath}`);
-            await downloadFromOneDrive(fileRef, localPath);
-            isTemp = true;
+        // ── 1. Check if fileRef already exists on disk ────────
+        let foundOnDisk = false;
+        if (typeof fileRef === 'string') {
+            if (fs.existsSync(fileRef)) {
+                localPath = fileRef;
+                foundOnDisk = true;
+            } else {
+                const altPath = path.resolve(__dirname, '../../', fileRef);
+                if (fs.existsSync(altPath)) {
+                    localPath = altPath;
+                    foundOnDisk = true;
+                }
+            }
+        }
+
+        // ── 2. Fall back to GridFS or OneDrive if not on disk ──
+        if (!foundOnDisk) {
+            const gridId = doc.gridFsFileId || (typeof fileRef === 'string' && mongoose.Types.ObjectId.isValid(fileRef) ? fileRef : null);
+            if (gridId) {
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+                const tempFileName = `temp_rfi_gridfs_${extractionId}_${Date.now()}.pdf`;
+                localPath = path.join(tempDir, tempFileName);
+                console.log(`[RfiService] Downloading GridFS file ${gridId} to ${localPath}`);
+                await _downloadFromGridFS(gridId, localPath);
+                isTemp = true;
+            } else if (typeof fileRef === 'string' && fileRef.length > 20) {
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+                const tempFileName = `temp_rfi_onedrive_${extractionId}_${Date.now()}.pdf`;
+                localPath = path.join(tempDir, tempFileName);
+                console.log(`[RfiService] Downloading OneDrive file ${fileRef} to ${localPath}`);
+                await downloadFromOneDrive(fileRef, localPath);
+                isTemp = true;
+            }
         }
 
         if (!fs.existsSync(localPath)) {
@@ -72,15 +102,24 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
 
         console.log(`[RfiService] Starting Python RFI extraction for ${path.basename(localPath)}`);
 
+        const pythonBin = getPythonBin();
+        console.log(`[RfiService] Using python binary: ${pythonBin}`);
+
         const output = await new Promise((resolve, reject) => {
-            const process = spawn(PYTHON_BIN, [SCRIPT_PATH, localPath, doc.originalFileName]);
+            const process = spawn(pythonBin, [SCRIPT_PATH, localPath, doc.originalFileName]);
             let dataOut = '';
             let dataErr = '';
+
+            const timeoutTimer = setTimeout(() => {
+                try { process.kill('SIGKILL'); } catch (_) {}
+                reject(new Error('Python RFI extraction timed out after 60 seconds'));
+            }, 60000);
 
             process.stdout.on('data', (d) => dataOut += d.toString());
             process.stderr.on('data', (d) => dataErr += d.toString());
 
             process.on('close', (code) => {
+                clearTimeout(timeoutTimer);
                 // Cleanup temp file
                 if (isTemp && fs.existsSync(localPath)) {
                     try { fs.unlinkSync(localPath); } catch (_) {}
@@ -89,10 +128,15 @@ exports.runRfiExtraction = async (extractionId, fileRef) => {
 
                 if (code !== 0) {
                     console.error('[RfiService] Python stderr:', dataErr);
-                    reject(new Error(`Python exit code ${code}`));
+                    reject(new Error(`Python exit code ${code}: ${dataErr || 'Script failure'}`));
                 } else {
                     resolve(dataOut);
                 }
+            });
+
+            process.on('error', (err) => {
+                clearTimeout(timeoutTimer);
+                reject(err);
             });
         });
 

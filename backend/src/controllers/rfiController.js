@@ -139,6 +139,13 @@ exports.listRfiExtractions = async (req, res) => {
             return res.json({ extractions: [] });
         }
 
+        // Auto-recover stale extractions if server restarted mid-process (>3 minutes in processing/queued)
+        const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+        await RfiExtraction.updateMany(
+            { projectId, status: { $in: ['queued', 'processing'] }, updatedAt: { $lt: threeMinutesAgo } },
+            { status: 'failed', errorDetails: 'Extraction timed out or was interrupted. Please delete and re-upload.' }
+        );
+
         const extractions = await RfiExtraction.find({ projectId })
             .sort({ createdAt: -1 })
             .lean();
