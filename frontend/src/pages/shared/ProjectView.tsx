@@ -285,6 +285,7 @@ export default function ProjectView() {
     }
 
     const assignedUsers = project?.assignments?.filter(a => a.permission !== 'admin') || [];
+    const creatorName = project?.createdByUsername || project?.createdBy || (project?.assignments?.find(a => a.permission === 'admin')?.username) || '';
 
     return (
         <div>
@@ -319,6 +320,12 @@ export default function ProjectView() {
                             <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><rect x="1" y="3" width="14" height="12" rx="1" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.2" /><path d="M5 1v3M11 1v3M1 7h14" stroke="currentColor" strokeWidth="1.2" /></svg>
                             Updated: {toIST(project.updatedAt)}
                         </div>
+                        {creatorName && (
+                            <div className="project-meta-item">
+                                <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 1a4 4 0 100 8A4 4 0 008 1zm0 9c-3 0-6 1.3-6 3v1h12v-1c0-1.7-3-3-6-3z" /></svg>
+                                Created by: <strong style={{ color: 'var(--color-text-primary)' }}>{creatorName}</strong>
+                            </div>
+                        )}
                         <div className="project-meta-item">
                             <span className={`role-chip ${permission}`}>{permission.charAt(0).toUpperCase() + permission.slice(1)}</span>
                         </div>
@@ -674,9 +681,24 @@ export default function ProjectView() {
                                 </div>
                             </div>
                             <div>
-                                <div className="form-label" style={{ marginBottom: 4 }}>Created</div>
+                                <div className="form-label" style={{ marginBottom: 4 }}>Created By</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, color: 'var(--color-text-primary)' }}>
+                                    <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13" style={{ color: 'var(--color-primary)' }}><path d="M8 1a4 4 0 100 8A4 4 0 008 1zm0 9c-3 0-6 1.3-6 3v1h12v-1c0-1.7-3-3-6-3z" /></svg>
+                                    <span>{creatorName || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
+                            <div>
+                                <div className="form-label" style={{ marginBottom: 4 }}>Created Date</div>
                                 <div className="text-muted">{toIST(project.createdAt)}</div>
                             </div>
+                            {project.location && (
+                                <div>
+                                    <div className="form-label" style={{ marginBottom: 4 }}>Location</div>
+                                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{project.location}</div>
+                                </div>
+                            )}
                         </div>
                         {project.description && (
                             <div style={{ marginBottom: 'var(--space-md)' }}>

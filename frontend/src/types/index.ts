@@ -94,6 +94,8 @@ export interface Project {
     status: ProjectStatus;
     rawStatus?: string;
     location: string;
+    createdByUsername?: string;
+    createdBy?: string;
     createdAt: string;
     updatedAt: string;
     assignments: ProjectAssignment[];

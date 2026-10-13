@@ -145,6 +145,31 @@ async function attachProjectStats(projects) {
         console.warn('[projectStatsService] Failed to load external projects:', err.message);
     }
 
+    // Resolve missing creator login names from Admin and User models if needed
+    const missingAdminIds = projectsArray
+        .filter(p => {
+            const pObj = typeof p.toObject === 'function' ? p.toObject() : p;
+            return !pObj.createdByUsername && !(pObj.assignments || []).some(a => a.permission === 'admin' && a.username);
+        })
+        .map(p => p.createdByAdminId)
+        .filter(Boolean);
+
+    let adminUserMap = {};
+    if (missingAdminIds.length > 0) {
+        try {
+            const Admin = require('../models/Admin');
+            const User = require('../models/User');
+            const [admins, users] = await Promise.all([
+                Admin.find({ _id: { $in: missingAdminIds } }).select('username displayName').lean(),
+                User.find({ _id: { $in: missingAdminIds } }).select('username displayName').lean(),
+            ]);
+            admins.forEach(a => { adminUserMap[a._id.toString()] = a.username || a.displayName; });
+            users.forEach(u => { adminUserMap[u._id.toString()] = u.username || u.displayName; });
+        } catch (mapErr) {
+            console.warn('[projectStatsService] Error resolving creator admin/user:', mapErr.message);
+        }
+    }
+
     // ── 4. Merge Stats with Projects ─────────────────────────
     const results = projectsArray.map((p) => {
         const pObj = typeof p.toObject === 'function' ? p.toObject() : p;
@@ -193,8 +218,22 @@ async function attachProjectStats(projects) {
             }
         }
 
+        let creatorName = pObj.createdByUsername || '';
+        if (!creatorName) {
+            const adminAssignment = (pObj.assignments || []).find(a => a.permission === 'admin') || (pObj.assignments || [])[0];
+            if (adminAssignment && adminAssignment.username) {
+                creatorName = adminAssignment.username;
+            } else if (pObj.createdByAdminId && adminUserMap[pObj.createdByAdminId.toString()]) {
+                creatorName = adminUserMap[pObj.createdByAdminId.toString()];
+            } else if (matchingExt && (matchingExt.projectManager || matchingExt.createdBy)) {
+                creatorName = matchingExt.projectManager || matchingExt.createdBy;
+            }
+        }
+
         return {
             ...pObj,
+            createdByUsername: creatorName,
+            createdBy: creatorName,
             drawingCount: stats.total,
             approvalCount: stats.approvalCount,
             fabricationCount: stats.fabricationCount,

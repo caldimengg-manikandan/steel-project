@@ -98,6 +98,12 @@ const projectSchema = new mongoose.Schema(
             index: true,
         },
 
+        createdByUsername: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+
         // ── User Assignments ──────────────────────────────────
         assignments: {
             type: [assignmentSchema],

@@ -123,6 +123,7 @@ async function createProject(req, res) {
         startingTransmittalNumber: startNum,
         transmittalCount: initialTransmittalCount,
         createdByAdminId: adminId,
+        createdByUsername: req.principal.username || '',
         assignments: [
             {
                 userId: req.principal.id,
@@ -160,9 +161,12 @@ async function getProject(req, res) {
         const drawingCount = p.approximateDrawingsCount || 0;
         const approvalCount = Math.round(((p.approvalPercentage || 0) * drawingCount) / 100);
         const fabricationCount = Math.round(((p.fabricationPercentage || 0) * drawingCount) / 100);
+        const creator = p.projectManager || p.pm || p.pmName || p.createdBy || p.createdByName || '';
         const projectWithStats = {
             ...p,
             _id: p.id,
+            createdByUsername: creator,
+            createdBy: creator,
             drawingCount,
             approvalCount,
             fabricationCount,
