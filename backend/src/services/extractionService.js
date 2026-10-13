@@ -447,7 +447,7 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
         formData.append('files', fileBlob, fileName);
         formData.append('client_name', clientName || '');
 
-        const aiPort = process.env.AI_SERVICE_PORT || '8001';
+        const aiPort = process.env.AI_SERVICE_PORT || '8085';
         console.log(`[AI API] Sending ${fileName} to AI model at http://localhost:${aiPort}/upload`);
 
         let response;
