@@ -19,9 +19,16 @@ def extract_sk_number(original_filename):
 
 
 def get_q_num(text):
-    """Extract the first Q-number found in a text string, e.g. 'Q1' -> '1'."""
-    m = re.search(r'\bQ\s*(\d+)\b', text, re.IGNORECASE)
-    return m.group(1) if m else None
+    """Extract the first Q-number found in a text string, e.g. 'Q1' -> '1', 'Q1)' -> '1', '(Q1)' -> '1'."""
+    m = re.search(
+        r'(?:^|[^\w])(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*(\d+[a-zA-Z]?)(?:[)\]\.\:\-\/\>\s\*]|$)',
+        text,
+        re.IGNORECASE
+    )
+    if m:
+        raw_num = m.group(1).upper()
+        return re.sub(r'^0+(?=\d)', '', raw_num)
+    return None
 
 
 def is_drawing_note(text):
@@ -87,18 +94,24 @@ def clean_duplicate_sentences(desc):
     return ' '.join(seen_parts)
 
 
-def is_blue_color(color):
-    """Check if RGB color tuple or stroke is pure blue (not cyan, yellow, or green)."""
+def is_blue_color(color, allow_cyan=False):
+    """Check if RGB color tuple or stroke is pure blue or callout markup color."""
     if not color or not isinstance(color, (list, tuple)) or len(color) < 3:
         return False
     r, g, b = float(color[0]), float(color[1]), float(color[2])
     if r > 1 or g > 1 or b > 1:
         r, g, b = r / 255.0, g / 255.0, b / 255.0
-    return b > 0.4 and r < 0.3 and (b > g + 0.2)
+    # Pure blue
+    if b > 0.4 and r < 0.3 and (b > g + 0.15):
+        return True
+    # Cyan / light blue (for markup annotations like text boxes and callout fills)
+    if allow_cyan and b > 0.4 and g > 0.3 and r < 0.6:
+        return True
+    return False
 
 
 def get_blue_boxes(page):
-    """Find blue annotation or vector drawing rectangles on the page."""
+    """Find blue or cyan markup annotation/vector drawing rectangles on the page."""
     blue_rects = []
     try:
         annots = page.annots()
@@ -107,7 +120,7 @@ def get_blue_boxes(page):
                 colors = getattr(a, 'colors', {})
                 stroke = colors.get("stroke") if isinstance(colors, dict) else None
                 fill = colors.get("fill") if isinstance(colors, dict) else None
-                if is_blue_color(stroke) or is_blue_color(fill):
+                if is_blue_color(stroke, allow_cyan=True) or is_blue_color(fill, allow_cyan=True):
                     blue_rects.append(a.rect)
     except Exception:
         pass
@@ -256,10 +269,16 @@ def extract_rfi(pdf_path, original_filename):
             for a in valid_annots:
                 text = a['text']
 
-                # Check if it's a STANDALONE Q marker (e.g. exactly "Q1" or "Q1.")
-                standalone_match = re.match(r'^[*\-\s]*Q[\.\-\:\s]*(\d+[a-zA-Z]?)[\.:\-]?[\s]*$', text, re.IGNORECASE)
+                # Check if it's a STANDALONE Q marker (e.g. exactly "Q1", "Q1.", "Q1)", "(Q1)")
+                standalone_match = re.match(
+                    r'^[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*(\d+[a-zA-Z]?)[)\]\.\:\-\s\*]*$',
+                    text,
+                    re.IGNORECASE
+                )
                 if standalone_match:
-                    rfi_num = f"Q{standalone_match.group(1).upper()}"
+                    raw_num = standalone_match.group(1).upper()
+                    clean_num = re.sub(r'^0+(?=\d)', '', raw_num)
+                    rfi_num = f"Q{clean_num}"
 
                     best_annot = {}
                     min_dist = float('inf')
@@ -280,7 +299,7 @@ def extract_rfi(pdf_path, original_filename):
                     for sibling in valid_annots:
                         if sibling == a:
                             continue
-                        if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
+                        if re.match(r'^[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*\d+[a-zA-Z]?[)\]\.\:\-\s\*]*$', sibling['text'], re.IGNORECASE):
                             continue
 
                         cx_s = (sibling['x0'] + sibling['x1']) / 2
@@ -317,7 +336,7 @@ def extract_rfi(pdf_path, original_filename):
                         for sibling in valid_annots:
                             if sibling == a:
                                 continue
-                            if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?[\.\-\:]?$', sibling['text'], re.IGNORECASE):
+                            if re.match(r'^[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*\d+[a-zA-Z]?[)\]\.\:\-\s\*]*$', sibling['text'], re.IGNORECASE):
                                 continue
                             cx_s = (sibling['x0'] + sibling['x1']) / 2
                             cy_s = (sibling['y0'] + sibling['y1']) / 2
@@ -375,26 +394,50 @@ def extract_rfi(pdf_path, original_filename):
                     })
                     continue
 
-                # Check if it's a COMBINED Q marker (e.g., "Q1 The architectural drawing...")
-                combined_match = re.match(r'^Q[\.\-\:\s]*(\d+[a-zA-Z]?)[\.\-\:\s]+(.+)', text, re.IGNORECASE | re.DOTALL)
-                if combined_match:
-                    desc = combined_match.group(2).strip()
-                    # Prevent glued labels (e.g., "Q11 Q12") from being extracted as label + description
-                    if re.match(r'^Q[\.\-\:]?\d+[a-zA-Z]?$', desc, re.IGNORECASE):
-                        continue
+                # Check if it's a COMBINED Q marker (e.g., "Q1) Kindly provide the curb cut sheets...", "(Q1) ...", "Q1: ...")
+                first_q = re.match(
+                    r'^[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*(\d+[a-zA-Z]?)[)\]\.\:\-\/\>\s]+(.+)',
+                    text,
+                    re.IGNORECASE | re.DOTALL
+                )
+                if first_q:
+                    q_split_pattern = re.compile(
+                        r'(?:^|[\r\n]+|(?<=\.)\s+|(?<=\;)\s+|\s{2,})[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*(\d+[a-zA-Z]?)[)\]\.\:\-\/\>\s]+',
+                        re.IGNORECASE
+                    )
+                    matches = list(q_split_pattern.finditer(text))
+                    if not matches:
+                        raw_num = first_q.group(1).upper()
+                        clean_num = re.sub(r'^0+(?=\d)', '', raw_num)
+                        desc_list = [(f"Q{clean_num}", first_q.group(2).strip())]
+                    else:
+                        desc_list = []
+                        for i, m in enumerate(matches):
+                            raw_num = m.group(1).upper()
+                            clean_num = re.sub(r'^0+(?=\d)', '', raw_num)
+                            start_pos = m.end()
+                            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+                            sub_desc = text[start_pos:end_pos].strip()
+                            sub_desc = re.sub(r'^[)\]\.\:\-\/\>\s]+', '', sub_desc).strip()
+                            if sub_desc:
+                                desc_list.append((f"Q{clean_num}", sub_desc))
 
-                    desc = clean_duplicate_sentences(desc)
-                    rfi_num = f"Q{combined_match.group(1).upper()}"
-                    page_rfis.append({
-                        'rfiNumber': rfi_num,
-                        'refDrawing': original_filename,
-                        'description': desc,
-                        'response': '',
-                        'status': 'OPEN',
-                        'remarks': '',
-                        'skNumber': sk_number,
-                        '_rect': a['rect']
-                    })
+                    for rfi_num, desc in desc_list:
+                        # Prevent glued labels (e.g., "Q11 Q12") from being extracted as label + description
+                        if re.match(r'^[*\-\s\(\[]*(?:RFI[\s\-_]*(?:Q)?|QUESTION[\s\-_]*|Q)[\.\-\:\#\s]*\d+[a-zA-Z]?[)\]\.\:\-\s\*]*$', desc, re.IGNORECASE):
+                            continue
+
+                        desc = clean_duplicate_sentences(desc)
+                        page_rfis.append({
+                            'rfiNumber': rfi_num,
+                            'refDrawing': original_filename,
+                            'description': desc,
+                            'response': '',
+                            'status': 'OPEN',
+                            'remarks': '',
+                            'skNumber': sk_number,
+                            '_rect': a['rect']
+                        })
 
             # Filter out RFIs with invalid drawing notes and deduplicate
             filtered_page_rfis = []
