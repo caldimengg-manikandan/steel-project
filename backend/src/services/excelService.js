@@ -908,7 +908,7 @@ async function generateProjectStatusExcel(projectsData) {
     });
 
     // ── Freeze header ─────────────────────────────────────────
-    sheet.views = [{ state: 'frozen', ySplit: 10 }];
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     const buffer = await workbook.xlsx.writeBuffer();
     const filename = `Project_Status_Report_${formattedDate.replace(/\//g, '-')}.xlsx`;

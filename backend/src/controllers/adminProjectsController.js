@@ -25,7 +25,7 @@ const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
-const { attachProjectStats } = require('../services/projectStatsService');
+const { attachProjectStats, getProjectStatusReportData } = require('../services/projectStatsService');
 const { getExternalProjects } = require('../services/externalProjectService');
 const storageGateway = require('../utils/storageGateway');
 const { runExtractionPipeline } = require('../services/extractionService');
@@ -419,171 +419,11 @@ async function downloadAllProjectsStatusExcel(req, res) {
     if (req.principal.role !== 'superadmin') {
         filter.createdByAdminId = adminId;
     }
-    const projects = await Project.find(filter).sort({ createdAt: -1 }).lean();
 
-    if (projects.length === 0) {
+    const projectsData = await getProjectStatusReportData(filter);
+    if (!projectsData || projectsData.length === 0) {
         return res.status(404).json({ error: 'No projects found.' });
     }
-
-    const projectIds = projects.map(p => p._id);
-
-    // Aggregate drawing counts per project, broken down by status and revision type
-    const counts = await DrawingExtraction.aggregate([
-        { $match: { projectId: { $in: projectIds } } },
-        {
-            $group: {
-                _id: '$projectId',
-                totalDrawings: { $sum: 1 },
-                approvalCount: {
-                    $sum: {
-                        $cond: [
-                            {
-                                $or: [
-                                    {
-                                        $regexMatch: {
-                                            input: { $ifNull: ['$extractedFields.revision', ''] },
-                                            regex: '^(rev\\s*)?[a-z]',
-                                            options: 'i'
-                                        }
-                                    },
-                                    {
-                                        $regexMatch: {
-                                            input: { $ifNull: ['$extractedFields.remarks', ''] },
-                                            regex: 'approved|approval',
-                                            options: 'i'
-                                        }
-                                    },
-                                    {
-                                        $regexMatch: {
-                                            input: { $ifNull: ['$extractedFields.description', ''] },
-                                            regex: 'approved|approval',
-                                            options: 'i'
-                                        }
-                                    }
-                                ]
-                            }, 1, 0
-                        ]
-                    }
-                },
-                fabricationCount: {
-                    $sum: {
-                        $cond: [
-                            {
-                                $regexMatch: {
-                                    input: { $ifNull: ['$extractedFields.revision', ''] },
-                                    regex: '^(rev\\s*)?[0-9]',
-                                    options: 'i'
-                                }
-                            }, 1, 0
-                        ]
-                    }
-                },
-                holdCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'on_hold'] }, 1, 0] }
-                },
-                pendingCount: {
-                    $sum: { $cond: [{ $in: ['$status', ['queued', 'processing']] }, 1, 0] }
-                },
-                failedCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] }
-                },
-            }
-        },
-    ]);
-
-    // Build a fast lookup map
-    const countMap = {};
-    counts.forEach(c => {
-        countMap[c._id.toString()] = c;
-    });
-
-    // ── Aggregate RFI Counts ──────────────────────────────────
-    const rfiCounts = await RfiExtraction.aggregate([
-        { $match: { createdByAdminId: new mongoose.Types.ObjectId(req.principal.adminId) } },
-        { $unwind: '$rfis' },
-        {
-            $group: {
-                _id: '$projectId',
-                openRfiCount: { $sum: { $cond: [{ $eq: ['$rfis.status', 'OPEN'] }, 1, 0] } },
-                closedRfiCount: { $sum: { $cond: [{ $eq: ['$rfis.status', 'CLOSED'] }, 1, 0] } }
-            }
-        }
-    ]);
-
-    const rfiMap = {};
-    rfiCounts.forEach(r => {
-        rfiMap[r._id.toString()] = r;
-    });
-
-    // ── Aggregate Change Order Counts ──────────────────────────
-    const coCounts = await ChangeOrder.aggregate([
-        { $match: { projectId: { $in: projectIds } } },
-        {
-            $group: {
-                _id: '$projectId',
-                totalCO: { $sum: 1 },
-                approvedCO: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, 1, 0] } },
-                workCompletedCO: { $sum: { $cond: [{ $eq: ['$status', 'WORK_COMPLETED'] }, 1, 0] } },
-                pendingCO: { $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, 1, 0] } }
-            }
-        }
-    ]);
-
-    const coMap = {};
-    coCounts.forEach(c => {
-        coMap[c._id.toString()] = c;
-    });
-
-    let externalProjects = [];
-    try {
-        const extResult = await getExternalProjects();
-        if (extResult && Array.isArray(extResult.projects)) {
-            externalProjects = extResult.projects;
-        }
-    } catch (err) { }
-
-    // Merge project data with aggregated stats
-    const projectsData = projects.map(p => {
-        const stats = countMap[p._id.toString()] || {};
-        const rfiStats = rfiMap[p._id.toString()] || { openRfiCount: 0, closedRfiCount: 0 };
-        const coStats = coMap[p._id.toString()] || { totalCO: 0, approvedCO: 0, workCompletedCO: 0, pendingCO: 0 };
-        const allSows = p.scopeOfWork || [];
-        const sowProg = calculateSowProgress(allSows);
-
-        const appPct = sowProg.approvalPercentage;
-        const fabPct = sowProg.fabricationPercentage;
-
-        const matchingExt = externalProjects.find(ep => 
-            ep.name.trim().toLowerCase() === p.name.trim().toLowerCase()
-        );
-
-        return {
-            ...p,
-            totalDrawings: stats.totalDrawings || 0,
-            fabricationCount: stats.fabricationCount || 0,
-            approvalCount: stats.approvalCount || 0,
-            holdCount: stats.holdCount || 0,
-            pendingCount: stats.pendingCount || 0,
-            failedCount: stats.failedCount || 0,
-            openRfiCount: rfiStats.openRfiCount,
-            closedRfiCount: rfiStats.closedRfiCount,
-            totalCO: coStats.totalCO,
-            approvedCO: coStats.approvedCO,
-            workCompletedCO: coStats.workCompletedCO,
-            pendingCO: coStats.pendingCO,
-            corStatus: matchingExt ? matchingExt.corStatus : null,
-            fabricationPercentage: fabPct,
-            approvalPercentage: appPct,
-            rawStatus: matchingExt ? matchingExt.rawStatus : '',
-            // Data from external project management app
-            financialYear: matchingExt ? matchingExt.financialYear : '',
-            projectCode: matchingExt ? matchingExt.projectCode : '',
-            division: matchingExt ? matchingExt.division : '',
-            projectManager: matchingExt ? matchingExt.projectManager : '',
-            clientName: matchingExt ? matchingExt.clientName : p.clientName,
-            name: matchingExt ? matchingExt.name : p.name,
-        };
-    });
 
     const { buffer, filename } = await generateProjectStatusExcel(projectsData);
 

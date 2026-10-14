@@ -139,5 +139,18 @@ exports.updateEmailSettings = async (req, res) => {
 };
 
 /**
- * Test Email Connection (sends a test email using current SMTP settings)
+ * Trigger Weekly Report Email Immediately
  */
+exports.triggerWeeklyReport = async (req, res) => {
+    try {
+        const { sendProjectStatusEmail } = require('../services/schedulerService');
+        const result = await sendProjectStatusEmail();
+        if (result && result.success === false) {
+            return res.status(400).json({ error: result.reason || 'Failed to send weekly report email.' });
+        }
+        res.json({ message: 'Weekly report email sent successfully!', result });
+    } catch (err) {
+        console.error('triggerWeeklyReport error:', err);
+        res.status(500).json({ error: err.message || 'Failed to send weekly report email.' });
+    }
+};

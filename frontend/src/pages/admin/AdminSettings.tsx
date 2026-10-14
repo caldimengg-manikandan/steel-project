@@ -119,6 +119,27 @@ export default function AdminSettings() {
     const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [savingPw, setSavingPw] = useState(false);
     const [showPw, setShowPw] = useState({ current: false, newPw: false, confirm: false });
+    const [triggeringWeeklyReport, setTriggeringWeeklyReport] = useState(false);
+
+    const handleTriggerWeeklyReport = async () => {
+        try {
+            setTriggeringWeeklyReport(true);
+            const res = await fetch(`${BASE}/settings/trigger-weekly-report`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showMessage('Report Sent', data.message || 'Weekly report email sent successfully!', 'success');
+            } else {
+                showMessage('Error Sending Report', data.error || 'Failed to send weekly report email.', 'error');
+            }
+        } catch (err: any) {
+            showMessage('Error', err.message || 'Network error occurred.', 'error');
+        } finally {
+            setTriggeringWeeklyReport(false);
+        }
+    };
 
 
 
@@ -488,7 +509,23 @@ export default function AdminSettings() {
                                                     onChange={(e) => handleSettingChange('weeklyProgressTime', e.target.value)}
                                                 />
                                             </div>
-                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 'auto' }}>
+                                                <label style={{ fontSize: 12, fontWeight: 600, color: 'transparent' }}>Action</label>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary"
+                                                    onClick={handleTriggerWeeklyReport}
+                                                    disabled={triggeringWeeklyReport}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px' }}
+                                                    title="Compile and send the latest Project Status Excel sheet to Project Managers right now"
+                                                >
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none">
+                                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                    </svg>
+                                                    {triggeringWeeklyReport ? 'Sending...' : 'Send Report Now'}
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </Card>
