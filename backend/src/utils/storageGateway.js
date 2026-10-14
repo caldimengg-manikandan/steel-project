@@ -93,11 +93,26 @@ async function getFileStream(relativePath) {
     try {
         const stat = await fsPromises.stat(filePath);
         const stream = fs.createReadStream(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+            '.pdf': 'application/pdf',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.svg': 'image/svg+xml',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.csv': 'text/csv',
+            '.txt': 'text/plain',
+        };
+        const resolvedType = mimeTypes[ext] || 'application/octet-stream';
         return {
             stream,
-            contentType: 'application/octet-stream',
+            contentType: resolvedType,
             contentLength: stat.size,
-            contentDisposition: `attachment; filename="${path.basename(filePath)}"`,
+            contentDisposition: `inline; filename="${path.basename(filePath)}"`,
         };
     } catch (err) {
         throw new Error(`Failed to download: ${err.message}`);

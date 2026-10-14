@@ -469,9 +469,9 @@ exports.viewCdrfiPdf = async (req, res) => {
             try {
                 const storageGateway = require('../utils/storageGateway');
                 if (storageGateway.isEnabled()) {
-                    const { stream, contentType, contentLength } = await storageGateway.getFileStream(doc.storageGatewayPath);
-                    res.setHeader('Content-Type', contentType || 'application/pdf');
-                    res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                    const { stream, contentLength } = await storageGateway.getFileStream(doc.storageGatewayPath);
+                    res.setHeader('Content-Type', 'application/pdf');
+                    res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(doc.originalFileName) + '"');
                     if (contentLength) res.setHeader('Content-Length', contentLength);
                     
                     stream.pipe(res);
@@ -486,7 +486,7 @@ exports.viewCdrfiPdf = async (req, res) => {
             try {
                 const rclone = require('../utils/rcloneOneDrive');
                 res.setHeader('Content-Type', 'application/pdf');
-                res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(doc.originalFileName) + '"');
                 rclone.streamFile(doc.oneDriveFileId, res);
                 return;
             } catch (err) {
@@ -502,7 +502,7 @@ exports.viewCdrfiPdf = async (req, res) => {
                 const mongoose = require('mongoose');
                 
                 res.setHeader('Content-Type', 'application/pdf');
-                res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(doc.originalFileName) + '"');
 
                 const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(doc.gridFsFileId));
                 downloadStream.pipe(res);
@@ -522,7 +522,7 @@ exports.viewCdrfiPdf = async (req, res) => {
 
             if (fs.existsSync(p)) {
                 res.setHeader('Content-Type', 'application/pdf');
-                res.setHeader('Content-Disposition', 'inline; filename="' + doc.originalFileName + '"');
+                res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(doc.originalFileName) + '"');
                 return fs.createReadStream(p).pipe(res);
             }
         }

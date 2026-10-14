@@ -128,7 +128,9 @@ app.use(cors({
 
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    crossOriginOpenerPolicy: { policy: "unsafe-none" }
+    crossOriginOpenerPolicy: { policy: "unsafe-none" },
+    contentSecurityPolicy: false,
+    xDownloadOptions: false,
 }));
 app.use(cookieParser());
 app.use(morgan('dev'));

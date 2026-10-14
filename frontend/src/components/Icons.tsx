@@ -231,4 +231,11 @@ export const IconDownload = ({ width = 16, height = 16, style }: { width?: numbe
     </svg>
 );
 
+export const IconEye = ({ width = 16, height = 16, style }: { width?: number; height?: number; style?: React.CSSProperties }) => (
+    <svg viewBox="0 0 24 24" width={width} height={height} style={{ width, height, minWidth: width, flexShrink: 0, ...style }} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import {
     listTransmittals,
     generateTransmittal,
@@ -9,7 +9,16 @@ import {
 } from '../services/transmittalApi';
 import { useMessage } from '../context/MessageContext';
 import { formatDate } from '../utils/dateUtils';
-import { IconDownload } from './Icons';
+import { IconDownload, IconEye } from './Icons';
+
+function normalizeFolderHeader(fName?: string) {
+    if (!fName) return 'DETAIL SHEET';
+    const s = String(fName).trim().replace(/_/g, ' ').toUpperCase();
+    if (s.includes('DETAIL') || s.startsWith('D SHEET') || s.startsWith('D-SHEET')) return 'DETAIL SHEET';
+    if (s.includes('ERECTION') || s.startsWith('E SHEET') || s.startsWith('E-SHEET')) return 'ERECTION SHEET';
+    if (s.includes('ANCHOR')) return 'ANCHOR BOLT';
+    return s;
+}
 
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
     const { showMessage, showConfirm } = useMessage();
@@ -18,6 +27,7 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState('');
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+    const [expandedTransmittalId, setExpandedTransmittalId] = useState<string | null>(null);
 
     const fetchTransmittals = useCallback(async (background = false) => {
         try {
@@ -218,56 +228,221 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                     );
                                 }
                                 return (
-                                    <tr key={t._id} style={{ opacity: t.isVoided ? 0.5 : 1, textDecoration: t.isVoided ? 'line-through' : 'none', background: t.isVoided ? '#f8fafc' : 'transparent' }}>
-                                        <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                                            TR-{String(t.transmittalNumber).padStart(3, '0')}
-                                            {t.isVoided && <span style={{ marginLeft: 8, fontSize: 10, background: '#fee2e2', color: '#b91c1c', padding: '2px 5px', borderRadius: 4, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>}
-                                        </td>
-                                        <td>
-                                            {t.sequences && t.sequences.length > 0 ? (
-                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                                    {t.sequences.map((seq: string, idx: number) => (
-                                                        <span key={idx} style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, fontWeight: 600, color: '#475569', border: '1px solid #e2e8f0' }}>
-                                                            {seq}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
-                                            )}
-                                        </td>
-                                        <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.createdAt)}</td>
-                                        <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.updatedAt || t.createdAt)}</td>
-                                        <td>
-                                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, filter: t.isVoided ? 'grayscale(100%)' : 'none' }}>
-                                                • {drawingCount}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', textDecoration: 'none' }}>
-                                                {!t.isVoided && (
-                                                    <>
-                                                        <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
-                                                            <IconDownload width={14} height={14} /> Transmittal
-                                                        </a>
-                                                        <a href={getDrawingLogExcelUrl(projectId, t.transmittalNumber)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
-                                                            <IconDownload width={14} height={14} /> Log
-                                                        </a>
-                                                        {canEdit && (
-                                                            <button 
-                                                                className="btn btn-sm" 
-                                                                style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
-                                                                onClick={() => handleVoid(t._id, t.transmittalNumber)}
-                                                                disabled={generating}
-                                                            >
-                                                                Void
-                                                            </button>
-                                                        )}
-                                                    </>
+                                    <Fragment key={t._id}>
+                                        <tr style={{ opacity: t.isVoided ? 0.5 : 1, textDecoration: t.isVoided ? 'line-through' : 'none', background: t.isVoided ? '#f8fafc' : 'transparent' }}>
+                                            <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                                TR-{String(t.transmittalNumber).padStart(3, '0')}
+                                                {t.isVoided && <span style={{ marginLeft: 8, fontSize: 10, background: '#fee2e2', color: '#b91c1c', padding: '2px 5px', borderRadius: 4, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>}
+                                            </td>
+                                            <td>
+                                                {t.sequences && t.sequences.length > 0 ? (
+                                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                        {t.sequences.map((seq: string, idx: number) => (
+                                                            <span key={idx} style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: 4, fontSize: 11, fontWeight: 600, color: '#475569', border: '1px solid #e2e8f0' }}>
+                                                                {seq}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
                                                 )}
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.createdAt)}</td>
+                                            <td className={t.isVoided ? "" : "text-muted"}>{formatDate(t.updatedAt || t.createdAt)}</td>
+                                            <td>
+                                                <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, filter: t.isVoided ? 'grayscale(100%)' : 'none' }}>
+                                                    • {drawingCount}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', textDecoration: 'none' }}>
+                                                    {!t.isVoided && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setExpandedTransmittalId(prev => prev === t._id ? null : t._id)}
+                                                                className={`btn btn-sm ${expandedTransmittalId === t._id ? 'btn-primary' : 'btn-secondary'}`}
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                                                title={expandedTransmittalId === t._id ? "Close Preview" : "Preview Transmittal"}
+                                                            >
+                                                                <IconEye width={14} height={14} /> {expandedTransmittalId === t._id ? 'Close' : 'Preview'}
+                                                            </button>
+                                                            <a href={getTransmittalExcelUrl(projectId, t._id)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                                                                <IconDownload width={14} height={14} /> Transmittal
+                                                            </a>
+                                                            <a href={getDrawingLogExcelUrl(projectId, t.transmittalNumber)} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                                                                <IconDownload width={14} height={14} /> Log
+                                                            </a>
+                                                            {canEdit && (
+                                                                <button 
+                                                                    className="btn btn-sm" 
+                                                                    style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+                                                                    onClick={() => handleVoid(t._id, t.transmittalNumber)}
+                                                                    disabled={generating}
+                                                                >
+                                                                    Void
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        {/* Inline Excel-style Preview Row */}
+                                        {expandedTransmittalId === t._id && !t.isVoided && (() => {
+                                            const groupedDrawings: { [category: string]: any[] } = {};
+                                            (t.drawings || []).forEach((d: any) => {
+                                                const cat = normalizeFolderHeader(d.folderName);
+                                                if (!groupedDrawings[cat]) groupedDrawings[cat] = [];
+                                                groupedDrawings[cat].push(d);
+                                            });
+                                            const categories = Object.keys(groupedDrawings).sort((a, b) => a.localeCompare(b));
+                                            let currentSlNo = 1;
+
+                                            return (
+                                                <tr key={`${t._id}-preview`} style={{ background: '#f8fafc' }}>
+                                                    <td colSpan={6} style={{ padding: '12px 16px 20px', borderBottom: '2px solid #cbd5e1' }}>
+                                                        <div style={{
+                                                            background: '#ffffff',
+                                                            border: '1px solid #cbd5e1',
+                                                            borderRadius: '8px',
+                                                            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            {/* Excel Transmittal Header Banner */}
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                alignItems: 'center',
+                                                                padding: '10px 16px',
+                                                                background: '#f1f5f9',
+                                                                borderBottom: '1px solid #e2e8f0',
+                                                                flexWrap: 'wrap',
+                                                                gap: 8
+                                                            }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                                                                    <span style={{ fontWeight: 800, fontSize: 13, color: '#16a34a', letterSpacing: '0.3px' }}>
+                                                                        TRANSMITTAL NO: TR-{String(t.transmittalNumber).padStart(3, '0')}
+                                                                    </span>
+                                                                    <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>
+                                                                        DATE: {formatDate(t.createdAt)}
+                                                                    </span>
+                                                                    {t.sequences && t.sequences.length > 0 && (
+                                                                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                                                                            Sequences: {t.sequences.join(', ')}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                    <span style={{
+                                                                        fontSize: 11,
+                                                                        fontWeight: 700,
+                                                                        padding: '3px 8px',
+                                                                        background: '#e0f2fe',
+                                                                        color: '#0369a1',
+                                                                        borderRadius: 4,
+                                                                        border: '1px solid #bae6fd'
+                                                                    }}>
+                                                                        Excel Sheet Preview • {drawingCount} Drawing{drawingCount === 1 ? '' : 's'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Excel Table */}
+                                                            <div style={{ overflowX: 'auto' }}>
+                                                                <table style={{
+                                                                    width: '100%',
+                                                                    borderCollapse: 'collapse',
+                                                                    fontSize: 12,
+                                                                    fontFamily: "'Segoe UI', Aptos, Calibri, sans-serif"
+                                                                }}>
+                                                                    <thead>
+                                                                        <tr style={{ background: '#d9e1f2', color: '#1f3864' }}>
+                                                                            <th style={{ width: 65, textAlign: 'center', padding: '9px 8px', fontWeight: 700, border: '1px solid #b4c6e7' }}>Sl. No.</th>
+                                                                            <th style={{ width: 140, textAlign: 'left', padding: '9px 12px', fontWeight: 700, border: '1px solid #b4c6e7' }}>Sheet No.</th>
+                                                                            <th style={{ textAlign: 'left', padding: '9px 12px', fontWeight: 700, border: '1px solid #b4c6e7' }}>Drawing Title</th>
+                                                                            <th style={{ width: 80, textAlign: 'center', padding: '9px 8px', fontWeight: 700, border: '1px solid #b4c6e7' }}>REV#</th>
+                                                                            <th style={{ width: 110, textAlign: 'center', padding: '9px 8px', fontWeight: 700, border: '1px solid #b4c6e7' }}>DATE</th>
+                                                                            <th style={{ width: 220, textAlign: 'left', padding: '9px 12px', fontWeight: 700, border: '1px solid #b4c6e7' }}>Revision History</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {categories.length === 0 || (t.drawings || []).length === 0 ? (
+                                                                            <tr>
+                                                                                <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontStyle: 'italic', border: '1px solid #e2e8f0' }}>
+                                                                                    No drawings recorded in this transmittal.
+                                                                                </td>
+                                                                            </tr>
+                                                                        ) : (
+                                                                            categories.map((catKey) => {
+                                                                                const sortedDrawings = [...groupedDrawings[catKey]].sort((a: any, b: any) =>
+                                                                                    (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+                                                                                );
+                                                                                return (
+                                                                                    <Fragment key={catKey}>
+                                                                                        {/* Yellow Main Category Header Row */}
+                                                                                        <tr style={{ background: '#ffff00', color: '#000000', fontWeight: 800 }}>
+                                                                                            <td
+                                                                                                colSpan={6}
+                                                                                                style={{
+                                                                                                    textAlign: 'center',
+                                                                                                    padding: '7px 12px',
+                                                                                                    border: '1px solid #b4c6e7',
+                                                                                                    letterSpacing: '0.5px',
+                                                                                                    fontSize: 12
+                                                                                                }}
+                                                                                            >
+                                                                                                {catKey}
+                                                                                            </td>
+                                                                                        </tr>
+
+                                                                                        {/* Drawing rows */}
+                                                                                        {sortedDrawings.map((d: any, dIdx: number) => {
+                                                                                            const rowSlNo = currentSlNo++;
+                                                                                            const revHistoryText = d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED');
+                                                                                            return (
+                                                                                                <tr
+                                                                                                    key={`${catKey}-${dIdx}`}
+                                                                                                    style={{
+                                                                                                        background: dIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                                                                                                        transition: 'background-color 0.15s ease'
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 600, color: '#64748b' }}>
+                                                                                                        {rowSlNo}
+                                                                                                    </td>
+                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#0f172a' }}>
+                                                                                                        {d.drawingNumber || '-'}
+                                                                                                    </td>
+                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#334155' }}>
+                                                                                                        {d.drawingTitle || '-'}
+                                                                                                    </td>
+                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#1d4ed8' }}>
+                                                                                                        {d.revision || '0'}
+                                                                                                    </td>
+                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
+                                                                                                        {d.date || formatDate(t.createdAt)}
+                                                                                                    </td>
+                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
+                                                                                                        {revHistoryText}
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            );
+                                                                                        })}
+                                                                                    </Fragment>
+                                                                                );
+                                                                            })
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })()}
+                                    </Fragment>
                                 );
                             })}
                         </tbody>
