@@ -26,6 +26,7 @@ function getErrorStatus(err) {
 
 const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
+const CdrfiExtraction = require('../models/CdrfiExtraction');
 
 /**
  * GET /api/files/browse?path=<relativePath>
@@ -46,9 +47,10 @@ exports.browse = async (req, res) => {
         // Helpful if Storage Agent API Key is lost or disconnected.
         if (requestedPath) {
             const pathRegex = new RegExp('^' + requestedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/');
-            const [drawingDocs, rfiDocs] = await Promise.all([
+            const [drawingDocs, rfiDocs, cdrfiDocs] = await Promise.all([
                 DrawingExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean(),
-                RfiExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean()
+                RfiExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean(),
+                CdrfiExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean()
             ]);
             
             const dbEntriesMap = {};
@@ -78,6 +80,7 @@ exports.browse = async (req, res) => {
             
             mergeDocs(drawingDocs);
             mergeDocs(rfiDocs);
+            mergeDocs(cdrfiDocs);
             
             entries = Object.values(dbEntriesMap);
         }
@@ -85,14 +88,16 @@ exports.browse = async (req, res) => {
         // Fetch uploadedBy usernames from DB for file items that don't have it yet
         const fileNames = entries.filter(e => e.type !== 'directory' && !e.uploadedBy).map(e => e.name);
         if (fileNames.length > 0) {
-            const [drawingDocs, rfiDocs] = await Promise.all([
+            const [drawingDocs, rfiDocs, cdrfiDocs] = await Promise.all([
                 DrawingExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
                 RfiExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
+                CdrfiExtraction.find({ originalFileName: { $in: fileNames } }).select('originalFileName uploadedBy').lean(),
             ]);
 
             const userMap = {};
             drawingDocs.forEach(d => { userMap[d.originalFileName] = d.uploadedBy; });
             rfiDocs.forEach(r => { userMap[r.originalFileName] = r.uploadedBy; });
+            cdrfiDocs.forEach(c => { userMap[c.originalFileName] = c.uploadedBy; });
 
             entries.forEach(e => {
                 if (e.type !== 'directory' && !e.uploadedBy && userMap[e.name]) {

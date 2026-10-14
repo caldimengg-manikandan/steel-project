@@ -11,6 +11,7 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminPermissions from './pages/admin/AdminPermissions';
 import AdminProjectStatus from './pages/admin/AdminProjectStatus';
 import AdminRfi from './pages/admin/AdminRfi';
+import AdminCdrfi from './pages/admin/AdminCdrfi';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReports from './pages/admin/AdminReports';
 import AdminClients from './pages/admin/AdminClients';
@@ -21,6 +22,7 @@ import AdminErrorLog from './pages/admin/AdminErrorLog';
 import UserDashboard from './pages/user/UserDashboard';
 import UserProjects from './pages/user/UserProjects';
 import UserRfi from './pages/user/UserRfi';
+import UserCdrfi from './pages/user/UserCdrfi';
 import UserSettings from './pages/user/UserSettings';
 import ProjectView from './pages/shared/ProjectView';
 import NotificationsPage from './pages/dashboard/NotificationsPage';
@@ -58,6 +60,7 @@ export default function App() {
                 <Route path="drawing-log" element={<AdminDrawingLog />} />
                 <Route path="drawing-log/:projectId/:mode" element={<AdminDrawingLog />} />
                 <Route path="rfi" element={<AdminRfi />} />
+                <Route path="cdrfi" element={<AdminCdrfi />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="weekly-progress" element={<AdminWeeklyProgress />} />
@@ -82,6 +85,7 @@ export default function App() {
                 <Route index element={<UserDashboard />} />
                 <Route path="projects" element={<UserProjects />} />
                 <Route path="rfi" element={<UserRfi />} />
+                <Route path="cdrfi" element={<UserCdrfi />} />
                 <Route path="settings" element={<UserSettings />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="projects/:id" element={<ProjectView />} />

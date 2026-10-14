@@ -107,7 +107,7 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
     let allRfis = [];
     rfiExtractions.forEach(doc => {
         const docSkNumber = extractSkFromFilename(doc.originalFileName);
-        doc.rfis.forEach(rfi => {
+        doc.rfis.forEach((rfi, idx) => {
             const compStatus = (rfi.status || 'OPEN').toUpperCase();
             if (filterStatus && compStatus !== filterStatus.toUpperCase()) return;
 
@@ -120,7 +120,8 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
                 fileUrl: doc.fileUrl,
                 storageGatewayPath: doc.storageGatewayPath,
                 projectId: doc.projectId,
-                extractionId: doc._id
+                extractionId: doc._id,
+                rfiIndex: idx
             });
         });
     });
@@ -328,7 +329,9 @@ exports.generateRfiLogExcel = async (rfiExtractions, projectDetails, baseUrl, is
         const responseVal = item.response || '';
         const isConfirmed = responseVal && responseVal.trim().toUpperCase() === 'CONFIRMED';
         let responseHref = '';
-        if (item.responseAttachmentUrl) {
+        if (item.responseAttachmentUrl && item.extractionId && item.projectId && item.rfiIndex !== undefined) {
+            responseHref = `${resolvedBase}/rfis/${item.projectId}/${item.extractionId}/attachment/${item.rfiIndex}?token=${token}`;
+        } else if (item.responseAttachmentUrl) {
             const root = apiRoot || resolvedBase;
             responseHref = item.responseAttachmentUrl.startsWith('http')
                 ? item.responseAttachmentUrl

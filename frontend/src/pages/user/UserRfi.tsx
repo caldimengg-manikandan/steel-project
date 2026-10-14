@@ -115,6 +115,7 @@ export default function UserRfi() {
     const [savingResponse, setSavingResponse] = useState<Record<string, boolean>>({});
     const [savedResponse, setSavedResponse] = useState<Record<string, boolean>>({});
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [sequenceFilter, setSequenceFilter] = useState('');
 
     useEffect(() => {
@@ -131,13 +132,16 @@ export default function UserRfi() {
                         if (target) {
                             setSelectedProject(target);
                             setSelectedSequences([]); // Reset sequences when switching project
+                            setSelectedCategories([]);
                         } else {
                             setSelectedProject(fetchedProjects[0]);
                             setSelectedSequences([]); // Reset sequences
+                            setSelectedCategories([]);
                         }
                     } else {
                         setSelectedProject(fetchedProjects[0]);
                         setSelectedSequences([]); // Reset sequences
+                        setSelectedCategories([]);
                     }
                 }
             } catch (err) { console.error(err); }
@@ -194,10 +198,11 @@ export default function UserRfi() {
             return;
         }
 
-        // Sequence Validation
-        if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
-            showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
-            setUploadError('Sequence selection is required.');
+        // Sequence or Criteria Validation
+        const hasSelection = selectedSequences.length > 0 || selectedCategories.length > 0;
+        if (!hasSelection) {
+            showMessage('Selection Required', 'Please select at least one Sequence or Category (General, Scope, Grids) before uploading.', 'error');
+            setUploadError('Please select at least one Sequence or Category (General, Scope, Grids).');
             return;
         }
 
@@ -255,8 +260,9 @@ export default function UserRfi() {
             }
 
             const executing = new Set<Promise<any>>();
+            const combinedSequences = Array.from(new Set([...selectedCategories, ...selectedSequences]));
             for (const chunk of chunks) {
-                const p = uploadRfiDrawing(projectId, chunk, undefined, selectedSequences)
+                const p = uploadRfiDrawing(projectId, chunk, undefined, combinedSequences)
                     .then(() => loadExtractions(true));
                 executing.add(p);
                 p.finally(() => executing.delete(p));
@@ -268,6 +274,7 @@ export default function UserRfi() {
 
             setPendingFiles([]);
             setSelectedSequences([]);
+            setSelectedCategories([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             loadExtractions(true);
         } catch (err: any) {
@@ -358,6 +365,15 @@ export default function UserRfi() {
     };
 
     const StatusChip = ({ status }: { status: string }) => {
+        if (status === 'completed') {
+            return (
+                <span title="Completed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </span>
+            );
+        }
         const s = statusConfig[status] || statusConfig.queued;
         return (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: s.bg, color: s.color, fontSize: 12, fontWeight: 600 }}>
@@ -459,6 +475,7 @@ export default function UserRfi() {
                                             setUploadError(''); 
                                             setUploadSuccess(''); 
                                             setSelectedSequences([]); // Reset selection
+                                            setSelectedCategories([]);
                                         }}
                                         style={{
                                             width: '100%', textAlign: 'left', padding: '10px 14px',
@@ -567,28 +584,124 @@ export default function UserRfi() {
                                             </div>
                                         </div>
 
-                                        {selectedProject.sequences && selectedProject.sequences.length > 0 && (
-                                            <div style={{ marginTop: 16, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                                                    {selectedProject.sequences.map((seq: any, idx: number) => (
-                                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedSequences.includes(seq.name)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
-                                                                    else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
-                                                                }}
-                                                                style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
-                                                            />
-                                                            {seq.name}{getSowNameForSequence(seq.name) ? ` (${getSowNameForSequence(seq.name)})` : ''}
-                                                        </label>
-                                                    ))}
-                                                </div>
+                                        {/* Criteria & Sequences Box Structure Card */}
+                                        <div style={{
+                                            marginTop: 18,
+                                            background: 'transparent',
+                                            borderRadius: 10,
+                                            border: '1px solid var(--color-border)',
+                                            overflow: 'hidden',
+                                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
+                                        }}>
+                                            {/* Box Header */}
+                                            <div style={{
+                                                padding: '10px 16px',
+                                                background: 'rgba(0, 0, 0, 0.025)',
+                                                borderBottom: '1px solid var(--color-border)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                flexWrap: 'wrap',
+                                                gap: 8
+                                            }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                                    Categories & Target Sequences
+                                                </span>
+                                                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                                    Select any category or target sequence below
+                                                </span>
                                             </div>
-                                        )}
 
+                                            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                                {/* 3 Checkboxes: General, Scope, Grids */}
+                                                <div>
+                                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
+                                                        Categories / Criteria
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                                                        {['General', 'Scope', 'Grids'].map((cat) => {
+                                                            const isChecked = selectedCategories.includes(cat);
+                                                            return (
+                                                                <label
+                                                                    key={cat}
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 8,
+                                                                        padding: '7px 14px',
+                                                                        borderRadius: 8,
+                                                                        cursor: 'pointer',
+                                                                        background: isChecked ? 'rgba(37,99,235,0.08)' : '#f8fafc',
+                                                                        border: `1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
+                                                                        color: isChecked ? '#1d4ed8' : '#1e293b',
+                                                                        fontSize: 13,
+                                                                        fontWeight: isChecked ? 600 : 500,
+                                                                        userSelect: 'none',
+                                                                        transition: 'all 0.15s'
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isChecked}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) setSelectedCategories(prev => [...prev, cat]);
+                                                                            else setSelectedCategories(prev => prev.filter(c => c !== cat));
+                                                                        }}
+                                                                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                                    />
+                                                                    {cat}
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Target Sequences */}
+                                                {sequencesToDisplay.length > 0 && (
+                                                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+                                                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                                            Target Sequences
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                                            {sequencesToDisplay.map((seq: any, idx: number) => {
+                                                                const isChecked = selectedSequences.includes(seq.name);
+                                                                return (
+                                                                    <label
+                                                                        key={idx}
+                                                                        style={{
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: 8,
+                                                                            padding: '6px 12px',
+                                                                            borderRadius: 8,
+                                                                            cursor: 'pointer',
+                                                                            background: isChecked ? 'rgba(37,99,235,0.08)' : '#f8fafc',
+                                                                            border: `1px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
+                                                                            color: isChecked ? '#1d4ed8' : '#1e293b',
+                                                                            fontSize: 13,
+                                                                            fontWeight: isChecked ? 600 : 500,
+                                                                            userSelect: 'none',
+                                                                            transition: 'all 0.15s'
+                                                                        }}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isChecked}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
+                                                                                else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
+                                                                            }}
+                                                                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                                        />
+                                                                        {seq.name}{getSowNameForSequence(seq.name) ? ` (${getSowNameForSequence(seq.name)})` : ''}
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                                             {uploadError && <span style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>⚠ {uploadError}</span>}
@@ -599,20 +712,24 @@ export default function UserRfi() {
                                                         showMessage('No Files Selected', 'Please select at least one PDF file to upload.', 'error');
                                                         return;
                                                     }
-                                                    if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
-                                                        showMessage('Sequence Required', 'Sequence selection is required for RFI extraction. Please check at least one sequence.', 'error');
+                                                    const hasSelection = selectedSequences.length > 0 || selectedCategories.length > 0;
+                                                    if (!hasSelection) {
+                                                        showMessage('Selection Required', 'Please select at least one Sequence or Category (General, Scope, Grids) before uploading.', 'error');
                                                         return;
                                                     }
                                                     doUpload(pendingFiles);
                                                 }}
                                                 disabled={uploading}
+                                                className="btn btn-primary"
                                                 style={{
-                                                    padding: '9px 20px', borderRadius: 8, border: 'none', 
+                                                    padding: '9px 20px',
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
                                                     cursor: uploading ? 'not-allowed' : 'pointer',
-                                                    background: uploading ? '#e5e7eb' : 'linear-gradient(135deg,#2563eb,#7c3aed)',
-                                                    color: uploading ? '#9ca3af' : 'white',
-                                                    fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
-                                                    boxShadow: uploading ? 'none' : '0 2px 6px rgba(37,99,235,0.25)',
+                                                    opacity: uploading ? 0.6 : 1
                                                 }}
                                             >
                                                 <IconUpload2 /> {uploading ? 'Uploading...' : 'Upload & Extract'}
@@ -635,24 +752,31 @@ export default function UserRfi() {
                                         style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: '100%', color: 'var(--color-text-primary)' }}
                                     />
                                 </div>
-                                {sequencesToDisplay.length > 0 && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--color-border-light)', paddingLeft: 12 }}>
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Filter:</span>
-                                        <select
-                                            value={sequenceFilter}
-                                            onChange={(e) => setSequenceFilter(e.target.value)}
-                                            style={{
-                                                fontSize: 12, fontWeight: 600, padding: '4px 10px',
-                                                borderRadius: 6, border: '1px solid var(--color-border)',
-                                                background: 'var(--color-background)', color: 'var(--color-text-primary)',
-                                                outline: 'none', cursor: 'pointer'
-                                            }}
-                                        >
-                                            <option value="">All Sequences</option>
-                                            {sequencesToDisplay.map((s: any, idx: number) => <option key={idx} value={s.name}>{s.name}{getSowNameForSequence(s.name) ? ` (${getSowNameForSequence(s.name)})` : ''}</option>)}
-                                        </select>
-                                    </div>
-                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--color-border-light)', paddingLeft: 12 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Filter:</span>
+                                    <select
+                                        value={sequenceFilter}
+                                        onChange={(e) => setSequenceFilter(e.target.value)}
+                                        style={{
+                                            fontSize: 12, fontWeight: 600, padding: '4px 10px',
+                                            borderRadius: 6, border: '1px solid var(--color-border)',
+                                            background: 'var(--color-background)', color: 'var(--color-text-primary)',
+                                            outline: 'none', cursor: 'pointer'
+                                        }}
+                                    >
+                                        <option value="">All Items</option>
+                                        <optgroup label="Categories">
+                                            <option value="General">General</option>
+                                            <option value="Scope">Scope</option>
+                                            <option value="Grids">Grids</option>
+                                        </optgroup>
+                                        {sequencesToDisplay.length > 0 && (
+                                            <optgroup label="Sequences">
+                                                {sequencesToDisplay.map((s: any, idx: number) => <option key={idx} value={s.name}>{s.name}{getSowNameForSequence(s.name) ? ` (${getSowNameForSequence(s.name)})` : ''}</option>)}
+                                            </optgroup>
+                                        )}
+                                    </select>
+                                </div>
                             </div>
 
                             {loadingExtractions ? (
@@ -726,6 +850,13 @@ export default function UserRfi() {
                                                                                     <div>
                                                                                         <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Response</label>
                                                                                         <textarea value={dResp} onChange={e => setResponseEdits(p => ({...p, [key]: e.target.value}))} rows={3} style={{ width: '100%', fontSize: 12, padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db' }} />
+                                                                                        {rfi.responseAttachmentUrl && (
+                                                                                            <div style={{ marginTop: 6 }}>
+                                                                                                <a href={rfi.responseAttachmentUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>
+                                                                                                    📎 View Attachment
+                                                                                                </a>
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
                                                                                     <div>
                                                                                         <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Remarks</label>
@@ -804,6 +935,13 @@ export default function UserRfi() {
                                                                     <div>
                                                                         <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Response</div>
                                                                         <textarea value={dResp} onChange={e => setResponseEdits(p => ({...p, [key]: e.target.value}))} rows={3} style={{ width: '100%', fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db' }} />
+                                                                        {rfi.responseAttachmentUrl && (
+                                                                            <div style={{ marginTop: 6 }}>
+                                                                                <a href={rfi.responseAttachmentUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>
+                                                                                    📎 View Attachment
+                                                                                </a>
+                                                                            </div>
+                                                                        )}
                                                                         <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
                                                                             <button onClick={() => handleSaveResponse(ext._id, i, dResp, dRem, dClient)} style={{ background: justSaved ? '#22c55e' : '#2563eb', color: 'white', border: 'none', padding: '4px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{isSaving ? '...' : justSaved ? 'OK' : 'Save'}</button>
                                                                             <button onClick={() => document.getElementById(`att-${key}`)?.click()} style={{ background: '#f3f4f6', border: '1px solid #d1d5db', padding: '4px 8px', borderRadius: 4, fontSize: 11 }}><IconClip /></button>

@@ -16,6 +16,7 @@ const {
     updateRfiStatus,
     uploadRfiResponseAttachment,
     viewRfiPdf,
+    viewRfiAttachment,
 } = require('../controllers/rfiController');
 
 const uploadDir = path.join(__dirname, '../../uploads/steel-dms-uploads');
@@ -84,6 +85,9 @@ router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), u
 // Stream PDF for viewing (supports both /view and /view.pdf for compatibility with existing Excel files)
 router.get('/:id/view.pdf', viewRfiPdf);
 router.get('/:id/view', viewRfiPdf);
+
+// Stream response attachment
+router.get('/:id/attachment/:rfiIndex', viewRfiAttachment);
 
 // Delete single Extraction (editor + admin)
 router.delete('/:id', requirePermission('editor'), deleteRfiExtraction);

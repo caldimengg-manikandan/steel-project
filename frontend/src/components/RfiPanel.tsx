@@ -37,6 +37,7 @@ export default function RfiExtractionPanel({
     const [searchTerm, setSearchTerm] = useState('');
     const [sequenceFilter, setSequenceFilter] = useState('');
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     
     const { showMessage, showConfirm } = useMessage();
 
@@ -119,10 +120,11 @@ export default function RfiExtractionPanel({
             }
         }
 
-        // Sequence Validation
-        if (sequences && sequences.length > 0 && selectedSequences.length === 0) {
-            alert('Please select at least one Sequence before uploading.');
-            setUploadError('Sequence selection is required.');
+        // Sequence or Criteria Validation
+        const hasSelection = selectedSequences.length > 0 || selectedCategories.length > 0;
+        if (!hasSelection) {
+            showMessage('Selection Required', 'Please select at least one Sequence or Category (General, Scope, Grids) before uploading.', 'error');
+            setUploadError('Please select at least one Sequence or Category (General, Scope, Grids).');
             return;
         }
 
@@ -153,8 +155,9 @@ export default function RfiExtractionPanel({
             }
 
             const executing = new Set<Promise<any>>();
+            const combinedSequences = Array.from(new Set([...selectedCategories, ...selectedSequences]));
             for (const chunk of chunks) {
-                const p = uploadRfiDrawing(projectId, chunk, localSavePath, selectedSequences)
+                const p = uploadRfiDrawing(projectId, chunk, localSavePath, combinedSequences)
                     .then(() => fetchExtractions(true));
                 executing.add(p);
                 p.finally(() => executing.delete(p));
@@ -168,6 +171,7 @@ export default function RfiExtractionPanel({
             setPendingFiles([]);
             setLocalSavePath('');
             setSelectedSequences([]);
+            setSelectedCategories([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             fetchExtractions(true);
         } catch (err: any) {
@@ -194,7 +198,13 @@ export default function RfiExtractionPanel({
 
     const StatusBadge = ({ status }: { status: string }) => {
         switch (status) {
-            case 'completed': return <span className="badge badge-success">Completed</span>;
+            case 'completed': return (
+                <span title="Completed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </span>
+            );
             case 'failed': return <span className="badge badge-danger">Failed</span>;
             case 'processing': return <span className="badge badge-warning">Parsing...</span>;
             default: return <span className="badge badge-neutral">Queued</span>;
@@ -244,12 +254,14 @@ export default function RfiExtractionPanel({
                         <button
                             className="btn btn-primary"
                             disabled={uploading}
-                            onClick={() => {                                 if (pendingFiles.length === 0) {
+                            onClick={() => {
+                                if (pendingFiles.length === 0) {
                                     showMessage('No Files Selected', 'Please select at least one PDF file (RFI drawing) to upload and extract.', 'error');
                                     return;
                                 }
-                                if (sequences && sequences.length > 0 && selectedSequences.length === 0) {
-                                    showMessage('Sequence Required', 'Please select at least one Sequence (e.g., SEQ 01) before continuing with the RFI extraction.', 'error');
+                                const hasSelection = selectedSequences.length > 0 || selectedCategories.length > 0;
+                                if (!hasSelection) {
+                                    showMessage('Selection Required', 'Please select at least one Sequence or Category (General, Scope, Grids) before continuing with the RFI extraction.', 'error');
                                     return;
                                 }
 
@@ -260,28 +272,84 @@ export default function RfiExtractionPanel({
                         </button>
                     </div>
 
-                    {/* Sequence Selection */}
-                    {sequences && sequences.length > 0 && (
-                        <div style={{ marginTop: 14, padding: '12px 14px', background: '#fff', border: '1px solid #e1e4e8', borderRadius: 6 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                                {sequences.map((seq, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, userSelect: 'none' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSequences.includes(seq.name)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
-                                                else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
-                                            }}
-                                            style={{ width: 16, height: 16, cursor: 'pointer' }}
-                                        />
-                                        {seq.name}
-                                    </label>
-                                ))}
-                            </div>
+                    {/* Criteria & Sequence Selection Box */}
+                    <div style={{
+                        marginTop: 18,
+                        background: 'transparent',
+                        borderRadius: 10,
+                        border: '1px solid var(--color-border)',
+                        overflow: 'hidden',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
+                    }}>
+                        {/* Box Header */}
+                        <div style={{
+                            padding: '10px 16px',
+                            background: 'rgba(0, 0, 0, 0.025)',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 8
+                        }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                Categories & Target Sequences
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                Select any category or target sequence below
+                            </span>
                         </div>
-                    )}
+
+                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Categories / Criteria</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                                    {['General', 'Scope', 'Grids'].map((cat) => {
+                                        const isChecked = selectedCategories.includes(cat);
+                                        return (
+                                            <label key={cat} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: isChecked ? 600 : 500, userSelect: 'none', border: `1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`, background: isChecked ? 'rgba(37,99,235,0.08)' : '#f8fafc', color: isChecked ? '#1d4ed8' : '#1e293b', transition: 'all 0.15s' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedCategories(prev => [...prev, cat]);
+                                                        else setSelectedCategories(prev => prev.filter(c => c !== cat));
+                                                    }}
+                                                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                />
+                                                {cat}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {sequences && sequences.length > 0 && (
+                                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Target Sequences</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                        {sequences.map((seq, idx) => {
+                                            const isChecked = selectedSequences.includes(seq.name);
+                                            return (
+                                                <label key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: isChecked ? 600 : 500, userSelect: 'none', border: `1px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`, background: isChecked ? 'rgba(37,99,235,0.08)' : '#f8fafc', color: isChecked ? '#1d4ed8' : '#1e293b', transition: 'all 0.15s' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
+                                                            else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
+                                                        }}
+                                                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                    />
+                                                    {seq.name}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
                     {pendingFiles.length > 0 && (
                         <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-primary)' }}>
@@ -311,7 +379,6 @@ export default function RfiExtractionPanel({
                     )}
                 </div>
 
-                {sequences && sequences.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid #ddd', paddingLeft: 12 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Filter:</span>
                         <select
@@ -334,13 +401,21 @@ export default function RfiExtractionPanel({
                                 minWidth: 140
                             }}
                         >
-                            <option value="">All Sequences</option>
-                            {sequences.map((s, idx) => (
-                                <option key={idx} value={s.name}>{s.name}</option>
-                            ))}
+                            <option value="">All Items</option>
+                            <optgroup label="Categories">
+                                <option value="General">General</option>
+                                <option value="Scope">Scope</option>
+                                <option value="Grids">Grids</option>
+                            </optgroup>
+                            {sequences && sequences.length > 0 && (
+                                <optgroup label="Sequences">
+                                    {sequences.map((s, idx) => (
+                                        <option key={idx} value={s.name}>{s.name}</option>
+                                    ))}
+                                </optgroup>
+                            )}
                         </select>
                     </div>
-                )}
             </div>
 
             {loading ? (

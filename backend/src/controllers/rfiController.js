@@ -236,7 +236,7 @@ exports.updateRfiResponse = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -282,7 +282,6 @@ exports.updateRfiResponse = async (req, res) => {
 // Update status (OPEN / CLOSED) for a single RFI item
 exports.updateRfiStatus = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
-    const adminId = req.principal.adminId;
     const { status } = req.body;
 
     const VALID = ['OPEN', 'CLOSED'];
@@ -296,7 +295,7 @@ exports.updateRfiStatus = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -322,10 +321,9 @@ exports.updateRfiStatus = async (req, res) => {
 // Delete single RFI extraction
 exports.deleteRfiExtraction = async (req, res) => {
     const { projectId, id } = req.params;
-    const adminId = req.principal.adminId;
 
     try {
-        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId, createdByAdminId: adminId });
+        const doc = await RfiExtraction.findOneAndDelete({ _id: id, projectId });
         if (!doc) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         // Delete from Storage Gateway if present
@@ -383,7 +381,6 @@ exports.deleteRfiExtraction = async (req, res) => {
 // Upload attachment for an RFI response
 exports.uploadRfiResponseAttachment = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
-    const adminId = req.principal.adminId;
 
     if (!req.file) {
         return res.status(400).json({ error: 'No attachment uploaded.' });
@@ -395,7 +392,7 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     }
 
     try {
-        const extraction = await RfiExtraction.findOne({ _id: id, projectId, createdByAdminId: adminId });
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
         if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
 
         if (!extraction.rfis[idx]) {
@@ -422,6 +419,58 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     } catch (err) {
         console.error('[RfiController] uploadRfiResponseAttachment error:', err);
         res.status(500).json({ error: 'Failed to upload response attachment.' });
+    }
+};
+
+// Stream response attachment for a specific RFI item
+exports.viewRfiAttachment = async (req, res) => {
+    const { projectId, id, rfiIndex } = req.params;
+    const idx = parseInt(rfiIndex, 10);
+
+    try {
+        const doc = await RfiExtraction.findOne({ _id: id, projectId });
+        if (!doc || !doc.rfis || isNaN(idx) || !doc.rfis[idx]) {
+            return res.status(404).json({ error: 'RFI item or attachment not found.' });
+        }
+
+        const rfi = doc.rfis[idx];
+        if (!rfi.responseAttachmentUrl) {
+            return res.status(404).json({ error: 'No attachment found for this RFI item.' });
+        }
+
+        const filename = path.basename(rfi.responseAttachmentUrl.replace(/\\/g, '/'));
+        const standardizedPath = path.join(__dirname, '../../uploads/steel-dms-uploads', filename);
+        const altPath = path.join(__dirname, '../uploads/steel-dms-uploads', filename);
+        const rootUploadsPath = path.join(__dirname, '../../../uploads/steel-dms-uploads', filename);
+        const directPath = path.isAbsolute(rfi.responseAttachmentUrl) ? rfi.responseAttachmentUrl : path.join(__dirname, '../../', rfi.responseAttachmentUrl);
+
+        let targetPath = null;
+        if (fs.existsSync(standardizedPath)) targetPath = standardizedPath;
+        else if (fs.existsSync(altPath)) targetPath = altPath;
+        else if (fs.existsSync(rootUploadsPath)) targetPath = rootUploadsPath;
+        else if (fs.existsSync(directPath)) targetPath = directPath;
+
+        if (!targetPath) {
+            return res.status(404).json({ error: 'Attachment file not found on disk.' });
+        }
+
+        const originalName = rfi.responseAttachmentName || filename;
+        const ext = path.extname(originalName).toLowerCase();
+        const contentTypes = {
+            '.pdf': 'application/pdf',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        };
+
+        res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
+        return fs.createReadStream(targetPath).pipe(res);
+    } catch (err) {
+        console.error('[RfiController] viewRfiAttachment failed:', err);
+        res.status(500).json({ error: 'Internal error viewing attachment.' });
     }
 };
 

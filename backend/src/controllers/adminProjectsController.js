@@ -23,6 +23,7 @@ const Project = require('../models/Project');
 const Drawing = require('../models/Drawing');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
+const CdrfiExtraction = require('../models/CdrfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
 const { attachProjectStats, getProjectStatusReportData } = require('../services/projectStatsService');
@@ -68,6 +69,7 @@ async function listProjects(req, res) {
 
 /**
  * POST /api/admin/projects
+ * 
  * Creates project under this admin.
  * createdByAdminId is always injected server-side.
  */
@@ -333,6 +335,7 @@ async function deleteProject(req, res) {
     await Drawing.deleteMany({ projectId: project._id });
     await DrawingExtraction.deleteMany({ projectId: project._id });
     await RfiExtraction.deleteMany({ projectId: project._id });
+    await CdrfiExtraction.deleteMany({ projectId: project._id });
     await ChangeOrder.deleteMany({ projectId: project._id });
 
     // Clean up Transmittals if the model exists

@@ -15,6 +15,10 @@ export default defineConfig(({ command }) => ({
         timeout: 1800000,
         proxyTimeout: 1800000,
       },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
       '/steel/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,
@@ -36,6 +40,10 @@ export default defineConfig(({ command }) => ({
         rewrite: (path) => path.replace(/^\/steel\/api/, '/api'),
         timeout: 1800000,
         proxyTimeout: 1800000,
+      },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
       },
       '/steel/uploads': {
         target: 'http://localhost:5000',
