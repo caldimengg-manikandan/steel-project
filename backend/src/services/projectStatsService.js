@@ -231,8 +231,23 @@ async function attachProjectStats(projects) {
             }
         }
 
+        const mergedProjectStartDate = pObj.projectStartDate || matchingExt?.projectStartDate || null;
+        const mergedFinancialYear = pObj.financialYear || matchingExt?.financialYear || '';
+        const mergedProjectCode = pObj.projectCode || matchingExt?.projectCode || '';
+        const mergedDivision = pObj.division || matchingExt?.division || '';
+        const mergedProjectManager = pObj.projectManager || matchingExt?.projectManager || '';
+        const mergedLocation = pObj.location || matchingExt?.location || '';
+        const mergedCreationDate = pObj.creationDate || (mergedProjectStartDate ? new Date(mergedProjectStartDate).toISOString().split('T')[0] : null);
+
         return {
             ...pObj,
+            creationDate: mergedCreationDate,
+            projectStartDate: mergedProjectStartDate,
+            financialYear: mergedFinancialYear,
+            projectCode: mergedProjectCode,
+            division: mergedDivision,
+            projectManager: mergedProjectManager,
+            location: mergedLocation,
             createdByUsername: creatorName,
             createdBy: creatorName,
             drawingCount: stats.total,

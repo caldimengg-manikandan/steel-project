@@ -47,6 +47,7 @@ export default function ProjectView() {
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
+    const [isSowDataVisible, setIsSowDataVisible] = useState<boolean>(true);
 
     const fetchData = useCallback(async (isSilent = false) => {
         if (!id || id === 'undefined' || id.length < 5) {
@@ -128,6 +129,8 @@ export default function ProjectView() {
 
     const derivedSequences = useMemo(() => {
         const seqs: any[] = [];
+        const defaultAppDate = project?.creationDate || (project?.createdAt ? new Date(project.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+
         if (project?.trackingMode === 'sow') {
             let hasAnySeq = false;
             if (project.scopeOfWork) {
@@ -142,7 +145,17 @@ export default function ProjectView() {
                     project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
                         if (sow.sequences) {
                             sow.sequences.forEach((seq: any, seqIdx: number) => {
-                                seqs.push({ ...seq, source: 'sow', sowIndex: sowIdx, seqIndex: seqIdx, name: `${seq.name} (${sow.name})` });
+                                const effectiveApprovalDate = seq.approvalDate || sow.approvalDate || defaultAppDate;
+                                seqs.push({ 
+                                    ...seq, 
+                                    approvalDate: effectiveApprovalDate,
+                                    source: 'sow', 
+                                    sowIndex: sowIdx, 
+                                    seqIndex: seqIdx, 
+                                    sowStatus: sow.status,
+                                    parentStatus: sow.status,
+                                    name: `${seq.name} (${sow.name})` 
+                                });
                             });
                         }
                     });
@@ -151,7 +164,17 @@ export default function ProjectView() {
                     project.additionalScopeOfWork.forEach((sow: any, sowIdx: number) => {
                         if (sow.sequences) {
                             sow.sequences.forEach((seq: any, seqIdx: number) => {
-                                seqs.push({ ...seq, source: 'additionalSow', sowIndex: sowIdx, seqIndex: seqIdx, name: `${seq.name} (${sow.name})` });
+                                const effectiveApprovalDate = seq.approvalDate || sow.approvalDate || defaultAppDate;
+                                seqs.push({ 
+                                    ...seq, 
+                                    approvalDate: effectiveApprovalDate,
+                                    source: 'additionalSow', 
+                                    sowIndex: sowIdx, 
+                                    seqIndex: seqIdx, 
+                                    sowStatus: sow.status,
+                                    parentStatus: sow.status,
+                                    name: `${seq.name} (${sow.name})` 
+                                });
                             });
                         }
                     });
@@ -159,13 +182,28 @@ export default function ProjectView() {
             } else {
                 if (project.scopeOfWork) {
                     project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
-                        seqs.push({ ...sow, source: 'sow-fallback', sowIndex: sowIdx, name: sow.name });
+                        const effectiveApprovalDate = sow.approvalDate || defaultAppDate;
+                        seqs.push({ 
+                            ...sow, 
+                            approvalDate: effectiveApprovalDate,
+                            source: 'sow-fallback', 
+                            sowIndex: sowIdx, 
+                            sowStatus: sow.status,
+                            parentStatus: sow.status,
+                            name: sow.name 
+                        });
                     });
                 }
             }
         } else if (project?.sequences) {
             project.sequences.forEach((seq: any, idx: number) => {
-                seqs.push({ ...seq, source: 'project', seqIndex: idx });
+                const effectiveApprovalDate = seq.approvalDate || defaultAppDate;
+                seqs.push({ 
+                    ...seq, 
+                    approvalDate: effectiveApprovalDate,
+                    source: 'project', 
+                    seqIndex: idx 
+                });
             });
         }
         return seqs;
@@ -714,6 +752,55 @@ export default function ProjectView() {
                         </div>
                         <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
                             <div>
+                                <div className="form-label" style={{ marginBottom: 4 }}>Project Start Date</div>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-primary)' }}>
+                                    {formatCreationDate(project.projectStartDate || project.creationDate, project.createdAt)}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="form-label" style={{ marginBottom: 4 }}>Project Year</div>
+                                <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                    {project.year ? (
+                                        <span>
+                                            {project.year}
+                                            {project.financialYear && (
+                                                <span className="badge badge-neutral" style={{ marginLeft: 8, fontSize: 11 }}>
+                                                    FY {project.financialYear}
+                                                </span>
+                                            )}
+                                        </span>
+                                    ) : (
+                                        project.financialYear ? `FY ${project.financialYear}` : 'N/A'
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {(project.projectCode || project.division || project.projectManager) && (
+                            <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
+                                {project.projectCode && (
+                                    <div>
+                                        <div className="form-label" style={{ marginBottom: 4 }}>Project Code</div>
+                                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 13, background: 'var(--color-bg-page)', padding: '3px 8px', borderRadius: 4, display: 'inline-block', border: '1px solid var(--color-border-light)' }}>
+                                            {project.projectCode}
+                                        </div>
+                                    </div>
+                                )}
+                                {project.division && (
+                                    <div>
+                                        <div className="form-label" style={{ marginBottom: 4 }}>Division / Software</div>
+                                        <div style={{ fontSize: 13, fontWeight: 500 }}>{project.division}</div>
+                                    </div>
+                                )}
+                                {project.projectManager && (
+                                    <div>
+                                        <div className="form-label" style={{ marginBottom: 4 }}>Project Manager</div>
+                                        <div style={{ fontSize: 13, fontWeight: 500 }}>{project.projectManager}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
+                            <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Created Date</div>
                                 <div className="text-muted">{formatCreationDate(project.creationDate, project.createdAt)}</div>
                             </div>
@@ -776,420 +863,538 @@ export default function ProjectView() {
 
                         {/* ── Scope of Work Progress Section ── */}
                         <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                                Scope of Work Progress
-                            </h3>
-
-                            {(!project.scopeOfWork || project.scopeOfWork.length === 0) ? (
-                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No Scope of Work items defined for this project.</div>
-                            ) : (
-                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
-                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {project.scopeOfWork.map((sow: any, idx: number) => {
-                                                const rawStatus = sow.status || 'Yet to Start';
-                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
-
-                                                const sowPct = Number(sow.percentage) || 0;
-                                                const appPctVal = Number(sow.approval) || 0;
-                                                const fabPctVal = Number(sow.fabrication) || 0;
-
-                                                const handleStatusChange = async (newStatus: string) => {
-                                                    if (!id || !project) return;
-                                                    if (!canEditSow) {
-                                                        showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
-                                                        return;
-                                                    }
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    try {
-                                                        await updateProjectScopeOfWork(id, updatedSow);
-                                                        await fetchData(true);
-                                                    } catch (err: any) {
-                                                        showMessage('Error', `Failed to update SOW status: ${err.message}`, 'error');
-                                                        await fetchData(true);
-                                                    }
-                                                };
-
-                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
-                                                    if (!id || !project) return;
-                                                    if (!canEditSow) return;
-                                                    const clamped = Math.min(100, Math.max(0, val));
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    try {
-                                                        await updateProjectScopeOfWork(id, updatedSow);
-                                                    } catch (err: any) {
-                                                        showMessage('Error', `Failed to update SOW: ${err.message}`, 'error');
-                                                        await fetchData(true);
-                                                    }
-                                                };
-
-                                                return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                            {sow.name}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
-                                                            {sowPct}%
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={appPctVal}
-                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
-                                                                        style={{ 
-                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
-                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
-                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
-                                                                            fontSize: 13, fontWeight: 600 
-                                                                        }}
-                                                                    />
-                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${appPctVal}%`
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={fabPctVal}
-                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
-                                                                        style={{ 
-                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
-                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
-                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
-                                                                            fontSize: 13, fontWeight: 600 
-                                                                        }}
-                                                                    />
-                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${fabPctVal}%`
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                                            <select
-                                                                value={rawStatus}
-                                                                onChange={(e) => handleStatusChange(e.target.value)}
-                                                                disabled={!canEditSow}
-                                                                style={{
-                                                                    padding: '4px 8px', borderRadius: 'var(--radius-md)',
-                                                                    fontSize: 12, fontWeight: 600, cursor: canEditSow ? 'pointer' : 'not-allowed',
-                                                                    border: rawStatus === 'Completed' ? '1px solid var(--color-success)' : rawStatus === 'In Progress' ? '1px solid var(--color-info)' : '1px solid var(--color-border)',
-                                                                    background: rawStatus === 'Completed' ? 'var(--color-success-bg)' : rawStatus === 'In Progress' ? 'var(--color-info-bg)' : 'var(--color-bg-page)',
-                                                                    color: rawStatus === 'Completed' ? 'var(--color-success-mid)' : rawStatus === 'In Progress' ? 'var(--color-info-mid)' : 'var(--color-text-muted)',
-                                                                }}
-                                                            >
-                                                                <option value="Yet to Start">Yet to Start</option>
-                                                                <option value="In Progress">In Progress</option>
-                                                                <option value="Completed">Completed</option>
-                                                            </select>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── Additional Scope of Work Progress Section ── */}
-                        {project.additionalScopeOfWork && project.additionalScopeOfWork.length > 0 && (
-                            <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
-                                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                    Additional Scope of Work
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                                    Scope of Work Progress
                                 </h3>
-                                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
-                                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
-                                                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {project.additionalScopeOfWork.map((sow: any, idx: number) => {
-                                                const rawStatus = sow.status || 'Yet to Start';
-                                                const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
-                                                
-                                                const sowPct = Number(sow.percentage) || 0;
-                                                const appPctVal = Number(sow.approval) || 0;
-                                                const fabPctVal = Number(sow.fabrication) || 0;
-                                                
-                                                const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
-                                                    if (!id || !project) return;
-                                                    if (!canEditSow) return;
-                                                    const clamped = Math.min(100, Math.max(0, val));
-                                                    const updatedSow = [...(project.additionalScopeOfWork || [])];
-                                                    updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
-                                                    setProject({ ...project, additionalScopeOfWork: updatedSow });
-                                                    try {
-                                                        await updateProjectAdditionalScopeOfWork(id, updatedSow);
-                                                    } catch (err: any) {
-                                                        showMessage('Error', `Failed to update Additional SOW: ${err.message}`, 'error');
-                                                        await fetchData(true);
-                                                    }
-                                                };
-                                                
-                                                return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                                                        <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                            {sow.name}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
-                                                            {sowPct}%
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={appPctVal}
-                                                                        onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
-                                                                        style={{ 
-                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
-                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
-                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
-                                                                            fontSize: 13, fontWeight: 600 
-                                                                        }}
-                                                                    />
-                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${appPctVal}%`
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
-                                                            {canEditSow ? (
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        value={fabPctVal}
-                                                                        onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
-                                                                        style={{ 
-                                                                            width: 60, padding: '4px 6px', textAlign: 'center', 
-                                                                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
-                                                                            background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
-                                                                            fontSize: 13, fontWeight: 600 
-                                                                        }}
-                                                                    />
-                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
-                                                                </div>
-                                                            ) : (
-                                                                `${fabPctVal}%`
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSowDataVisible(prev => !prev)}
+                                    title={isSowDataVisible ? "Collapse Scope of Work & Sequence Progress" : "Expand Scope of Work & Sequence Progress"}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        padding: '4px 10px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--color-border)',
+                                        background: isSowDataVisible ? 'var(--color-bg-page)' : 'var(--color-primary-bg, #eff6ff)',
+                                        color: isSowDataVisible ? 'var(--color-text-secondary)' : 'var(--color-primary, #2563eb)',
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: 'var(--shadow-xs)'
+                                    }}
+                                >
+                                    {isSowDataVisible ? (
+                                        <>
+                                            <span style={{ fontSize: 15, lineHeight: 1, fontWeight: 'bold' }}>−</span>
+                                            <span>Collapse</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span style={{ fontSize: 15, lineHeight: 1, fontWeight: 'bold' }}>+</span>
+                                            <span>Expand Data</span>
+                                        </>
+                                    )}
+                                </button>
                             </div>
-                        )}
 
-                        {/* ── Sequence Progress Section (Moved Below SOW) ── */}
-                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                                Sequence Progress
-                            </h3>
-
-                            {!derivedSequences || derivedSequences.length === 0 ? (
-                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
-                            ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-                                    {derivedSequences.map((seq, idx) => {
-                                        const isDone = seq.status === 'Completed';
-                                        const canEditSequences = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
-                                        const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
-                                            if (!id || !project) return;
-                                            if (!canEditSequences) {
-                                                showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
-                                                return;
-                                            }
-                                            
-                                            try {
-                                                if (seq.source === 'sow') {
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
-                                                    updatedSeqs[seq.seqIndex] = { ...updatedSeqs[seq.seqIndex], ...updates };
-                                                    updatedSow[seq.sowIndex].sequences = updatedSeqs;
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    await updateProjectScopeOfWork(id, updatedSow);
-                                                } else if (seq.source === 'additionalSow') {
-                                                    const updatedAddSow = [...(project.additionalScopeOfWork || [])];
-                                                    const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
-                                                    updatedSeqs[seq.seqIndex] = { ...updatedSeqs[seq.seqIndex], ...updates };
-                                                    updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
-                                                    setProject({ ...project, additionalScopeOfWork: updatedAddSow });
-                                                    await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
-                                                } else if (seq.source === 'project') {
-                                                    const newSeqs = [...(project.sequences || [])];
-                                                    newSeqs[seq.seqIndex] = { ...newSeqs[seq.seqIndex], ...updates };
-                                                    setProject({ ...project, sequences: newSeqs });
-                                                    await updateProjectSequences(id, newSeqs);
-                                                } else if (seq.source === 'sow-fallback') {
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
-                                                    const targetSow = updatedSow[seq.sowIndex];
-                                                    updatedSow[seq.sowIndex] = { 
-                                                        ...targetSow, 
-                                                        status: updates.status === 'Completed' ? 'Completed' : (targetSow.status === 'Completed' ? 'In Progress' : targetSow.status),
-                                                        approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
-                                                        fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
-                                                    };
-                                                    setProject({ ...project, scopeOfWork: updatedSow });
-                                                    await updateProjectScopeOfWork(id, updatedSow);
-                                                }
-                                                await fetchData(true);
-                                            } catch (err: any) {
-                                                showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
-                                                await fetchData(true);
-                                            }
-                                        };
-                                        return (
-                                            <div
-                                                key={idx}
-                                                style={{
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    padding: '12px 16px',
-                                                    background: isDone ? 'var(--color-success-bg)' : 'var(--color-bg-card)',
-                                                    border: `1px solid ${isDone ? 'var(--color-success-bg)' : 'var(--color-border-light)'}`,
-                                                    borderRadius: 'var(--radius-lg)',
-                                                    boxShadow: 'var(--shadow-xs)',
-                                                    transition: 'all 0.15s',
-                                                    gap: 12,
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                                    {/* Sequence name with status dot */}
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                                                        <div style={{
-                                                            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                                                            background: isDone ? 'var(--color-success-mid)' : 'var(--color-border)',
-                                                            boxShadow: isDone ? '0 0 0 3px var(--color-success-bg)' : 'none',
-                                                        }} />
-                                                        <span style={{
-                                                            fontWeight: 700, fontSize: 13,
-                                                            color: 'var(--color-text-primary)',
-                                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                                        }}>{seq.name}</span>
-                                                    </div>
-
-                                                    {/* Toggle pill */}
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        flexShrink: 0,
-                                                        background: 'var(--color-bg-page)',
-                                                        border: '1px solid var(--color-border)',
-                                                        borderRadius: 99,
-                                                        padding: 3,
-                                                        gap: 2,
-                                                    }}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleUpdateSequence({ status: 'Not Completed' })}
-                                                            disabled={!canEditSequences}
-                                                            style={{
-                                                                padding: '3px 10px',
-                                                                borderRadius: 99,
-                                                                fontSize: 10,
-                                                                fontWeight: 700,
-                                                                border: 'none',
-                                                                cursor: canEditSequences ? 'pointer' : 'not-allowed',
-                                                                transition: 'all 0.15s',
-                                                                background: !isDone ? 'var(--color-danger-mid)' : 'transparent',
-                                                                color: !isDone ? 'white' : 'var(--color-text-muted)',
-                                                                boxShadow: !isDone ? '0 1px 4px rgba(220,38,38,0.3)' : 'none',
-                                                                letterSpacing: 0.2,
-                                                                opacity: canEditSequences ? 1 : 0.6,
-                                                            }}
-                                                        >
-                                                            Pending
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString(), approvalDate: seq.approvalDate || new Date().toISOString() })}
-                                                            disabled={!canEditSequences}
-                                                            style={{
-                                                                padding: '3px 10px',
-                                                                borderRadius: 99,
-                                                                fontSize: 10,
-                                                                fontWeight: 700,
-                                                                border: 'none',
-                                                                cursor: canEditSequences ? 'pointer' : 'not-allowed',
-                                                                transition: 'all 0.15s',
-                                                                background: isDone ? 'var(--color-success-mid)' : 'transparent',
-                                                                color: isDone ? 'white' : 'var(--color-text-muted)',
-                                                                boxShadow: isDone ? '0 1px 4px rgba(22,163,74,0.3)' : 'none',
-                                                                letterSpacing: 0.2,
-                                                                opacity: canEditSequences ? 1 : 0.6,
-                                                            }}
-                                                        >
-                                                            ✓ Done
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                                    <div>
-                                                        <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Approval Date</label>
-                                                        <input
-                                                            type="date"
-                                                            className="form-control form-control-sm"
-                                                            style={{ height: 28, fontSize: 11 }}
-                                                            value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
-                                                            onChange={(e) => handleUpdateSequence({ approvalDate: e.target.value })}
-                                                            disabled={!canEditSequences}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Fabrication Date</label>
-                                                        <input
-                                                            type="date"
-                                                            className="form-control form-control-sm"
-                                                            style={{ height: 28, fontSize: 11 }}
-                                                            value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
-                                                            onChange={(e) => handleUpdateSequence({ fabricationDate: e.target.value })}
-                                                            disabled={!canEditSequences}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                            {!isSowDataVisible ? (
+                                <div 
+                                    onClick={() => setIsSowDataVisible(true)}
+                                    style={{
+                                        padding: '14px 18px',
+                                        borderRadius: 'var(--radius-lg)',
+                                        background: 'var(--color-bg-page)',
+                                        border: '1.5px dashed var(--color-border)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        cursor: 'pointer',
+                                        color: 'var(--color-text-secondary)',
+                                        fontSize: 13,
+                                        transition: 'all 0.15s'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <span style={{
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: '50%',
+                                            background: 'var(--color-primary-bg, #eff6ff)',
+                                            color: 'var(--color-primary, #2563eb)',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 'bold',
+                                            fontSize: 16
+                                        }}>+</span>
+                                        <span>Scope of Work and Sequence Progress data are collapsed inside. Click to view data.</span>
+                                    </div>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary, #2563eb)' }}>
+                                        Show Details →
+                                    </span>
                                 </div>
+                            ) : (
+                                <>
+                                    {(!project.scopeOfWork || project.scopeOfWork.length === 0) ? (
+                                        <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No Scope of Work items defined for this project.</div>
+                                    ) : (
+                                        <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
+                                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
+                                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
+                                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
+                                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {project.scopeOfWork.map((sow: any, idx: number) => {
+                                                        const rawStatus = sow.status || 'Yet to Start';
+                                                        const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
+
+                                                        const sowPct = Number(sow.percentage) || 0;
+                                                        const appPctVal = Number(sow.approval) || 0;
+                                                        const fabPctVal = Number(sow.fabrication) || 0;
+
+                                                        const handleStatusChange = async (newStatus: string) => {
+                                                            if (!id || !project) return;
+                                                            if (!canEditSow) {
+                                                                showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
+                                                                return;
+                                                            }
+                                                            const updatedSow = [...(project.scopeOfWork || [])];
+                                                            updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
+                                                            setProject({ ...project, scopeOfWork: updatedSow });
+                                                            try {
+                                                                await updateProjectScopeOfWork(id, updatedSow);
+                                                                await fetchData(true);
+                                                            } catch (err: any) {
+                                                                showMessage('Error', `Failed to update SOW status: ${err.message}`, 'error');
+                                                                await fetchData(true);
+                                                            }
+                                                        };
+
+                                                        const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
+                                                            if (!id || !project) return;
+                                                            if (!canEditSow) return;
+                                                            const clamped = Math.min(100, Math.max(0, val));
+                                                            const updatedSow = [...(project.scopeOfWork || [])];
+                                                            updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
+                                                            setProject({ ...project, scopeOfWork: updatedSow });
+                                                            try {
+                                                                await updateProjectScopeOfWork(id, updatedSow);
+                                                            } catch (err: any) {
+                                                                showMessage('Error', `Failed to update SOW: ${err.message}`, 'error');
+                                                                await fetchData(true);
+                                                            }
+                                                        };
+
+                                                        const isHoldStatus = rawStatus === 'Hold' || rawStatus === 'On Hold';
+
+                                                        return (
+                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                                <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                                    {sow.name}
+                                                                </td>
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
+                                                                    {sowPct}%
+                                                                </td>
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
+                                                                    {canEditSow ? (
+                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max="100"
+                                                                                value={appPctVal}
+                                                                                onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
+                                                                                style={{ 
+                                                                                    width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                                    background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                                    fontSize: 13, fontWeight: 600 
+                                                                                }}
+                                                                            />
+                                                                            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        `${appPctVal}%`
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                                                                    {canEditSow ? (
+                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max="100"
+                                                                                value={fabPctVal}
+                                                                                onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
+                                                                                style={{ 
+                                                                                    width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                                    background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                                    fontSize: 13, fontWeight: 600 
+                                                                                }}
+                                                                            />
+                                                                            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        `${fabPctVal}%`
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                                    <select
+                                                                        value={rawStatus}
+                                                                        onChange={(e) => handleStatusChange(e.target.value)}
+                                                                        disabled={!canEditSow}
+                                                                        style={{
+                                                                            padding: '4px 8px', borderRadius: 'var(--radius-md)',
+                                                                            fontSize: 12, fontWeight: 600, cursor: canEditSow ? 'pointer' : 'not-allowed',
+                                                                            border: rawStatus === 'Completed' ? '1px solid var(--color-success)' : rawStatus === 'In Progress' ? '1px solid var(--color-info)' : isHoldStatus ? '1px solid #f59e0b' : '1px solid var(--color-border)',
+                                                                            background: rawStatus === 'Completed' ? 'var(--color-success-bg)' : rawStatus === 'In Progress' ? 'var(--color-info-bg)' : isHoldStatus ? '#fef3c7' : 'var(--color-bg-page)',
+                                                                            color: rawStatus === 'Completed' ? 'var(--color-success-mid)' : rawStatus === 'In Progress' ? 'var(--color-info-mid)' : isHoldStatus ? '#b45309' : 'var(--color-text-muted)',
+                                                                        }}
+                                                                    >
+                                                                        <option value="Yet to Start">Yet to Start</option>
+                                                                        <option value="In Progress">In Progress</option>
+                                                                        <option value="Hold">Hold</option>
+                                                                        <option value="Completed">Completed</option>
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* ── Additional Scope of Work Progress Section ── */}
+                                    {project.additionalScopeOfWork && project.additionalScopeOfWork.length > 0 && (
+                                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                                                Additional Scope of Work
+                                            </h3>
+                                            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ background: 'var(--color-table-header-bg)', borderBottom: '1px solid var(--color-border-light)' }}>
+                                                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>SOW Name</th>
+                                                            <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>% of Total Work</th>
+                                                            <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>App (%)</th>
+                                                            <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Fab (%)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {project.additionalScopeOfWork.map((sow: any, idx: number) => {
+                                                            const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
+                                                            
+                                                            const sowPct = Number(sow.percentage) || 0;
+                                                            const appPctVal = Number(sow.approval) || 0;
+                                                            const fabPctVal = Number(sow.fabrication) || 0;
+                                                            
+                                                            const handlePercentageChange = async (field: 'approval' | 'fabrication', val: number) => {
+                                                                if (!id || !project) return;
+                                                                if (!canEditSow) return;
+                                                                const clamped = Math.min(100, Math.max(0, val));
+                                                                const updatedSow = [...(project.additionalScopeOfWork || [])];
+                                                                updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
+                                                                setProject({ ...project, additionalScopeOfWork: updatedSow });
+                                                                try {
+                                                                    await updateProjectAdditionalScopeOfWork(id, updatedSow);
+                                                                } catch (err: any) {
+                                                                    showMessage('Error', `Failed to update Additional SOW: ${err.message}`, 'error');
+                                                                    await fetchData(true);
+                                                                }
+                                                            };
+                                                            
+                                                            return (
+                                                                <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                                                                    <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                                        {sow.name}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
+                                                                        {sowPct}%
+                                                                    </td>
+                                                                    <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
+                                                                        {canEditSow ? (
+                                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    max="100"
+                                                                                    value={appPctVal}
+                                                                                    onChange={(e) => handlePercentageChange('approval', Number(e.target.value))}
+                                                                                    style={{ 
+                                                                                        width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                                        background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                                        fontSize: 13, fontWeight: 600 
+                                                                                    }}
+                                                                                />
+                                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            `${appPctVal}%`
+                                                                        )}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                                                                        {canEditSow ? (
+                                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    max="100"
+                                                                                    value={fabPctVal}
+                                                                                    onChange={(e) => handlePercentageChange('fabrication', Number(e.target.value))}
+                                                                                    style={{ 
+                                                                                        width: 60, padding: '4px 6px', textAlign: 'center', 
+                                                                                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', 
+                                                                                        background: 'var(--color-bg-page)', color: 'var(--color-text-primary)',
+                                                                                        fontSize: 13, fontWeight: 600 
+                                                                                    }}
+                                                                                />
+                                                                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>%</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            `${fabPctVal}%`
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ── Sequence Progress Section (Moved Below SOW) ── */}
+                                    <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                                        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                                            Sequence Progress
+                                        </h3>
+
+                                        {!derivedSequences || derivedSequences.length === 0 ? (
+                                            <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
+                                        ) : (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                                                {derivedSequences.map((seq, idx) => {
+                                                    const isDone = seq.status === 'Completed';
+                                                    const isHold = seq.status === 'Hold' || seq.status === 'On Hold' || seq.parentStatus === 'Hold' || seq.parentStatus === 'On Hold' || seq.sowStatus === 'Hold' || seq.sowStatus === 'On Hold';
+                                                    const canEditSequences = (isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin') && !isHold;
+                                                    
+                                                    const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
+                                                        if (!id || !project) return;
+                                                        if (!canEditSequences) {
+                                                            showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
+                                                            return;
+                                                        }
+                                                        
+                                                        try {
+                                                            if (seq.source === 'sow') {
+                                                                const updatedSow = [...(project.scopeOfWork || [])];
+                                                                const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
+                                                                const currentSeq = updatedSeqs[seq.seqIndex];
+                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                                updatedSeqs[seq.seqIndex] = { 
+                                                                    ...currentSeq, 
+                                                                    ...updates,
+                                                                    status: nextStatus
+                                                                };
+                                                                updatedSow[seq.sowIndex].sequences = updatedSeqs;
+                                                                setProject({ ...project, scopeOfWork: updatedSow });
+                                                                await updateProjectScopeOfWork(id, updatedSow);
+                                                            } else if (seq.source === 'additionalSow') {
+                                                                const updatedAddSow = [...(project.additionalScopeOfWork || [])];
+                                                                const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
+                                                                const currentSeq = updatedSeqs[seq.seqIndex];
+                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                                updatedSeqs[seq.seqIndex] = { 
+                                                                    ...currentSeq, 
+                                                                    ...updates,
+                                                                    status: nextStatus
+                                                                };
+                                                                updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
+                                                                setProject({ ...project, additionalScopeOfWork: updatedAddSow });
+                                                                await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
+                                                            } else if (seq.source === 'project') {
+                                                                const newSeqs = [...(project.sequences || [])];
+                                                                const currentSeq = newSeqs[seq.seqIndex];
+                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                                newSeqs[seq.seqIndex] = { 
+                                                                    ...currentSeq, 
+                                                                    ...updates,
+                                                                    status: nextStatus
+                                                                };
+                                                                setProject({ ...project, sequences: newSeqs });
+                                                                await updateProjectSequences(id, newSeqs);
+                                                            } else if (seq.source === 'sow-fallback') {
+                                                                const updatedSow = [...(project.scopeOfWork || [])];
+                                                                const targetSow = updatedSow[seq.sowIndex];
+                                                                const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
+                                                                updatedSow[seq.sowIndex] = { 
+                                                                    ...targetSow, 
+                                                                    status: nextStatus,
+                                                                    approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
+                                                                    fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
+                                                                };
+                                                                setProject({ ...project, scopeOfWork: updatedSow });
+                                                                await updateProjectScopeOfWork(id, updatedSow);
+                                                            }
+                                                            await fetchData(true);
+                                                        } catch (err: any) {
+                                                            showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
+                                                            await fetchData(true);
+                                                        }
+                                                    };
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                padding: '12px 16px',
+                                                                background: isHold ? '#fffdf7' : isDone ? 'var(--color-success-bg)' : 'var(--color-bg-card)',
+                                                                border: isHold ? '1.5px dashed #f59e0b' : `1px solid ${isDone ? 'var(--color-success-bg)' : 'var(--color-border-light)'}`,
+                                                                borderRadius: 'var(--radius-lg)',
+                                                                boxShadow: isHold ? 'none' : 'var(--shadow-xs)',
+                                                                opacity: isHold ? 0.65 : 1,
+                                                                transition: 'all 0.15s',
+                                                                gap: 12,
+                                                                position: 'relative',
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                                                {/* Sequence name with status dot */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                                                                    <div style={{
+                                                                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                                                        background: isHold ? '#f59e0b' : isDone ? 'var(--color-success-mid)' : 'var(--color-border)',
+                                                                        boxShadow: isHold ? '0 0 0 3px #fef3c7' : isDone ? '0 0 0 3px var(--color-success-bg)' : 'none',
+                                                                    }} />
+                                                                    <span style={{
+                                                                        fontWeight: 700, fontSize: 13,
+                                                                        color: isHold ? '#92400e' : 'var(--color-text-primary)',
+                                                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                                                    }}>{seq.name}</span>
+                                                                    {isHold && (
+                                                                        <span style={{
+                                                                            fontSize: 10,
+                                                                            fontWeight: 700,
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: 99,
+                                                                            background: '#fef3c7',
+                                                                            color: '#b45309',
+                                                                            border: '1px solid #f59e0b',
+                                                                            textTransform: 'uppercase',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: 4,
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            ⏸ On Hold
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Toggle pill */}
+                                                                <div style={{
+                                                                    display: 'flex',
+                                                                    flexShrink: 0,
+                                                                    background: 'var(--color-bg-page)',
+                                                                    border: '1px solid var(--color-border)',
+                                                                    borderRadius: 99,
+                                                                    padding: 3,
+                                                                    gap: 2,
+                                                                }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleUpdateSequence({ status: 'Not Completed' })}
+                                                                        disabled={isHold || !canEditSequences}
+                                                                        style={{
+                                                                            padding: '3px 10px',
+                                                                            borderRadius: 99,
+                                                                            fontSize: 10,
+                                                                            fontWeight: 700,
+                                                                            border: 'none',
+                                                                            cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
+                                                                            transition: 'all 0.15s',
+                                                                            background: !isDone ? 'var(--color-danger-mid)' : 'transparent',
+                                                                            color: !isDone ? 'white' : 'var(--color-text-muted)',
+                                                                            boxShadow: !isDone ? '0 1px 4px rgba(220,38,38,0.3)' : 'none',
+                                                                            letterSpacing: 0.2,
+                                                                            opacity: (isHold || !canEditSequences) ? 0.5 : 1,
+                                                                        }}
+                                                                    >
+                                                                        Pending
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString(), approvalDate: seq.approvalDate || new Date().toISOString() })}
+                                                                        disabled={isHold || !canEditSequences}
+                                                                        style={{
+                                                                            padding: '3px 10px',
+                                                                            borderRadius: 99,
+                                                                            fontSize: 10,
+                                                                            fontWeight: 700,
+                                                                            border: 'none',
+                                                                            cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
+                                                                            transition: 'all 0.15s',
+                                                                            background: isDone ? 'var(--color-success-mid)' : 'transparent',
+                                                                            color: isDone ? 'white' : 'var(--color-text-muted)',
+                                                                            boxShadow: isDone ? '0 1px 4px rgba(22,163,74,0.3)' : 'none',
+                                                                            letterSpacing: 0.2,
+                                                                            opacity: (isHold || !canEditSequences) ? 0.5 : 1,
+                                                                        }}
+                                                                    >
+                                                                        ✓ Done
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                                                <div>
+                                                                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Approval Date</label>
+                                                                    <input
+                                                                        type="date"
+                                                                        className="form-control form-control-sm"
+                                                                        style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
+                                                                        value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
+                                                                        onChange={(e) => handleUpdateSequence({ approvalDate: e.target.value })}
+                                                                        disabled={isHold || !canEditSequences}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Fabrication Date</label>
+                                                                    <input
+                                                                        type="date"
+                                                                        className="form-control form-control-sm"
+                                                                        style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
+                                                                        value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
+                                                                        onChange={(e) => handleUpdateSequence({ fabricationDate: e.target.value })}
+                                                                        disabled={isHold || !canEditSequences}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>

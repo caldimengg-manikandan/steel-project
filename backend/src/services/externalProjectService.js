@@ -116,6 +116,8 @@ async function fetchAndCache(projectsUrl, countUrl) {
                 division: p.software || p.division || '',
                 projectManager: p.projectManager || p.pm || p.pmName || '',
                 financialYear: p.financialYear || p.fy || '',
+                projectStartDate: p.projectStartDate || p.startDate || null,
+                location: p.location || p.projectLocation || '',
                 status: mappedStatus,
                 rawStatus: p.projectStatus || p.status || '',
                 createdAt: p.createdAt || p.projectStartDate || p.created_at || new Date().toISOString(),

@@ -107,9 +107,8 @@ function requireAdmin(req, res, next) {
  * Rejects any principal not logged in as a 'User' entity.
  */
 function requireUser(req, res, next) {
-    // Only 'admin' model logins don't pass this check as 'User' logins.
-    if (req.principal?.role === 'admin') {
-        return res.status(403).json({ error: 'User access required.' });
+    if (!req.principal) {
+        return res.status(401).json({ error: 'Authentication required.' });
     }
     next();
 }

@@ -135,6 +135,31 @@ const projectSchema = new mongoose.Schema(
             max: 2100,
         },
 
+        financialYear: {
+            type: String,
+            default: '',
+        },
+
+        projectStartDate: {
+            type: String,
+            default: null,
+        },
+
+        projectCode: {
+            type: String,
+            default: '',
+        },
+
+        division: {
+            type: String,
+            default: '',
+        },
+
+        projectManager: {
+            type: String,
+            default: '',
+        },
+
         // ── Starting Transmittal Number ───────────────────────
         // Only meaningful when year <= 2026.
         // The transmittalCount will be pre-seeded to (startingTransmittalNumber - 1)
@@ -180,6 +205,9 @@ const projectSchema = new mongoose.Schema(
                 approval: { type: Number, default: 0 },
                 fabrication: { type: Number, default: 0 },
                 status: { type: String, default: 'Yet to Start' },
+                approvalDate: { type: Date, default: null },
+                fabricationDate: { type: Date, default: null },
+                deadline: { type: Date, default: null },
                 sequences: {
                     type: [{
                         name: { type: String, required: true },
@@ -202,6 +230,9 @@ const projectSchema = new mongoose.Schema(
                 approval: { type: Number, default: 0 },
                 fabrication: { type: Number, default: 0 },
                 status: { type: String, default: 'Yet to Start' },
+                approvalDate: { type: Date, default: null },
+                fabricationDate: { type: Date, default: null },
+                deadline: { type: Date, default: null },
                 sequences: {
                     type: [{
                         name: { type: String, required: true },

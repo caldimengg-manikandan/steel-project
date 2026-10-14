@@ -56,6 +56,8 @@ interface CreateProjectForm {
         approval: number; 
         fabrication: number; 
         status: string;
+        approvalDate?: string;
+        fabricationDate?: string | null;
         sequences: Array<{ name: string; status: string; deadline?: string; approvalDate?: string; fabricationDate?: string }>;
     }>;
     connectionDesignVendor: string;
@@ -64,6 +66,11 @@ interface CreateProjectForm {
     year: string;
     lastTransmittalNumber: string;
     creationDate: string;
+    projectStartDate?: string;
+    financialYear?: string;
+    projectCode?: string;
+    division?: string;
+    projectManager?: string;
 }
 const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], isAdditional: boolean = false, trackingMode: 'sow' | 'seq' = 'sow') => {
     const count = parseInt(countVal) || 0;
@@ -86,10 +93,11 @@ const generateSowRows = (countVal: string, nameVal: string, currentRows: any[], 
     }
 
     let newRows = [...currentRows];
+    const today = new Date().toISOString().split('T')[0];
     
     if (count > newRows.length) {
         for (let i = newRows.length; i < count; i++) {
-            newRows.push({ name: '', percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start' });
+            newRows.push({ name: '', percentage: 0, approval: 0, fabrication: 0, status: 'Yet to Start', approvalDate: today, fabricationDate: null });
         }
     } else if (count < newRows.length) {
         newRows = newRows.slice(0, count);
@@ -262,6 +270,11 @@ const DEFAULT_FORM: CreateProjectForm = {
     year: String(new Date().getFullYear()),
     lastTransmittalNumber: '0',
     creationDate: '',
+    projectStartDate: '',
+    financialYear: '',
+    projectCode: '',
+    division: '',
+    projectManager: '',
 };
 
 export default function AdminProjects() {
@@ -356,12 +369,15 @@ export default function AdminProjects() {
         try {
             setActionLoading(true);
             setModalError('');
-            const today = new Date().toISOString().split('T')[0];
+            const today = form.creationDate || new Date().toISOString().split('T')[0];
             const preparedScopeOfWork = (form.scopeOfWork || []).map(s => ({
                 ...s,
+                approvalDate: s.approvalDate || today,
+                fabricationDate: s.fabricationDate || null,
                 sequences: (s.sequences || []).map((seq: any) => ({
                     ...seq,
-                    approvalDate: seq.approvalDate || today
+                    approvalDate: seq.approvalDate || today,
+                    fabricationDate: seq.fabricationDate || null
                 }))
             }));
             const sequencesPayload = form.trackingMode === 'seq'
@@ -395,6 +411,11 @@ export default function AdminProjects() {
                 year: Number(form.year),
                 startingTransmittalNumber: Number(form.year) <= 2026 ? (Number(form.lastTransmittalNumber) || 0) + 1 : 1,
                 creationDate: form.creationDate || undefined,
+                projectStartDate: form.projectStartDate || undefined,
+                financialYear: form.financialYear || undefined,
+                projectCode: form.projectCode || undefined,
+                division: form.division || undefined,
+                projectManager: form.projectManager || undefined,
             } as any);
 
             const newProject = {
@@ -451,16 +472,22 @@ export default function AdminProjects() {
             const today = new Date().toISOString().split('T')[0];
             const preparedScopeOfWork = (editTarget.scopeOfWork || []).map(s => ({
                 ...s,
+                approvalDate: s.approvalDate || today,
+                fabricationDate: s.fabricationDate || null,
                 sequences: (s.sequences || []).map((seq: any) => ({
                     ...seq,
-                    approvalDate: seq.approvalDate || today
+                    approvalDate: seq.approvalDate || today,
+                    fabricationDate: seq.fabricationDate || null
                 }))
             }));
             const preparedAdditionalScopeOfWork = (editTarget.additionalScopeOfWork || []).map(s => ({
                 ...s,
+                approvalDate: s.approvalDate || today,
+                fabricationDate: s.fabricationDate || null,
                 sequences: (s.sequences || []).map((seq: any) => ({
                     ...seq,
-                    approvalDate: seq.approvalDate || today
+                    approvalDate: seq.approvalDate || today,
+                    fabricationDate: seq.fabricationDate || null
                 }))
             }));
             const sequencesPayload = (editTarget.trackingMode === 'seq')
@@ -770,12 +797,50 @@ export default function AdminProjects() {
                                         onChange={(e) => {
                                             const selectedProjectName = e.target.value;
                                             if (selectedProjectName) {
-                                                setForm({ ...form, name: selectedProjectName });
+                                                const ep = externalProjects.find(p => p.name === selectedProjectName);
+                                                if (ep) {
+                                                    let fetchedYear = form.year;
+                                                    let fetchedStartDate = '';
+
+                                                    if (ep.projectStartDate) {
+                                                        const parsedDate = new Date(ep.projectStartDate);
+                                                        if (!isNaN(parsedDate.getTime())) {
+                                                            fetchedStartDate = parsedDate.toISOString().split('T')[0];
+                                                            fetchedYear = String(parsedDate.getFullYear());
+                                                        }
+                                                    } else if (ep.financialYear) {
+                                                        const fyMatch = String(ep.financialYear).match(/(\d{2,4})/);
+                                                        if (fyMatch) {
+                                                            let yNum = parseInt(fyMatch[1], 10);
+                                                            if (yNum < 100) yNum += 2000;
+                                                            fetchedYear = String(yNum);
+                                                        }
+                                                    }
+
+                                                    const isOldYear = Number(fetchedYear) <= 2025 && Number(fetchedYear) >= 2000;
+                                                    const creationDateVal = fetchedStartDate || (isOldYear ? (form.creationDate || `${fetchedYear}-01-01`) : '');
+
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        name: ep.name,
+                                                        year: fetchedYear,
+                                                        creationDate: creationDateVal,
+                                                        projectStartDate: ep.projectStartDate || (fetchedStartDate ? new Date(fetchedStartDate).toISOString() : ''),
+                                                        financialYear: ep.financialYear || '',
+                                                        projectCode: ep.projectCode || '',
+                                                        division: ep.division || '',
+                                                        projectManager: ep.projectManager || '',
+                                                        location: ep.location || prev.location || '',
+                                                        lastTransmittalNumber: isOldYear ? (prev.lastTransmittalNumber || '0') : '0',
+                                                    }));
+                                                } else {
+                                                    setForm(prev => ({ ...prev, name: selectedProjectName }));
+                                                }
                                             }
                                         }}
                                         defaultValue=""
                                     >
-                                        <option value="">-- Select a project to auto-fill name --</option>
+                                        <option value="">-- Select a project to auto-fill name & details --</option>
                                         {externalProjects
                                             .filter(ep => {
                                                 const selectedClient = clients.find(c => (c.id || c._id) === form.clientId);
@@ -793,7 +858,7 @@ export default function AdminProjects() {
                                         }
                                     </select>
                                     <small style={{ color: 'var(--color-text-secondary)', marginTop: 4, display: 'block' }}>
-                                        Selecting a project will auto-fill the Project Name field below.
+                                        Selecting a project will auto-fill Project Name, Year, Start Date, and Project Details.
                                     </small>
                                 </div>
                             )}

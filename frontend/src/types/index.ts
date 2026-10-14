@@ -160,6 +160,11 @@ export interface Project {
     connectionDesignEmail?: string;
     /** Project year (e.g. 2024, 2025, 2026) */
     year?: number;
+    financialYear?: string;
+    projectStartDate?: string;
+    projectCode?: string;
+    division?: string;
+    projectManager?: string;
     /** Starting transmittal number — only used when year <= 2025 */
     startingTransmittalNumber?: number;
     /** Multi-tenant key: the admin who created this project */

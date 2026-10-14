@@ -192,6 +192,9 @@ export async function updateProjectScopeOfWork(projectId: string, scopeOfWork: A
     approval?: number; 
     fabrication?: number; 
     status?: string; 
+    approvalDate?: string | null;
+    fabricationDate?: string | null;
+    sequences?: any[];
 }>): Promise<{ project: Project }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',

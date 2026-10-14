@@ -155,7 +155,17 @@ async function updateProjectSequences(req, res) {
             percentage: Number(s.percentage) || 0,
             approval: Number(s.approval) || 0,
             fabrication: Number(s.fabrication) || 0,
-            status: s.status || 'Yet to Start'
+            status: s.status || 'Yet to Start',
+            approvalDate: s.approvalDate ? new Date(s.approvalDate) : null,
+            fabricationDate: s.fabricationDate ? new Date(s.fabricationDate) : null,
+            deadline: s.deadline ? new Date(s.deadline) : null,
+            sequences: Array.isArray(s.sequences) ? s.sequences.map((seq, seqIdx) => ({
+                name: (seq.name || '').trim() || `SEQ ${String(seqIdx + 1).padStart(2, '0')}`,
+                status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
+                deadline: seq.deadline || null,
+                approvalDate: seq.approvalDate ? new Date(seq.approvalDate) : null,
+                fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
+            })) : []
         }));
     }
     await project.save();

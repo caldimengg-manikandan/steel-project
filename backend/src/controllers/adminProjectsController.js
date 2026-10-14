@@ -73,7 +73,13 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, year, startingTransmittalNumber, trackingMode, creationDate } = req.body;
+    const { 
+        name, clientName, clientId, contactPerson, description, status, 
+        approximateDrawingsCount, location, sequences, scopeOfWork, 
+        connectionDesignVendor, connectionDesignContact, connectionDesignEmail, 
+        year, startingTransmittalNumber, trackingMode, creationDate,
+        projectStartDate, financialYear, projectCode, division, projectManager 
+    } = req.body;
 
     const today = new Date();
     let finalSequences = sequences || [];
@@ -89,9 +95,13 @@ async function createProject(req, res) {
 
     const processedScopeOfWork = (scopeOfWork || []).map(sow => ({
         ...sow,
+        approvalDate: sow.approvalDate ? new Date(sow.approvalDate) : today,
+        fabricationDate: sow.fabricationDate ? new Date(sow.fabricationDate) : null,
+        deadline: sow.deadline ? new Date(sow.deadline) : null,
         sequences: Array.isArray(sow.sequences) ? sow.sequences.map(seq => ({
             ...seq,
-            approvalDate: seq.approvalDate || today
+            approvalDate: seq.approvalDate ? new Date(seq.approvalDate) : today,
+            fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
         })) : []
     }));
 
@@ -103,6 +113,8 @@ async function createProject(req, res) {
     const startNum = (projectYear <= 2026 && startingTransmittalNumber) ? Number(startingTransmittalNumber) : 1;
     // Pre-seed transmittalCount so first reserve = startNum
     const initialTransmittalCount = startNum - 1;
+
+    const effectiveCreationDate = creationDate || (projectStartDate ? new Date(projectStartDate).toISOString().split('T')[0] : null);
 
     const projectPayload = {
         name,
@@ -124,19 +136,24 @@ async function createProject(req, res) {
         transmittalCount: initialTransmittalCount,
         createdByAdminId: adminId,
         createdByUsername: req.principal.username || '',
-        creationDate: creationDate || null,
+        creationDate: effectiveCreationDate,
+        projectStartDate: projectStartDate || (effectiveCreationDate ? new Date(effectiveCreationDate).toISOString() : null),
+        financialYear: financialYear || '',
+        projectCode: projectCode || '',
+        division: division || '',
+        projectManager: projectManager || '',
         assignments: [
             {
                 userId: req.principal.id,
                 username: req.principal.username,
                 permission: 'admin',
-                assignedAt: creationDate ? new Date(creationDate) : new Date(),
+                assignedAt: effectiveCreationDate ? new Date(effectiveCreationDate) : new Date(),
             }
         ],
         drawingCount: 0,
     };
-    if (creationDate) {
-        projectPayload.createdAt = new Date(creationDate);
+    if (effectiveCreationDate) {
+        projectPayload.createdAt = new Date(effectiveCreationDate);
     }
 
     const project = await Project.create(projectPayload);
@@ -193,19 +210,27 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate } = req.body;
+    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate, projectStartDate, financialYear, projectCode, division, projectManager } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
     if (clientId !== undefined) project.clientId = clientId;
     if (contactPerson !== undefined) project.contactPerson = contactPerson;
     if (description !== undefined) project.description = description;
+    if (location !== undefined) project.location = location;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
+    if (projectStartDate !== undefined) project.projectStartDate = projectStartDate;
+    if (financialYear !== undefined) project.financialYear = financialYear;
+    if (projectCode !== undefined) project.projectCode = projectCode;
+    if (division !== undefined) project.division = division;
+    if (projectManager !== undefined) project.projectManager = projectManager;
     if (creationDate !== undefined) {
         project.creationDate = creationDate || null;
         if (creationDate) {
             project.createdAt = new Date(creationDate);
         }
+    } else if (projectStartDate && !project.creationDate) {
+        project.creationDate = new Date(projectStartDate).toISOString().split('T')[0];
     }
     const today = new Date();
     if (sequences !== undefined && Array.isArray(sequences)) {
@@ -213,8 +238,8 @@ async function updateProject(req, res) {
             name: (s.name || '').trim() || `Seq ${idx + 1}`,
             status: s.status === 'Completed' ? 'Completed' : 'Not Completed',
             deadline: s.deadline || null,
-            approvalDate: s.approvalDate || today,
-            fabricationDate: s.fabricationDate || null
+            approvalDate: s.approvalDate ? new Date(s.approvalDate) : today,
+            fabricationDate: s.fabricationDate ? new Date(s.fabricationDate) : null
         }));
     }
     if (scopeOfWork !== undefined && Array.isArray(scopeOfWork)) {
@@ -224,12 +249,15 @@ async function updateProject(req, res) {
             approval: Number(s.approval) || 0,
             fabrication: Number(s.fabrication) || 0,
             status: s.status || 'Yet to Start',
+            approvalDate: s.approvalDate ? new Date(s.approvalDate) : (s.approvalDate === null ? null : today),
+            fabricationDate: s.fabricationDate ? new Date(s.fabricationDate) : null,
+            deadline: s.deadline ? new Date(s.deadline) : null,
             sequences: Array.isArray(s.sequences) ? s.sequences.map((seq, seqIdx) => ({
                 name: (seq.name || '').trim() || `SEQ ${String(seqIdx + 1).padStart(2, '0')}`,
                 status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
                 deadline: seq.deadline || null,
-                approvalDate: seq.approvalDate || today,
-                fabricationDate: seq.fabricationDate || null
+                approvalDate: seq.approvalDate ? new Date(seq.approvalDate) : today,
+                fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
             })) : []
         }));
     }
@@ -240,12 +268,15 @@ async function updateProject(req, res) {
             approval: Number(s.approval) || 0,
             fabrication: Number(s.fabrication) || 0,
             status: s.status || 'Yet to Start',
+            approvalDate: s.approvalDate ? new Date(s.approvalDate) : (s.approvalDate === null ? null : today),
+            fabricationDate: s.fabricationDate ? new Date(s.fabricationDate) : null,
+            deadline: s.deadline ? new Date(s.deadline) : null,
             sequences: Array.isArray(s.sequences) ? s.sequences.map((seq, seqIdx) => ({
                 name: (seq.name || '').trim() || `SEQ ${String(seqIdx + 1).padStart(2, '0')}`,
                 status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
                 deadline: seq.deadline || null,
-                approvalDate: seq.approvalDate || today,
-                fabricationDate: seq.fabricationDate || null
+                approvalDate: seq.approvalDate ? new Date(seq.approvalDate) : today,
+                fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
             })) : []
         }));
     }
