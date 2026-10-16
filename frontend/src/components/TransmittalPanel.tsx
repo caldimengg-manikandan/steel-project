@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import {
     listTransmittals,
     generateTransmittal,
@@ -28,16 +28,18 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     const [error, setError] = useState('');
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [expandedTransmittalId, setExpandedTransmittalId] = useState<string | null>(null);
+    const attemptedAutoGeneratesRef = useRef<Set<number>>(new Set());
 
     const fetchTransmittals = useCallback(async (background = false) => {
         try {
             if (!background) setLoading(true);
             const data = await listTransmittals(projectId);
             setTransmittals(data.transmittals || []);
+            setError('');
         } catch (err: any) {
-            setError(err.message || 'Failed to load transmittals');
+            if (!background) setError(err.message || 'Failed to load transmittals');
         } finally {
-            setLoading(false);
+            if (!background) setLoading(false);
         }
     }, [projectId]);
 
@@ -46,17 +48,26 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
     }, [fetchTransmittals]);
 
     useEffect(() => {
-        // Auto-fetch every 10 seconds to update extraction progress
+        // Only background poll if there is actual extraction work in progress
+        const hasActiveWork = transmittals.some(t => t.isPending && (t.inProgressCount > 0 || !t.isReadyToGenerate));
+        if (!hasActiveWork) return;
+
         const interval = setInterval(() => {
             if (!generating) fetchTransmittals(true);
-        }, 10000);
+        }, 15000);
         return () => clearInterval(interval);
-    }, [fetchTransmittals, generating]);
+    }, [fetchTransmittals, generating, transmittals]);
 
     useEffect(() => {
-        // Auto-generate ONLY when all extractions are completed
-        const pendingT = transmittals.find(t => t.isPending && t.isReadyToGenerate);
+        // Auto-generate ONLY once when all extractions are completed and not already attempted
+        const pendingT = transmittals.find(t => 
+            t.isPending && 
+            t.isReadyToGenerate && 
+            t.transmittalNumber != null &&
+            !attemptedAutoGeneratesRef.current.has(t.transmittalNumber)
+        );
         if (pendingT && canEdit && !generating) {
+            attemptedAutoGeneratesRef.current.add(pendingT.transmittalNumber);
             handleGenerate(pendingT.transmittalNumber);
         }
     }, [transmittals, canEdit, generating]);

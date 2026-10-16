@@ -1,6 +1,6 @@
 const RfiReport = require('../models/RfiReport');
 const RfiExtraction = require('../models/RfiExtraction');
-const ChangeOrder = require('../models/ChangeOrder');
+const CdrfiExtraction = require('../models/CdrfiExtraction');
 const Project = require('../models/Project');
 const SystemSettings = require('../models/SystemSettings');
 const exceljs = require('exceljs');
@@ -32,13 +32,33 @@ exports.getReportDraft = async (req, res) => {
         // Fetch auto-fetch data concurrently
         const [rfisResult, cdrfisResult] = await Promise.allSettled([
             RfiExtraction.find({ projectId }),
-            ChangeOrder.find({ projectId })
+            CdrfiExtraction.find({ projectId })
         ]);
 
         const rfiExtractions = rfisResult.status === 'fulfilled' ? rfisResult.value : [];
-        const rawCdrfis = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
+        const cdrfiExtractions = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
         
-        const cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
+        const cdrfis = [];
+        cdrfiExtractions.forEach(ext => {
+            if (ext.rfis && Array.isArray(ext.rfis)) {
+                ext.rfis.forEach(item => {
+                    const sentStr = item.sentOn ? new Date(item.sentOn).toISOString().split('T')[0] : (ext.createdAt ? new Date(ext.createdAt).toISOString().split('T')[0] : '');
+                    const recvdStr = item.closedOn ? new Date(item.closedOn).toISOString().split('T')[0] : '';
+                    cdrfis.push({
+                        caldimCdrfiNo: item.skNumber || item.rfiNumber || '',
+                        clientCdrfiNo: item.clientRfiNumber || '',
+                        status: item.status || 'OPEN',
+                        priority: '',
+                        sentDate: sentStr,
+                        seqArea: Array.isArray(ext.sequences) ? ext.sequences.join(', ') : '',
+                        cdrfiType: '',
+                        description: item.description || '',
+                        receivedDate: recvdStr,
+                        remarks: item.remarks || (item.response ? `Response: ${item.response}` : '')
+                    });
+                });
+            }
+        });
         
         // Flatten RFIs from extractions
         const rfis = [];
@@ -169,13 +189,32 @@ exports.downloadExcel = async (req, res) => {
             // Fallback to auto-fetched data if report isn't saved yet
             const [rfisResult, cdrfisResult] = await Promise.allSettled([
                 RfiExtraction.find({ projectId }),
-                ChangeOrder.find({ projectId })
+                CdrfiExtraction.find({ projectId })
             ]);
 
             const rfiExtractions = rfisResult.status === 'fulfilled' ? rfisResult.value : [];
-            const rawCdrfis = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
+            const cdrfiExtractions = cdrfisResult.status === 'fulfilled' ? cdrfisResult.value : [];
             
-            cdrfis = rawCdrfis.map(co => ({ id: co.coNumber, status: co.status, description: co.description }));
+            cdrfiExtractions.forEach(ext => {
+                if (ext.rfis && Array.isArray(ext.rfis)) {
+                    ext.rfis.forEach(item => {
+                        const sentStr = item.sentOn ? new Date(item.sentOn).toISOString().split('T')[0] : (ext.createdAt ? new Date(ext.createdAt).toISOString().split('T')[0] : '');
+                        const recvdStr = item.closedOn ? new Date(item.closedOn).toISOString().split('T')[0] : '';
+                        cdrfis.push({
+                            caldimCdrfiNo: item.skNumber || item.rfiNumber || '',
+                            clientCdrfiNo: item.clientRfiNumber || '',
+                            status: item.status || 'OPEN',
+                            priority: '',
+                            sentDate: sentStr,
+                            seqArea: Array.isArray(ext.sequences) ? ext.sequences.join(', ') : '',
+                            cdrfiType: '',
+                            description: item.description || '',
+                            receivedDate: recvdStr,
+                            remarks: item.remarks || (item.response ? `Response: ${item.response}` : '')
+                        });
+                    });
+                }
+            });
             
             rfiExtractions.forEach(ext => {
                 if (ext.rfis && Array.isArray(ext.rfis)) {

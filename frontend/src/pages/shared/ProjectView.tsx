@@ -872,7 +872,7 @@ export default function ProjectView() {
                                 <button
                                     type="button"
                                     onClick={() => setIsSowDataVisible(prev => !prev)}
-                                    title={isSowDataVisible ? "Collapse Scope of Work & Sequence Progress" : "Expand Scope of Work & Sequence Progress"}
+                                    title={isSowDataVisible ? "Collapse Scope of Work Progress" : "Expand Scope of Work Progress"}
                                     style={{
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -933,7 +933,7 @@ export default function ProjectView() {
                                             fontWeight: 'bold',
                                             fontSize: 16
                                         }}>+</span>
-                                        <span>Scope of Work and Sequence Progress data are collapsed inside. Click to view data.</span>
+                                        <span>Scope of Work Progress data is collapsed. Click to view Scope of Work details.</span>
                                     </div>
                                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary, #2563eb)' }}>
                                         Show Details →
@@ -1178,223 +1178,223 @@ export default function ProjectView() {
                                             </div>
                                         </div>
                                     )}
+                                </>
+                            )}
+                        </div>
 
-                                    {/* ── Sequence Progress Section (Moved Below SOW) ── */}
-                                    <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
-                                        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                                            Sequence Progress
-                                        </h3>
+                        {/* ── Sequence Progress Section (Always Visible) ── */}
+                        <div style={{ marginTop: 24, borderTop: '1px solid var(--color-border-light)', paddingTop: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                                Sequence Progress
+                            </h3>
 
-                                        {!derivedSequences || derivedSequences.length === 0 ? (
-                                            <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
-                                        ) : (
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-                                                {derivedSequences.map((seq, idx) => {
-                                                    const isDone = seq.status === 'Completed';
-                                                    const isHold = seq.status === 'Hold' || seq.status === 'On Hold' || seq.parentStatus === 'Hold' || seq.parentStatus === 'On Hold' || seq.sowStatus === 'Hold' || seq.sowStatus === 'On Hold';
-                                                    const canEditSequences = (isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin') && !isHold;
-                                                    
-                                                    const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
-                                                        if (!id || !project) return;
-                                                        if (!canEditSequences) {
-                                                            showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
-                                                            return;
-                                                        }
-                                                        
-                                                        try {
-                                                            if (seq.source === 'sow') {
-                                                                const updatedSow = [...(project.scopeOfWork || [])];
-                                                                const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
-                                                                const currentSeq = updatedSeqs[seq.seqIndex];
-                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                                updatedSeqs[seq.seqIndex] = { 
-                                                                    ...currentSeq, 
-                                                                    ...updates,
-                                                                    status: nextStatus
-                                                                };
-                                                                updatedSow[seq.sowIndex].sequences = updatedSeqs;
-                                                                setProject({ ...project, scopeOfWork: updatedSow });
-                                                                await updateProjectScopeOfWork(id, updatedSow);
-                                                            } else if (seq.source === 'additionalSow') {
-                                                                const updatedAddSow = [...(project.additionalScopeOfWork || [])];
-                                                                const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
-                                                                const currentSeq = updatedSeqs[seq.seqIndex];
-                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                                updatedSeqs[seq.seqIndex] = { 
-                                                                    ...currentSeq, 
-                                                                    ...updates,
-                                                                    status: nextStatus
-                                                                };
-                                                                updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
-                                                                setProject({ ...project, additionalScopeOfWork: updatedAddSow });
-                                                                await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
-                                                            } else if (seq.source === 'project') {
-                                                                const newSeqs = [...(project.sequences || [])];
-                                                                const currentSeq = newSeqs[seq.seqIndex];
-                                                                const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                                newSeqs[seq.seqIndex] = { 
-                                                                    ...currentSeq, 
-                                                                    ...updates,
-                                                                    status: nextStatus
-                                                                };
-                                                                setProject({ ...project, sequences: newSeqs });
-                                                                await updateProjectSequences(id, newSeqs);
-                                                            } else if (seq.source === 'sow-fallback') {
-                                                                const updatedSow = [...(project.scopeOfWork || [])];
-                                                                const targetSow = updatedSow[seq.sowIndex];
-                                                                const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
-                                                                updatedSow[seq.sowIndex] = { 
-                                                                    ...targetSow, 
-                                                                    status: nextStatus,
-                                                                    approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
-                                                                    fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
-                                                                };
-                                                                setProject({ ...project, scopeOfWork: updatedSow });
-                                                                await updateProjectScopeOfWork(id, updatedSow);
-                                                            }
-                                                            await fetchData(true);
-                                                        } catch (err: any) {
-                                                            showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
-                                                            await fetchData(true);
-                                                        }
+                            {!derivedSequences || derivedSequences.length === 0 ? (
+                                <div className="text-muted" style={{ fontSize: 13, padding: '12px 0' }}>No sequences defined for this project.</div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                                    {derivedSequences.map((seq, idx) => {
+                                        const isDone = seq.status === 'Completed';
+                                        const isHold = seq.status === 'Hold' || seq.status === 'On Hold' || seq.parentStatus === 'Hold' || seq.parentStatus === 'On Hold' || seq.sowStatus === 'Hold' || seq.sowStatus === 'On Hold';
+                                        const canEditSequences = (isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin') && !isHold;
+                                        
+                                        const handleUpdateSequence = async (updates: Partial<typeof seq>) => {
+                                            if (!id || !project) return;
+                                            if (!canEditSequences) {
+                                                showMessage('Permission Denied', 'Only editors or admins can update sequences.', 'error');
+                                                return;
+                                            }
+                                            
+                                            try {
+                                                if (seq.source === 'sow') {
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
+                                                    const currentSeq = updatedSeqs[seq.seqIndex];
+                                                    const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                    updatedSeqs[seq.seqIndex] = { 
+                                                        ...currentSeq, 
+                                                        ...updates,
+                                                        status: nextStatus
                                                     };
-                                                    return (
-                                                        <div
-                                                            key={idx}
+                                                    updatedSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    await updateProjectScopeOfWork(id, updatedSow);
+                                                } else if (seq.source === 'additionalSow') {
+                                                    const updatedAddSow = [...(project.additionalScopeOfWork || [])];
+                                                    const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
+                                                    const currentSeq = updatedSeqs[seq.seqIndex];
+                                                    const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                    updatedSeqs[seq.seqIndex] = { 
+                                                        ...currentSeq, 
+                                                        ...updates,
+                                                        status: nextStatus
+                                                    };
+                                                    updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    setProject({ ...project, additionalScopeOfWork: updatedAddSow });
+                                                    await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
+                                                } else if (seq.source === 'project') {
+                                                    const newSeqs = [...(project.sequences || [])];
+                                                    const currentSeq = newSeqs[seq.seqIndex];
+                                                    const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
+                                                    newSeqs[seq.seqIndex] = { 
+                                                        ...currentSeq, 
+                                                        ...updates,
+                                                        status: nextStatus
+                                                    };
+                                                    setProject({ ...project, sequences: newSeqs });
+                                                    await updateProjectSequences(id, newSeqs);
+                                                } else if (seq.source === 'sow-fallback') {
+                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    const targetSow = updatedSow[seq.sowIndex];
+                                                    const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
+                                                    updatedSow[seq.sowIndex] = { 
+                                                        ...targetSow, 
+                                                        status: nextStatus,
+                                                        approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
+                                                        fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
+                                                    };
+                                                    setProject({ ...project, scopeOfWork: updatedSow });
+                                                    await updateProjectScopeOfWork(id, updatedSow);
+                                                }
+                                                await fetchData(true);
+                                            } catch (err: any) {
+                                                showMessage('Error', `Failed to update sequence: ${err.message}`, 'error');
+                                                await fetchData(true);
+                                            }
+                                        };
+                                        return (
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    padding: '12px 16px',
+                                                    background: isHold ? '#fffdf7' : isDone ? 'var(--color-success-bg)' : 'var(--color-bg-card)',
+                                                    border: isHold ? '1.5px dashed #f59e0b' : `1px solid ${isDone ? 'var(--color-success-bg)' : 'var(--color-border-light)'}`,
+                                                    borderRadius: 'var(--radius-lg)',
+                                                    boxShadow: isHold ? 'none' : 'var(--shadow-xs)',
+                                                    opacity: isHold ? 0.65 : 1,
+                                                    transition: 'all 0.15s',
+                                                    gap: 12,
+                                                    position: 'relative',
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                                    {/* Sequence name with status dot */}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                                                        <div style={{
+                                                            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                                            background: isHold ? '#f59e0b' : isDone ? 'var(--color-success-mid)' : 'var(--color-border)',
+                                                            boxShadow: isHold ? '0 0 0 3px #fef3c7' : isDone ? '0 0 0 3px var(--color-success-bg)' : 'none',
+                                                        }} />
+                                                        <span style={{
+                                                            fontWeight: 700, fontSize: 13,
+                                                            color: isHold ? '#92400e' : 'var(--color-text-primary)',
+                                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                                        }}>{seq.name}</span>
+                                                        {isHold && (
+                                                            <span style={{
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                padding: '2px 8px',
+                                                                borderRadius: 99,
+                                                                background: '#fef3c7',
+                                                                color: '#b45309',
+                                                                border: '1px solid #f59e0b',
+                                                                textTransform: 'uppercase',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: 4,
+                                                                flexShrink: 0
+                                                            }}>
+                                                                ⏸ On Hold
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Toggle pill */}
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        flexShrink: 0,
+                                                        background: 'var(--color-bg-page)',
+                                                        border: '1px solid var(--color-border)',
+                                                        borderRadius: 99,
+                                                        padding: 3,
+                                                        gap: 2,
+                                                    }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleUpdateSequence({ status: 'Not Completed' })}
+                                                            disabled={isHold || !canEditSequences}
                                                             style={{
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                padding: '12px 16px',
-                                                                background: isHold ? '#fffdf7' : isDone ? 'var(--color-success-bg)' : 'var(--color-bg-card)',
-                                                                border: isHold ? '1.5px dashed #f59e0b' : `1px solid ${isDone ? 'var(--color-success-bg)' : 'var(--color-border-light)'}`,
-                                                                borderRadius: 'var(--radius-lg)',
-                                                                boxShadow: isHold ? 'none' : 'var(--shadow-xs)',
-                                                                opacity: isHold ? 0.65 : 1,
+                                                                padding: '3px 10px',
+                                                                borderRadius: 99,
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                border: 'none',
+                                                                cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
                                                                 transition: 'all 0.15s',
-                                                                gap: 12,
-                                                                position: 'relative',
+                                                                background: !isDone ? 'var(--color-danger-mid)' : 'transparent',
+                                                                color: !isDone ? 'white' : 'var(--color-text-muted)',
+                                                                boxShadow: !isDone ? '0 1px 4px rgba(220,38,38,0.3)' : 'none',
+                                                                letterSpacing: 0.2,
+                                                                opacity: (isHold || !canEditSequences) ? 0.5 : 1,
                                                             }}
                                                         >
-                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                                                {/* Sequence name with status dot */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                                                                    <div style={{
-                                                                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                                                                        background: isHold ? '#f59e0b' : isDone ? 'var(--color-success-mid)' : 'var(--color-border)',
-                                                                        boxShadow: isHold ? '0 0 0 3px #fef3c7' : isDone ? '0 0 0 3px var(--color-success-bg)' : 'none',
-                                                                    }} />
-                                                                    <span style={{
-                                                                        fontWeight: 700, fontSize: 13,
-                                                                        color: isHold ? '#92400e' : 'var(--color-text-primary)',
-                                                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                                                    }}>{seq.name}</span>
-                                                                    {isHold && (
-                                                                        <span style={{
-                                                                            fontSize: 10,
-                                                                            fontWeight: 700,
-                                                                            padding: '2px 8px',
-                                                                            borderRadius: 99,
-                                                                            background: '#fef3c7',
-                                                                            color: '#b45309',
-                                                                            border: '1px solid #f59e0b',
-                                                                            textTransform: 'uppercase',
-                                                                            display: 'inline-flex',
-                                                                            alignItems: 'center',
-                                                                            gap: 4,
-                                                                            flexShrink: 0
-                                                                        }}>
-                                                                            ⏸ On Hold
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                                            Pending
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString(), approvalDate: seq.approvalDate || new Date().toISOString() })}
+                                                            disabled={isHold || !canEditSequences}
+                                                            style={{
+                                                                padding: '3px 10px',
+                                                                borderRadius: 99,
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                border: 'none',
+                                                                cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
+                                                                transition: 'all 0.15s',
+                                                                background: isDone ? 'var(--color-success-mid)' : 'transparent',
+                                                                color: isDone ? 'white' : 'var(--color-text-muted)',
+                                                                boxShadow: isDone ? '0 1px 4px rgba(220,38,38,0.3)' : 'none',
+                                                                letterSpacing: 0.2,
+                                                                opacity: (isHold || !canEditSequences) ? 0.5 : 1,
+                                                            }}
+                                                        >
+                                                            ✓ Done
+                                                        </button>
+                                                    </div>
+                                                </div>
 
-                                                                {/* Toggle pill */}
-                                                                <div style={{
-                                                                    display: 'flex',
-                                                                    flexShrink: 0,
-                                                                    background: 'var(--color-bg-page)',
-                                                                    border: '1px solid var(--color-border)',
-                                                                    borderRadius: 99,
-                                                                    padding: 3,
-                                                                    gap: 2,
-                                                                }}>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleUpdateSequence({ status: 'Not Completed' })}
-                                                                        disabled={isHold || !canEditSequences}
-                                                                        style={{
-                                                                            padding: '3px 10px',
-                                                                            borderRadius: 99,
-                                                                            fontSize: 10,
-                                                                            fontWeight: 700,
-                                                                            border: 'none',
-                                                                            cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
-                                                                            transition: 'all 0.15s',
-                                                                            background: !isDone ? 'var(--color-danger-mid)' : 'transparent',
-                                                                            color: !isDone ? 'white' : 'var(--color-text-muted)',
-                                                                            boxShadow: !isDone ? '0 1px 4px rgba(220,38,38,0.3)' : 'none',
-                                                                            letterSpacing: 0.2,
-                                                                            opacity: (isHold || !canEditSequences) ? 0.5 : 1,
-                                                                        }}
-                                                                    >
-                                                                        Pending
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleUpdateSequence({ status: 'Completed', fabricationDate: seq.fabricationDate || new Date().toISOString(), approvalDate: seq.approvalDate || new Date().toISOString() })}
-                                                                        disabled={isHold || !canEditSequences}
-                                                                        style={{
-                                                                            padding: '3px 10px',
-                                                                            borderRadius: 99,
-                                                                            fontSize: 10,
-                                                                            fontWeight: 700,
-                                                                            border: 'none',
-                                                                            cursor: (isHold || !canEditSequences) ? 'not-allowed' : 'pointer',
-                                                                            transition: 'all 0.15s',
-                                                                            background: isDone ? 'var(--color-success-mid)' : 'transparent',
-                                                                            color: isDone ? 'white' : 'var(--color-text-muted)',
-                                                                            boxShadow: isDone ? '0 1px 4px rgba(22,163,74,0.3)' : 'none',
-                                                                            letterSpacing: 0.2,
-                                                                            opacity: (isHold || !canEditSequences) ? 0.5 : 1,
-                                                                        }}
-                                                                    >
-                                                                        ✓ Done
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                                                <div>
-                                                                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Approval Date</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        className="form-control form-control-sm"
-                                                                        style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
-                                                                        value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
-                                                                        onChange={(e) => handleUpdateSequence({ approvalDate: e.target.value })}
-                                                                        disabled={isHold || !canEditSequences}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Fabrication Date</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        className="form-control form-control-sm"
-                                                                        style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
-                                                                        value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
-                                                                        onChange={(e) => handleUpdateSequence({ fabricationDate: e.target.value })}
-                                                                        disabled={isHold || !canEditSequences}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                                    <div>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Approval Date</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control form-control-sm"
+                                                            style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
+                                                            value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
+                                                            onChange={(e) => handleUpdateSequence({ approvalDate: e.target.value })}
+                                                            disabled={isHold || !canEditSequences}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Fabrication Date</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control form-control-sm"
+                                                            style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
+                                                            value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
+                                                            onChange={(e) => handleUpdateSequence({ fabricationDate: e.target.value })}
+                                                            disabled={isHold || !canEditSequences}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
-                                </>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
                     </div>

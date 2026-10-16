@@ -1,6 +1,12 @@
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
-
+function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+    const token = localStorage.getItem('token');
+    return {
+        ...extraHeaders,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {
@@ -14,9 +20,9 @@ export async function generateTransmittal(projectId: string, extractionIds?: str
     const res = await fetch(`${BASE}/transmittals/${projectId}/generate`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
+        headers: getAuthHeaders({
             'Content-Type': 'application/json'
-        },
+        }),
         body: JSON.stringify({ extractionIds: extractionIds || [], targetTransmittalNumber })
     });
     return handleResponse<any>(res);
@@ -24,7 +30,8 @@ export async function generateTransmittal(projectId: string, extractionIds?: str
 
 export async function listTransmittals(projectId: string) {
     const res = await fetch(`${BASE}/transmittals/${projectId}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
     });
     return handleResponse<any>(res);
 }
@@ -33,9 +40,9 @@ export async function previewTransmittal(projectId: string, extractionIds?: stri
     const res = await fetch(`${BASE}/transmittals/${projectId}/preview-changes`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
+        headers: getAuthHeaders({
             'Content-Type': 'application/json'
-        },
+        }),
         body: JSON.stringify({ extractionIds: extractionIds || [], targetTransmittalNumber })
     });
     return handleResponse<any>(res);
@@ -66,7 +73,8 @@ export function getDrawingLogExcelUrl(projectId: string, upToTransmittalNumber?:
 export async function deleteTransmittal(projectId: string, transmittalId: string) {
     const res = await fetch(`${BASE}/transmittals/${projectId}/${transmittalId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
     });
     return handleResponse<any>(res);
 }
@@ -74,7 +82,8 @@ export async function deleteTransmittal(projectId: string, transmittalId: string
 export async function voidTransmittal(projectId: string, transmittalId: string) {
     const res = await fetch(`${BASE}/transmittals/${projectId}/${transmittalId}/void`, {
         method: 'PUT',
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
     });
     return handleResponse<any>(res);
 }

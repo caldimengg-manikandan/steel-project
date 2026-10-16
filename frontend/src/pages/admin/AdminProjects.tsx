@@ -298,6 +298,7 @@ export default function AdminProjects() {
     const [seqInput, setSeqInput] = useState<string>('');
     const [sowInput, setSowInput] = useState<string>('');
     const [sowNameInput, setSowNameInput] = useState<string>('');
+    const [isCreateSowCollapsed, setIsCreateSowCollapsed] = useState<boolean>(false);
     const [editSowInput, setEditSowInput] = useState<string>('');
     const [editSowNameInput, setEditSowNameInput] = useState<string>('');
     const [showAdditionalSowFields, setShowAdditionalSowFields] = useState<boolean>(false);
@@ -558,7 +559,7 @@ export default function AdminProjects() {
                     <h2 className="page-title">Projects</h2>
                     <p className="page-subtitle">Manage all steel detailing projects</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); setSowNameInput(''); }}>
+                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); setSowNameInput(''); setIsCreateSowCollapsed(false); }}>
                     <span style={{ marginRight: 8, display: 'inline-flex' }}><IconPlus /></span> Create Project
                 </button>
             </div>
@@ -1041,8 +1042,64 @@ export default function AdminProjects() {
                                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                             Configure {form.trackingMode === 'seq' ? 'Sequence' : 'Scope of Work'} Details
                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCreateSowCollapsed(prev => !prev)}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                padding: '4px 10px',
+                                                borderRadius: 6,
+                                                border: '1px solid #cbd5e1',
+                                                background: isCreateSowCollapsed ? '#eff6ff' : '#ffffff',
+                                                color: isCreateSowCollapsed ? '#2563eb' : '#475569',
+                                                cursor: 'pointer',
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                            }}
+                                        >
+                                            {isCreateSowCollapsed ? (
+                                                <>
+                                                    <span style={{ fontSize: 14, fontWeight: 'bold' }}>+</span>
+                                                    <span>Expand</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span style={{ fontSize: 14, fontWeight: 'bold' }}>−</span>
+                                                    <span>Collapse</span>
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {isCreateSowCollapsed ? (
+                                        <div
+                                            onClick={() => setIsCreateSowCollapsed(false)}
+                                            style={{
+                                                padding: '12px 16px',
+                                                borderRadius: 6,
+                                                background: '#ffffff',
+                                                border: '1.5px dashed #94a3b8',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                cursor: 'pointer',
+                                                color: '#475569',
+                                                fontSize: 12
+                                            }}
+                                        >
+                                            <span>
+                                                📦 <strong>{form.scopeOfWork.length}</strong> {form.trackingMode === 'seq' ? 'sequences' : 'SOW items'} configured 
+                                                (Total: <strong style={{ color: Number((form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2)) === 100 ? '#16a34a' : '#ef4444' }}>
+                                                    {Number((form.scopeOfWork || []).reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0).toFixed(2))}%
+                                                </strong>). Click to expand / edit.
+                                            </span>
+                                            <span style={{ color: '#2563eb', fontWeight: 700 }}>Show Details →</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {form.scopeOfWork.map((item, idx) => (
                                             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
                                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1215,6 +1272,8 @@ export default function AdminProjects() {
                                             </span>
                                         </div>
                                     </div>
+                                    </>
+                                )}
                                 </div>
                             )}
                             <div className="form-group">

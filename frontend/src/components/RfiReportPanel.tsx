@@ -76,72 +76,96 @@ export default function RfiReportPanel({ projectId, projectName, initialMode = '
             if (reportId !== 'new' && res.report) {
                 setReportDate(res.report.reportDate);
                 
+                const formatIsoDate = (d?: string) => {
+                    if (!d) return '';
+                    if (d.includes('T')) return d.split('T')[0];
+                    try {
+                        const parsed = new Date(d);
+                        if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+                    } catch {}
+                    return d;
+                };
+
+                const mapRfi = (r: any) => ({
+                    isCustomRow: false,
+                    rfiNumber: r.skNumber || r.rfiNumber || '',
+                    questionNumber: r.questionNumber || r.rfiNumber || '',
+                    clientRfiNumber: r.clientRfiNumber || '',
+                    status: r.status || 'OPEN',
+                    priority: r.priority || '',
+                    description: r.question || r.description || '',
+                    sentDate: formatIsoDate(r.sentDate),
+                    seqArea: r.seqArea || '',
+                    rfiType: r.rfiType || '',
+                    receivedDate: formatIsoDate(r.receivedDate),
+                    remarks: r.remarks || ''
+                });
+
+                const mapCdrfi = (c: any) => ({
+                    isCustomRow: false,
+                    caldimCdrfiNo: c.caldimCdrfiNo || c.skNumber || c.rfiNumber || c.id || '',
+                    clientCdrfiNo: c.clientCdrfiNo || c.clientRfiNumber || '',
+                    status: c.status || 'OPEN',
+                    priority: c.priority || '',
+                    sentDate: formatIsoDate(c.sentDate),
+                    seqArea: c.seqArea || '',
+                    cdrfiType: c.cdrfiType || '',
+                    description: c.description || '',
+                    receivedDate: formatIsoDate(c.receivedDate),
+                    remarks: c.remarks || ''
+                });
+
                 let savedRfis = res.report.rfiData || [];
                 if (savedRfis.length === 0 && res.autoFetch && res.autoFetch.rfis && res.autoFetch.rfis.length > 0) {
-                    savedRfis = res.autoFetch.rfis.map((r: any) => ({
-                        isCustomRow: false,
-                        rfiNumber: r.skNumber || '',
-                        questionNumber: r.rfiNumber || '',
-                        clientRfiNumber: r.clientRfiNumber || '',
-                        status: r.status,
-                        priority: r.priority || '',
-                        description: r.question || r.description || '',
-                        sentDate: r.sentDate ? new Date(r.sentDate).toLocaleDateString() : '',
-                        seqArea: r.seqArea || '',
-                        rfiType: r.rfiType || '',
-                        receivedDate: r.receivedDate || '',
-                        remarks: r.remarks || ''
-                    }));
+                    savedRfis = res.autoFetch.rfis.map(mapRfi);
                 }
                 setRfiData(savedRfis);
 
                 let savedCdrfis = res.report.cdrfiData || [];
                 if (savedCdrfis.length === 0 && res.autoFetch && res.autoFetch.cdrfis && res.autoFetch.cdrfis.length > 0) {
-                    savedCdrfis = res.autoFetch.cdrfis.map((c: any) => ({
-                        isCustomRow: false,
-                        caldimCdrfiNo: c.id,
-                        clientCdrfiNo: '',
-                        status: c.status,
-                        priority: '',
-                        sentDate: '',
-                        seqArea: '',
-                        cdrfiType: '',
-                        description: c.description,
-                        receivedDate: '',
-                        remarks: ''
-                    }));
+                    savedCdrfis = res.autoFetch.cdrfis.map(mapCdrfi);
                 }
                 setCdrfiData(savedCdrfis);
                 setCurrentReportId(res.report._id);
             } else if (reportId === 'new' && res.autoFetch) {
-                const initialRfis = res.autoFetch.rfis.map((r: any) => ({
+                const formatIsoDate = (d?: string) => {
+                    if (!d) return '';
+                    if (d.includes('T')) return d.split('T')[0];
+                    try {
+                        const parsed = new Date(d);
+                        if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+                    } catch {}
+                    return d;
+                };
+
+                const initialRfis = (res.autoFetch.rfis || []).map((r: any) => ({
                     isCustomRow: false,
-                    rfiNumber: r.skNumber || '',
-                    questionNumber: r.rfiNumber || '',
+                    rfiNumber: r.skNumber || r.rfiNumber || '',
+                    questionNumber: r.questionNumber || r.rfiNumber || '',
                     clientRfiNumber: r.clientRfiNumber || '',
-                    status: r.status,
+                    status: r.status || 'OPEN',
                     priority: r.priority || '',
                     description: r.question || r.description || '',
-                    sentDate: r.sentDate ? new Date(r.sentDate).toLocaleDateString() : '',
+                    sentDate: formatIsoDate(r.sentDate),
                     seqArea: r.seqArea || '',
                     rfiType: r.rfiType || '',
-                    receivedDate: r.receivedDate || '',
+                    receivedDate: formatIsoDate(r.receivedDate),
                     remarks: r.remarks || ''
                 }));
                 setRfiData(initialRfis);
 
-                const initialCdrfis = res.autoFetch.cdrfis.map((c: any) => ({
+                const initialCdrfis = (res.autoFetch.cdrfis || []).map((c: any) => ({
                     isCustomRow: false,
-                    caldimCdrfiNo: c.id,
-                    clientCdrfiNo: '',
-                    status: c.status,
-                    priority: '',
-                    sentDate: '',
-                    seqArea: '',
-                    cdrfiType: '',
-                    description: c.description,
-                    receivedDate: '',
-                    remarks: ''
+                    caldimCdrfiNo: c.caldimCdrfiNo || c.skNumber || c.rfiNumber || c.id || '',
+                    clientCdrfiNo: c.clientCdrfiNo || c.clientRfiNumber || '',
+                    status: c.status || 'OPEN',
+                    priority: c.priority || '',
+                    sentDate: formatIsoDate(c.sentDate),
+                    seqArea: c.seqArea || '',
+                    cdrfiType: c.cdrfiType || '',
+                    description: c.description || '',
+                    receivedDate: formatIsoDate(c.receivedDate),
+                    remarks: c.remarks || ''
                 }));
                 setCdrfiData(initialCdrfis);
             }
