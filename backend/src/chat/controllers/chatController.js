@@ -398,7 +398,9 @@ exports.searchUsers = async (req, res) => {
     }
 
     const users = await User.find(userQuery, 'username displayName email role division employeeId')
-        .limit(30)
+        .collation({ locale: 'en', strength: 2 })
+        .sort({ displayName: 1, username: 1 })
+        .limit(200)
         .lean();
 
     const results = users.map(u => ({
@@ -417,7 +419,7 @@ exports.searchUsers = async (req, res) => {
         const admin = await Admin.findById(adminId, 'username displayName email role').lean();
         if (admin && admin._id.toString() !== currentUserId) {
             if (!q || admin.username.match(regex) || (admin.displayName && admin.displayName.match(regex))) {
-                results.unshift({
+                results.push({
                     id: admin._id.toString(),
                     username: admin.username,
                     displayName: admin.displayName || 'System Administrator',
@@ -429,6 +431,13 @@ exports.searchUsers = async (req, res) => {
             }
         }
     }
+
+    // Sort all results alphabetically from A to Z
+    results.sort((a, b) => {
+        const nameA = (a.displayName || a.username || '').trim().toLowerCase();
+        const nameB = (b.displayName || b.username || '').trim().toLowerCase();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
 
     res.json({ success: true, users: results });
 };

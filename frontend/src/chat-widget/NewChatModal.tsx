@@ -30,7 +30,12 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({
         setErrorMessage('');
         searchUsers(query)
             .then(data => {
-                setUsers(data || []);
+                const sorted = (data || []).slice().sort((a, b) => {
+                    const nameA = (a.displayName || a.username || '').trim().toLowerCase();
+                    const nameB = (b.displayName || b.username || '').trim().toLowerCase();
+                    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+                });
+                setUsers(sorted);
                 setIsLoading(false);
             })
             .catch(err => {
