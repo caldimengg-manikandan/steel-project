@@ -33,7 +33,17 @@ function getLocalPath(relativePath) {
     
     // Prevent path traversal
     const safePath = relativePath.replace(/\.\./g, '').replace(/^[\/\\]+/, '');
-    return path.join(STORAGE_DIR, safePath);
+    const directPath = path.join(STORAGE_DIR, safePath);
+    if (fs.existsSync(directPath)) return directPath;
+
+    // Check with spaces replaced with underscores or underscores replaced with spaces
+    const alt1 = path.join(STORAGE_DIR, safePath.replace(/_/g, ' '));
+    if (fs.existsSync(alt1)) return alt1;
+
+    const alt2 = path.join(STORAGE_DIR, safePath.replace(/ /g, '_'));
+    if (fs.existsSync(alt2)) return alt2;
+
+    return directPath;
 }
 
 async function listDirectory(relativePath = '') {

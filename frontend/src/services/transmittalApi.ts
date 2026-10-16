@@ -42,13 +42,23 @@ export async function previewTransmittal(projectId: string, extractionIds?: stri
 }
 
 export function getTransmittalExcelUrl(projectId: string, transmittalId: string): string {
-    return `${BASE}/transmittals/${projectId}/${transmittalId}/excel`;
+    const token = localStorage.getItem('token');
+    const q = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${BASE}/transmittals/${projectId}/${transmittalId}/excel${q}`;
 }
 
 export function getDrawingLogExcelUrl(projectId: string, upToTransmittalNumber?: number): string {
     let url = `${BASE}/transmittals/${projectId}/drawing-log/excel`;
+    const params: string[] = [];
     if (upToTransmittalNumber) {
-        url += `?upToTransmittalNumber=${upToTransmittalNumber}`;
+        params.push(`upToTransmittalNumber=${upToTransmittalNumber}`);
+    }
+    const token = localStorage.getItem('token');
+    if (token) {
+        params.push(`token=${encodeURIComponent(token)}`);
+    }
+    if (params.length > 0) {
+        url += `?${params.join('&')}`;
     }
     return url;
 }

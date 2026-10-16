@@ -22,6 +22,7 @@ export const fetchDrawingLog = async (projectId: string) => {
 };
 
 export const getDrawingLogDownloadUrl = (projectId: string) => {
-    // Rely on the browser passing the cookie automatically for standard anchor tag downloads.
-    return `${BASE}/drawing-log/${projectId}/download`;
+    const token = localStorage.getItem('token');
+    return `${BASE}/drawing-log/${projectId}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 };
+

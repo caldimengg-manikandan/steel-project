@@ -269,10 +269,6 @@ exports.downloadDrawingLogExcel = async (req, res) => {
     const limitToNumber = upToTransmittalNumber ? parseInt(upToTransmittalNumber, 10) : null;
     const log = await getDrawingLog(projectId, limitToNumber);
 
-    if (!log || !log.drawings || log.drawings.length === 0) {
-        return res.status(404).json({ error: 'Drawing Log is empty or not found.' });
-    }
-
     const project = await Project.findById(projectId).lean();
     const settings = await SystemSettings.findOne().lean();
     
@@ -280,6 +276,37 @@ exports.downloadDrawingLogExcel = async (req, res) => {
         projectName: project ? project.name : 'Project',
         clientName: project ? project.clientName : 'CLIENT',
     };
+
+    if (!log || !log.drawings || log.drawings.length === 0) {
+        const safeProjectName = project?.name ? project.name.replace(/[^a-zA-Z0-9 _-]/g, '_') : 'Project';
+        const underscoreName = project?.name ? project.name.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Project';
+        const candidatePaths = [
+            path.join(__dirname, '../../uploads/storage/Projects', safeProjectName, 'Logs', `${safeProjectName}_Drawing_Log.xlsx`),
+            path.join(__dirname, '../../uploads/storage/Projects', underscoreName, 'Logs', `${underscoreName}_Drawing_Log.xlsx`),
+            path.join(__dirname, '../../uploads/temp', `${underscoreName}_Drawing_Log.xlsx`),
+            path.join(__dirname, '../../uploads/temp', `${safeProjectName}_Drawing_Log.xlsx`),
+        ];
+
+        for (const cPath of candidatePaths) {
+            if (fs.existsSync(cPath)) {
+                const buffer = fs.readFileSync(cPath);
+                const filename = `${safeProjectName}_Drawing_Log.xlsx`;
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                return res.send(buffer);
+            }
+        }
+
+        if (project) {
+            const emptyLog = { projectId, lastTransmittalNo: 1, drawings: [] };
+            const { buffer, filename } = await generateDrawingLogExcel(emptyLog, projectDetails, settings?.logoPath);
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            return res.send(buffer);
+        }
+
+        return res.status(404).json({ error: 'Drawing Log is empty or not found.' });
+    }
 
     const { buffer, filename } = await generateDrawingLogExcel(log, projectDetails, settings?.logoPath);
 
