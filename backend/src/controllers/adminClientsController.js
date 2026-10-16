@@ -83,7 +83,7 @@ async function deleteClient(req, res) {
     // Optional: check if projects are linked?
     const projects = await Project.countDocuments({ clientId: client._id });
     if (projects > 0) {
-       return res.status(400).json({ error: 'Cannot delete client with active projects.' });
+        return res.status(400).json({ error: 'Cannot delete client with active projects.' });
     }
 
     await client.deleteOne();
@@ -115,10 +115,10 @@ async function bulkCreateClients(req, res) {
 
     try {
         console.log(`[BULK UPLOAD CLIENTS] Processing file at: ${req.file.path}`);
-        
+
         const workbook = new ExcelJS.Workbook();
         const extension = req.file.originalname.split('.').pop().toLowerCase();
-        
+
         if (extension === 'csv') {
             await workbook.csv.readFile(req.file.path);
         } else {
@@ -132,7 +132,7 @@ async function bulkCreateClients(req, res) {
 
         const headerRow = worksheet.getRow(1);
         const colMap = {};
-        
+
         headerRow.eachCell((cell, colNumber) => {
             const header = String(cell.value).trim().toLowerCase();
             // Map common header naming variations
@@ -167,11 +167,11 @@ async function bulkCreateClients(req, res) {
                 skippedCount++;
                 continue;
             }
-            
+
             // Clean values
             const name = String(clientName).trim();
             const email = (emailValue && typeof emailValue === 'object') ? emailValue.text || emailValue.hyperlink : String(emailValue).trim();
-            const contactName = contactNameValue ? String(contactNameValue).trim() : name; 
+            const contactName = contactNameValue ? String(contactNameValue).trim() : name;
             const phone = phoneValue ? String(phoneValue).trim() : '';
 
             const query = req.principal.role === 'superadmin' ? { name: name } : { name: name, createdByAdminId: adminId };
@@ -197,7 +197,7 @@ async function bulkCreateClients(req, res) {
         }
 
         // Cleanup temp file
-        try { fs.unlinkSync(req.file.path); } catch(e) {}
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
 
         res.json({
             message: `Bulk upload completed. Created: ${createdCount}, Skipped: ${skippedCount}.`,
@@ -208,7 +208,7 @@ async function bulkCreateClients(req, res) {
 
     } catch (err) {
         console.error('[BULK UPLOAD CLIENTS] Error:', err);
-        try { fs.unlinkSync(req.file.path); } catch(e) {}
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
         res.status(500).json({ error: err.message || 'Failed to process bulk upload.' });
     }
 }

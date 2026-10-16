@@ -417,7 +417,7 @@ export default function AdminRfi() {
                         Upload drawings, auto-extract RFI annotations, and generate a structured Excel log.
                     </p>
                 </div>
-                {completedCount > 0 && projectId && (
+                {projectId && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
 
                         <div style={{ display: 'flex', gap: 8 }}>

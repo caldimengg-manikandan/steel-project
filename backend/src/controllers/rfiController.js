@@ -165,11 +165,7 @@ exports.downloadRfiExcel = async (req, res) => {
             query._id = req.query.extractionId;
         }
 
-        const extractions = await RfiExtraction.find(query).lean();
-
-        if (extractions.length === 0) {
-            return res.status(404).json({ error: 'No completed RFI extractions found.' });
-        }
+        const extractions = (await RfiExtraction.find(query).lean()) || [];
 
         const publicUrl = process.env.PUBLIC_SERVER_URL;
         const hostHeader = req.get('host') || '';

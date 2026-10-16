@@ -56,6 +56,8 @@ export const getRfiExcelDownloadUrl = (projectId: string, extractionId?: string,
     if (extractionId) params.push(`extractionId=${String(extractionId)}`);
     if (baseUrl && baseUrl.trim()) params.push(`baseUrl=${encodeURIComponent(baseUrl.trim())}`);
     if (status) params.push(`status=${status}`);
+    const token = localStorage.getItem('token');
+    if (token) params.push(`token=${encodeURIComponent(token)}`);
     
     if (params.length > 0) {
         url += '?' + params.join('&');

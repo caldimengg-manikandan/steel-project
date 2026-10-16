@@ -75,12 +75,12 @@ async function listProjects(req, res) {
  */
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
-    const { 
-        name, clientName, clientId, contactPerson, description, status, 
-        approximateDrawingsCount, location, sequences, scopeOfWork, 
-        connectionDesignVendor, connectionDesignContact, connectionDesignEmail, 
+    const {
+        name, clientName, clientId, contactPerson, description, status,
+        approximateDrawingsCount, location, sequences, scopeOfWork,
+        connectionDesignVendor, connectionDesignContact, connectionDesignEmail,
         year, startingTransmittalNumber, trackingMode, creationDate,
-        projectStartDate, financialYear, projectCode, division, projectManager 
+        projectStartDate, financialYear, projectCode, division, projectManager
     } = req.body;
 
     const today = new Date();
