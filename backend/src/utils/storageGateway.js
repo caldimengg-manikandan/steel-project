@@ -325,6 +325,18 @@ function sanitizeUploadTargetDir(targetDir, filename) {
 async function uploadFile(targetDir, filename, buffer) {
     const finalTargetDir = sanitizeUploadTargetDir(targetDir, filename);
 
+    // 1. ALWAYS save a copy to Local Disk (VPS) so files are NEVER wiped out
+    try {
+        const dirPath = getLocalPath(finalTargetDir);
+        await fsPromises.mkdir(dirPath, { recursive: true });
+        const filePath = path.join(dirPath, filename);
+        await fsPromises.writeFile(filePath, buffer);
+        console.log(`[StorageGateway] Saved "${filename}" to local server disk at "${filePath}"`);
+    } catch (localErr) {
+        console.warn(`[StorageGateway] Local write warning: ${localErr.message}`);
+    }
+
+    // 2. ALSO save to Remote Windows Storage Agent (I:\storage\projects)
     if (isRemoteAgent()) {
         const formData = new FormData();
         formData.append('targetPath', finalTargetDir);
@@ -341,16 +353,10 @@ async function uploadFile(targetDir, filename, buffer) {
             throw new Error(err.error || `Upload to Storage Agent failed: HTTP ${response.status}`);
         }
 
-        console.log(`[StorageGateway] Successfully uploaded "${filename}" to Storage Agent at "${finalTargetDir}"`);
+        console.log(`[StorageGateway] Successfully synced "${filename}" to Windows Storage Agent at "${finalTargetDir}"`);
         return response.json();
     }
 
-    // Local Disk Fallback
-    const dirPath = getLocalPath(finalTargetDir);
-    await fsPromises.mkdir(dirPath, { recursive: true });
-    const filePath = path.join(dirPath, filename);
-    await fsPromises.writeFile(filePath, buffer);
-    console.log(`[StorageGateway] Successfully saved "${filename}" to local disk at "${filePath}"`);
     return { message: 'File saved successfully to local server disk.' };
 }
 
