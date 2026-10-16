@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
+const ChatWidgetLauncher = lazy(() => import('./chat-widget/ChatWidgetLauncher'));
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 
@@ -119,6 +121,9 @@ export default function App() {
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+            <Suspense fallback={null}>
+              <ChatWidgetLauncher />
+            </Suspense>
           </BrowserRouter>
         </AuthProvider>
       </MessageProvider>

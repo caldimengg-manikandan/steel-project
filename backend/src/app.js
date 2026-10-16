@@ -175,6 +175,7 @@ app.use('/api/admin/activity-logs', activityLogRoutes);
 app.use('/api/weekly-report', require('./routes/weeklyProgressRoutes'));
 app.use('/api/rfi-report', require('./routes/rfiReportRoutes'));
 app.use('/api/error-log', require('./routes/errorLogRoutes'));
+if (process.env.ENABLE_CHAT_WIDGET !== 'false') app.use('/api/chat', require('./chat').router);
 // â”€â”€ Ensure upload directories and permissions exist â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const { initUploadDirectories } = require('./utils/initDirectories');
 initUploadDirectories();
@@ -270,6 +271,7 @@ connectDB().then(async () => {
     }
 
     const server = app.listen(PORT, async () => {
+        if (process.env.ENABLE_CHAT_WIDGET !== 'false') require('./chat').initSocket(server);
         console.log(`\n[SERVER] Steel Detailing DMS API running on http://localhost:${PORT}`);
         console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}\n`);
 

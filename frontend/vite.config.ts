@@ -24,6 +24,11 @@ export default defineConfig(({ command }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/steel\/uploads/, '/uploads'),
       },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
@@ -34,6 +39,11 @@ export default defineConfig(({ command }) => ({
   },
   preview: {
     proxy: {
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+      },
       '/steel/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
