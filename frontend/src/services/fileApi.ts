@@ -4,6 +4,14 @@ const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
 
 
+function getAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    const token = localStorage.getItem('token') || (sessionStorage.getItem('sdms_user') ? JSON.parse(sessionStorage.getItem('sdms_user')!).token : '');
+    return {
+        ...extra,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+}
+
 async function handleResponse(res: Response) {
     const text = await res.text();
     let data;
@@ -34,9 +42,12 @@ export async function browseFiles(path: string = ''): Promise<{ path: string; en
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
+
     const res = await fetch(`${BASE}/files/browse?${params.toString()}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     });
     return handleResponse(res);
 }
@@ -48,9 +59,12 @@ export async function getFileInfo(path: string): Promise<FileEntry> {
     const params = new URLSearchParams();
     params.append('path', path);
 
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
+
     const res = await fetch(`${BASE}/files/info?${params.toString()}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     });
     return handleResponse(res);
 }
@@ -63,9 +77,12 @@ export async function searchFiles(query: string, path: string = ''): Promise<{ r
     params.append('q', query);
     if (path) params.append('path', path);
 
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
+
     const res = await fetch(`${BASE}/files/search?${params.toString()}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     });
     return handleResponse(res);
 }
@@ -83,6 +100,7 @@ export async function uploadFiles(files: File[], targetPath: string = ''): Promi
     const res = await fetch(`${BASE}/files/upload`, {
         method: 'POST',
         credentials: 'include',
+        headers: getAuthHeaders(),
         body: formData,
     });
     return handleResponse(res);
@@ -95,10 +113,13 @@ export async function deleteFile(path: string): Promise<{ message: string; path:
     const params = new URLSearchParams();
     params.append('path', path);
 
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
+
     const res = await fetch(`${BASE}/files/remove?${params.toString()}`, {
         method: 'DELETE',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     });
     return handleResponse(res);
 }
@@ -110,13 +131,14 @@ export async function downloadFile(path: string): Promise<void> {
     const params = new URLSearchParams();
     params.append('path', path);
 
-    // Let's use fetch/blob approach so we can handle headers if needed, OR just open URL.
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
 
-    // We could open a new tab, but using fetch -> blob is better for keeping the user on the same page 
-    // and catching errors if it fails.
-    const res = await fetch(`${BASE}/files/download?path=${encodeURIComponent(path)}`, {
+    const res = await fetch(`${BASE}/files/download?${params.toString()}`, {
         credentials: 'include',
+        headers: getAuthHeaders(),
     });
+
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -166,7 +188,7 @@ export async function uploadFolder(
 }> {
     return new Promise((resolve, reject) => {
         const stored = sessionStorage.getItem('sdms_user');
-        const token = stored ? JSON.parse(stored).token : '';
+        const token = localStorage.getItem('token') || (stored ? JSON.parse(stored).token : '');
 
         const formData = new FormData();
         if (targetPath) {

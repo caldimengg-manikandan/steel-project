@@ -58,6 +58,12 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         return unsubscribe;
     }, []);
 
+    useEffect(() => {
+        if (basePath) {
+            setCurrentPath((prev) => (!prev || !prev.startsWith(basePath) ? basePath : prev));
+        }
+    }, [basePath]);
+
     // Derived states from global session store
     const uploadingFolder = !!session?.active && !!session?.uploading;
     const uploadProgressPercent = session?.progressPercent || 0;
