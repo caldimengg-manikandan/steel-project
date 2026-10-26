@@ -828,6 +828,7 @@ export default function AdminCdrfi() {
                                                             const { rfi, parent } = item;
                                                             const rfiIndexInOriginal = parent.rfis.findIndex((r: any) => r._id === rfi._id);
                                                             const key = `${parent._id}_${rfiIndexInOriginal}`;
+                                                            const isExp = expanded === key;
                                                             const defaultResponse = rfi.response || (rfi.responseAttachmentName ? `[Attached]: ${rfi.responseAttachmentName}` : '');
                                                             const draftText = responseEdits[key] !== undefined ? responseEdits[key] : defaultResponse;
                                                             const draftRemarks = remarksEdits[key] ?? rfi.remarks ?? '';
