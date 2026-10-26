@@ -288,7 +288,60 @@ const DEFAULT_FORM: CreateProjectForm = {
     projectManager: '',
 };
 
+function getApmsForPm(pmId: string, allUsers: User[]): User[] {
+
+    if (!pmId) return [];
+    const pmIdStr = String(pmId);
+
+    // 1. APMs that directly have this PM as their project_manager
+    const directApms = allUsers.filter(u => {
+        if (u.role !== 'assistant_project_manager') return false;
+        const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id || (u.project_manager as any)?.id : u.project_manager;
+        return userPm && String(userPm) === pmIdStr;
+    });
+
+    // 2. APMs linked via team members/users where user's PM is pmId and user's APM is this APM
+    const linkedApmIds = new Set<string>();
+    allUsers.forEach(u => {
+        const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id || (u.project_manager as any)?.id : u.project_manager;
+        if (userPm && String(userPm) === pmIdStr && u.assistant_project_manager) {
+            const apmId = typeof u.assistant_project_manager === 'object' ? (u.assistant_project_manager as any)?._id || (u.assistant_project_manager as any)?.id : u.assistant_project_manager;
+            if (apmId) linkedApmIds.add(String(apmId));
+        }
+    });
+
+    const indirectApms = allUsers.filter(u => 
+        u.role === 'assistant_project_manager' && linkedApmIds.has(String(u.id || (u as any)._id))
+    );
+
+    // 3. APM assigned directly on the PM user document (if any)
+    const pmUser = allUsers.find(u => String(u.id || (u as any)._id) === pmIdStr);
+    if (pmUser && pmUser.assistant_project_manager) {
+        const pmApmId = typeof pmUser.assistant_project_manager === 'object' 
+            ? (pmUser.assistant_project_manager as any)?._id || (pmUser.assistant_project_manager as any)?.id
+            : pmUser.assistant_project_manager;
+        if (pmApmId) {
+            const pmApm = allUsers.find(u => u.role === 'assistant_project_manager' && String(u.id || (u as any)._id) === String(pmApmId));
+            if (pmApm && !indirectApms.some(a => String(a.id || (a as any)._id) === String(pmApm.id || (pmApm as any)._id))) {
+                indirectApms.push(pmApm);
+            }
+        }
+    }
+
+    // Combine direct and indirect (deduplicated)
+    const combined = [...directApms];
+    indirectApms.forEach(apm => {
+        const apmId = String(apm.id || (apm as any)._id);
+        if (!combined.some(c => String(c.id || (c as any)._id) === apmId)) {
+            combined.push(apm);
+        }
+    });
+
+    return combined;
+}
+
 export default function AdminProjects() {
+
     const navigate = useNavigate();
     const { showMessage } = useMessage();
     const [projects, setProjects] = useState<Project[]>([]);
@@ -947,13 +1000,15 @@ export default function AdminProjects() {
                                             value={form.caldimProjectManager || ''}
                                             onChange={(e) => {
                                                 const pmId = e.target.value;
-                                                const pmUser = users.find(u => (u.id || u._id) === pmId);
+                                                const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
+                                                const availableApms = getApmsForPm(pmId, users);
+                                                const autoApm = availableApms.length === 1 ? availableApms[0] : null;
                                                 setForm({
                                                     ...form,
                                                     caldimProjectManager: pmId,
                                                     caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
-                                                    caldimAssistantProjectManager: '',
-                                                    caldimAssistantProjectManagerName: ''
+                                                    caldimAssistantProjectManager: autoApm ? String(autoApm.id || (autoApm as any)._id) : '',
+                                                    caldimAssistantProjectManagerName: autoApm ? (autoApm.displayName || autoApm.username) : ''
                                                 });
                                             }}
                                         >
@@ -967,27 +1022,21 @@ export default function AdminProjects() {
                                     </div>
 
                                     {form.caldimProjectManager && (() => {
-                                        const pmId = form.caldimProjectManager;
-                                        const apmsForPm = users.filter(u => {
-                                            if (u.role !== 'assistant_project_manager') return false;
-                                            const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : u.project_manager;
-                                            return userPm === pmId;
-                                        });
-                                        const displayApms = apmsForPm.length > 0 ? apmsForPm : users.filter(u => u.role === 'assistant_project_manager');
+                                        const apmsForPm = getApmsForPm(form.caldimProjectManager, users);
 
                                         return (
                                             <div style={{ marginTop: 4 }}>
                                                 <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
-                                                    Assistant Project Manager {apmsForPm.length === 0 && displayApms.length > 0 && <span style={{ fontWeight: 400, color: '#64748b' }}>(All APMs)</span>}
+                                                    Assistant Project Manager
                                                 </label>
-                                                {displayApms.length === 0 ? (
-                                                    <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
-                                                        No Assistant Project Managers available.
+                                                {apmsForPm.length === 0 ? (
+                                                    <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
+                                                        No Assistant Project Manager assigned to this Project Manager.
                                                     </div>
                                                 ) : (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                        {displayApms.map(apm => {
-                                                            const apmId = apm.id || apm._id;
+                                                        {apmsForPm.map(apm => {
+                                                            const apmId = String(apm.id || (apm as any)._id);
                                                             const isSelected = form.caldimAssistantProjectManager === apmId;
                                                             return (
                                                                 <label
@@ -1030,6 +1079,7 @@ export default function AdminProjects() {
                                     })()}
                                 </div>
                             </div>
+
 
                             <div className="form-group">
                                 <label className="form-label required">Project Name</label>
@@ -1624,13 +1674,15 @@ export default function AdminProjects() {
                                                     value={editTarget.caldimProjectManager || ''}
                                                     onChange={(e) => {
                                                         const pmId = e.target.value;
-                                                        const pmUser = users.find(u => (u.id || u._id) === pmId);
+                                                        const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
+                                                        const availableApms = getApmsForPm(pmId, users);
+                                                        const autoApm = availableApms.length === 1 ? availableApms[0] : null;
                                                         setEditTarget({
                                                             ...editTarget,
                                                             caldimProjectManager: pmId,
                                                             caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
-                                                            caldimAssistantProjectManager: '',
-                                                            caldimAssistantProjectManagerName: ''
+                                                            caldimAssistantProjectManager: autoApm ? String(autoApm.id || (autoApm as any)._id) : '',
+                                                            caldimAssistantProjectManagerName: autoApm ? (autoApm.displayName || autoApm.username) : ''
                                                         });
                                                     }}
                                                 >
@@ -1644,27 +1696,21 @@ export default function AdminProjects() {
                                             </div>
 
                                             {editTarget.caldimProjectManager && (() => {
-                                                const pmId = editTarget.caldimProjectManager;
-                                                const apmsForPm = users.filter(u => {
-                                                    if (u.role !== 'assistant_project_manager') return false;
-                                                    const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : u.project_manager;
-                                                    return userPm === pmId;
-                                                });
-                                                const displayApms = apmsForPm.length > 0 ? apmsForPm : users.filter(u => u.role === 'assistant_project_manager');
+                                                const apmsForPm = getApmsForPm(editTarget.caldimProjectManager, users);
 
                                                 return (
                                                     <div style={{ marginTop: 4 }}>
                                                         <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
-                                                            Assistant Project Manager {apmsForPm.length === 0 && displayApms.length > 0 && <span style={{ fontWeight: 400, color: '#64748b' }}>(All APMs)</span>}
+                                                            Assistant Project Manager
                                                         </label>
-                                                        {displayApms.length === 0 ? (
-                                                            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
-                                                                No Assistant Project Managers available.
+                                                        {apmsForPm.length === 0 ? (
+                                                             <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
+                                                                No Assistant Project Manager assigned to this Project Manager.
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                                {displayApms.map(apm => {
-                                                                    const apmId = apm.id || apm._id;
+                                                                {apmsForPm.map(apm => {
+                                                                    const apmId = String(apm.id || (apm as any)._id);
                                                                     const isSelected = editTarget.caldimAssistantProjectManager === apmId;
                                                                     return (
                                                                         <label
@@ -1705,6 +1751,7 @@ export default function AdminProjects() {
                                                     </div>
                                                 );
                                             })()}
+
                                         </div>
                                     </div>
 
