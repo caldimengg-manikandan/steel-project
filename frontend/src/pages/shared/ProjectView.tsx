@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getProjectById, updateProjectSequences, updateProjectScopeOfWork, updateProjectAdditionalScopeOfWork } from '../../services/projectApi';
+import { getProjectById, updateProjectSequences, updateProjectScopeOfWork, updateProjectAdditionalScopeOfWork, updateProjectAllocations } from '../../services/projectApi';
 import { useMessage } from '../../context/MessageContext';
-import type { Project, ProjectPermission } from '../../types';
+import type { Project, ProjectPermission, User } from '../../types';
 import { isFullAccessUser } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
 import { listTransmittals } from '../../services/transmittalApi';
+import { adminListUsers } from '../../services/adminUserApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
 import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
@@ -31,7 +32,7 @@ export default function ProjectView() {
     const [allRevisions, setAllRevisions] = useState<any[]>([]); // Populated from Extractions
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi' | 'storage' | 'weekly-report'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'revisions' | 'info' | 'extraction' | 'transmittals' | 'rfi' | 'storage' | 'weekly-report' | 'allocations'>('dashboard');
     const [uploadModal, setUploadModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     // Duplicate detection state
@@ -48,6 +49,84 @@ export default function ProjectView() {
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
     const [isSowDataVisible, setIsSowDataVisible] = useState<boolean>(true);
+
+    // Allocations state
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [allocationsMap, setAllocationsMap] = useState<Record<string, { selected: boolean; permission: 'viewer' | 'editor' }>>({});
+    const [savingAllocations, setSavingAllocations] = useState(false);
+    const [allocationSearch, setAllocationSearch] = useState('');
+    const [allocationRoleFilter, setAllocationRoleFilter] = useState<'all' | 'team_member' | 'team_lead'>('all');
+
+    useEffect(() => {
+        adminListUsers()
+            .then(res => setAllUsers(res.users || []))
+            .catch(err => console.error('[ProjectView] Failed to load users for allocations:', err));
+    }, []);
+
+    useEffect(() => {
+        if (!project) return;
+        const initialMap: Record<string, { selected: boolean; permission: 'viewer' | 'editor' }> = {};
+        (allUsers || []).forEach(u => {
+            const uid = String(u.id || u._id);
+            const existing = (project.assignments || []).find(a => String(a.userId) === uid);
+            initialMap[uid] = {
+                selected: !!existing,
+                permission: existing?.permission === 'editor' ? 'editor' : (existing?.permission === 'viewer' ? 'viewer' : (u.role === 'team_member' ? 'editor' : 'viewer'))
+            };
+        });
+        setAllocationsMap(initialMap);
+    }, [project, allUsers]);
+
+    const eligibleUsers = useMemo(() => {
+        return allUsers.filter(u => {
+            const r = u.role;
+            return r === 'team_member' || r === 'team_lead' || r === 'assistant_team_lead';
+        });
+    }, [allUsers]);
+
+    const displayedUsers = useMemo(() => {
+        return eligibleUsers.filter(u => {
+            if (allocationRoleFilter === 'team_member' && u.role !== 'team_member') return false;
+            if (allocationRoleFilter === 'team_lead' && u.role !== 'team_lead' && u.role !== 'assistant_team_lead') return false;
+            if (allocationSearch.trim()) {
+                const q = allocationSearch.toLowerCase();
+                const matchName = (u.displayName || '').toLowerCase().includes(q);
+                const matchUser = (u.username || '').toLowerCase().includes(q);
+                const matchEmail = (u.email || '').toLowerCase().includes(q);
+                const matchDiv = (u.division || '').toLowerCase().includes(q);
+                return matchName || matchUser || matchEmail || matchDiv;
+            }
+            return true;
+        });
+    }, [eligibleUsers, allocationRoleFilter, allocationSearch]);
+
+    const handleSaveAllocations = async () => {
+        if (!project) return;
+        try {
+            setSavingAllocations(true);
+            const projectId = String(project._id || project.id);
+            const payload = Object.entries(allocationsMap)
+                .filter(([_, data]) => data.selected)
+                .map(([userId, data]) => {
+                    const usr = allUsers.find(u => String(u.id || u._id) === userId);
+                    return {
+                        userId,
+                        username: usr?.displayName || usr?.username || 'User',
+                        permission: data.permission,
+                    };
+                });
+
+            const res = await updateProjectAllocations(projectId, payload);
+            if (res && res.project) {
+                setProject(res.project);
+            }
+            showMessage('Allocations Saved', `Successfully updated project allocations (${payload.length} assigned).`, 'success');
+        } catch (err: any) {
+            showMessage('Allocation Failed', err.message || 'Failed to save allocations.', 'error');
+        } finally {
+            setSavingAllocations(false);
+        }
+    };
 
     const fetchData = useCallback(async (isSilent = false) => {
         if (!id || id === 'undefined' || id.length < 5) {
@@ -398,7 +477,7 @@ export default function ProjectView() {
 
             {/* Tabs */}
             <div className="tab-bar">
-                {(['dashboard', 'storage', 'transmittals', 'extraction', 'info'] as const).map((tab) => (
+                {(['dashboard', 'storage', 'transmittals', 'extraction', 'info', 'allocations'] as const).map((tab) => (
                     <button
                         key={tab}
                         className={`tab-item${activeTab === tab ? ' active' : ''}`}
@@ -409,6 +488,7 @@ export default function ProjectView() {
                         {tab === 'transmittals' && 'Transmittals & Log'}
                         {tab === 'extraction' && 'Extraction'}
                         {tab === 'info' && 'Project Info'}
+                        {tab === 'allocations' && '👥 Allocations'}
                     </button>
                 ))}
             </div>
@@ -811,6 +891,51 @@ export default function ProjectView() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Client Contact Person(s) */}
+                        <div style={{ marginBottom: 'var(--space-md)' }}>
+                            <div className="form-label" style={{ marginBottom: 6 }}>Client Contact Person</div>
+                            {project.clientContactPersons && project.clientContactPersons.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+                                    {project.clientContactPersons.map((cc, idx) => (
+                                        <div key={idx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{cc.name}</div>
+                                            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{cc.email}</div>
+                                            {cc.phone && <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>📞 {cc.phone}</div>}
+                                            {cc.designation && <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>💼 {cc.designation}</div>}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : project.contactPerson ? (
+                                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', display: 'inline-block' }}>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{project.contactPerson.name}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{project.contactPerson.email}</div>
+                                    {project.contactPerson.phone && <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>📞 {project.contactPerson.phone}</div>}
+                                </div>
+                            ) : (
+                                <div className="text-muted" style={{ fontSize: 13 }}>No client contact person specified.</div>
+                            )}
+                        </div>
+
+                        {/* Caldim Contact Person */}
+                        <div style={{ marginBottom: 'var(--space-md)' }}>
+                            <div className="form-label" style={{ marginBottom: 6 }}>Caldim Contact Person</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Project Manager</div>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                        {project.caldimProjectManagerName || project.projectManager || 'Not Assigned'}
+                                    </div>
+                                </div>
+                                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assistant Project Manager</div>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                        {project.caldimAssistantProjectManagerName || 'Not Assigned'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {project.description && (
                             <div style={{ marginBottom: 'var(--space-md)' }}>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Description</div>
@@ -1397,6 +1522,326 @@ export default function ProjectView() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Allocations Tab ── */}
+            {activeTab === 'allocations' && (
+                <div className="card">
+                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, borderBottom: '1px solid var(--color-border-light)', padding: '16px 20px' }}>
+                        <div>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                                Project Allocations
+                            </h3>
+                            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                Assign Team Members and Team Leads to this project. Allocated users will automatically receive project access in their login and appear in the Users &amp; Permission modules.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '6px 12px' }}>
+                                {Object.values(allocationsMap).filter(v => v.selected).length} Allocated
+                            </span>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                disabled={savingAllocations}
+                                onClick={handleSaveAllocations}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+                            >
+                                {savingAllocations ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                                        <span>Allocating...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        <span>Allocate</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="card-body" style={{ padding: 20 }}>
+                        {/* Filter & Search Bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <div style={{ position: 'relative', width: 280 }}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="Search team member or lead..."
+                                        value={allocationSearch}
+                                        onChange={(e) => setAllocationSearch(e.target.value)}
+                                        style={{ paddingLeft: 32, fontSize: 13, height: 36 }}
+                                    />
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="none"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        width="14"
+                                        height="14"
+                                        style={{ position: 'absolute', left: 10, top: 11, color: '#94a3b8' }}
+                                    >
+                                        <circle cx="6.5" cy="6.5" r="4.5" />
+                                        <path d="M10 10l3.5 3.5" strokeLinecap="round" />
+                                    </svg>
+                                    {allocationSearch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setAllocationSearch('')}
+                                            style={{ position: 'absolute', right: 8, top: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: 8, padding: 3 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllocationRoleFilter('all')}
+                                        style={{
+                                            padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                                            background: allocationRoleFilter === 'all' ? '#fff' : 'transparent',
+                                            color: allocationRoleFilter === 'all' ? 'var(--color-primary)' : '#64748b',
+                                            boxShadow: allocationRoleFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                                        }}
+                                    >
+                                        All ({eligibleUsers.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllocationRoleFilter('team_member')}
+                                        style={{
+                                            padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                                            background: allocationRoleFilter === 'team_member' ? '#fff' : 'transparent',
+                                            color: allocationRoleFilter === 'team_member' ? 'var(--color-primary)' : '#64748b',
+                                            boxShadow: allocationRoleFilter === 'team_member' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                                        }}
+                                    >
+                                        Team Members ({eligibleUsers.filter(u => u.role === 'team_member').length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllocationRoleFilter('team_lead')}
+                                        style={{
+                                            padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                                            background: allocationRoleFilter === 'team_lead' ? '#fff' : 'transparent',
+                                            color: allocationRoleFilter === 'team_lead' ? 'var(--color-primary)' : '#64748b',
+                                            boxShadow: allocationRoleFilter === 'team_lead' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                                        }}
+                                    >
+                                        Team Leads ({eligibleUsers.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').length})
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ fontSize: 12 }}
+                                    onClick={() => {
+                                        const updated = { ...allocationsMap };
+                                        displayedUsers.forEach(u => {
+                                            const uid = String(u.id || u._id);
+                                            updated[uid] = {
+                                                selected: true,
+                                                permission: updated[uid]?.permission || (u.role === 'team_member' ? 'editor' : 'viewer')
+                                            };
+                                        });
+                                        setAllocationsMap(updated);
+                                    }}
+                                >
+                                    Select All Visible
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ fontSize: 12 }}
+                                    onClick={() => {
+                                        const updated = { ...allocationsMap };
+                                        displayedUsers.forEach(u => {
+                                            const uid = String(u.id || u._id);
+                                            if (updated[uid]) {
+                                                updated[uid] = { ...updated[uid], selected: false };
+                                            }
+                                        });
+                                        setAllocationsMap(updated);
+                                    }}
+                                >
+                                    Deselect All Visible
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Allocations Table */}
+                        {displayedUsers.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                                <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: '#475569' }}>No users found</div>
+                                <div style={{ fontSize: 12 }}>Try adjusting your search or role filter.</div>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                                    <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <tr>
+                                            <th style={{ padding: '10px 14px', width: 44 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={displayedUsers.length > 0 && displayedUsers.every(u => allocationsMap[String(u.id || u._id)]?.selected)}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        const updated = { ...allocationsMap };
+                                                        displayedUsers.forEach(u => {
+                                                            const uid = String(u.id || u._id);
+                                                            updated[uid] = {
+                                                                selected: checked,
+                                                                permission: updated[uid]?.permission || (u.role === 'team_member' ? 'editor' : 'viewer')
+                                                            };
+                                                        });
+                                                        setAllocationsMap(updated);
+                                                    }}
+                                                    style={{ cursor: 'pointer' }}
+                                                />
+                                            </th>
+                                            <th style={{ padding: '10px 14px', fontWeight: 600, color: '#475569' }}>User</th>
+                                            <th style={{ padding: '10px 14px', fontWeight: 600, color: '#475569' }}>Role</th>
+                                            <th style={{ padding: '10px 14px', fontWeight: 600, color: '#475569' }}>Division</th>
+                                            <th style={{ padding: '10px 14px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Access Level</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayedUsers.map(u => {
+                                            const uid = String(u.id || u._id);
+                                            const isAllocated = !!allocationsMap[uid]?.selected;
+                                            const currentPerm = allocationsMap[uid]?.permission || (u.role === 'team_member' ? 'editor' : 'viewer');
+                                            const roleLabel = u.role === 'team_lead' ? 'Team Lead' : (u.role === 'assistant_team_lead' ? 'Assistant Team Lead' : 'Team Member');
+                                            const roleClass = (u.role === 'team_lead' || u.role === 'assistant_team_lead') ? 'badge-primary' : 'badge-neutral';
+
+                                            return (
+                                                <tr
+                                                    key={uid}
+                                                    style={{
+                                                        borderBottom: '1px solid #f1f5f9',
+                                                        background: isAllocated ? 'rgba(37,99,235,0.03)' : 'transparent',
+                                                        transition: 'background 0.15s'
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '12px 14px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isAllocated}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setAllocationsMap(prev => ({
+                                                                    ...prev,
+                                                                    [uid]: {
+                                                                        selected: checked,
+                                                                        permission: prev[uid]?.permission || (u.role === 'team_member' ? 'editor' : 'viewer')
+                                                                    }
+                                                                }));
+                                                            }}
+                                                            style={{ cursor: 'pointer' }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '12px 14px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                            <div style={{
+                                                                width: 32, height: 32, borderRadius: '50%',
+                                                                background: isAllocated ? 'var(--color-primary)' : '#94a3b8',
+                                                                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: 12, fontWeight: 700
+                                                            }}>
+                                                                {(u.displayName || u.username).slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                                                    {u.displayName || u.username}
+                                                                </span>
+                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                    {u.email}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 14px' }}>
+                                                        <span className={`badge ${roleClass}`} style={{ fontSize: 11 }}>
+                                                            {roleLabel}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 14px', color: 'var(--color-text-secondary)', fontSize: 12 }}>
+                                                        {u.division || '—'}
+                                                    </td>
+                                                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f1f5f9', borderRadius: 6, padding: 2 }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setAllocationsMap(prev => ({
+                                                                        ...prev,
+                                                                        [uid]: {
+                                                                            selected: true,
+                                                                            permission: 'viewer'
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: 4,
+                                                                    border: 'none',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    transition: 'all 0.15s',
+                                                                    background: (isAllocated && currentPerm === 'viewer') ? '#2563eb' : 'transparent',
+                                                                    color: (isAllocated && currentPerm === 'viewer') ? '#fff' : '#64748b',
+                                                                    boxShadow: (isAllocated && currentPerm === 'viewer') ? '0 1px 2px rgba(37,99,235,0.2)' : 'none'
+                                                                }}
+                                                            >
+                                                                View
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setAllocationsMap(prev => ({
+                                                                        ...prev,
+                                                                        [uid]: {
+                                                                            selected: true,
+                                                                            permission: 'editor'
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: 4,
+                                                                    border: 'none',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    transition: 'all 0.15s',
+                                                                    background: (isAllocated && currentPerm === 'editor') ? '#059669' : 'transparent',
+                                                                    color: (isAllocated && currentPerm === 'editor') ? '#fff' : '#64748b',
+                                                                    boxShadow: (isAllocated && currentPerm === 'editor') ? '0 1px 2px rgba(5,150,105,0.2)' : 'none'
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

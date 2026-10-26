@@ -16,7 +16,7 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { scopeProjectToAdmin, validateCrossAdminAssignment } = require('../middleware/adminScope');
 const {
     listProjects, createProject, getProject,
-    updateProject, deleteProject, assignUser, removeAssignment,
+    updateProject, deleteProject, assignUser, removeAssignment, allocateUsers,
     downloadAllProjectsStatusExcel, uploadCOR,
     reserveTransmittalNumber, listExternalProjects, uploadFolder,
 } = require('../controllers/adminProjectsController');
@@ -63,6 +63,7 @@ router.post(
 );
 router.post('/:projectId/assignments', scopeProjectToAdmin, validateCrossAdminAssignment, assignUser);
 router.delete('/:projectId/assignments/:userId', scopeProjectToAdmin, removeAssignment);
+router.post('/:projectId/allocations', scopeProjectToAdmin, allocateUsers);
 
 // Project CRUD
 router.get('/:projectId', scopeProjectToAdmin, getProject);

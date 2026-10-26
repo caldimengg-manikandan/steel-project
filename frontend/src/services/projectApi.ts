@@ -333,3 +333,19 @@ export async function adminListExternalProjects(): Promise<{
     return handleResponse(res);
 }
 
+/**
+ * Update project allocations in batch (Team Members and Team Leads)
+ */
+export async function updateProjectAllocations(
+    projectId: string,
+    allocations: Array<{ userId: string; permission: 'viewer' | 'editor' | 'admin' }>
+): Promise<{ project: Project; message: string }> {
+    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/allocations`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allocations }),
+    });
+    return handleResponse(res);
+}
+

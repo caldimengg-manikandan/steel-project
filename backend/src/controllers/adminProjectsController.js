@@ -76,7 +76,9 @@ async function listProjects(req, res) {
 async function createProject(req, res) {
     const adminId = req.principal.adminId;
     const {
-        name, clientName, clientId, contactPerson, description, status,
+        name, clientName, clientId, contactPerson, clientContactPersons,
+        caldimProjectManager, caldimProjectManagerName, caldimAssistantProjectManager, caldimAssistantProjectManagerName,
+        description, status,
         approximateDrawingsCount, location, sequences, scopeOfWork,
         connectionDesignVendor, connectionDesignContact, connectionDesignEmail,
         year, startingTransmittalNumber, trackingMode, creationDate,
@@ -118,11 +120,19 @@ async function createProject(req, res) {
 
     const effectiveCreationDate = creationDate || (projectStartDate ? new Date(projectStartDate).toISOString().split('T')[0] : null);
 
+    const effectiveContactPerson = contactPerson || (Array.isArray(clientContactPersons) && clientContactPersons.length > 0 ? clientContactPersons[0] : null);
+    const effectivePmName = caldimProjectManagerName || projectManager || '';
+
     const projectPayload = {
         name,
         clientName: clientName || '',
         clientId: clientId || null,
-        contactPerson: contactPerson || null,
+        contactPerson: effectiveContactPerson,
+        clientContactPersons: Array.isArray(clientContactPersons) ? clientContactPersons : (effectiveContactPerson ? [effectiveContactPerson] : []),
+        caldimProjectManager: caldimProjectManager || null,
+        caldimProjectManagerName: caldimProjectManagerName || '',
+        caldimAssistantProjectManager: caldimAssistantProjectManager || null,
+        caldimAssistantProjectManagerName: caldimAssistantProjectManagerName || '',
         description: description || '',
         status: status === 'active' ? 'in_progress' : (status || 'in_progress'),
         location: location || '',
@@ -143,7 +153,7 @@ async function createProject(req, res) {
         financialYear: financialYear || '',
         projectCode: projectCode || '',
         division: division || '',
-        projectManager: projectManager || '',
+        projectManager: effectivePmName,
         assignments: [
             {
                 userId: req.principal.id,
@@ -212,12 +222,33 @@ async function getProject(req, res) {
  */
 async function updateProject(req, res) {
     const project = req.scopedProject;
-    const { name, clientName, clientId, contactPerson, description, status, approximateDrawingsCount, location, sequences, scopeOfWork, connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate, projectStartDate, financialYear, projectCode, division, projectManager } = req.body;
+    const { 
+        name, clientName, clientId, contactPerson, clientContactPersons,
+        caldimProjectManager, caldimProjectManagerName, caldimAssistantProjectManager, caldimAssistantProjectManagerName,
+        description, status, approximateDrawingsCount, location, sequences, scopeOfWork, 
+        connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate, 
+        projectStartDate, financialYear, projectCode, division, projectManager 
+    } = req.body;
 
     if (name !== undefined) project.name = name;
     if (clientName !== undefined) project.clientName = clientName;
     if (clientId !== undefined) project.clientId = clientId;
     if (contactPerson !== undefined) project.contactPerson = contactPerson;
+    if (clientContactPersons !== undefined && Array.isArray(clientContactPersons)) {
+        project.clientContactPersons = clientContactPersons;
+        if (!project.contactPerson && clientContactPersons.length > 0) {
+            project.contactPerson = clientContactPersons[0];
+        }
+    }
+    if (caldimProjectManager !== undefined) project.caldimProjectManager = caldimProjectManager || null;
+    if (caldimProjectManagerName !== undefined) {
+        project.caldimProjectManagerName = caldimProjectManagerName || '';
+        if (caldimProjectManagerName && !projectManager) {
+            project.projectManager = caldimProjectManagerName;
+        }
+    }
+    if (caldimAssistantProjectManager !== undefined) project.caldimAssistantProjectManager = caldimAssistantProjectManager || null;
+    if (caldimAssistantProjectManagerName !== undefined) project.caldimAssistantProjectManagerName = caldimAssistantProjectManagerName || '';
     if (description !== undefined) project.description = description;
     if (location !== undefined) project.location = location;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
@@ -796,6 +827,88 @@ async function uploadFolder(req, res) {
     });
 }
 
+/**
+ * POST /api/admin/projects/:projectId/allocations
+ * Allocates users (team members and team leads) to this project with their access level.
+ * Body: {
+ *   allocations: [ { userId: string, permission: 'viewer' | 'editor' } ]
+ * }
+ */
+async function allocateUsers(req, res) {
+    const project = req.scopedProject;
+    const adminId = req.principal.adminId;
+    const { allocations } = req.body;
+
+    if (!Array.isArray(allocations)) {
+        return res.status(400).json({ error: 'allocations must be an array.' });
+    }
+
+    const User = require('../models/User');
+    const Notification = require('../models/Notification');
+
+    // Keep admin / creator assignments intact
+    const existingAdminAssignments = (project.assignments || []).filter(
+        a => a.permission === 'admin' || a.userId.toString() === req.principal.id.toString()
+    );
+
+    const updatedAssignments = [...existingAdminAssignments];
+    const newNotifications = [];
+
+    for (const alloc of allocations) {
+        if (!alloc.userId) continue;
+        const permission = ['viewer', 'editor', 'admin'].includes(alloc.permission) ? alloc.permission : 'viewer';
+
+        // If user already in updatedAssignments as admin, leave as admin unless updating permission
+        const existingIdx = updatedAssignments.findIndex(a => a.userId.toString() === alloc.userId.toString());
+        if (existingIdx >= 0) {
+            if (updatedAssignments[existingIdx].permission !== 'admin') {
+                updatedAssignments[existingIdx].permission = permission;
+            }
+            continue;
+        }
+
+        const user = await User.findOne({ _id: alloc.userId, adminId });
+        if (!user) continue;
+
+        const wasPreviouslyAssigned = (project.assignments || []).some(
+            a => a.userId.toString() === alloc.userId.toString()
+        );
+
+        updatedAssignments.push({
+            userId: user._id,
+            username: user.username,
+            permission,
+            assignedAt: new Date()
+        });
+
+        if (!wasPreviouslyAssigned) {
+            newNotifications.push({
+                user: user._id,
+                title: 'New Project Assigned',
+                body: `You have been allocated to project "${project.name}" with ${permission === 'editor' ? 'Edit' : 'View'} access.`,
+                type: 'assignment'
+            });
+        }
+    }
+
+    project.assignments = updatedAssignments;
+    await project.save({ validateModifiedOnly: true });
+
+    if (newNotifications.length > 0) {
+        try {
+            await Notification.insertMany(newNotifications);
+        } catch (e) {
+            console.error('[Allocations] Notification insert error:', e.message);
+        }
+    }
+
+    const projectWithStats = await attachProjectStats(project);
+    res.json({
+        message: 'Project allocations updated successfully.',
+        project: projectWithStats
+    });
+}
+
 module.exports = {
     listProjects,
     createProject,
@@ -804,6 +917,7 @@ module.exports = {
     deleteProject,
     assignUser,
     removeAssignment,
+    allocateUsers,
     downloadAllProjectsStatusExcel,
     uploadCOR,
     reserveTransmittalNumber,

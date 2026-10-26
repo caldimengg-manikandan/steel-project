@@ -66,6 +66,38 @@ const projectSchema = new mongoose.Schema(
             default: null
         },
 
+        clientContactPersons: {
+            type: [{
+                name: String,
+                email: String,
+                phone: String,
+                designation: String
+            }],
+            default: []
+        },
+
+        caldimProjectManager: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+
+        caldimProjectManagerName: {
+            type: String,
+            default: ''
+        },
+
+        caldimAssistantProjectManager: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+
+        caldimAssistantProjectManagerName: {
+            type: String,
+            default: ''
+        },
+
         description: {
             type: String,
             default: '',

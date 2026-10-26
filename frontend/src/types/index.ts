@@ -90,6 +90,11 @@ export interface Project {
     clientName: string;
     clientId?: string;
     contactPerson?: ClientContact;
+    clientContactPersons?: ClientContact[];
+    caldimProjectManager?: string;
+    caldimProjectManagerName?: string;
+    caldimAssistantProjectManager?: string;
+    caldimAssistantProjectManagerName?: string;
     description: string;
     status: ProjectStatus;
     rawStatus?: string;

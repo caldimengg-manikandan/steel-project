@@ -4,9 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
 import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject, adminListExternalProjects } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
+import { adminListUsers } from '../../services/adminUserApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import { formatDate } from '../../utils/dateUtils';
-import type { Project, ProjectStatus, Client, ClientContact } from '../../types';
+import type { Project, ProjectStatus, Client, ClientContact, User } from '../../types';
 
 const STATUS_OPTIONS: ProjectStatus[] = ['in_progress', 'on_hold', 'completed', 'archived'];
 const STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -46,6 +47,11 @@ interface CreateProjectForm {
     clientName: string;
     clientId: string;
     contactPerson: ClientContact | null;
+    clientContactPersons?: ClientContact[];
+    caldimProjectManager?: string;
+    caldimProjectManagerName?: string;
+    caldimAssistantProjectManager?: string;
+    caldimAssistantProjectManagerName?: string;
     description: string;
     status: ProjectStatus;
     location: string;
@@ -259,6 +265,11 @@ const DEFAULT_FORM: CreateProjectForm = {
     clientName: '',
     clientId: '',
     contactPerson: null,
+    clientContactPersons: [],
+    caldimProjectManager: '',
+    caldimProjectManagerName: '',
+    caldimAssistantProjectManager: '',
+    caldimAssistantProjectManagerName: '',
     description: '',
     status: 'in_progress',
     location: '',
@@ -281,6 +292,7 @@ export default function AdminProjects() {
     const navigate = useNavigate();
     const { showMessage } = useMessage();
     const [projects, setProjects] = useState<Project[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [totalProjectsCount, setTotalProjectsCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -308,10 +320,11 @@ export default function AdminProjects() {
             setLoading(true);
             setError('');
 
-            const [projData, clientData, externalData] = await Promise.all([
+            const [projData, clientData, externalData, userData] = await Promise.all([
                 adminListProjects(),
                 adminListClients(),
-                adminListExternalProjects()
+                adminListExternalProjects(),
+                adminListUsers().catch(() => ({ users: [] }))
             ]);
 
             if (!projData || !Array.isArray(projData.projects)) {
@@ -320,6 +333,7 @@ export default function AdminProjects() {
 
             setClients(clientData.clients || []);
             setExternalProjects(externalData.projects || []);
+            setUsers(userData.users || []);
 
             const mapped = projData.projects.map((p: any) => ({
                 ...p,
@@ -400,6 +414,11 @@ export default function AdminProjects() {
                 clientName: selectedClient.name,
                 clientId: form.clientId,
                 contactPerson: form.contactPerson,
+                clientContactPersons: form.clientContactPersons,
+                caldimProjectManager: form.caldimProjectManager || undefined,
+                caldimProjectManagerName: form.caldimProjectManagerName || undefined,
+                caldimAssistantProjectManager: form.caldimAssistantProjectManager || undefined,
+                caldimAssistantProjectManagerName: form.caldimAssistantProjectManagerName || undefined,
                 description: form.description.trim(),
                 status: form.status,
                 trackingMode: form.trackingMode,
@@ -510,6 +529,11 @@ export default function AdminProjects() {
                 clientName: editTarget.clientName,
                 clientId: editTarget.clientId,
                 contactPerson: editTarget.contactPerson,
+                clientContactPersons: editTarget.clientContactPersons,
+                caldimProjectManager: editTarget.caldimProjectManager || undefined,
+                caldimProjectManagerName: editTarget.caldimProjectManagerName || undefined,
+                caldimAssistantProjectManager: editTarget.caldimAssistantProjectManager || undefined,
+                caldimAssistantProjectManagerName: editTarget.caldimAssistantProjectManagerName || undefined,
                 description: editTarget.description,
                 status: editTarget.status,
                 scopeOfWork: preparedScopeOfWork,
@@ -780,7 +804,7 @@ export default function AdminProjects() {
                                     value={form.clientId}
                                     onChange={(e) => {
                                         const cId = e.target.value;
-                                        setForm({ ...form, clientId: cId, contactPerson: null });
+                                        setForm({ ...form, clientId: cId, contactPerson: null, clientContactPersons: [] });
                                     }}
                                 >
                                     <option value="">Select a Client</option>
@@ -866,37 +890,146 @@ export default function AdminProjects() {
 
                             {form.clientId && (
                                 <div className="form-group">
-                                    <label className="form-label required">Contact Person</label>
+                                    <label className="form-label required">Client Contact Person</label>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                                         {clients.find(c => (c.id || c._id) === form.clientId)?.contacts.map((con, idx) => {
-                                            const isSelected = form.contactPerson?.email === con.email;
+                                            const isChecked = (form.clientContactPersons || []).some(c => c.email === con.email) || form.contactPerson?.email === con.email;
                                             return (
                                                 <label
                                                     key={idx}
                                                     style={{
                                                         display: 'flex', alignItems: 'flex-start', gap: 10,
-                                                        padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                        borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                        padding: '10px 14px', border: `1px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                        borderRadius: 6, cursor: 'pointer', background: isChecked ? 'var(--color-primary-light)' : '#fff',
                                                         transition: 'all 0.2s', margin: 0
                                                     }}
                                                 >
                                                     <input
-                                                        type="radio"
-                                                        name="contactPersonRadio"
-                                                        checked={isSelected}
-                                                        onChange={() => setForm({ ...form, contactPerson: con })}
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            const current = form.clientContactPersons || (form.contactPerson ? [form.contactPerson] : []);
+                                                            let updated: ClientContact[];
+                                                            if (e.target.checked) {
+                                                                updated = [...current, con];
+                                                            } else {
+                                                                updated = current.filter(c => c.email !== con.email);
+                                                            }
+                                                            setForm({
+                                                                ...form,
+                                                                clientContactPersons: updated,
+                                                                contactPerson: updated.length > 0 ? updated[0] : null
+                                                            });
+                                                        }}
                                                         style={{ marginTop: 2, cursor: 'pointer' }}
                                                     />
                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{con.name}</span>
-                                                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{con.email}</span>
+                                                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                                            {con.email}{con.phone ? ` • ${con.phone}` : ''}{con.designation ? ` (${con.designation})` : ''}
+                                                        </span>
                                                     </div>
                                                 </label>
-                                            )
+                                            );
                                         })}
                                     </div>
                                 </div>
                             )}
+
+                            {/* Caldim Contact Person (PM dropdown + APM radio button) */}
+                            <div className="form-group" style={{ marginTop: 12 }}>
+                                <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Caldim Contact Person</label>
+                                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div>
+                                        <label className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>Project Manager</label>
+                                        <select
+                                            className="form-control"
+                                            value={form.caldimProjectManager || ''}
+                                            onChange={(e) => {
+                                                const pmId = e.target.value;
+                                                const pmUser = users.find(u => (u.id || u._id) === pmId);
+                                                setForm({
+                                                    ...form,
+                                                    caldimProjectManager: pmId,
+                                                    caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
+                                                    caldimAssistantProjectManager: '',
+                                                    caldimAssistantProjectManagerName: ''
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Select Project Manager</option>
+                                            {users.filter(u => u.role === 'project_manager').map(u => (
+                                                <option key={u.id || u._id} value={u.id || u._id}>
+                                                    {u.displayName || u.username} ({u.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {form.caldimProjectManager && (() => {
+                                        const pmId = form.caldimProjectManager;
+                                        const apmsForPm = users.filter(u => {
+                                            if (u.role !== 'assistant_project_manager') return false;
+                                            const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : u.project_manager;
+                                            return userPm === pmId;
+                                        });
+                                        const displayApms = apmsForPm.length > 0 ? apmsForPm : users.filter(u => u.role === 'assistant_project_manager');
+
+                                        return (
+                                            <div style={{ marginTop: 4 }}>
+                                                <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
+                                                    Assistant Project Manager {apmsForPm.length === 0 && displayApms.length > 0 && <span style={{ fontWeight: 400, color: '#64748b' }}>(All APMs)</span>}
+                                                </label>
+                                                {displayApms.length === 0 ? (
+                                                    <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
+                                                        No Assistant Project Managers available.
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        {displayApms.map(apm => {
+                                                            const apmId = apm.id || apm._id;
+                                                            const isSelected = form.caldimAssistantProjectManager === apmId;
+                                                            return (
+                                                                <label
+                                                                    key={apmId}
+                                                                    style={{
+                                                                        display: 'flex', alignItems: 'center', gap: 10,
+                                                                        padding: '8px 12px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                        borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                        transition: 'all 0.2s', margin: 0
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="createCaldimApmRadio"
+                                                                        checked={isSelected}
+                                                                        onChange={() => {
+                                                                            setForm({
+                                                                                ...form,
+                                                                                caldimAssistantProjectManager: apmId,
+                                                                                caldimAssistantProjectManagerName: apm.displayName || apm.username
+                                                                            });
+                                                                        }}
+                                                                        style={{ cursor: 'pointer' }}
+                                                                    />
+                                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                                            {apm.displayName || apm.username}
+                                                                        </span>
+                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                            {apm.email}
+                                                                        </span>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
 
                             <div className="form-group">
                                 <label className="form-label required">Project Name</label>
@@ -1353,7 +1486,8 @@ export default function AdminProjects() {
                                     onClick={() => {
                                         const missing: string[] = [];
                                         if (!form.clientId) missing.push('Client / Organization');
-                                        if (!form.contactPerson) missing.push('Contact Person');
+                                        const hasContact = (form.clientContactPersons && form.clientContactPersons.length > 0) || form.contactPerson;
+                                        if (!hasContact) missing.push('Client Contact Person');
                                         if (!form.name.trim()) missing.push('Project Name');
                                         if (!form.year || isNaN(Number(form.year))) missing.push('Project Year');
                                         if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (form.lastTransmittalNumber === undefined || form.lastTransmittalNumber.toString().trim() === '')) {
@@ -1419,7 +1553,8 @@ export default function AdminProjects() {
                                                     ...editTarget,
                                                     clientName: selectedName,
                                                     clientId: selectedClient ? (selectedClient.id || selectedClient._id) : editTarget.clientId,
-                                                    contactPerson: undefined
+                                                    contactPerson: undefined,
+                                                    clientContactPersons: []
                                                 });
                                             }}
                                         >
@@ -1432,37 +1567,146 @@ export default function AdminProjects() {
 
                                     {editTarget.clientId && (
                                         <div className="form-group">
-                                            <label className="form-label required">Contact Person</label>
+                                            <label className="form-label required">Client Contact Person</label>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                                                 {clients.find(c => (c.id || c._id) === editTarget.clientId)?.contacts.map((con, idx) => {
-                                                    const isSelected = editTarget.contactPerson?.email === con.email;
+                                                    const isChecked = (editTarget.clientContactPersons || []).some(c => c.email === con.email) || editTarget.contactPerson?.email === con.email;
                                                     return (
                                                         <label
                                                             key={idx}
                                                             style={{
                                                                 display: 'flex', alignItems: 'flex-start', gap: 10,
-                                                                padding: '10px 14px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                padding: '10px 14px', border: `1px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                borderRadius: 6, cursor: 'pointer', background: isChecked ? 'var(--color-primary-light)' : '#fff',
                                                                 transition: 'all 0.2s', margin: 0
                                                             }}
                                                         >
                                                             <input
-                                                                type="radio"
-                                                                name="editContactPersonRadio"
-                                                                checked={isSelected}
-                                                                onChange={() => setEditTarget({ ...editTarget, contactPerson: con })}
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={(e) => {
+                                                                    const current = editTarget.clientContactPersons || (editTarget.contactPerson ? [editTarget.contactPerson] : []);
+                                                                    let updated: ClientContact[];
+                                                                    if (e.target.checked) {
+                                                                        updated = [...current, con];
+                                                                    } else {
+                                                                        updated = current.filter(c => c.email !== con.email);
+                                                                    }
+                                                                    setEditTarget({
+                                                                        ...editTarget,
+                                                                        clientContactPersons: updated,
+                                                                        contactPerson: updated.length > 0 ? updated[0] : undefined
+                                                                    });
+                                                                }}
                                                                 style={{ marginTop: 2, cursor: 'pointer' }}
                                                             />
                                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>{con.name}</span>
-                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{con.email}</span>
+                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                                                    {con.email}{con.phone ? ` • ${con.phone}` : ''}{con.designation ? ` (${con.designation})` : ''}
+                                                                </span>
                                                             </div>
                                                         </label>
-                                                    )
+                                                    );
                                                 })}
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Caldim Contact Person in Edit Modal */}
+                                    <div className="form-group" style={{ marginTop: 12 }}>
+                                        <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Caldim Contact Person</label>
+                                        <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            <div>
+                                                <label className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>Project Manager</label>
+                                                <select
+                                                    className="form-control"
+                                                    value={editTarget.caldimProjectManager || ''}
+                                                    onChange={(e) => {
+                                                        const pmId = e.target.value;
+                                                        const pmUser = users.find(u => (u.id || u._id) === pmId);
+                                                        setEditTarget({
+                                                            ...editTarget,
+                                                            caldimProjectManager: pmId,
+                                                            caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
+                                                            caldimAssistantProjectManager: '',
+                                                            caldimAssistantProjectManagerName: ''
+                                                        });
+                                                    }}
+                                                >
+                                                    <option value="">Select Project Manager</option>
+                                                    {users.filter(u => u.role === 'project_manager').map(u => (
+                                                        <option key={u.id || u._id} value={u.id || u._id}>
+                                                            {u.displayName || u.username} ({u.email})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {editTarget.caldimProjectManager && (() => {
+                                                const pmId = editTarget.caldimProjectManager;
+                                                const apmsForPm = users.filter(u => {
+                                                    if (u.role !== 'assistant_project_manager') return false;
+                                                    const userPm = typeof u.project_manager === 'object' ? (u.project_manager as any)?._id : u.project_manager;
+                                                    return userPm === pmId;
+                                                });
+                                                const displayApms = apmsForPm.length > 0 ? apmsForPm : users.filter(u => u.role === 'assistant_project_manager');
+
+                                                return (
+                                                    <div style={{ marginTop: 4 }}>
+                                                        <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
+                                                            Assistant Project Manager {apmsForPm.length === 0 && displayApms.length > 0 && <span style={{ fontWeight: 400, color: '#64748b' }}>(All APMs)</span>}
+                                                        </label>
+                                                        {displayApms.length === 0 ? (
+                                                            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
+                                                                No Assistant Project Managers available.
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                                {displayApms.map(apm => {
+                                                                    const apmId = apm.id || apm._id;
+                                                                    const isSelected = editTarget.caldimAssistantProjectManager === apmId;
+                                                                    return (
+                                                                        <label
+                                                                            key={apmId}
+                                                                            style={{
+                                                                                display: 'flex', alignItems: 'center', gap: 10,
+                                                                                padding: '8px 12px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                                borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                                transition: 'all 0.2s', margin: 0
+                                                                            }}
+                                                                        >
+                                                                            <input
+                                                                                type="radio"
+                                                                                name="editCaldimApmRadio"
+                                                                                checked={isSelected}
+                                                                                onChange={() => {
+                                                                                    setEditTarget({
+                                                                                        ...editTarget,
+                                                                                        caldimAssistantProjectManager: apmId,
+                                                                                        caldimAssistantProjectManagerName: apm.displayName || apm.username
+                                                                                    });
+                                                                                }}
+                                                                                style={{ cursor: 'pointer' }}
+                                                                            />
+                                                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                                                    {apm.displayName || apm.username}
+                                                                                </span>
+                                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                                    {apm.email}
+                                                                                </span>
+                                                                            </div>
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
 
                                     <div className="form-group">
                                         <label className="form-label">Description</label>
