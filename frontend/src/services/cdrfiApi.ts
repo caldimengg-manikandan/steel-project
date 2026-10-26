@@ -140,5 +140,38 @@ export const uploadCdrfiResponseAttachment = async (
 };
 
 export const getCdrfiViewPdfUrl = (projectId: string, extractionId: string): string => {
-    return `${BASE}/cdrfis/${String(projectId)}/${String(extractionId)}/view.pdf`;
+    const token = localStorage.getItem('token');
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${BASE}/cdrfis/${String(projectId)}/${String(extractionId)}/view.pdf${tokenParam}`;
+};
+
+export const getCdrfiAttachmentUrl = (projectId: string, extractionId?: string, rfiIndex?: number, rawUrl?: string): string => {
+    const token = localStorage.getItem('token');
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    if (projectId && extractionId && rfiIndex !== undefined && rfiIndex >= 0) {
+        return `${BASE}/cdrfis/${String(projectId)}/${String(extractionId)}/attachment/${rfiIndex}${tokenParam}`;
+    }
+    if (rawUrl) {
+        if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
+        const cleanBase = BASE.replace(/\/api$/, '');
+        return `${cleanBase}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+    }
+    return '#';
+};
+
+export const deleteCdrfiResponseAttachment = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number
+) => {
+    const res = await fetch(`${BASE}/cdrfis/${String(projectId)}/${String(extractionId)}/response/${rfiIndex}/attachment`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete response attachment');
+    }
+    return res.json();
 };

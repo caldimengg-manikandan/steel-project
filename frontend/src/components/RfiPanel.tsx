@@ -5,7 +5,8 @@ import {
     uploadRfiDrawing,
     listRfiExtractions,
     getRfiExcelDownloadUrl,
-    deleteRfiExtraction
+    deleteRfiExtraction,
+    getRfiAttachmentUrl
 } from '../services/rfiApi';
 import { IconUpload, IconTrash } from './Icons';
 import { isFullAccessUser } from '../types';
@@ -531,7 +532,7 @@ export default function RfiExtractionPanel({
                                                                             {rfi.responseAttachmentUrl && (
                                                                                 <div style={{ marginTop: 4 }}>
                                                                                     <a 
-                                                                                        href={rfi.responseAttachmentUrl} 
+                                                                                        href={getRfiAttachmentUrl(projectId, ext._id, ext.rfis.indexOf(rfi), rfi.responseAttachmentUrl)} 
                                                                                         target="_blank" 
                                                                                         rel="noreferrer"
                                                                                         style={{ fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}

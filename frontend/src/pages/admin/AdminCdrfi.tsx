@@ -9,6 +9,8 @@ import {
     deleteCdrfiExtraction,
     updateCdrfiResponse,
     uploadCdrfiResponseAttachment,
+    deleteCdrfiResponseAttachment,
+    getCdrfiAttachmentUrl,
     getCdrfiViewPdfUrl
 } from '../../services/cdrfiApi';
 import { useAuth } from '../../context/AuthContext';
@@ -345,10 +347,39 @@ export default function AdminCdrfi() {
                 );
                 return { ...ext, rfis: updatedRfis };
             }));
+            if (resData.rfi?.response) {
+                setResponseEdits(prev => ({ ...prev, [key]: resData.rfi.response }));
+            }
             setSavedResponse(prev => ({ ...prev, [key]: true }));
             setTimeout(() => setSavedResponse(prev => ({ ...prev, [key]: false })), 2000);
         } catch (err: any) {
             showMessage('Upload Failed', `Failed to upload attachment: ${err.message}`, 'error');
+        } finally {
+            setSavingResponse(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleDeleteAttachment = async (extractionId: string, rfiIndex: number) => {
+        if (!window.confirm('Are you sure you want to delete this attachment?')) return;
+        const key = `${extractionId}_${rfiIndex}`;
+        setSavingResponse(prev => ({ ...prev, [key]: true }));
+        try {
+            const resData = await deleteCdrfiResponseAttachment(
+                String(selectedProject._id || selectedProject.id),
+                extractionId,
+                rfiIndex
+            );
+            setExtractions(prev => prev.map(ext => {
+                if (ext._id !== extractionId) return ext;
+                const updatedRfis = ext.rfis.map((rfi: any, i: number) =>
+                    i === rfiIndex ? resData.rfi : rfi
+                );
+                return { ...ext, rfis: updatedRfis };
+            }));
+            setResponseEdits(prev => ({ ...prev, [key]: resData.rfi?.response || '' }));
+            showMessage('Attachment Deleted', 'Attachment removed successfully.', 'success');
+        } catch (err: any) {
+            showMessage('Delete Failed', `Failed to delete attachment: ${err.message}`, 'error');
         } finally {
             setSavingResponse(prev => ({ ...prev, [key]: false }));
         }
@@ -797,8 +828,8 @@ export default function AdminCdrfi() {
                                                             const { rfi, parent } = item;
                                                             const rfiIndexInOriginal = parent.rfis.findIndex((r: any) => r._id === rfi._id);
                                                             const key = `${parent._id}_${rfiIndexInOriginal}`;
-                                                            const isExp = expanded === key;
-                                                            const draftText = responseEdits[key] ?? rfi.response ?? '';
+                                                            const defaultResponse = rfi.response || (rfi.responseAttachmentName ? `[Attached]: ${rfi.responseAttachmentName}` : '');
+                                                            const draftText = responseEdits[key] !== undefined ? responseEdits[key] : defaultResponse;
                                                             const draftRemarks = remarksEdits[key] ?? rfi.remarks ?? '';
                                                             const draftClientRfi = clientRfiEdits[key] ?? rfi.clientRfiNumber ?? '';
                                                             const isSaving = savingResponse[key] || false;
@@ -863,9 +894,12 @@ export default function AdminCdrfi() {
                                                                                         <button onClick={() => document.getElementById(`att-${key}`)?.click()} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '10px 18px', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}><IconClip /> Attach PDF</button>
                                                                                         <input type="file" id={`att-${key}`} style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentUpload(parent._id, rfiIndexInOriginal, f); }} />
                                                                                         {rfi.responseAttachmentUrl && (
-                                                                                            <a href={rfi.responseAttachmentUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>
-                                                                                                📎 {rfi.responseAttachmentName || 'View Attachment'}
-                                                                                            </a>
+                                                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', padding: '4px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+                                                                                                <a href={getCdrfiAttachmentUrl(String(selectedProject._id || selectedProject.id), parent._id, rfiIndexInOriginal, rfi.responseAttachmentUrl)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 600, textDecoration: 'underline' }} title={rfi.responseAttachmentName || 'View Attachment'}>
+                                                                                                    📎 {rfi.responseAttachmentName || 'View Attachment'}
+                                                                                                </a>
+                                                                                                <button type="button" title="Delete attachment" onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(parent._id, rfiIndexInOriginal); }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: 13, lineHeight: 1, fontWeight: 'bold' }}>✕</button>
+                                                                                            </div>
                                                                                         )}
                                                                                     </div>
                                                                                 </div>
@@ -926,7 +960,8 @@ export default function AdminCdrfi() {
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                                                         {ext.rfis.map((rfi: any, i: number) => {
                                                                             const key = `${ext._id}_${i}`;
-                                                                            const draftText = responseEdits[key] ?? rfi.response ?? '';
+                                                                            const defaultResponse = rfi.response || (rfi.responseAttachmentName ? `[Attached]: ${rfi.responseAttachmentName}` : '');
+                                                                            const draftText = responseEdits[key] !== undefined ? responseEdits[key] : defaultResponse;
                                                                             const draftRemarks = remarksEdits[key] ?? rfi.remarks ?? '';
                                                                             const draftClientRfi = clientRfiEdits[key] ?? rfi.clientRfiNumber ?? '';
                                                                             const isSaving = savingResponse[key] || false;
@@ -961,9 +996,12 @@ export default function AdminCdrfi() {
                                                                                             <button onClick={() => document.getElementById(`att-${key}`)?.click()} style={{ background: '#f3f4f6', border: '1px solid #d1d5db', padding: '4px 8px', borderRadius: 4, fontSize: 11 }}><IconClip /></button>
                                                                                             <input type="file" id={`att-${key}`} style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentUpload(ext._id, i, f); }} />
                                                                                             {rfi.responseAttachmentUrl && (
-                                                                                                <a href={rfi.responseAttachmentUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>
-                                                                                                    📎 {rfi.responseAttachmentName || 'View Attachment'}
-                                                                                                </a>
+                                                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', padding: '3px 8px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+                                                                                                    <a href={getCdrfiAttachmentUrl(String(selectedProject._id || selectedProject.id), ext._id, i, rfi.responseAttachmentUrl)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#1d4ed8', fontWeight: 600, textDecoration: 'underline' }} title={rfi.responseAttachmentName || 'View Attachment'}>
+                                                                                                        📎 {rfi.responseAttachmentName || 'View Attachment'}
+                                                                                                    </a>
+                                                                                                    <button type="button" title="Delete attachment" onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(ext._id, i); }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: 13, lineHeight: 1, fontWeight: 'bold' }}>✕</button>
+                                                                                                </div>
                                                                                             )}
                                                                                         </div>
                                                                                     </div>

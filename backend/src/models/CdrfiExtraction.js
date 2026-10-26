@@ -12,6 +12,8 @@ const cdrfiItemSchema = new mongoose.Schema({
     closedOn: Date,
     responseAttachmentUrl: String,
     responseAttachmentName: String,
+    responseAttachmentGridFsId: { type: mongoose.Schema.Types.ObjectId },
+    responseAttachmentStorageGatewayPath: String,
     clientRfiNumber: { type: String, default: '' },
 });
 

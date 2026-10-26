@@ -143,10 +143,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// Normalize /steel/api prefix to /api so direct calls and variations work seamlessly across dev, preview, and hosted environments
+// Normalize /steel/api prefix to /api and /steel/uploads to /uploads so direct calls and variations work seamlessly across dev, preview, and hosted environments
 app.use((req, res, next) => {
     if (req.url.startsWith('/steel/api')) {
         req.url = req.url.replace(/^\/steel\/api/, '/api');
+    }
+    if (req.url.startsWith('/steel/uploads')) {
+        req.url = req.url.replace(/^\/steel\/uploads/, '/uploads');
     }
     next();
 });
@@ -183,9 +186,11 @@ initUploadDirectories();
 // â”€â”€ Serve uploaded files (PDFs, Excel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/steel/uploads', express.static(path.join(__dirname, '../uploads')));
 // Also serve project root uploads folder if present (e.g. /var/www/steel-project/uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, '../../uploads')));
+app.use('/steel/uploads', express.static(path.join(__dirname, '../../uploads')));
 // â”€â”€ Mail router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
     // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token

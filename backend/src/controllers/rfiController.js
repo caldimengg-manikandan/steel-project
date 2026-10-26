@@ -244,7 +244,9 @@ exports.updateRfiResponse = async (req, res) => {
         const reqRemarks = remarks !== undefined ? remarks : extraction.rfis[idx].remarks;
         const reqClientRfiNumber = clientRfiNumber !== undefined ? clientRfiNumber : extraction.rfis[idx].clientRfiNumber;
 
-        const hasResponse = reqResponse && reqResponse.trim() !== '';
+        const hasAttachment = !!(extraction.rfis[idx].responseAttachmentUrl || extraction.rfis[idx].responseAttachmentGridFsId);
+        const hasText = reqResponse && reqResponse.trim() !== '';
+        const hasResponse = hasText || hasAttachment;
 
         let newStatus = 'OPEN';
         if (reqStatus && ['OPEN', 'CLOSED'].includes(reqStatus.toUpperCase())) {
@@ -255,7 +257,13 @@ exports.updateRfiResponse = async (req, res) => {
 
         const oldStatus = extraction.rfis[idx].status;
 
-        extraction.rfis[idx].response = reqResponse || '';
+        // If response text is empty but an attachment exists, default to [Attached]: filename
+        let finalResponse = reqResponse || '';
+        if (!finalResponse.trim() && hasAttachment && extraction.rfis[idx].responseAttachmentName) {
+            finalResponse = `[Attached]: ${extraction.rfis[idx].responseAttachmentName}`;
+        }
+
+        extraction.rfis[idx].response = finalResponse;
         extraction.rfis[idx].remarks = reqRemarks || '';
         extraction.rfis[idx].clientRfiNumber = reqClientRfiNumber || '';
         extraction.rfis[idx].status = newStatus;
@@ -395,9 +403,58 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
             return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
         }
 
-        // Store the local URL for the response attachment
+        // 1. Persist to GridFS for cloud reliability across restarts
+        let gridFsId = null;
+        try {
+            const { getBucket } = require('../utils/gridfs');
+            const bucket = getBucket();
+            if (bucket && req.file.path && fs.existsSync(req.file.path)) {
+                const uploadStream = bucket.openUploadStream(req.file.filename, {
+                    contentType: req.file.mimetype || 'application/octet-stream',
+                    metadata: {
+                        originalName: req.file.originalname,
+                        projectId,
+                        extractionId: id,
+                        rfiIndex: idx,
+                        type: 'rfi-response-attachment'
+                    }
+                });
+                fs.createReadStream(req.file.path).pipe(uploadStream);
+                await new Promise((resolve) => {
+                    uploadStream.on('finish', () => {
+                        gridFsId = uploadStream.id;
+                        resolve();
+                    });
+                    uploadStream.on('error', (e) => {
+                        console.warn('[RfiAttachment] GridFS upload failed:', e.message);
+                        resolve();
+                    });
+                });
+            }
+        } catch (gfsErr) {
+            console.warn('[RfiAttachment] GridFS error:', gfsErr.message);
+        }
+
+        // 2. Persist to Storage Gateway if enabled
+        let storageGatewayPath = null;
+        try {
+            const storageGateway = require('../utils/storageGateway');
+            if (storageGateway.isEnabled() && req.file.path && fs.existsSync(req.file.path)) {
+                const project = await Project.findById(projectId).lean();
+                const safeProjectName = (project?.name || 'Project').replace(/[<>:"/\\|?*]/g, '_');
+                const targetDir = `Projects/${safeProjectName}/RFI_Attachments`;
+                await storageGateway.uploadFile(req.file.path, targetDir, req.file.filename);
+                storageGatewayPath = `${targetDir}/${req.file.filename}`;
+            }
+        } catch (sgErr) {
+            console.warn('[RfiAttachment] Storage Gateway upload error:', sgErr.message);
+        }
+
+        // Store the local URL & backup pointers for the response attachment
         extraction.rfis[idx].responseAttachmentUrl = `/uploads/steel-dms-uploads/${req.file.filename}`;
         extraction.rfis[idx].responseAttachmentName = req.file.originalname;
+        if (gridFsId) extraction.rfis[idx].responseAttachmentGridFsId = gridFsId;
+        if (storageGatewayPath) extraction.rfis[idx].responseAttachmentStorageGatewayPath = storageGatewayPath;
         extraction.rfis[idx].status = 'CLOSED';
         extraction.rfis[idx].closedOn = new Date();
 
@@ -418,7 +475,7 @@ exports.uploadRfiResponseAttachment = async (req, res) => {
     }
 };
 
-// Stream response attachment for a specific RFI item
+// Stream response attachment for a specific RFI item (Disk -> Storage Gateway -> GridFS fallback)
 exports.viewRfiAttachment = async (req, res) => {
     const { projectId, id, rfiIndex } = req.params;
     const idx = parseInt(rfiIndex, 10);
@@ -430,43 +487,174 @@ exports.viewRfiAttachment = async (req, res) => {
         }
 
         const rfi = doc.rfis[idx];
-        if (!rfi.responseAttachmentUrl) {
+        if (!rfi.responseAttachmentUrl && !rfi.responseAttachmentGridFsId && !rfi.responseAttachmentStorageGatewayPath) {
             return res.status(404).json({ error: 'No attachment found for this RFI item.' });
         }
 
-        const filename = path.basename(rfi.responseAttachmentUrl.replace(/\\/g, '/'));
-        const standardizedPath = path.join(__dirname, '../../uploads/steel-dms-uploads', filename);
-        const altPath = path.join(__dirname, '../uploads/steel-dms-uploads', filename);
-        const rootUploadsPath = path.join(__dirname, '../../../uploads/steel-dms-uploads', filename);
-        const directPath = path.isAbsolute(rfi.responseAttachmentUrl) ? rfi.responseAttachmentUrl : path.join(__dirname, '../../', rfi.responseAttachmentUrl);
-
-        let targetPath = null;
-        if (fs.existsSync(standardizedPath)) targetPath = standardizedPath;
-        else if (fs.existsSync(altPath)) targetPath = altPath;
-        else if (fs.existsSync(rootUploadsPath)) targetPath = rootUploadsPath;
-        else if (fs.existsSync(directPath)) targetPath = directPath;
-
-        if (!targetPath) {
-            return res.status(404).json({ error: 'Attachment file not found on disk.' });
-        }
-
-        const originalName = rfi.responseAttachmentName || filename;
+        const rawUrl = rfi.responseAttachmentUrl || '';
+        const filename = rawUrl ? path.basename(rawUrl.replace(/\\/g, '/')) : '';
+        const originalName = rfi.responseAttachmentName || filename || 'attachment';
         const ext = path.extname(originalName).toLowerCase();
         const contentTypes = {
             '.pdf': 'application/pdf',
             '.png': 'image/png',
             '.jpg': 'image/jpeg',
             '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
             '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            '.doc': 'application/msword',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.xls': 'application/vnd.ms-excel',
+            '.csv': 'text/csv',
+            '.txt': 'text/plain'
         };
 
-        res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
-        return fs.createReadStream(targetPath).pipe(res);
+        // 1. Try local disk paths
+        if (filename) {
+            const candidatePaths = [
+                path.join(__dirname, '../../uploads/steel-dms-uploads', filename),
+                path.join(__dirname, '../../../uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'backend/uploads/steel-dms-uploads', filename),
+            ];
+
+            for (const p of candidatePaths) {
+                if (fs.existsSync(p)) {
+                    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+                    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
+                    return fs.createReadStream(p).pipe(res);
+                }
+            }
+        }
+
+        // 2. Try Storage Gateway
+        if (rfi.responseAttachmentStorageGatewayPath) {
+            try {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled() && await storageGateway.fileExists(rfi.responseAttachmentStorageGatewayPath)) {
+                    const stream = await storageGateway.getFileStream(rfi.responseAttachmentStorageGatewayPath);
+                    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+                    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
+                    return stream.pipe(res);
+                }
+            } catch (sgErr) {
+                console.warn('[RfiAttachment] Storage Gateway stream error:', sgErr.message);
+            }
+        }
+
+        // 3. Try GridFS
+        try {
+            const { getBucket } = require('../utils/gridfs');
+            const bucket = getBucket();
+            if (bucket) {
+                let fileId = rfi.responseAttachmentGridFsId;
+                if (!fileId && filename) {
+                    const gfile = await bucket.find({ filename }).next();
+                    if (gfile) fileId = gfile._id;
+                }
+                if (fileId) {
+                    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+                    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
+                    const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
+                    return downloadStream.pipe(res);
+                }
+            }
+        } catch (gfsErr) {
+            console.warn('[RfiAttachment] GridFS stream error:', gfsErr.message);
+        }
+
+        return res.status(404).json({ error: 'Attachment file not found on disk or remote storage.' });
     } catch (err) {
         console.error('[RfiController] viewRfiAttachment failed:', err);
         res.status(500).json({ error: 'Internal error viewing attachment.' });
+    }
+};
+
+// Delete response attachment from an RFI item
+exports.deleteRfiResponseAttachment = async (req, res) => {
+    const { projectId, id, rfiIndex } = req.params;
+    const idx = parseInt(rfiIndex, 10);
+
+    if (isNaN(idx) || idx < 0) {
+        return res.status(400).json({ error: 'Invalid rfiIndex.' });
+    }
+
+    try {
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
+        if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
+
+        if (!extraction.rfis || !extraction.rfis[idx]) {
+            return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
+        }
+
+        const rfi = extraction.rfis[idx];
+        if (!rfi.responseAttachmentUrl && !rfi.responseAttachmentGridFsId && !rfi.responseAttachmentStorageGatewayPath) {
+            return res.status(400).json({ error: 'No attachment found on this RFI item.' });
+        }
+
+        // 1. Delete from local disk
+        if (rfi.responseAttachmentUrl) {
+            const filename = path.basename(rfi.responseAttachmentUrl.replace(/\\/g, '/'));
+            const candidatePaths = [
+                path.join(__dirname, '../../uploads/steel-dms-uploads', filename),
+                path.join(__dirname, '../../../uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'backend/uploads/steel-dms-uploads', filename),
+            ];
+            candidatePaths.forEach(p => {
+                if (fs.existsSync(p)) {
+                    try { fs.unlinkSync(p); } catch (_) {}
+                }
+            });
+        }
+
+        // 2. Delete from GridFS
+        if (rfi.responseAttachmentGridFsId) {
+            try {
+                const { getBucket } = require('../utils/gridfs');
+                const bucket = getBucket();
+                if (bucket) {
+                    await bucket.delete(new mongoose.Types.ObjectId(rfi.responseAttachmentGridFsId));
+                }
+            } catch (gfsErr) {
+                console.warn('[RfiAttachment] GridFS delete error:', gfsErr.message);
+            }
+        }
+
+        // 3. Delete from Storage Gateway
+        if (rfi.responseAttachmentStorageGatewayPath) {
+            try {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled()) {
+                    await storageGateway.deleteFile(rfi.responseAttachmentStorageGatewayPath);
+                }
+            } catch (sgErr) {
+                console.warn('[RfiAttachment] Storage Gateway delete error:', sgErr.message);
+            }
+        }
+
+        // If response text was auto-set to `[Attached]: <file>`, clean it up
+        if (rfi.response && rfi.responseAttachmentName && rfi.response.trim() === `[Attached]: ${rfi.responseAttachmentName}`) {
+            extraction.rfis[idx].response = '';
+            extraction.rfis[idx].status = 'OPEN';
+            extraction.rfis[idx].closedOn = undefined;
+        }
+
+        extraction.rfis[idx].responseAttachmentUrl = undefined;
+        extraction.rfis[idx].responseAttachmentName = undefined;
+        extraction.rfis[idx].responseAttachmentGridFsId = undefined;
+        extraction.rfis[idx].responseAttachmentStorageGatewayPath = undefined;
+
+        await extraction.save();
+
+        res.json({
+            message: 'Attachment deleted successfully.',
+            rfi: extraction.rfis[idx]
+        });
+    } catch (err) {
+        console.error('[RfiController] deleteRfiResponseAttachment error:', err);
+        res.status(500).json({ error: 'Failed to delete attachment.' });
     }
 };
 
