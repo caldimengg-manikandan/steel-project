@@ -20,6 +20,19 @@ async function handleResponse(res: Response) {
     return data;
 }
 
+function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+    const headers = new Headers(options.headers || {});
+    if (token && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+    return fetch(url, {
+        ...options,
+        credentials: options.credentials || 'include',
+        headers,
+    });
+}
+
 /**
  * List all projects for the admin
  */
@@ -28,7 +41,7 @@ export async function adminListProjects(status?: string, search?: string): Promi
     if (status) params.append('status', status);
     if (search) params.append('search', search);
 
-    const res = await fetch(`${BASE}/admin/projects?${params.toString()}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects?${params.toString()}`, {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
     });
@@ -59,7 +72,7 @@ export async function adminCreateProject(data: {
     connectionDesignEmail?: string;
     creationDate?: string;
 }): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -75,7 +88,7 @@ export async function adminAssignUser(projectId: string, data: {
     userId: string;
     permission: 'viewer' | 'editor' | 'admin';
 }): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/assignments`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -88,7 +101,7 @@ export async function adminAssignUser(projectId: string, data: {
  * List projects for regular user (assigned to them)
  */
 export async function userListProjects(): Promise<{ projects: Project[]; recentActivity?: any[] }> {
-    const res = await fetch(`${BASE}/user/projects`, {
+    const res = await fetchWithAuth(`${BASE}/user/projects`, {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
     });
@@ -99,13 +112,13 @@ export async function userListProjects(): Promise<{ projects: Project[]; recentA
  * Get a single project by ID (scoped check on backend)
  */
 export async function getProjectById(id: string): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(id)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(id)}`, {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
     });
     // Fallback try user route if admin fails (or just simplify backend)
     if (!res.ok && res.status === 403) {
-        const resUser = await fetch(`${BASE}/user/projects/${String(id)}`, {
+        const resUser = await fetchWithAuth(`${BASE}/user/projects/${String(id)}`, {
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -118,7 +131,7 @@ export async function getProjectById(id: string): Promise<{ project: Project }> 
  * Remove a user from a project
  */
 export async function adminRemoveUserAssignment(projectId: string, userId: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/assignments/${String(userId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/assignments/${String(userId)}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -130,7 +143,7 @@ export async function adminRemoveUserAssignment(projectId: string, userId: strin
  * Delete a project (Admin)
  */
 export async function adminDeleteProject(projectId: string): Promise<{ message: string }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -142,7 +155,7 @@ export async function adminDeleteProject(projectId: string): Promise<{ message: 
  * Update a project (Admin)
  */
 export async function adminUpdateProject(projectId: string, data: Partial<CreateProjectForm>): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -162,7 +175,7 @@ export async function updateProjectSequences(projectId: string, sequences: Array
     deadline?: string;
 }>): Promise<{ project: Project }> {
     // Try Admin endpoint first
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -171,7 +184,7 @@ export async function updateProjectSequences(projectId: string, sequences: Array
 
     if (res.status === 403) {
         // Try User endpoint specifically for sequences
-        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
+        const resUser = await fetchWithAuth(`${BASE}/user/projects/${String(projectId)}/sequences`, {
             method: 'PATCH',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -196,7 +209,7 @@ export async function updateProjectScopeOfWork(projectId: string, scopeOfWork: A
     fabricationDate?: string | null;
     sequences?: any[];
 }>): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +217,7 @@ export async function updateProjectScopeOfWork(projectId: string, scopeOfWork: A
     });
 
     if (res.status === 403) {
-        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
+        const resUser = await fetchWithAuth(`${BASE}/user/projects/${String(projectId)}/sequences`, {
             method: 'PATCH',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -226,7 +239,7 @@ export async function updateProjectAdditionalScopeOfWork(projectId: string, addi
     fabrication?: number; 
     status?: string; 
 }>): Promise<{ project: Project }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -234,7 +247,7 @@ export async function updateProjectAdditionalScopeOfWork(projectId: string, addi
     });
 
     if (res.status === 403) {
-        const resUser = await fetch(`${BASE}/user/projects/${String(projectId)}/sequences`, {
+        const resUser = await fetchWithAuth(`${BASE}/user/projects/${String(projectId)}/sequences`, {
             method: 'PATCH',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -281,7 +294,7 @@ export async function adminUploadCOR(projectId: string, file: File): Promise<{ m
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/cor`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/cor`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -294,7 +307,7 @@ export async function adminUploadCOR(projectId: string, file: File): Promise<{ m
  * Triggers a browser download using a temporary anchor element.
  */
 export async function downloadProjectStatusExcel(): Promise<void> {
-    const res = await fetch(`${BASE}/admin/projects/status/excel`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/status/excel`, {
         credentials: 'include',
     });
 
@@ -327,7 +340,7 @@ export async function adminListExternalProjects(): Promise<{
     projects: any[];
     error?: string;
 }> {
-    const res = await fetch(`${BASE}/admin/projects/external`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/external`, {
         credentials: 'include',
     });
     return handleResponse(res);
@@ -340,7 +353,7 @@ export async function updateProjectAllocations(
     projectId: string,
     allocations: Array<{ userId: string; permission: 'viewer' | 'editor' | 'admin' }>
 ): Promise<{ project: Project; message: string }> {
-    const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/allocations`, {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/allocations`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

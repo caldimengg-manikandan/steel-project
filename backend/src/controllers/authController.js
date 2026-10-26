@@ -60,10 +60,11 @@ async function adminLogin(req, res) {
             adminId: admin._id.toString(),
         });
 
+        const isProd = process.env.NODE_ENV === 'production';
         res.cookie('sdms_token', token, {
             httpOnly: true,
-            secure: true,
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: isProd ? 'none' : 'lax',
             maxAge: 8 * 60 * 60 * 1000
         });
         
@@ -123,10 +124,11 @@ async function userLogin(req, res) {
             adminId: user.adminId.toString(),
         });
 
+        const isProd = process.env.NODE_ENV === 'production';
         res.cookie('sdms_token', token, {
             httpOnly: true,
-            secure: true,
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: isProd ? 'none' : 'lax',
             maxAge: 8 * 60 * 60 * 1000
         });
         

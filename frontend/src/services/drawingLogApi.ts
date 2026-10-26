@@ -1,7 +1,7 @@
-const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+import { BASE, fetchWithAuth } from './apiClient';
 
 export const fetchDrawingLogProjects = async () => {
-    const res = await fetch(`${BASE}/drawing-log/projects`, {
+    const res = await fetchWithAuth(`${BASE}/drawing-log/projects`, {
         credentials: 'include'
     });
     if (!res.ok) throw new Error('Failed to fetch drawing log projects');
@@ -9,7 +9,7 @@ export const fetchDrawingLogProjects = async () => {
 };
 
 export const fetchDrawingLog = async (projectId: string) => {
-    const res = await fetch(`${BASE}/drawing-log/${projectId}`, {
+    const res = await fetchWithAuth(`${BASE}/drawing-log/${projectId}`, {
         credentials: 'include'
     });
     if (!res.ok) {
@@ -22,7 +22,6 @@ export const fetchDrawingLog = async (projectId: string) => {
 };
 
 export const getDrawingLogDownloadUrl = (projectId: string) => {
-    const token = localStorage.getItem('token');
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
     return `${BASE}/drawing-log/${projectId}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 };
-

@@ -11,6 +11,14 @@ import type { DrawingExtraction } from '../types';
 
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
+function getAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...extra,
+    };
+}
+
 // ── Response handler ─────────────────────────────────────
 async function handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {
@@ -57,6 +65,7 @@ export async function uploadDrawing(
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/upload`, {
         method: 'POST',
         credentials: 'include',
+        headers: getAuthHeaders(),
         body: form,
     });
     return handleResponse(res);
@@ -69,7 +78,8 @@ export async function listExtractions(projectId: string): Promise<{
     excelDownloadUrl: string | null;
 }> {
     const res = await fetch(`${BASE}/extractions/${String(projectId)}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders(),
     });
     return handleResponse(res);
 }
@@ -81,7 +91,7 @@ export async function reprocessExtraction(
 ): Promise<{ message: string; status: string }> {
     const res = await fetch(
         `${BASE}/extractions/${String(projectId)}/${String(extractionId)}/reprocess`,
-        { method: 'POST', credentials: 'include' }
+        { method: 'POST', credentials: 'include', headers: getAuthHeaders() }
     );
     return handleResponse(res);
 }
@@ -93,7 +103,7 @@ export async function deleteExtraction(
 ): Promise<{ message: string }> {
     const res = await fetch(
         `${BASE}/extractions/${String(projectId)}/${String(extractionId)}`,
-        { method: 'DELETE', credentials: 'include' }
+        { method: 'DELETE', credentials: 'include', headers: getAuthHeaders() }
     );
     return handleResponse(res);
 }
@@ -128,9 +138,9 @@ export async function checkDuplicates(
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/check-duplicates`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
+        headers: getAuthHeaders({
             'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({ filenames }),
     });
     return handleResponse(res);
@@ -141,7 +151,8 @@ export async function reserveTransmittalNumber(
 ): Promise<{ transmittalNumber: number }> {
     const res = await fetch(`${BASE}/admin/projects/${String(projectId)}/reserve-transmittal`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders(),
     });
     return handleResponse(res);
 }
@@ -155,9 +166,9 @@ export async function resolveDuplicateExtraction(
     const res = await fetch(`${BASE}/extractions/${String(projectId)}/${extractionId}/resolve-duplicate`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
+        headers: getAuthHeaders({
             'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({ action }),
     });
     return handleResponse(res);

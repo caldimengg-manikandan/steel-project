@@ -1,12 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || '/steel/api';
-
-async function handleResponse(res: Response) {
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'API Request failed');
-    }
-    return res.json();
-}
+import { BASE, fetchWithAuth, handleResponse } from './apiClient';
 
 export interface Team {
     _id: string;
@@ -18,7 +10,7 @@ export interface Team {
 }
 
 export async function adminCreateTeam(payload: { name: string; lead: string[]; members: string[] }) {
-    const res = await fetch(`${BASE}/admin/teams`, {
+    const res = await fetchWithAuth(`${BASE}/admin/teams`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +20,7 @@ export async function adminCreateTeam(payload: { name: string; lead: string[]; m
 }
 
 export async function adminListTeams() {
-    const res = await fetch(`${BASE}/admin/teams`, {
+    const res = await fetchWithAuth(`${BASE}/admin/teams`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -37,7 +29,7 @@ export async function adminListTeams() {
 }
 
 export async function adminDeleteTeam(id: string) {
-    const res = await fetch(`${BASE}/admin/teams/${id}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/teams/${id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -46,7 +38,7 @@ export async function adminDeleteTeam(id: string) {
 }
 
 export async function adminUpdateTeam(id: string, payload: { name: string; lead: string[]; members: string[] }) {
-    const res = await fetch(`${BASE}/admin/teams/${id}`, {
+    const res = await fetchWithAuth(`${BASE}/admin/teams/${id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
