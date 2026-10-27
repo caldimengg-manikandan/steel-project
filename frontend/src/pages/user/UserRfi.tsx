@@ -354,7 +354,7 @@ export default function UserRfi() {
             setExtractions(prev => prev.map(ext => {
                 if (ext._id !== extractionId) return ext;
                 const updatedRfis = ext.rfis.map((rfi: any, i: number) =>
-                    i === rfiIndex ? resData.rfi : rfi
+                    i === rfiIndex ? { ...resData.rfi, status: 'CLOSED' } : rfi
                 );
                 return { ...ext, rfis: updatedRfis };
             }));
@@ -407,6 +407,12 @@ export default function UserRfi() {
         queued: { label: 'Queued', color: '#374151', bg: '#f3f4f6', dot: '#9ca3af' },
     };
 
+    const isRfiClosed = (r: any): boolean => {
+        if ((r?.status || '').toUpperCase() === 'CLOSED') return true;
+        if (r?.responseAttachmentUrl || r?.responseAttachmentName || r?.responseAttachmentGridFsId || r?.responseAttachmentStorageGatewayPath) return true;
+        return false;
+    };
+
     const StatusChip = ({ status, rfis }: { status: string; rfis?: any[] }) => {
         if (status === 'processing') return <span className="badge badge-warning">Parsing...</span>;
         if (status === 'queued') return <span className="badge badge-neutral">Queued</span>;
@@ -417,7 +423,7 @@ export default function UserRfi() {
             return <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>—</span>;
         }
 
-        const allClosed = items.every((r: any) => (r.status || '').toUpperCase() === 'CLOSED');
+        const allClosed = items.length > 0 && items.every(isRfiClosed);
 
         if (allClosed) {
             return (
@@ -889,7 +895,7 @@ export default function UserRfi() {
                                                                             <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{rfi.description.substring(0, 40)}...</span>
                                                                         </div>
                                                                     </div>
-                                                                    {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                    {isRfiClosed(rfi) ? (
                                                                         <span title="Closed" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 700, width: 'fit-content' }}>
                                                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                                 <polyline points="20 6 9 17 4 12" />
@@ -990,8 +996,8 @@ export default function UserRfi() {
                                                         </div>
                                                         <StatusChip status={ext.status} rfis={ext.rfis} />
                                                         <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: (ext.rfis?.length || 0) > 0 ? '#2563eb' : '#94a3b8' }}>{ext.rfis?.length || 0}</span>
-                                                        <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: (ext.rfis || []).some((r: any) => (r.status || '').toUpperCase() !== 'CLOSED') ? '#dc2626' : '#16a34a' }}>
-                                                            {(ext.rfis || []).filter((r: any) => (r.status || '').toUpperCase() !== 'CLOSED').length}
+                                                        <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: (ext.rfis || []).filter((r: any) => !isRfiClosed(r)).length > 0 ? '#dc2626' : '#16a34a' }}>
+                                                            {(ext.rfis || []).filter((r: any) => !isRfiClosed(r)).length}
                                                         </span>
                                                         <span style={{ fontSize: 12 }}>{ext.uploadedBy}</span>
                                                         <span style={{ fontSize: 12 }}>{formatDate(ext.createdAt)}</span>
@@ -1044,8 +1050,8 @@ export default function UserRfi() {
                                                                     </div>
                                                                     <div>
                                                                         <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
-                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: (rfi.status || '').toUpperCase() === 'CLOSED' ? '#dcfce7' : '#fee2e2', color: (rfi.status || '').toUpperCase() === 'CLOSED' ? '#16a34a' : '#dc2626', fontSize: 11, fontWeight: 700 }}>
-                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: isRfiClosed(rfi) ? '#dcfce7' : '#fee2e2', color: isRfiClosed(rfi) ? '#16a34a' : '#dc2626', fontSize: 11, fontWeight: 700 }}>
+                                                                            {isRfiClosed(rfi) ? (
                                                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                                     <polyline points="20 6 9 17 4 12" />
                                                                                 </svg>
@@ -1055,7 +1061,7 @@ export default function UserRfi() {
                                                                                     <line x1="6" y1="6" x2="18" y2="18" />
                                                                                 </svg>
                                                                             )}
-                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? 'Closed' : 'Open'}
+                                                                            {isRfiClosed(rfi) ? 'Closed' : 'Open'}
                                                                         </div>
                                                                     </div>
                                                                 </div>

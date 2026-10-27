@@ -141,6 +141,17 @@ exports.listCdrfiExtractions = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Any CDRFI that has a response attachment uploaded must be considered closed
+        for (const ext of extractions) {
+            if (Array.isArray(ext.rfis)) {
+                for (const r of ext.rfis) {
+                    if (r.responseAttachmentUrl || r.responseAttachmentName || r.responseAttachmentGridFsId || r.responseAttachmentStorageGatewayPath) {
+                        r.status = 'CLOSED';
+                    }
+                }
+            }
+        }
+
         res.json({ extractions });
     } catch (err) {
         console.error('[CdrfiController] list error:', err);

@@ -61,6 +61,16 @@ const chatMessageSchema = new mongoose.Schema(
             enum: ['sent', 'delivered', 'read'],
             default: 'sent',
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+        },
+        deletedAt: {
+            type: Date,
+        },
+        deletedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+        },
     },
     {
         timestamps: true,

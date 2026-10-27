@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Conversation, ChatMessage, ChatAttachment } from './chatTypes';
-import { fetchMessages, sendMessage, markAsRead } from './chatApi';
+import { fetchMessages, sendMessage, markAsRead, deleteMessage } from './chatApi';
 import { MessageInput } from './MessageInput';
 
 interface ConversationViewProps {
@@ -17,6 +17,8 @@ interface ConversationViewProps {
     onTyping: () => void;
     onStopTyping: () => void;
     onMessageSent?: (msg: ChatMessage) => void;
+    onMessageDeleted?: (messageId: string) => void;
+    deletedMessageEvent?: { conversationId: string; messageId: string } | null;
 }
 
 function formatMsgTime(dateStr: string): string {
@@ -39,7 +41,18 @@ function formatDateSeparator(dateStr: string): string {
 
 function isImageMime(mime: string, filename: string): boolean {
     if (mime?.startsWith('image/')) return true;
-    return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(filename);
+}
+
+function getFileTypeBadge(filename: string): { label: string; className: string } {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (ext === 'pdf') return { label: 'PDF', className: 'cw-badge-pdf' };
+    if (['xls', 'xlsx', 'csv', 'xlsm', 'xlsb'].includes(ext)) return { label: ext.toUpperCase(), className: 'cw-badge-xls' };
+    if (['doc', 'docx', 'rtf'].includes(ext)) return { label: ext.toUpperCase(), className: 'cw-badge-doc' };
+    if (['ppt', 'pptx'].includes(ext)) return { label: ext.toUpperCase(), className: 'cw-badge-ppt' };
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return { label: ext.toUpperCase(), className: 'cw-badge-zip' };
+    if (['dwg', 'dxf', 'dwf', 'ifc'].includes(ext)) return { label: ext.toUpperCase(), className: 'cw-badge-cad' };
+    return { label: ext ? ext.toUpperCase() : 'FILE', className: 'cw-badge-file' };
 }
 
 function formatFileSize(bytes: number): string {
@@ -58,12 +71,15 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
     onTyping,
     onStopTyping,
     onMessageSent,
+    onMessageDeleted,
+    deletedMessageEvent,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const [oldestCursor, setOldestCursor] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const streamRef = useRef<HTMLDivElement>(null);
     const isAtBottomRef = useRef(true);
@@ -127,6 +143,18 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         }
     }, [conversation.lastMessage, conversation._id, scrollToBottom]);
 
+    // Handle real-time message deletion from socket
+    useEffect(() => {
+        if (deletedMessageEvent && deletedMessageEvent.conversationId === conversation._id) {
+            setMessages(prev => prev.map(m => m._id === deletedMessageEvent.messageId ? {
+                ...m,
+                isDeleted: true,
+                content: 'This message was deleted',
+                attachments: [],
+            } : m));
+        }
+    }, [deletedMessageEvent, conversation._id]);
+
     const handleLoadOlder = async () => {
         if (!oldestCursor || isLoadingOlder) return;
         setIsLoadingOlder(true);
@@ -158,6 +186,27 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         setMessages(prev => [...prev, newMsg]);
         setTimeout(() => scrollToBottom(true), 50);
         if (onMessageSent) onMessageSent(newMsg);
+    };
+
+    const handleDeleteMessage = async (msgId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!window.confirm('Delete this message for everyone?')) return;
+        setDeletingId(msgId);
+        try {
+            await deleteMessage(conversation._id, msgId);
+            setMessages(prev => prev.map(m => m._id === msgId ? {
+                ...m,
+                isDeleted: true,
+                content: 'This message was deleted',
+                attachments: [],
+            } : m));
+            if (onMessageDeleted) onMessageDeleted(msgId);
+        } catch (err: any) {
+            console.error('Failed to delete message:', err);
+            alert(err.message || 'Failed to delete message.');
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     return (
@@ -229,6 +278,37 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                         const showDate = !prevMsg || new Date(msg.createdAt).toDateString() !== new Date(prevMsg.createdAt).toDateString();
                         const isRead = isOutgoing && msg.readBy?.some(r => String(r.userId) !== String(currentUserId));
 
+                        if (msg.isDeleted) {
+                            return (
+                                <React.Fragment key={msg._id || index}>
+                                    {showDate && (
+                                        <div className="cw-date-divider">
+                                            {formatDateSeparator(msg.createdAt)}
+                                        </div>
+                                    )}
+                                    <div className={`cw-msg-row ${isOutgoing ? 'cw-outgoing' : 'cw-incoming'}`}>
+                                        {!isOutgoing && isGroup && (
+                                            <div className="cw-msg-sender-name">
+                                                {msg.senderName}
+                                            </div>
+                                        )}
+                                        <div className="cw-msg-bubble-wrap">
+                                            <div className="cw-msg-bubble cw-msg-bubble-deleted">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13" style={{ opacity: 0.7, flexShrink: 0 }}>
+                                                    <circle cx="12" cy="12" r="10" />
+                                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                                </svg>
+                                                <span>This message was deleted</span>
+                                            </div>
+                                        </div>
+                                        <div className="cw-msg-footer">
+                                            <span>{formatMsgTime(msg.createdAt)}</span>
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            );
+                        }
+
                         return (
                             <React.Fragment key={msg._id || index}>
                                 {showDate && (
@@ -243,56 +323,77 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                                             {msg.senderName}
                                         </div>
                                     )}
+                                    <div className="cw-msg-bubble-wrap">
+                                        <div className="cw-msg-bubble">
+                                            {msg.content && <div style={{ marginBottom: msg.attachments?.length ? 6 : 0 }}>{msg.content}</div>}
 
-                                    <div className="cw-msg-bubble">
-                                        {msg.content && <div>{msg.content}</div>}
+                                            {/* Attachments */}
+                                            {msg.attachments?.map((att, attIdx) => {
+                                                const isImg = isImageMime(att.mimetype, att.filename);
+                                                const backendOrigin = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
+                                                const fileUrl = att.url?.startsWith('http') ? att.url : `${backendOrigin}${att.url}`;
 
-                                        {/* Attachments */}
-                                        {msg.attachments?.map((att, attIdx) => {
-                                            const isImg = isImageMime(att.mimetype, att.filename);
-                                            const backendOrigin = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
-                                            const fileUrl = att.url?.startsWith('http') ? att.url : `${backendOrigin}${att.url}`;
+                                                if (isImg) {
+                                                    return (
+                                                        <a
+                                                            key={attIdx}
+                                                            href={fileUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            style={{ display: 'block' }}
+                                                        >
+                                                            <img
+                                                                src={fileUrl}
+                                                                alt={att.originalName || att.filename}
+                                                                className="cw-attachment-img"
+                                                            />
+                                                        </a>
+                                                    );
+                                                }
 
-                                            if (isImg) {
+                                                const badge = getFileTypeBadge(att.originalName || att.filename);
                                                 return (
                                                     <a
                                                         key={attIdx}
                                                         href={fileUrl}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
+                                                        className="cw-attachment-card"
+                                                        title={`Open ${att.originalName || att.filename}`}
                                                     >
-                                                        <img
-                                                            src={fileUrl}
-                                                            alt={att.originalName || att.filename}
-                                                            className="cw-attachment-img"
-                                                        />
+                                                        <span className={`cw-attach-badge ${badge.className}`}>{badge.label}</span>
+                                                        <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {att.originalName || att.filename}
+                                                        </span>
+                                                        {att.size > 0 && (
+                                                            <span style={{ fontSize: '10.5px', opacity: 0.75 }}>
+                                                                ({formatFileSize(att.size)})
+                                                            </span>
+                                                        )}
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13" style={{ marginLeft: 'auto', opacity: 0.7, flexShrink: 0 }}>
+                                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                            <polyline points="7 10 12 15 17 10" />
+                                                            <line x1="12" y1="15" x2="12" y2="3" />
+                                                        </svg>
                                                     </a>
                                                 );
-                                            }
+                                            })}
+                                        </div>
 
-                                            return (
-                                                <a
-                                                    key={attIdx}
-                                                    href={fileUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="cw-attachment-card"
-                                                >
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                                        <polyline points="14 2 14 8 20 8" />
-                                                    </svg>
-                                                    <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {att.originalName || att.filename}
-                                                    </span>
-                                                    {att.size > 0 && (
-                                                        <span style={{ fontSize: '10.5px', opacity: 0.75 }}>
-                                                            ({formatFileSize(att.size)})
-                                                        </span>
-                                                    )}
-                                                </a>
-                                            );
-                                        })}
+                                        {isOutgoing && (
+                                            <button
+                                                type="button"
+                                                className="cw-msg-delete-btn"
+                                                title="Delete message for everyone"
+                                                onClick={(e) => handleDeleteMessage(msg._id, e)}
+                                                disabled={deletingId === msg._id}
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
+                                                    <polyline points="3 6 5 6 21 6" />
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                </svg>
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="cw-msg-footer">

@@ -286,7 +286,7 @@ exports.sendMessage = async (req, res) => {
         }
     });
 
-    const preview = sanitizedContent || (attachments.length > 0 ? `📎 ${attachments[0].filename || 'Attachment'}` : '');
+    const preview = sanitizedContent || (attachments.length > 0 ? `📎 ${attachments[0].originalName || attachments[0].filename || 'Attachment'}` : '');
     conversation.lastMessage = message._id;
     conversation.lastMessagePreview = preview;
     conversation.lastMessageAt = message.createdAt;
@@ -465,3 +465,111 @@ exports.uploadAttachment = async (req, res) => {
         },
     });
 };
+
+/**
+ * Delete a message (real-time broadcast to all participants)
+ * DELETE /api/chat/conversations/:id/messages/:messageId
+ */
+exports.deleteMessage = async (req, res) => {
+    try {
+        const userId = req.principal.id;
+        const conversationId = req.params.id;
+        const messageId = req.params.messageId;
+
+        if (!mongoose.Types.ObjectId.isValid(conversationId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+            return res.status(400).json({ error: 'Invalid conversation or message ID' });
+        }
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        const isParticipant = conversation.participants.some(p => p.toString() === userId);
+        if (!isParticipant) {
+            return res.status(403).json({ error: 'Access denied to this conversation.' });
+        }
+
+        const message = await ChatMessage.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+
+        // Permission: sender or admin
+        const isSender = message.senderId.toString() === userId;
+        const isAdmin = ['admin', 'superadmin', 'project_manager'].includes(req.principal.role);
+        if (!isSender && !isAdmin) {
+            return res.status(403).json({ error: 'You do not have permission to delete this message.' });
+        }
+
+        // Clean up attached disk files if any
+        if (Array.isArray(message.attachments) && message.attachments.length > 0) {
+            const path = require('path');
+            const fs = require('fs');
+            const chatUploadDir = path.join(__dirname, '../../../uploads/chat');
+            for (const att of message.attachments) {
+                if (att.url && att.url.startsWith('/uploads/chat/')) {
+                    const targetPath = path.join(chatUploadDir, path.basename(att.url));
+                    if (fs.existsSync(targetPath)) {
+                        try { fs.unlinkSync(targetPath); } catch (_) {}
+                    }
+                }
+            }
+        }
+
+        // Soft-delete the message so it shows "This message was deleted"
+        message.isDeleted = true;
+        message.deletedAt = new Date();
+        message.deletedBy = new mongoose.Types.ObjectId(userId);
+        message.content = 'This message was deleted';
+        message.attachments = [];
+        await message.save();
+
+        const updatedLastMessage = message.toObject();
+        const updatedPreview = 'This message was deleted';
+
+        // If this deleted message was the lastMessage, update conversation lastMessagePreview
+        if (conversation.lastMessage && conversation.lastMessage.toString() === messageId) {
+            conversation.lastMessagePreview = updatedPreview;
+            await conversation.save();
+        }
+
+        // Real-time Socket.IO Broadcast to everyone in conversation and user rooms
+        try {
+            const io = getSocketIO();
+            if (io) {
+                // 1. Broadcast message_deleted to active conversation room
+                io.to(`conversation:${conversationId}`).emit('message_deleted', {
+                    conversationId,
+                    messageId,
+                    isDeleted: true,
+                    content: 'This message was deleted',
+                });
+
+                // 2. Broadcast to each participant's personal room
+                conversation.participants.forEach(pId => {
+                    const pIdStr = pId.toString();
+                    io.to(`user:${pIdStr}`).emit('message_deleted', {
+                        conversationId,
+                        messageId,
+                        isDeleted: true,
+                        content: 'This message was deleted',
+                    });
+                    io.to(`user:${pIdStr}`).emit('conversation_updated', {
+                        conversationId: conversation._id,
+                        lastMessage: updatedLastMessage,
+                        lastMessagePreview: updatedPreview,
+                    });
+                });
+            }
+        } catch (sErr) {
+            console.error('[Chat] Socket delete broadcast error:', sErr.message);
+        }
+
+        res.json({ success: true, messageId, conversationId, message: updatedLastMessage });
+    } catch (err) {
+        console.error('[Chat] deleteMessage error:', err);
+        res.status(500).json({ error: 'Failed to delete message.' });
+    }
+};
+

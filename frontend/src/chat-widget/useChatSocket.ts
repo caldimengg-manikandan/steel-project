@@ -59,7 +59,8 @@ export function useChatSocket(
     onNewMessage?: (message: ChatMessage) => void,
     onConversationUpdated?: (update: { conversationId: string; lastMessage: ChatMessage; unreadCount: number }) => void,
     onConversationCreated?: (conv: Conversation) => void,
-    onMessagesRead?: (data: { conversationId: string; readerId: string }) => void
+    onMessagesRead?: (data: { conversationId: string; readerId: string }) => void,
+    onMessageDeleted?: (data: { conversationId: string; messageId: string }) => void
 ) {
     const [isConnected, setIsConnected] = useState(false);
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -147,6 +148,10 @@ export function useChatSocket(
             if (onMessagesRead) onMessagesRead(data);
         }
 
+        function handleMessageDeleted(data: { conversationId: string; messageId: string }) {
+            if (onMessageDeleted) onMessageDeleted(data);
+        }
+
         function handleConnect() {
             setIsConnected(true);
             globalSocket?.emit('get_online_users', (onlineIds: string[]) => {
@@ -211,6 +216,7 @@ export function useChatSocket(
             socket.on('conversation_updated', handleConvUpdate);
             socket.on('conversation_created', handleConvCreated);
             socket.on('messages_read', handleRead);
+            socket.on('message_deleted', handleMessageDeleted);
 
             if (socket.connected) {
                 handleConnect();
@@ -232,6 +238,7 @@ export function useChatSocket(
                 globalSocket.off('conversation_updated', handleConvUpdate);
                 globalSocket.off('conversation_created', handleConvCreated);
                 globalSocket.off('messages_read', handleRead);
+                globalSocket.off('message_deleted', handleMessageDeleted);
             }
         };
     }, [userId]);

@@ -30,28 +30,17 @@ const storage = multer.diskStorage({
     },
 });
 
-const ALLOWED_MIME_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain',
-];
+const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.com', '.scr', '.pif', '.ps1'];
 
 const upload = multer({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
     fileFilter: (_req, file, cb) => {
-        if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Unsupported file type. Allowed: images, PDF, Word, Excel, text files.'));
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (BLOCKED_EXTENSIONS.includes(ext)) {
+            return cb(new Error('Executable and script files are not allowed for security reasons.'));
         }
+        cb(null, true);
     },
 });
 
@@ -82,6 +71,7 @@ router.post('/conversations', chatController.createConversation);
 // Messages in a conversation
 router.get('/conversations/:id/messages', chatController.getMessages);
 router.post('/conversations/:id/messages', chatController.sendMessage);
+router.delete('/conversations/:id/messages/:messageId', chatController.deleteMessage);
 router.patch('/conversations/:id/read', chatController.markAsRead);
 
 // User search for new chats

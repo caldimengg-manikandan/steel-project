@@ -143,6 +143,17 @@ exports.listRfiExtractions = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Any RFI that has a response attachment uploaded must be considered closed
+        for (const ext of extractions) {
+            if (Array.isArray(ext.rfis)) {
+                for (const r of ext.rfis) {
+                    if (r.responseAttachmentUrl || r.responseAttachmentName || r.responseAttachmentGridFsId || r.responseAttachmentStorageGatewayPath) {
+                        r.status = 'CLOSED';
+                    }
+                }
+            }
+        }
+
         res.json({ extractions });
     } catch (err) {
         console.error('[RfiController] list error:', err);
@@ -244,7 +255,12 @@ exports.updateRfiResponse = async (req, res) => {
         const reqRemarks = remarks !== undefined ? remarks : extraction.rfis[idx].remarks;
         const reqClientRfiNumber = clientRfiNumber !== undefined ? clientRfiNumber : extraction.rfis[idx].clientRfiNumber;
 
-        const hasAttachment = !!(extraction.rfis[idx].responseAttachmentUrl || extraction.rfis[idx].responseAttachmentGridFsId);
+        const hasAttachment = !!(
+            extraction.rfis[idx].responseAttachmentUrl || 
+            extraction.rfis[idx].responseAttachmentName ||
+            extraction.rfis[idx].responseAttachmentGridFsId ||
+            extraction.rfis[idx].responseAttachmentStorageGatewayPath
+        );
         const hasText = reqResponse && reqResponse.trim() !== '';
         const hasResponse = hasText || hasAttachment;
 

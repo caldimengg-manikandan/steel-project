@@ -207,6 +207,12 @@ export default function RfiExtractionPanel({
         });
     };
 
+    const isRfiClosed = (r: any): boolean => {
+        if ((r?.status || '').toUpperCase() === 'CLOSED') return true;
+        if (r?.responseAttachmentUrl || r?.responseAttachmentName || r?.responseAttachmentGridFsId || r?.responseAttachmentStorageGatewayPath) return true;
+        return false;
+    };
+
     const StatusBadge = ({ status, rfis }: { status: string; rfis?: any[] }) => {
         if (status === 'processing') return <span className="badge badge-warning">Parsing...</span>;
         if (status === 'queued') return <span className="badge badge-neutral">Queued</span>;
@@ -217,7 +223,7 @@ export default function RfiExtractionPanel({
             return <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>—</span>;
         }
 
-        const allClosed = items.every((r: any) => (r.status || '').toUpperCase() === 'CLOSED');
+        const allClosed = items.length > 0 && items.every(isRfiClosed);
 
         if (allClosed) {
             return (
@@ -503,8 +509,8 @@ export default function RfiExtractionPanel({
                                             <td><StatusBadge status={ext.status} rfis={ext.rfis} /></td>
                                             <td>{ext.rfis ? ext.rfis.length : 0}</td>
                                             <td>
-                                                <span style={{ fontWeight: 700, color: (ext.rfis || []).some((r: any) => (r.status || '').toUpperCase() !== 'CLOSED') ? '#dc2626' : '#16a34a' }}>
-                                                    {(ext.rfis || []).filter((r: any) => (r.status || '').toUpperCase() !== 'CLOSED').length}
+                                                <span style={{ fontWeight: 700, color: (ext.rfis || []).filter((r: any) => !isRfiClosed(r)).length > 0 ? '#dc2626' : '#16a34a' }}>
+                                                    {(ext.rfis || []).filter((r: any) => !isRfiClosed(r)).length}
                                                 </span>
                                             </td>
                                             <td className="text-muted">{ext.uploadedBy}</td>
@@ -576,7 +582,7 @@ export default function RfiExtractionPanel({
                                                                             )}
                                                                         </td>
                                                                         <td>
-                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                            {isRfiClosed(rfi) ? (
                                                                                 <span title="Closed" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: '#dcfce7', color: '#16a34a', fontSize: 11, fontWeight: 700 }}>
                                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                                         <polyline points="20 6 9 17 4 12" />

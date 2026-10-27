@@ -139,3 +139,13 @@ export async function uploadAttachment(file: File): Promise<ChatAttachment> {
     const data = await handleResponse<{ success: boolean; attachment: ChatAttachment }>(res);
     return data.attachment;
 }
+
+export async function deleteMessage(conversationId: string, messageId: string): Promise<void> {
+    const res = await fetch(`${BASE}/chat/conversations/${conversationId}/messages/${messageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<{ success: boolean }>(res);
+}
+

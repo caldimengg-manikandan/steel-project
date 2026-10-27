@@ -32,6 +32,7 @@ export const ChatWidgetPanel: React.FC<ChatWidgetPanelProps> = ({
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deletedMessageEvent, setDeletedMessageEvent] = useState<{ conversationId: string; messageId: string } | null>(null);
     const [isMuted, setIsMuted] = useState(() => {
         try {
             return localStorage.getItem('cw_is_muted') === 'true';
@@ -150,6 +151,19 @@ export const ChatWidgetPanel: React.FC<ChatWidgetPanelProps> = ({
         });
     }, [calculateTotalUnread]);
 
+    const handleMessageDeleted = useCallback((data: { conversationId: string; messageId: string }) => {
+        setDeletedMessageEvent(data);
+        setConversations(prev => {
+            const index = prev.findIndex(c => c._id === data.conversationId);
+            if (index === -1) return prev;
+            const target = prev[index];
+            if (target.lastMessage?._id === data.messageId) {
+                loadConversations();
+            }
+            return prev;
+        });
+    }, [loadConversations]);
+
     // Socket Hook
     const { isConnected, onlineUsers, typingUsers, emitTyping, emitStopTyping } = useChatSocket(
         currentUserId,
@@ -158,7 +172,9 @@ export const ChatWidgetPanel: React.FC<ChatWidgetPanelProps> = ({
         isMuted,
         handleNewMessage,
         handleConversationUpdated,
-        handleConversationCreated
+        handleConversationCreated,
+        undefined,
+        handleMessageDeleted
     );
 
     const handleSelectConversation = (conv: Conversation) => {
@@ -318,6 +334,10 @@ export const ChatWidgetPanel: React.FC<ChatWidgetPanelProps> = ({
                                 );
                                 return updated;
                             });
+                        }}
+                        deletedMessageEvent={deletedMessageEvent}
+                        onMessageDeleted={() => {
+                            loadConversations();
                         }}
                     />
                 )}

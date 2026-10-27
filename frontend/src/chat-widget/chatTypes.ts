@@ -32,6 +32,8 @@ export interface ChatMessage {
     attachments: ChatAttachment[];
     readBy: { userId: string; readAt: string }[];
     status: 'sent' | 'delivered' | 'read';
+    isDeleted?: boolean;
+    deletedAt?: string;
     createdAt: string;
     updatedAt: string;
 }

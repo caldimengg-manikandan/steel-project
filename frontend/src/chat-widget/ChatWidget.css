@@ -518,6 +518,45 @@
     box-sizing: border-box;
 }
 
+.cw-msg-bubble-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+}
+
+.cw-outgoing .cw-msg-bubble-wrap {
+    flex-direction: row-reverse;
+}
+
+.cw-msg-delete-btn {
+    opacity: 0;
+    visibility: hidden;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.cw-msg-row:hover .cw-msg-delete-btn {
+    opacity: 0.85;
+    visibility: visible;
+}
+
+.cw-msg-delete-btn:hover {
+    opacity: 1;
+    color: #dc2626;
+    background: #fee2e2;
+    transform: scale(1.08);
+}
+
 .cw-outgoing .cw-msg-bubble {
     background: linear-gradient(135deg, var(--color-primary, #1e4fd8) 0%, #153cb0 100%);
     color: #ffffff;
@@ -529,6 +568,25 @@
     color: #1e293b;
     border: 1px solid #e2e8f0;
     border-bottom-left-radius: 2px;
+}
+
+.cw-msg-bubble.cw-msg-bubble-deleted {
+    font-style: italic;
+    color: #94a3b8 !important;
+    background: #f8fafc !important;
+    border: 1px dashed #cbd5e1 !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    box-shadow: none;
+    user-select: none;
+}
+
+.cw-outgoing .cw-msg-bubble.cw-msg-bubble-deleted {
+    background: #f1f5f9 !important;
+    color: #64748b !important;
+    border: 1px dashed #94a3b8 !important;
 }
 
 .cw-msg-footer {
@@ -636,6 +694,46 @@
     flex-shrink: 0;
 }
 
+.cw-attach-preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 130px;
+    overflow-y: auto;
+    padding: 2px 0;
+}
+
+.cw-attach-preview-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    color: #334155;
+    max-width: 100%;
+}
+
+.cw-attach-badge {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 1.5px 5px;
+    border-radius: 4px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+.cw-badge-pdf { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+.cw-badge-xls { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+.cw-badge-doc { background: #dbeafe; color: #2563eb; border: 1px solid #93c5fd; }
+.cw-badge-ppt { background: #ffedd5; color: #ea580c; border: 1px solid #fdba74; }
+.cw-badge-zip { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
+.cw-badge-cad { background: #f3e8ff; color: #9333ea; border: 1px solid #d8b4fe; }
+.cw-badge-img { background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; }
+.cw-badge-file { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
 .cw-attach-preview-box {
     display: flex;
     align-items: center;
@@ -650,11 +748,19 @@
 .cw-attach-remove-btn {
     background: transparent;
     border: none;
-    color: #ef4444;
+    color: #94a3b8;
     cursor: pointer;
-    margin-left: auto;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.cw-attach-remove-btn:hover {
+    color: #ef4444;
+    background: #fee2e2;
 }
 
 .cw-input-controls {
