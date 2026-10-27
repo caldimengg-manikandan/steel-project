@@ -189,12 +189,23 @@ export default function UserCdrfi() {
         const projectId = selectedProject._id || selectedProject.id;
         const projectName = selectedProject.name;
 
-        const invalidFiles = files.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
+        // Validation: Filename must contain at least one word from the project name
+        const projectWords: string[] = (projectName || '')
+            .toLowerCase()
+            .split(/[\s_\-#.,/()\[\]]+/)
+            .map((w: string) => w.trim())
+            .filter((w: string) => w.length >= 2 || (w.length === 1 && /[a-z0-9]/i.test(w)));
+
+        const invalidFiles = files.filter(f => {
+            const fileLower = f.name.toLowerCase();
+            return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+        });
+
         if (invalidFiles.length > 0) {
-            showMessage('Naming Validation Error', `The following files do not contain the project name "${projectName}":\n\n` + 
+            showMessage('Naming Validation Error', `The following files do not match any word from the project name "${projectName}":\n\n` + 
                         invalidFiles.map(f => `• ${f.name}`).join(', ') + 
-                        `\n\nPlease ensure your drawing filenames include the project name.`, 'error');
-            setUploadError(`Drawing filenames must include the project name "${projectName}".`);
+                        `\n\nPlease ensure your drawing filenames include at least one word from the project name.`, 'error');
+            setUploadError(`Drawing filenames must include at least one word from the project name "${projectName}".`);
             return;
         }
 

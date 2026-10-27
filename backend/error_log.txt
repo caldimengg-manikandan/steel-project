@@ -5231,3 +5231,54 @@
     at model.Query.exec (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongoose\lib\query.js:4627:80)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async verifyToken (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\auth.js:73:26)
+2026-10-27T08:02:01.363Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:02:01.916Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:02:04.788Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:04:54.083Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:04:54.636Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:04:55.939Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:04:56.469Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:31.173Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:31.279Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:34.401Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:34.517Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:39.296Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:39.407Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:45.319Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:16:45.480Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:19:39.303Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+2026-10-27T08:19:39.410Z: ReferenceError: isFullAccess is not defined
+    at scopeProjectAccess (C:\steel-project(2)\steel-project\steel-project\backend\src\middleware\adminScope.js:263:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

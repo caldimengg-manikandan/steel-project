@@ -46,7 +46,13 @@ export default function AdminUsers() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
     const [showCreateTeam, setShowCreateTeam] = useState(false);
-    const [teamForm, setTeamForm] = useState<{name: string, lead: string[], members: string[]}>({name: '', lead: [], members: []});
+    const [teamForm, setTeamForm] = useState<{
+        name: string;
+        project_manager: string;
+        assistant_project_manager: string;
+        lead: string[];
+        members: string[];
+    }>({ name: '', project_manager: '', assistant_project_manager: '', lead: [], members: [] });
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
     const [teamLeadSearch, setTeamLeadSearch] = useState('');
@@ -288,7 +294,7 @@ export default function AdminUsers() {
                             </button>
                         </>
                     ) : (
-                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setEditingTeamId(null); setTeamLeadSearch(''); setTeamMemberSearch(''); setTeamForm({name: '', lead: [], members: []}); }}>
+                        <button className="btn btn-primary" onClick={() => { setShowCreateTeam(true); setEditingTeamId(null); setTeamLeadSearch(''); setTeamMemberSearch(''); setTeamForm({ name: '', project_manager: '', assistant_project_manager: '', lead: [], members: [] }); }}>
                             <IconPlus /> Create Team
                         </button>
                     )}
@@ -504,58 +510,90 @@ export default function AdminUsers() {
                             <tr>
                                 <th>#</th>
                                 <th>TEAM NAME</th>
-                                <th>TEAM LEAD</th>
+                                <th>PROJECT MANAGER</th>
+                                <th>APM / TEAM LEAD</th>
                                 <th>MEMBERS</th>
                                 <th>ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {[...teams].sort((a, b) => a.name.localeCompare(b.name)).map((t, idx) => (
-                                <tr key={t.id || t._id}>
-                                    <td>{idx + 1}</td>
-                                    <td>{t.name}</td>
-                                    <td>
-                                        {Array.isArray(t.lead) 
-                                            ? t.lead.map((l: any) => l.username).join(', ') 
-                                            : t.lead?.username}
-                                    </td>
-                                    <td>{t.members?.length || 0} Members</td>
-                                    <td style={{ display: 'flex', gap: 8 }}>
-                                        <button className="btn btn-ghost btn-sm" onClick={() => setViewingTeam(t)}>
-                                            View
-                                        </button>
-                                        <button className="btn btn-ghost btn-sm" onClick={() => {
-                                            setTeamForm({
-                                                name: t.name,
-                                                lead: Array.isArray(t.lead) ? t.lead.map((l: any) => l._id || l.id) : (t.lead ? [t.lead._id || t.lead.id] : []),
-                                                members: t.members?.map((m: any) => m._id || m.id) || []
-                                            });
-                                            setEditingTeamId(t._id || t.id);
-                                            setTeamLeadSearch('');
-                                            setTeamMemberSearch('');
-                                            setShowCreateTeam(true);
-                                        }}>
-                                            <IconEdit />
-                                        </button>
-                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
-                                            showConfirm('Delete Team', 'Are you sure you want to delete this team?', async () => {
-                                                try {
-                                                    await adminDeleteTeam(t._id || t.id);
-                                                    setTeams(teams.filter(team => (team._id || team.id) !== (t._id || t.id)));
-                                                    showMessage('Success', 'Team deleted.', 'success');
-                                                } catch(err: any) {
-                                                    showMessage('Error', err.message, 'error');
-                                                }
-                                            });
-                                        }}>
-                                            <IconTrash />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {[...teams].sort((a, b) => a.name.localeCompare(b.name)).map((t, idx) => {
+                                const rawPm = t.project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l.project_manager).filter(Boolean)[0] : null);
+                                const pmId = rawPm ? String(rawPm._id || rawPm.id || rawPm) : null;
+                                const pmUser = pmId ? (typeof rawPm === 'object' && (rawPm.displayName || rawPm.username) ? rawPm : users.find(u => String(u.id || u._id) === pmId)) : null;
+                                const pmDisplayName = pmUser ? (pmUser.displayName || pmUser.username) : 'Not Assigned';
+
+                                const rawApm = t.assistant_project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l.assistant_project_manager).filter(Boolean)[0] : null);
+                                const apmId = rawApm ? String(rawApm._id || rawApm.id || rawApm) : null;
+                                const apmUser = apmId ? (typeof rawApm === 'object' && (rawApm.displayName || rawApm.username) ? rawApm : users.find(u => String(u.id || u._id) === apmId)) : null;
+                                const apmDisplayName = apmUser ? (apmUser.displayName || apmUser.username) : null;
+
+                                const leadDisplayNames = Array.isArray(t.lead) 
+                                    ? t.lead.map((l: any) => (typeof l === 'object' && (l.displayName || l.username) ? (l.displayName || l.username) : users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l))?.displayName || users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l))?.username)).filter(Boolean).join(', ') 
+                                    : (typeof t.lead === 'object' && (t.lead?.displayName || t.lead?.username) ? (t.lead?.displayName || t.lead?.username) : users.find(u => String(u.id || u._id) === String(t.lead?._id || t.lead?.id || t.lead))?.displayName || users.find(u => String(u.id || u._id) === String(t.lead?._id || t.lead?.id || t.lead))?.username || 'No Lead');
+
+                                return (
+                                    <tr key={t.id || t._id}>
+                                        <td>{idx + 1}</td>
+                                        <td style={{ fontWeight: 650 }}>{t.name}</td>
+                                        <td>
+                                            <span style={{ color: pmUser ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                                {pmDisplayName}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {apmDisplayName ? (
+                                                <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                                                    APM: {apmDisplayName}
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-success" style={{ fontWeight: 600 }}>
+                                                    Team Lead: {leadDisplayNames}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td>{t.members?.length || 0} Members</td>
+                                        <td style={{ display: 'flex', gap: 8 }}>
+                                            <button className="btn btn-ghost btn-sm" onClick={() => setViewingTeam(t)}>
+                                                View
+                                            </button>
+                                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                                                const tPmId = t.project_manager ? (t.project_manager._id || t.project_manager.id || t.project_manager) : '';
+                                                const tApmId = t.assistant_project_manager ? (t.assistant_project_manager._id || t.assistant_project_manager.id || t.assistant_project_manager) : '';
+                                                setTeamForm({
+                                                    name: t.name,
+                                                    project_manager: tPmId,
+                                                    assistant_project_manager: tApmId,
+                                                    lead: Array.isArray(t.lead) ? t.lead.map((l: any) => l._id || l.id) : (t.lead ? [t.lead._id || t.lead.id] : []),
+                                                    members: t.members?.map((m: any) => m._id || m.id) || []
+                                                });
+                                                setEditingTeamId(t._id || t.id);
+                                                setTeamLeadSearch('');
+                                                setTeamMemberSearch('');
+                                                setShowCreateTeam(true);
+                                            }}>
+                                                <IconEdit />
+                                            </button>
+                                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => {
+                                                showConfirm('Delete Team', 'Are you sure you want to delete this team?', async () => {
+                                                    try {
+                                                        await adminDeleteTeam(t._id || t.id);
+                                                        setTeams(teams.filter(team => (team._id || team.id) !== (t._id || t.id)));
+                                                        showMessage('Success', 'Team deleted.', 'success');
+                                                    } catch(err: any) {
+                                                        showMessage('Error', err.message, 'error');
+                                                    }
+                                                });
+                                            }}>
+                                                <IconTrash />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {teams.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="text-center text-muted" style={{ padding: 40 }}>No teams created yet.</td>
+                                    <td colSpan={6} className="text-center text-muted" style={{ padding: 40 }}>No teams created yet.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -573,9 +611,41 @@ export default function AdminUsers() {
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label className="form-label">Team Name</label>
+                                <label className="form-label required">Team Name</label>
                                 <input className="form-control" value={teamForm.name} onChange={e => setTeamForm({...teamForm, name: e.target.value})} placeholder="Enter team name" />
                             </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Project Manager</label>
+                                <select
+                                    className="form-control"
+                                    value={teamForm.project_manager}
+                                    onChange={(e) => setTeamForm({ ...teamForm, project_manager: e.target.value })}
+                                >
+                                    <option value="">Select Project Manager (Optional)</option>
+                                    {users.filter(u => u.role === 'project_manager').map(u => (
+                                        <option key={u.id} value={u.id}>{u.displayName || u.username}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Assistant Project Manager</label>
+                                <select
+                                    className="form-control"
+                                    value={teamForm.assistant_project_manager}
+                                    onChange={(e) => setTeamForm({ ...teamForm, assistant_project_manager: e.target.value })}
+                                >
+                                    <option value="">None / Only Team Lead</option>
+                                    {users.filter(u => u.role === 'assistant_project_manager').map(u => (
+                                        <option key={u.id} value={u.id}>{u.displayName || u.username}</option>
+                                    ))}
+                                </select>
+                                <small style={{ color: 'var(--color-text-secondary)', fontSize: 12, marginTop: 4, display: 'block' }}>
+                                    If this team only has a Team Lead, leave as &quot;None / Only Team Lead&quot;. The Team Lead&apos;s name will be populated.
+                                </small>
+                            </div>
+
                             <div className="form-group">
                                 <label className="form-label required">Team Leads</label>
                                 <input className="form-control" value={teamLeadSearch} onChange={e => setTeamLeadSearch(e.target.value)} placeholder="Search team leads..." style={{ marginBottom: 10 }} />
@@ -654,34 +724,78 @@ export default function AdminUsers() {
             )}
 
             {/* ── View Team Modal ── */}
-            {viewingTeam && (
-                <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setViewingTeam(null) }}>
-                    <div className="modal" style={{ width: 600 }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <span className="modal-title">Team: {viewingTeam.name}</span>
-                            <button className="modal-close" onClick={() => setViewingTeam(null)}><IconClose /></button>
-                        </div>
-                        <div className="modal-body">
-                            <h4 style={{ margin: '0 0 10px 0' }}>Team Leads</h4>
-                            <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
-                                {Array.isArray(viewingTeam.lead) 
-                                    ? viewingTeam.lead.map((l: any) => <li key={l._id || l.id}>{l.username} {l.email ? `(${l.email})` : ''}</li>)
-                                    : (viewingTeam.lead ? <li key={viewingTeam.lead._id || viewingTeam.lead.id}>{viewingTeam.lead.username} {viewingTeam.lead.email ? `(${viewingTeam.lead.email})` : ''}</li> : <li>No lead assigned</li>)}
-                            </ul>
-                            <h4 style={{ margin: '0 0 10px 0' }}>Team Members</h4>
-                            <ul style={{ paddingLeft: 20 }}>
-                                {viewingTeam.members?.map((m: any) => (
-                                    <li key={m._id || m.id}>{m.username} {m.email ? `(${m.email})` : ''}</li>
-                                ))}
-                                {(!viewingTeam.members || viewingTeam.members.length === 0) && <li>No members</li>}
-                            </ul>
-                        </div>
-                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 var(--space-lg) var(--space-lg) var(--space-lg)' }}>
-                            <button className="btn btn-primary" onClick={() => setViewingTeam(null)}>Close</button>
+            {viewingTeam && (() => {
+                const viewPmId = viewingTeam.project_manager ? String(viewingTeam.project_manager._id || viewingTeam.project_manager.id || viewingTeam.project_manager) : '';
+                const viewPmUser = (typeof viewingTeam.project_manager === 'object' && (viewingTeam.project_manager.displayName || viewingTeam.project_manager.username))
+                    ? viewingTeam.project_manager
+                    : users.find(u => String(u.id || u._id) === viewPmId);
+                const viewPmName = viewPmUser ? (viewPmUser.displayName || viewPmUser.username) : (viewPmId ? 'Not Assigned' : null);
+
+                const viewApmId = viewingTeam.assistant_project_manager ? String(viewingTeam.assistant_project_manager._id || viewingTeam.assistant_project_manager.id || viewingTeam.assistant_project_manager) : '';
+                const viewApmUser = (typeof viewingTeam.assistant_project_manager === 'object' && (viewingTeam.assistant_project_manager.displayName || viewingTeam.assistant_project_manager.username))
+                    ? viewingTeam.assistant_project_manager
+                    : users.find(u => String(u.id || u._id) === viewApmId);
+                const viewApmName = viewApmUser ? (viewApmUser.displayName || viewApmUser.username) : null;
+
+                const viewLeads = Array.isArray(viewingTeam.lead) ? viewingTeam.lead : (viewingTeam.lead ? [viewingTeam.lead] : []);
+                const viewLeadNames = viewLeads.map((l: any) => {
+                    if (typeof l === 'object' && (l.displayName || l.username)) return l.displayName || l.username;
+                    const found = users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l));
+                    return found ? (found.displayName || found.username) : 'Lead';
+                }).filter(Boolean).join(', ');
+
+                const viewMembers = Array.isArray(viewingTeam.members) ? viewingTeam.members : (Array.isArray(viewingTeam.users) ? viewingTeam.users : []);
+
+                return (
+                    <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setViewingTeam(null) }}>
+                        <div className="modal" style={{ width: 600 }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <span className="modal-title">Team: {viewingTeam.name}</span>
+                                <button className="modal-close" onClick={() => setViewingTeam(null)}><IconClose /></button>
+                            </div>
+                            <div className="modal-body">
+                                {viewPmName && (
+                                    <div style={{ marginBottom: 16 }}>
+                                        <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Project Manager</h4>
+                                        <p style={{ margin: 0, fontWeight: 600 }}>{viewPmName}</p>
+                                    </div>
+                                )}
+                                <div style={{ marginBottom: 16 }}>
+                                    <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                                        {viewApmName ? 'Assistant Project Manager' : 'Team Lead (Populated)'}
+                                    </h4>
+                                    <p style={{ margin: 0, fontWeight: 600 }}>
+                                        {viewApmName || viewLeadNames || 'No Lead Assigned'}
+                                    </p>
+                                </div>
+                                <h4 style={{ margin: '0 0 10px 0' }}>Team Leads</h4>
+                                <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
+                                    {viewLeads.map((l: any) => {
+                                        const leadUser = (typeof l === 'object' && (l.displayName || l.username)) ? l : users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l));
+                                        const name = leadUser ? (leadUser.displayName || leadUser.username) : 'Team Lead';
+                                        const email = leadUser?.email ? `(${leadUser.email})` : '';
+                                        return <li key={String(leadUser?._id || leadUser?.id || l?._id || l)}>{name} {email}</li>;
+                                    })}
+                                    {viewLeads.length === 0 && <li>No lead assigned</li>}
+                                </ul>
+                                <h4 style={{ margin: '0 0 10px 0' }}>Team Members</h4>
+                                <ul style={{ paddingLeft: 20 }}>
+                                    {viewMembers.map((m: any) => {
+                                        const memUser = (typeof m === 'object' && (m.displayName || m.username)) ? m : users.find(u => String(u.id || u._id) === String(m?._id || m?.id || m));
+                                        const name = memUser ? (memUser.displayName || memUser.username) : 'Team Member';
+                                        const email = memUser?.email ? `(${memUser.email})` : '';
+                                        return <li key={String(memUser?._id || memUser?.id || m?._id || m)}>{name} {email}</li>;
+                                    })}
+                                    {viewMembers.length === 0 && <li>No members</li>}
+                                </ul>
+                            </div>
+                            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 var(--space-lg) var(--space-lg) var(--space-lg)' }}>
+                                <button className="btn btn-primary" onClick={() => setViewingTeam(null)}>Close</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* ── Create User Modal ── */}
             {showCreate && (

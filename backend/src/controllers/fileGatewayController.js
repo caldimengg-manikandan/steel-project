@@ -284,19 +284,41 @@ exports.remove = async (req, res) => {
                 searchConditions.push({ originalFileName: new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
             }
 
-            // If deleting the entire project folder: Projects/<ProjectName>
+            let proj = null;
+            let folderPathInProject = cleanPath;
+            let isProjectRoot = false;
+
+            // If deleting under or the entire project folder: Projects/<ProjectName>
             if (pathParts.length >= 2 && pathParts[0].toLowerCase() === 'projects') {
                 const projName = pathParts[1].replace(/_/g, ' ');
-                const proj = await Project.findOne({
+                proj = await Project.findOne({
                     $or: [
                         { name: new RegExp(`^${projName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
                         { name: new RegExp(`^${pathParts[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
                     ]
                 }).lean();
 
+                isProjectRoot = pathParts.length === 2;
+                folderPathInProject = isProjectRoot ? `Project Root Folder (${cleanPath})` : pathParts.slice(2).join('/');
+
                 if (proj) {
-                    // If deleting the root project folder or all drawing subfolders, also match by projectId
-                    if (pathParts.length === 2) {
+                    // If deleting the root project folder, also match by projectId
+                    if (isProjectRoot) {
+                        searchConditions.push({ projectId: proj._id });
+                    }
+                }
+            } else if (pathParts.length >= 1) {
+                const projName = pathParts[0].replace(/_/g, ' ');
+                proj = await Project.findOne({
+                    $or: [
+                        { name: new RegExp(`^${projName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                        { name: new RegExp(`^${pathParts[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                    ]
+                }).lean();
+                if (proj) {
+                    isProjectRoot = pathParts.length === 1;
+                    folderPathInProject = isProjectRoot ? `Project Root Folder (${cleanPath})` : pathParts.slice(1).join('/');
+                    if (isProjectRoot) {
                         searchConditions.push({ projectId: proj._id });
                     }
                 }
@@ -306,6 +328,40 @@ exports.remove = async (req, res) => {
 
             if (deleteResult.deletedCount > 0) {
                 console.log(`[FileGateway] Removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
+                if (proj) {
+                    const remainingCount = await DrawingExtraction.countDocuments({ projectId: proj._id, status: 'completed' });
+                    await Project.findByIdAndUpdate(proj._id, { drawingCount: remainingCount, approximateDrawingsCount: remainingCount });
+                    console.log(`[FileGateway] Updated Project "${proj.name}" drawing count to ${remainingCount}.`);
+                }
+            }
+
+            // Send automated email alert strictly to that particular team (PM, APM, Team Lead)
+            if (proj) {
+                try {
+                    const User = require('../models/User');
+                    const { sendFolderDeletionAlert } = require('../services/emailService');
+                    let userDoc = null;
+                    if (req.principal?.id && req.principal.id !== 'viewer') {
+                        userDoc = await User.findById(req.principal.id).select('displayName email role username').lean();
+                    }
+                    const deletedBy = {
+                        username: req.principal?.username || 'Unknown',
+                        displayName: userDoc?.displayName || req.principal?.username || 'User',
+                        email: req.principal?.email || userDoc?.email || '',
+                        role: req.principal?.role || 'user'
+                    };
+
+                    sendFolderDeletionAlert({
+                        project: proj,
+                        deletedItemPath: folderPathInProject,
+                        deletedBy,
+                        isProjectDeletion: isProjectRoot
+                    }).catch(mailErr => {
+                        console.error('[FileGateway] Email notification error:', mailErr.message);
+                    });
+                } catch (emailErr) {
+                    console.error('[FileGateway] Error preparing email alert:', emailErr.message);
+                }
             }
         } catch (dbErr) {
             console.error('[FileGateway] DB cleanup warning:', dbErr.message);

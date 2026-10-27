@@ -98,6 +98,28 @@ const projectSchema = new mongoose.Schema(
             default: ''
         },
 
+        caldimTeamLead: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+
+        caldimTeamLeadName: {
+            type: String,
+            default: ''
+        },
+
+        teamId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Team',
+            default: null
+        },
+
+        teamName: {
+            type: String,
+            default: ''
+        },
+
         description: {
             type: String,
             default: '',
@@ -127,6 +149,13 @@ const projectSchema = new mongoose.Schema(
             ref: 'Admin',
             required: [true, 'createdByAdminId is required'],
             immutable: true,
+            index: true,
+        },
+
+        createdByUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
             index: true,
         },
 

@@ -7,11 +7,12 @@ import type { Project, ProjectPermission, User } from '../../types';
 import { isFullAccessUser } from '../../types';
 import { IconBack, IconUpload, IconClose } from '../../components/Icons';
 import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumber } from '../../services/extractionApi';
-import { listTransmittals } from '../../services/transmittalApi';
 import { adminListUsers } from '../../services/adminUserApi';
+import { adminListTeams, type Team } from '../../services/adminTeamApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
 import { formatDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
+import { listTransmittals } from '../../services/transmittalApi';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
 
@@ -52,37 +53,177 @@ export default function ProjectView() {
 
     // Allocations state
     const [allUsers, setAllUsers] = useState<User[]>([]);
-    const [allocationsMap, setAllocationsMap] = useState<Record<string, { selected: boolean; permission: 'viewer' | 'editor' }>>({});
+    const [allTeams, setAllTeams] = useState<Team[]>([]);
+    const [allocationsMap, setAllocationsMap] = useState<Record<string, { selected: boolean; permission?: 'viewer' | 'editor' }>>({});
     const [savingAllocations, setSavingAllocations] = useState(false);
     const [allocationSearch, setAllocationSearch] = useState('');
     const [allocationRoleFilter, setAllocationRoleFilter] = useState<'all' | 'team_member' | 'team_lead'>('all');
 
     useEffect(() => {
-        adminListUsers()
-            .then(res => setAllUsers(res.users || []))
-            .catch(err => console.error('[ProjectView] Failed to load users for allocations:', err));
+        Promise.all([
+            adminListUsers().catch(() => ({ users: [] })),
+            adminListTeams().catch(() => [])
+        ]).then(([userData, teamsData]) => {
+            setAllUsers(userData.users || []);
+            setAllTeams(teamsData || []);
+        }).catch(err => console.error('[ProjectView] Failed to load data for allocations:', err));
     }, []);
 
     useEffect(() => {
         if (!project) return;
-        const initialMap: Record<string, { selected: boolean; permission: 'viewer' | 'editor' }> = {};
+        const initialMap: Record<string, { selected: boolean; permission?: 'viewer' | 'editor' }> = {};
         (allUsers || []).forEach(u => {
             const uid = String(u.id || u._id);
-            const existing = (project.assignments || []).find(a => String(a.userId) === uid);
+            const existing = (project.assignments || []).find(a => String(a.userId) === uid && (a.permission === 'viewer' || a.permission === 'editor'));
             initialMap[uid] = {
                 selected: !!existing,
-                permission: existing?.permission === 'editor' ? 'editor' : (existing?.permission === 'viewer' ? 'viewer' : (u.role === 'team_member' ? 'editor' : 'viewer'))
+                permission: existing ? (existing.permission === 'editor' ? 'editor' : 'viewer') : undefined
             };
         });
         setAllocationsMap(initialMap);
     }, [project, allUsers]);
 
     const eligibleUsers = useMemo(() => {
-        return allUsers.filter(u => {
-            const r = u.role;
-            return r === 'team_member' || r === 'team_lead' || r === 'assistant_team_lead';
+        if (!project) return [];
+
+        const projectTeamId = project.teamId ? String(project.teamId) : '';
+        const projectTeamName = project.teamName ? String(project.teamName).toLowerCase().trim() : '';
+        const projectApmId = project.caldimAssistantProjectManager ? String(project.caldimAssistantProjectManager) : '';
+        const projectTlId = project.caldimTeamLead ? String(project.caldimTeamLead) : '';
+        const projectPmId = project.caldimProjectManager ? String(project.caldimProjectManager) : '';
+
+        // Find matched team documents by ID or name
+        const matchedTeams = allTeams.filter(t => {
+            const tid = String(t._id || t.id);
+            const tname = String(t.name || '').toLowerCase().trim();
+            if (projectTeamId && tid === projectTeamId) return true;
+            if (projectTeamName && tname === projectTeamName) return true;
+            return false;
         });
-    }, [allUsers]);
+
+        // Gather allowed user IDs for this project's team
+        const teamUserIds = new Set<string>();
+
+        // 1. Members and leads of the matched team
+        matchedTeams.forEach(t => {
+            const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+            members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+
+            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+            leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+        });
+
+        // 2. Users explicitly assigned to this team via user.team
+        if (projectTeamId) {
+            allUsers.forEach(u => {
+                const uTeam = u.team ? String((u.team as any)?._id || (u.team as any)?.id || u.team) : '';
+                if (uTeam === projectTeamId) {
+                    teamUserIds.add(String(u.id || u._id));
+                }
+            });
+        }
+
+        // 3. If APM is assigned on the project, all users and teams reporting to this APM
+        if (projectApmId) {
+            allTeams.forEach(t => {
+                const tApm = t.assistant_project_manager ? String((t.assistant_project_manager as any)?._id || (t.assistant_project_manager as any)?.id || t.assistant_project_manager) : '';
+                if (tApm === projectApmId) {
+                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+                    const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+                }
+            });
+            allUsers.forEach(u => {
+                const uApm = u.assistant_project_manager ? String((u.assistant_project_manager as any)?._id || (u.assistant_project_manager as any)?.id || u.assistant_project_manager) : '';
+                if (uApm === projectApmId) {
+                    teamUserIds.add(String(u.id || u._id));
+                }
+            });
+        }
+
+        // 4. If Team Lead is assigned on the project, users reporting to this TL
+        if (projectTlId) {
+            allTeams.forEach(t => {
+                const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+                const isLeadOfTeam = leads.some((l: any) => String(l?._id || l?.id || l) === projectTlId);
+                if (isLeadOfTeam) {
+                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+                }
+            });
+            allUsers.forEach(u => {
+                const uTl = u.team_lead ? String((u.team_lead as any)?._id || (u.team_lead as any)?.id || u.team_lead) : '';
+                if (uTl === projectTlId) {
+                    teamUserIds.add(String(u.id || u._id));
+                }
+            });
+        }
+
+        // 5. If still no team members found, check creator from assignments or createdByUserId
+        if (teamUserIds.size === 0) {
+            const creatorId = String(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : '') || '');
+            if (creatorId) {
+                const creator = allUsers.find(u => String(u.id || u._id) === creatorId);
+                if (creator) {
+                    allTeams.forEach(t => {
+                        const tApm = t.assistant_project_manager ? String((t.assistant_project_manager as any)?._id || (t.assistant_project_manager as any)?.id || t.assistant_project_manager) : '';
+                        const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+                        const isLead = leads.some((l: any) => String(l?._id || l?.id || l) === creatorId);
+                        if (tApm === creatorId || isLead) {
+                            const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                            members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+                            leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+                        }
+                    });
+                }
+            }
+        }
+
+        // 6. If no team/APM/TL identified, but PM is set: users and teams under this PM
+        if (teamUserIds.size === 0 && projectPmId) {
+            allTeams.forEach(t => {
+                const tPm = t.project_manager ? String((t.project_manager as any)?._id || (t.project_manager as any)?.id || t.project_manager) : '';
+                if (tPm === projectPmId) {
+                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+                    const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+                }
+            });
+            allUsers.forEach(u => {
+                const uPm = u.project_manager ? String((u.project_manager as any)?._id || (u.project_manager as any)?.id || u.project_manager) : '';
+                if (uPm === projectPmId) {
+                    teamUserIds.add(String(u.id || u._id));
+                }
+            });
+        }
+
+        const creatorId = String(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : '') || '');
+
+        return allUsers.filter(u => {
+            const uid = String(u.id || u._id);
+            const r = u.role;
+
+            // 1. Only team members and team leads can be allocated (excludes PMs, APMs, Admins)
+            const isRoleEligible = r === 'team_member' || r === 'team_lead' || r === 'assistant_team_lead';
+            if (!isRoleEligible) return false;
+
+            // 2. Never show the creator of the project, managing PM, or managing APM
+            if (creatorId && uid === creatorId) return false;
+            if (projectPmId && uid === projectPmId) return false;
+            if (projectApmId && uid === projectApmId) return false;
+
+            // 4. If a team was identified, restrict to that team's members
+            if (teamUserIds.size > 0) {
+                return teamUserIds.has(uid);
+            }
+
+            // Fallback: show all eligible team members/leads
+            return true;
+        });
+    }, [allUsers, allTeams, project]);
 
     const displayedUsers = useMemo(() => {
         return eligibleUsers.filter(u => {
@@ -112,7 +253,7 @@ export default function ProjectView() {
                     return {
                         userId,
                         username: usr?.displayName || usr?.username || 'User',
-                        permission: data.permission,
+                        permission: (data.permission || 'editor') as 'viewer' | 'editor',
                     };
                 });
 
@@ -920,19 +1061,43 @@ export default function ProjectView() {
                         {/* Caldim Contact Person */}
                         <div style={{ marginBottom: 'var(--space-md)' }}>
                             <div className="form-label" style={{ marginBottom: 6 }}>Caldim Contact Person</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
                                 <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Project Manager</div>
                                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
                                         {project.caldimProjectManagerName || project.projectManager || 'Not Assigned'}
                                     </div>
                                 </div>
-                                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assistant Project Manager</div>
-                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
-                                        {project.caldimAssistantProjectManagerName || 'Not Assigned'}
+                                {project.caldimAssistantProjectManagerName ? (
+                                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assistant Project Manager</div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                            {project.caldimAssistantProjectManagerName}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : project.caldimTeamLeadName ? (
+                                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Team Lead</div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                            {project.caldimTeamLeadName}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>APM / Team Lead</div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                            Not Assigned
+                                        </div>
+                                    </div>
+                                )}
+                                {project.teamName && (
+                                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assigned Team</div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
+                                            {project.teamName}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1721,9 +1886,20 @@ export default function ProjectView() {
                                         {displayedUsers.map(u => {
                                             const uid = String(u.id || u._id);
                                             const isAllocated = !!allocationsMap[uid]?.selected;
-                                            const currentPerm = allocationsMap[uid]?.permission || (u.role === 'team_member' ? 'editor' : 'viewer');
+                                            const currentPerm = allocationsMap[uid]?.permission;
                                             const roleLabel = u.role === 'team_lead' ? 'Team Lead' : (u.role === 'assistant_team_lead' ? 'Assistant Team Lead' : 'Team Member');
                                             const roleClass = (u.role === 'team_lead' || u.role === 'assistant_team_lead') ? 'badge-primary' : 'badge-neutral';
+                                            const userDivision = u.division || (() => {
+                                                const userTeam = allTeams.find(t => {
+                                                    const mems = (t.members || []).concat(t.lead || []);
+                                                    return mems.some((m: any) => String(m?._id || m?.id || m) === uid);
+                                                });
+                                                if (userTeam) {
+                                                    if (/tekla/i.test(userTeam.name)) return 'Tekla';
+                                                    if (/sds/i.test(userTeam.name)) return 'SDS2';
+                                                }
+                                                return project?.division || '—';
+                                            })();
 
                                             return (
                                                 <tr
@@ -1777,12 +1953,24 @@ export default function ProjectView() {
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '12px 14px', color: 'var(--color-text-secondary)', fontSize: 12 }}>
-                                                        {u.division || '—'}
+                                                        {userDivision}
                                                     </td>
                                                     <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f1f5f9', borderRadius: 6, padding: 2 }}>
+                                                        <div
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                background: '#f1f5f9',
+                                                                borderRadius: 24,
+                                                                padding: 3,
+                                                                border: '1px solid #e2e8f0',
+                                                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                                                                userSelect: 'none'
+                                                            }}
+                                                        >
                                                             <button
                                                                 type="button"
+                                                                title="Grant Viewer (read-only) access"
                                                                 onClick={() => {
                                                                     setAllocationsMap(prev => ({
                                                                         ...prev,
@@ -1793,22 +1981,30 @@ export default function ProjectView() {
                                                                     }));
                                                                 }}
                                                                 style={{
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: 4,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 6,
+                                                                    padding: '5px 12px',
+                                                                    borderRadius: 20,
                                                                     border: 'none',
                                                                     cursor: 'pointer',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    transition: 'all 0.15s',
+                                                                    fontSize: 12,
+                                                                    fontWeight: 650,
+                                                                    transition: 'all 0.18s ease-in-out',
                                                                     background: (isAllocated && currentPerm === 'viewer') ? '#2563eb' : 'transparent',
-                                                                    color: (isAllocated && currentPerm === 'viewer') ? '#fff' : '#64748b',
-                                                                    boxShadow: (isAllocated && currentPerm === 'viewer') ? '0 1px 2px rgba(37,99,235,0.2)' : 'none'
+                                                                    color: (isAllocated && currentPerm === 'viewer') ? '#ffffff' : '#64748b',
+                                                                    boxShadow: (isAllocated && currentPerm === 'viewer') ? '0 2px 5px rgba(37,99,235,0.28)' : 'none'
                                                                 }}
                                                             >
-                                                                View
+                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
+                                                                    <circle cx="12" cy="12" r="3" />
+                                                                </svg>
+                                                                <span>Viewer</span>
                                                             </button>
                                                             <button
                                                                 type="button"
+                                                                title="Grant Editor (upload and editing) access"
                                                                 onClick={() => {
                                                                     setAllocationsMap(prev => ({
                                                                         ...prev,
@@ -1819,19 +2015,26 @@ export default function ProjectView() {
                                                                     }));
                                                                 }}
                                                                 style={{
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: 4,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 6,
+                                                                    padding: '5px 12px',
+                                                                    borderRadius: 20,
                                                                     border: 'none',
                                                                     cursor: 'pointer',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    transition: 'all 0.15s',
+                                                                    fontSize: 12,
+                                                                    fontWeight: 650,
+                                                                    transition: 'all 0.18s ease-in-out',
                                                                     background: (isAllocated && currentPerm === 'editor') ? '#059669' : 'transparent',
-                                                                    color: (isAllocated && currentPerm === 'editor') ? '#fff' : '#64748b',
-                                                                    boxShadow: (isAllocated && currentPerm === 'editor') ? '0 1px 2px rgba(5,150,105,0.2)' : 'none'
+                                                                    color: (isAllocated && currentPerm === 'editor') ? '#ffffff' : '#64748b',
+                                                                    boxShadow: (isAllocated && currentPerm === 'editor') ? '0 2px 5px rgba(5,150,105,0.28)' : 'none'
                                                                 }}
                                                             >
-                                                                Edit
+                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                                </svg>
+                                                                <span>Editor</span>
                                                             </button>
                                                         </div>
                                                     </td>

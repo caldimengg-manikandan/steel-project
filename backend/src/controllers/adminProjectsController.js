@@ -20,6 +20,8 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const Project = require('../models/Project');
+const User = require('../models/User');
+const Team = require('../models/Team');
 const Drawing = require('../models/Drawing');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
@@ -28,6 +30,7 @@ const ChangeOrder = require('../models/ChangeOrder');
 const { generateProjectStatusExcel } = require('../services/excelService');
 const { attachProjectStats, getProjectStatusReportData } = require('../services/projectStatsService');
 const { getExternalProjects } = require('../services/externalProjectService');
+const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 const storageGateway = require('../utils/storageGateway');
 const { runExtractionPipeline } = require('../services/extractionService');
 const { calculateSowProgress } = require('../utils/sowCalculator');
@@ -39,24 +42,23 @@ const { calculateSowProgress } = require('../utils/sowCalculator');
 async function listProjects(req, res) {
     const { status, search } = req.query;
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
-    const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
+    const accessFilter = await buildProjectQueryForUser(req.principal);
+    const filter = { ...accessFilter };
 
-    const filter = {};
-    if (isFullAccess) {
-        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
-    } else {
-        // Limited access roles (team_member / user) see ONLY their assigned projects
-        const userId = req.principal.id;
-        const queryUserId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
-        filter['assignments.userId'] = queryUserId;
-    }
     if (status) filter.status = status;
     if (search) {
-        filter.$or = [
-            { name: { $regex: search, $options: 'i' } },
-            { clientName: { $regex: search, $options: 'i' } },
-        ];
+        const searchCondition = {
+            $or: [
+                { name: { $regex: search, $options: 'i' } },
+                { clientName: { $regex: search, $options: 'i' } },
+            ]
+        };
+        if (filter.$or) {
+            filter.$and = [{ $or: filter.$or }, searchCondition];
+            delete filter.$or;
+        } else {
+            filter.$or = searchCondition.$or;
+        }
     }
 
     const projects = await Project
@@ -78,6 +80,7 @@ async function createProject(req, res) {
     const {
         name, clientName, clientId, contactPerson, clientContactPersons,
         caldimProjectManager, caldimProjectManagerName, caldimAssistantProjectManager, caldimAssistantProjectManagerName,
+        caldimTeamLead, caldimTeamLeadName, teamId, teamName,
         description, status,
         approximateDrawingsCount, location, sequences, scopeOfWork,
         connectionDesignVendor, connectionDesignContact, connectionDesignEmail,
@@ -121,7 +124,77 @@ async function createProject(req, res) {
     const effectiveCreationDate = creationDate || (projectStartDate ? new Date(projectStartDate).toISOString().split('T')[0] : null);
 
     const effectiveContactPerson = contactPerson || (Array.isArray(clientContactPersons) && clientContactPersons.length > 0 ? clientContactPersons[0] : null);
-    const effectivePmName = caldimProjectManagerName || projectManager || '';
+
+    // Auto-resolve hierarchy if created by APM or Team Lead
+    const creatorId = req.principal.id;
+    let effectivePm = caldimProjectManager || null;
+    let effectivePmName = caldimProjectManagerName || projectManager || '';
+    let effectiveApm = caldimAssistantProjectManager || null;
+    let effectiveApmName = caldimAssistantProjectManagerName || '';
+    let effectiveTl = caldimTeamLead || null;
+    let effectiveTlName = caldimTeamLeadName || '';
+    let effectiveTeamId = teamId || null;
+    let effectiveTeamName = teamName || '';
+
+    const creatorUser = await User.findById(creatorId);
+    if (creatorUser) {
+        // If PM is not set, resolve from creator's designated PM
+        if (!effectivePm && creatorUser.project_manager) {
+            effectivePm = creatorUser.project_manager;
+            const pmUser = await User.findById(effectivePm);
+            if (pmUser) effectivePmName = pmUser.displayName || pmUser.username;
+        }
+
+        // If creator is APM, set APM to creator
+        if (req.principal.role === 'assistant_project_manager') {
+            if (!effectiveApm) {
+                effectiveApm = creatorId;
+                effectiveApmName = creatorUser.displayName || creatorUser.username;
+            }
+        } else if (req.principal.role === 'team_lead' || req.principal.role === 'assistant_team_lead') {
+            // If creator is Team Lead, set TL to creator
+            if (!effectiveTl) {
+                effectiveTl = creatorId;
+                effectiveTlName = creatorUser.displayName || creatorUser.username;
+            }
+            if (!effectiveApm && creatorUser.assistant_project_manager) {
+                effectiveApm = creatorUser.assistant_project_manager;
+                const apmUser = await User.findById(effectiveApm);
+                if (apmUser) effectiveApmName = apmUser.displayName || apmUser.username;
+            }
+        }
+
+        // Auto-resolve team if not specified
+        if (!effectiveTeamId) {
+            const userTeam = await Team.findOne({ $or: [{ assistant_project_manager: creatorId }, { lead: creatorId }, { members: creatorId }] });
+            if (userTeam) {
+                effectiveTeamId = userTeam._id;
+                effectiveTeamName = userTeam.name;
+            }
+        }
+    }
+
+    const assignments = [
+        {
+            userId: req.principal.id,
+            username: req.principal.username,
+            permission: 'admin',
+            assignedAt: effectiveCreationDate ? new Date(effectiveCreationDate) : new Date(),
+        }
+    ];
+
+    // If PM is specified and different from creator, also ensure PM is in assignments
+    if (effectivePm && String(effectivePm) !== String(creatorId)) {
+        const pmDoc = await User.findById(effectivePm);
+        if (pmDoc) {
+            assignments.push({
+                userId: pmDoc._id,
+                username: pmDoc.username,
+                permission: 'admin',
+                assignedAt: effectiveCreationDate ? new Date(effectiveCreationDate) : new Date(),
+            });
+        }
+    }
 
     const projectPayload = {
         name,
@@ -129,10 +202,14 @@ async function createProject(req, res) {
         clientId: clientId || null,
         contactPerson: effectiveContactPerson,
         clientContactPersons: Array.isArray(clientContactPersons) ? clientContactPersons : (effectiveContactPerson ? [effectiveContactPerson] : []),
-        caldimProjectManager: caldimProjectManager || null,
-        caldimProjectManagerName: caldimProjectManagerName || '',
-        caldimAssistantProjectManager: caldimAssistantProjectManager || null,
-        caldimAssistantProjectManagerName: caldimAssistantProjectManagerName || '',
+        caldimProjectManager: effectivePm,
+        caldimProjectManagerName: effectivePmName,
+        caldimAssistantProjectManager: effectiveApm,
+        caldimAssistantProjectManagerName: effectiveApmName,
+        caldimTeamLead: effectiveTl,
+        caldimTeamLeadName: effectiveTlName,
+        teamId: effectiveTeamId,
+        teamName: effectiveTeamName,
         description: description || '',
         status: status === 'active' ? 'in_progress' : (status || 'in_progress'),
         location: location || '',
@@ -147,6 +224,7 @@ async function createProject(req, res) {
         startingTransmittalNumber: startNum,
         transmittalCount: initialTransmittalCount,
         createdByAdminId: adminId,
+        createdByUserId: creatorId,
         createdByUsername: req.principal.username || '',
         creationDate: effectiveCreationDate,
         projectStartDate: projectStartDate || (effectiveCreationDate ? new Date(effectiveCreationDate).toISOString() : null),
@@ -154,14 +232,7 @@ async function createProject(req, res) {
         projectCode: projectCode || '',
         division: division || '',
         projectManager: effectivePmName,
-        assignments: [
-            {
-                userId: req.principal.id,
-                username: req.principal.username,
-                permission: 'admin',
-                assignedAt: effectiveCreationDate ? new Date(effectiveCreationDate) : new Date(),
-            }
-        ],
+        assignments: assignments,
         drawingCount: 0,
     };
     if (effectiveCreationDate) {
@@ -225,6 +296,7 @@ async function updateProject(req, res) {
     const { 
         name, clientName, clientId, contactPerson, clientContactPersons,
         caldimProjectManager, caldimProjectManagerName, caldimAssistantProjectManager, caldimAssistantProjectManagerName,
+        caldimTeamLead, caldimTeamLeadName, teamId, teamName,
         description, status, approximateDrawingsCount, location, sequences, scopeOfWork, 
         connectionDesignVendor, connectionDesignContact, connectionDesignEmail, creationDate, 
         projectStartDate, financialYear, projectCode, division, projectManager 
@@ -249,6 +321,10 @@ async function updateProject(req, res) {
     }
     if (caldimAssistantProjectManager !== undefined) project.caldimAssistantProjectManager = caldimAssistantProjectManager || null;
     if (caldimAssistantProjectManagerName !== undefined) project.caldimAssistantProjectManagerName = caldimAssistantProjectManagerName || '';
+    if (caldimTeamLead !== undefined) project.caldimTeamLead = caldimTeamLead || null;
+    if (caldimTeamLeadName !== undefined) project.caldimTeamLeadName = caldimTeamLeadName || '';
+    if (teamId !== undefined) project.teamId = teamId || null;
+    if (teamName !== undefined) project.teamName = teamName || '';
     if (description !== undefined) project.description = description;
     if (location !== undefined) project.location = location;
     if (approximateDrawingsCount !== undefined) project.approximateDrawingsCount = Number(approximateDrawingsCount) || 0;
@@ -381,7 +457,34 @@ async function deleteProject(req, res) {
         await DrawingLog.deleteMany({ projectId: project._id });
     } catch (_) { }
 
-    // 4. Delete project itself
+    // 4. Send email alert to that particular team (PM, APM, Team Lead)
+    try {
+        const User = require('../models/User');
+        const { sendFolderDeletionAlert } = require('../services/emailService');
+        let userDoc = null;
+        if (req.principal?.id && req.principal.id !== 'viewer') {
+            userDoc = await User.findById(req.principal.id).select('displayName email role username').lean();
+        }
+        const deletedBy = {
+            username: req.principal?.username || 'Unknown',
+            displayName: userDoc?.displayName || req.principal?.username || 'User',
+            email: req.principal?.email || userDoc?.email || '',
+            role: req.principal?.role || 'user'
+        };
+
+        sendFolderDeletionAlert({
+            project,
+            deletedItemPath: `Project "${project.name}" (entire project and all associated files)`,
+            deletedBy,
+            isProjectDeletion: true
+        }).catch(mailErr => {
+            console.error('[DeleteProject] Email notification error:', mailErr.message);
+        });
+    } catch (emailErr) {
+        console.error('[DeleteProject] Error preparing email alert:', emailErr.message);
+    }
+
+    // 5. Delete project itself
     await project.deleteOne();
 
     res.json({ message: `Project "${project.name}" and all related data deleted from database and storage server.` });

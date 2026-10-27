@@ -17,6 +17,8 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Project = require('../models/Project');
 const { getExternalProjects } = require('../services/externalProjectService');
+const { canUserAccessProject } = require('../utils/projectAccessFilter');
+const { FULL_ACCESS_ROLES } = require('./auth');
 
 /**
  * scopeUserToAdmin
@@ -83,6 +85,14 @@ async function scopeProjectToAdmin(req, res, next) {
         return res.status(404).json({ error: 'Project not found.' });
     }
 
+    // Role-based access enforcement for PMs, APMs, TLs, etc.
+    if (req.principal.role !== 'superadmin' && req.principal.role !== 'admin') {
+        const allowed = await canUserAccessProject(req.principal, projectId);
+        if (!allowed) {
+            return res.status(403).json({ error: 'Access denied: You do not have permission to view or manage this project.' });
+        }
+    }
+
     req.scopedProject = project;
     next();
 }
@@ -146,10 +156,10 @@ async function scopeProjectToUser(req, res, next) {
 
     let project = null;
     if (mongoose.Types.ObjectId.isValid(projectId)) {
-        project = await Project.findOne({
-            _id: projectId,
-            'assignments.userId': userId,
-        });
+        const allowed = await canUserAccessProject(req.principal, projectId);
+        if (allowed) {
+            project = await Project.findById(projectId);
+        }
     }
 
     if (!project) {
@@ -159,7 +169,7 @@ async function scopeProjectToUser(req, res, next) {
         if (found) {
             return res.status(403).json({ error: 'External projects are not accessible to users.' });
         }
-        return res.status(404).json({ error: 'Project not found or you are not assigned to it.' });
+        return res.status(404).json({ error: 'Project not found or you do not have access to it.' });
     }
 
     req.scopedProject = project;
@@ -180,6 +190,7 @@ async function scopeProjectToUser(req, res, next) {
  */
 async function scopeProjectAccess(req, res, next) {
     const { id, role, adminId } = req.principal;
+    const isFullAccess = FULL_ACCESS_ROLES.includes(role);
 
     // Capture projectId from any possible source (Params, Body, or Query)
     let projectId = req.params.projectId || req.body.projectId || req.query.projectId;
@@ -204,8 +215,7 @@ async function scopeProjectAccess(req, res, next) {
         });
     }
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead', 'pm', 'tl'];
-    const isFullAccess = FULL_ACCESS_ROLES.includes(role);
+    const { canUserAccessProject } = require('../utils/projectAccessFilter');
 
     let project = null;
     let internalExists = false;
@@ -214,11 +224,15 @@ async function scopeProjectAccess(req, res, next) {
         const rawDoc = await Project.findById(projectId);
         if (rawDoc) {
             internalExists = true;
-            if (isFullAccess || role === 'viewer') {
+            if (role === 'superadmin' || role === 'viewer') {
                 project = rawDoc;
+            } else if (role === 'admin') {
+                if (String(rawDoc.createdByAdminId) === String(req.principal.adminId)) {
+                    project = rawDoc;
+                }
             } else {
-                const assigned = rawDoc.assignments.some(a => a.userId.toString() === String(id));
-                if (assigned) {
+                const hasAccess = await canUserAccessProject(req.principal, projectId);
+                if (hasAccess) {
                     project = rawDoc;
                 }
             }
@@ -251,7 +265,7 @@ async function scopeProjectAccess(req, res, next) {
     if (isFullAccess) {
         req.userPermission = 'admin';
     } else {
-        req.userPermission = project.assignments.find(a => a.userId.toString() === id)?.permission || 'viewer';
+        req.userPermission = project.assignments?.find(a => a.userId && a.userId.toString() === id)?.permission || 'viewer';
     }
 
     next();

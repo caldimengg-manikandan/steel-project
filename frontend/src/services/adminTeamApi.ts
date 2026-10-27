@@ -4,12 +4,21 @@ export interface Team {
     _id: string;
     id: string;
     name: string;
+    project_manager?: any;
+    assistant_project_manager?: any;
     lead: any;
     members: any[];
+    users?: any[];
     createdAt: string;
 }
 
-export async function adminCreateTeam(payload: { name: string; lead: string[]; members: string[] }) {
+export async function adminCreateTeam(payload: {
+    name: string;
+    project_manager?: string;
+    assistant_project_manager?: string;
+    lead: string[];
+    members: string[];
+}) {
     const res = await fetchWithAuth(`${BASE}/admin/teams`, {
         method: 'POST',
         credentials: 'include',
@@ -37,7 +46,13 @@ export async function adminDeleteTeam(id: string) {
     return handleResponse(res);
 }
 
-export async function adminUpdateTeam(id: string, payload: { name: string; lead: string[]; members: string[] }) {
+export async function adminUpdateTeam(id: string, payload: {
+    name: string;
+    project_manager?: string;
+    assistant_project_manager?: string;
+    lead: string[];
+    members: string[];
+}) {
     const res = await fetchWithAuth(`${BASE}/admin/teams/${id}`, {
         method: 'PUT',
         credentials: 'include',

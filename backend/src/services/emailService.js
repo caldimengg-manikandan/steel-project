@@ -520,4 +520,296 @@ async function sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries = 
     }
 }
 
-module.exports = { sendErrorLogNotification, sendErrorLogUpdateSummary, getTransporter };
+/**
+ * Resolve recipient emails strictly for the specific team assigned to a project (PM, APM, Team Lead).
+ * Ensures NO other team or unrelated project manager receives the notification.
+ */
+async function getProjectTeamRecipients(project) {
+    if (!project) return [];
+
+    const Project = require('../models/Project');
+    const Team = require('../models/Team');
+    const User = require('../models/User');
+
+    let fullProject = project;
+    if (typeof project === 'string' || !project.caldimProjectManager) {
+        const pDoc = await Project.findById(project._id || project).lean();
+        if (pDoc) fullProject = pDoc;
+    }
+
+    const userIds = new Set();
+
+    // 1. Direct project team role IDs
+    if (fullProject.caldimProjectManager) userIds.add(fullProject.caldimProjectManager.toString());
+    if (fullProject.caldimAssistantProjectManager) userIds.add(fullProject.caldimAssistantProjectManager.toString());
+    if (fullProject.caldimTeamLead) userIds.add(fullProject.caldimTeamLead.toString());
+
+    // 2. Linked Team
+    let team = null;
+    if (fullProject.teamId) {
+        team = await Team.findById(fullProject.teamId).lean();
+    } else if (fullProject.teamName) {
+        team = await Team.findOne({ name: fullProject.teamName }).lean();
+    }
+
+    if (team) {
+        if (team.project_manager) userIds.add(team.project_manager.toString());
+        if (team.assistant_project_manager) userIds.add(team.assistant_project_manager.toString());
+        if (Array.isArray(team.lead)) {
+            team.lead.forEach(id => {
+                if (id) userIds.add(id.toString());
+            });
+        }
+    }
+
+    // 3. Fallback: if no direct team assignments yet, check assigned users who are PM, APM, or Team Lead
+    if (userIds.size === 0 && Array.isArray(fullProject.assignments) && fullProject.assignments.length > 0) {
+        const assignedIds = fullProject.assignments.map(a => a.userId).filter(Boolean);
+        const assignedUsers = await User.find({
+            _id: { $in: assignedIds },
+            role: { $in: ['project_manager', 'assistant_project_manager', 'team_lead', 'assistant_team_lead'] }
+        }).select('_id').lean();
+        assignedUsers.forEach(u => userIds.add(u._id.toString()));
+
+        // Also check if any assigned user belongs to a Team
+        if (assignedIds.length > 0) {
+            const memberTeams = await Team.find({
+                $or: [
+                    { project_manager: { $in: assignedIds } },
+                    { assistant_project_manager: { $in: assignedIds } },
+                    { lead: { $in: assignedIds } },
+                    { members: { $in: assignedIds } }
+                ]
+            }).lean();
+            for (const t of memberTeams) {
+                if (t.project_manager) userIds.add(t.project_manager.toString());
+                if (t.assistant_project_manager) userIds.add(t.assistant_project_manager.toString());
+                if (Array.isArray(t.lead)) {
+                    t.lead.forEach(id => { if (id) userIds.add(id.toString()); });
+                }
+            }
+        }
+    }
+
+    if (userIds.size === 0) {
+        return [];
+    }
+
+    const users = await User.find({
+        _id: { $in: Array.from(userIds) },
+        status: { $ne: 'inactive' }
+    }).select('email displayName username role').lean();
+
+    const recipients = users
+        .map(u => ({
+            id: u._id.toString(),
+            email: u.email?.trim()?.toLowerCase(),
+            name: u.displayName || u.username,
+            role: u.role
+        }))
+        .filter(u => u.email && u.email.includes('@'));
+
+    // Unique by email
+    const uniqueMap = new Map();
+    for (const r of recipients) {
+        if (!uniqueMap.has(r.email)) {
+            uniqueMap.set(r.email, r);
+        }
+    }
+
+    return Array.from(uniqueMap.values());
+}
+
+/**
+ * Send an automated email notification when a folder or project is deleted.
+ * Alerts strictly the assigned Team Lead, Assistant Project Manager, and Project Manager for that team.
+ *
+ * @param {Object} params
+ * @param {Object|string} params.project - Project model or lean object
+ * @param {string} params.deletedItemPath - Name or relative path of the deleted item/folder
+ * @param {Object} params.deletedBy - Information on who performed the deletion { username, displayName, email, role }
+ * @param {boolean} [params.isProjectDeletion=false] - True if entire project was deleted
+ */
+async function sendFolderDeletionAlert({ project, deletedItemPath, deletedBy, isProjectDeletion = false }) {
+    try {
+        const Project = require('../models/Project');
+        let fullProject = project;
+        if (typeof project === 'string' || !project.caldimProjectManager) {
+            const pDoc = await Project.findById(project._id || project).lean();
+            if (pDoc) fullProject = pDoc;
+        }
+
+        if (!fullProject) {
+            console.log('[Email] Deletion alert skipped — project not found.');
+            return;
+        }
+
+        const recipients = await getProjectTeamRecipients(fullProject);
+        if (recipients.length === 0) {
+            console.log(`[Email] No team leads/PMs found for project "${fullProject.name}" — skipping deletion alert.`);
+            return;
+        }
+
+        // SAFETY GUARD: Do not send live emails in local dev before push
+        if (process.env.ENABLE_DELETION_EMAIL !== 'true' && process.env.NODE_ENV !== 'production') {
+            console.log(`[Email] [DEV SAFETY - EMAIL SUPPRESSED] Deletion alert for "${fullProject.name}". Recipients would be: ${recipients.map(r => r.email).join(', ')}`);
+            return;
+        }
+
+        const conn = await getTransporter();
+        if (!conn) {
+            console.warn('[Email] SMTP transporter not configured — cannot send deletion alert.');
+            return;
+        }
+
+        const { transporter, from } = conn;
+
+        const roleLabels = {
+            superadmin: 'Super Admin',
+            admin: 'Admin',
+            project_manager: 'Project Manager',
+            assistant_project_manager: 'Assistant Project Manager',
+            team_lead: 'Team Lead',
+            assistant_team_lead: 'Assistant Team Lead',
+            team_member: 'Team Member',
+            user: 'User'
+        };
+
+        const actorName = deletedBy?.displayName || deletedBy?.username || 'System User';
+        const actorEmail = deletedBy?.email || 'N/A';
+        const actorRole = roleLabels[deletedBy?.role] || deletedBy?.role || 'User';
+
+        const projectName = fullProject.name || 'Unnamed Project';
+        const clientName = fullProject.clientName || 'N/A';
+        const teamName = fullProject.teamName || 'Assigned Team';
+
+        const cleanItemPath = (deletedItemPath || '').replace(/\\/g, '/');
+        const formattedDate = new Date().toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            dateStyle: 'full',
+            timeStyle: 'medium'
+        });
+
+        const actionTitle = isProjectDeletion ? 'Project Deleted' : 'Folder Deleted from Project';
+        const subjectPrefix = isProjectDeletion ? '🚨 [Project Deleted]' : '⚠️ [Folder Deleted]';
+        const subject = `${subjectPrefix} Project "${projectName}" - deleted by ${actorName}`;
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${actionTitle}</title>
+</head>
+<body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
+  <div style="max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+    
+    <!-- Top Header Banner -->
+    <div style="background: ${isProjectDeletion ? '#b91c1c' : '#ea580c'}; padding: 24px 32px; color: #ffffff;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 24px; margin-right: 10px;">${isProjectDeletion ? '🚨' : '⚠️'}</span>
+        <h1 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">${actionTitle}</h1>
+      </div>
+      <p style="margin: 0; font-size: 14px; opacity: 0.95; line-height: 1.5;">
+        ${isProjectDeletion 
+            ? `The project <strong>${projectName}</strong> was deleted from the system.` 
+            : `A folder/directory was deleted from project <strong>${projectName}</strong>.`}
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 28px 32px;">
+      
+      <!-- Key Info Summary Box -->
+      <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 14px 18px; border-radius: 6px; margin-bottom: 24px;">
+        <p style="margin: 0; font-size: 14px; color: #9a3412; line-height: 1.5;">
+          <strong>Security & Audit Notice:</strong> This notification is automatically sent to the assigned <strong>Project Manager</strong>, <strong>Assistant Project Manager</strong>, and <strong>Team Lead</strong> for this project team.
+        </p>
+      </div>
+
+      <!-- Details Table -->
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b; width: 35%;">Project Name</td>
+          <td style="padding: 10px 0; font-weight: 700; color: #0f172a;">${projectName}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">Client Name</td>
+          <td style="padding: 10px 0; color: #1e293b;">${clientName}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">Assigned Team</td>
+          <td style="padding: 10px 0; color: #1e293b;">
+            <span style="display: inline-block; background-color: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;">
+              ${teamName}
+            </span>
+          </td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">${isProjectDeletion ? 'Deleted Target' : 'Deleted Folder / Item'}</td>
+          <td style="padding: 10px 0;">
+            <code style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 13px; font-weight: 600; word-break: break-all;">
+              ${cleanItemPath}
+            </code>
+          </td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">Deleted By (Login User)</td>
+          <td style="padding: 10px 0; color: #1e293b;">
+            <strong>${actorName}</strong> 
+            <span style="color: #64748b; font-size: 13px;">(${actorRole})</span>
+          </td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">User Email</td>
+          <td style="padding: 10px 0; color: #475569;">${actorEmail}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-weight: 600; color: #64748b;">Timestamp (IST)</td>
+          <td style="padding: 10px 0; color: #1e293b;">${formattedDate}</td>
+        </tr>
+      </table>
+
+      <!-- Notified Team Members -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 18px; margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+          Team Recipients Notified (${recipients.length})
+        </div>
+        <div style="font-size: 13px; color: #334155; line-height: 1.6;">
+          ${recipients.map(r => `<div>• <strong>${r.name}</strong> <span style="color: #64748b;">(${roleLabels[r.role] || r.role})</span> &lt;${r.email}&gt;</div>`).join('')}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 18px 32px; font-size: 12px; color: #94a3b8; text-align: center;">
+      Steel DMS • Caldim Engineering • Automated System Alert
+    </div>
+  </div>
+</body>
+</html>`;
+
+        const recipientEmails = recipients.map(r => r.email);
+
+        await transporter.sendMail({
+            from,
+            to: recipientEmails.join(', '),
+            subject,
+            html
+        });
+
+        console.log(`[Email] Deletion alert sent to ${recipientEmails.length} team member(s) (${recipientEmails.join(', ')}) for project "${projectName}".`);
+    } catch (err) {
+        console.error('[Email] Failed to send deletion alert email:', err.message);
+    }
+}
+
+module.exports = {
+    sendErrorLogNotification,
+    sendErrorLogUpdateSummary,
+    getTransporter,
+    getProjectTeamRecipients,
+    sendFolderDeletionAlert
+};
+

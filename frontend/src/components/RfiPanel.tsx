@@ -109,14 +109,24 @@ export default function RfiExtractionPanel({
             return;
         }
 
-        // Project Name Validation: Filename must contain project name
+        // Project Name Validation: Filename must contain at least one word from the project name
         if (projectName) {
-            const invalidFiles = fileArray.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
+            const projectWords: string[] = (projectName || '')
+                .toLowerCase()
+                .split(/[\s_\-#.,/()\[\]]+/)
+                .map((w: string) => w.trim())
+                .filter((w: string) => w.length >= 2 || (w.length === 1 && /[a-z0-9]/i.test(w)));
+
+            const invalidFiles = fileArray.filter(f => {
+                const fileLower = f.name.toLowerCase();
+                return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+            });
+
             if (invalidFiles.length > 0) {
-                showMessage('Naming Validation Error', `The following files do not contain the project name "${projectName}":\n\n` + 
+                showMessage('Naming Validation Error', `The following files do not match any word from the project name "${projectName}":\n\n` + 
                           invalidFiles.map(f => `• ${f.name}`).join(', ') + 
-                          `\n\nPlease ensure your drawing filenames include the project name.`, 'error');
-                setUploadError(`Drawing filenames must include the project name "${projectName}".`);
+                          `\n\nPlease ensure your drawing filenames include at least one word from the project name.`, 'error');
+                setUploadError(`Drawing filenames must include at least one word from the project name "${projectName}".`);
                 return;
             }
         }
@@ -197,19 +207,36 @@ export default function RfiExtractionPanel({
         });
     };
 
-    const StatusBadge = ({ status }: { status: string }) => {
-        switch (status) {
-            case 'completed': return (
-                <span title="Completed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
+    const StatusBadge = ({ status, rfis }: { status: string; rfis?: any[] }) => {
+        if (status === 'processing') return <span className="badge badge-warning">Parsing...</span>;
+        if (status === 'queued') return <span className="badge badge-neutral">Queued</span>;
+        if (status === 'failed') return <span className="badge badge-danger">Failed</span>;
+
+        const items = rfis || [];
+        if (items.length === 0) {
+            return <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>—</span>;
+        }
+
+        const allClosed = items.every((r: any) => (r.status || '').toUpperCase() === 'CLOSED');
+
+        if (allClosed) {
+            return (
+                <span title="All Responses Closed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </span>
             );
-            case 'failed': return <span className="badge badge-danger">Failed</span>;
-            case 'processing': return <span className="badge badge-warning">Parsing...</span>;
-            default: return <span className="badge badge-neutral">Queued</span>;
         }
+
+        return (
+            <span title="Open Questions Pending" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', color: '#dc2626' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </span>
+        );
     };
 
     const completedCount = extractions.filter(e => e.status === 'completed').length;
@@ -433,6 +460,7 @@ export default function RfiExtractionPanel({
                                 <th>Drawing File</th>
                                 <th>Status</th>
                                 <th>RFIs Found</th>
+                                <th>Unanswered</th>
                                 <th>Uploaded By</th>
                                 <th>Created</th>
                                 {isAdmin && <th>Actions</th>}
@@ -472,8 +500,13 @@ export default function RfiExtractionPanel({
                                             style={{ cursor: 'pointer', background: isExp ? '#fafbfc' : 'transparent' }}
                                         >
                                             <td style={{ fontWeight: 500, color: 'var(--color-primary)' }}>{ext.originalFileName || 'Unknown'}</td>
-                                            <td><StatusBadge status={ext.status} /></td>
+                                            <td><StatusBadge status={ext.status} rfis={ext.rfis} /></td>
                                             <td>{ext.rfis ? ext.rfis.length : 0}</td>
+                                            <td>
+                                                <span style={{ fontWeight: 700, color: (ext.rfis || []).some((r: any) => (r.status || '').toUpperCase() !== 'CLOSED') ? '#dc2626' : '#16a34a' }}>
+                                                    {(ext.rfis || []).filter((r: any) => (r.status || '').toUpperCase() !== 'CLOSED').length}
+                                                </span>
+                                            </td>
                                             <td className="text-muted">{ext.uploadedBy}</td>
                                             <td className="text-muted">{new Date(ext.createdAt).toLocaleString()}</td>
                                             {isAdmin && (
@@ -486,7 +519,7 @@ export default function RfiExtractionPanel({
                                         </tr>
                                         {isExp && ext.rfis && ext.rfis.length > 0 && (
                                             <tr>
-                                                <td colSpan={isAdmin ? 6 : 5} style={{ padding: 0, background: '#f8f9fa' }}>
+                                                <td colSpan={isAdmin ? 7 : 6} style={{ padding: 0, background: '#f8f9fa' }}>
                                                     <div style={{ padding: '10px 20px' }}>
                                                         {/* Sequence Labels */}
                                                         {ext.sequences && ext.sequences.length > 0 && (
@@ -543,9 +576,22 @@ export default function RfiExtractionPanel({
                                                                             )}
                                                                         </td>
                                                                         <td>
-                                                                            <span className={`badge ${rfi.status === 'CLOSED' ? 'badge-success' : 'badge-warning'}`}>
-                                                                                {rfi.status}
-                                                                            </span>
+                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                                <span title="Closed" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: '#dcfce7', color: '#16a34a', fontSize: 11, fontWeight: 700 }}>
+                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                        <polyline points="20 6 9 17 4 12" />
+                                                                                    </svg>
+                                                                                    Closed
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span title="Open" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: '#fee2e2', color: '#dc2626', fontSize: 11, fontWeight: 700 }}>
+                                                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                                                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                                                                    </svg>
+                                                                                    Open
+                                                                                </span>
+                                                                            )}
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -557,7 +603,7 @@ export default function RfiExtractionPanel({
                                         )}
                                         {isExp && ext.status === 'failed' && (
                                             <tr>
-                                                <td colSpan={isAdmin ? 6 : 5} style={{ padding: '10px 20px', color: 'red', background: '#fff0f0' }}>
+                                                <td colSpan={isAdmin ? 7 : 6} style={{ padding: '10px 20px', color: 'red', background: '#fff0f0' }}>
                                                     <strong>Error:</strong> {ext.errorDetails || 'Unknown error occurred'}
                                                 </td>
                                             </tr>

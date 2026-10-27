@@ -4,6 +4,7 @@ const Client = require('../models/Client');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { attachProjectStats } = require('../services/projectStatsService');
 const { getExternalProjects } = require('../services/externalProjectService');
+const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 
 /**
  * GET /api/admin/stats
@@ -11,19 +12,8 @@ const { getExternalProjects } = require('../services/externalProjectService');
  */
 async function getAdminStats(req, res) {
     const adminId = req.principal.adminId;
-    const mongoose = require('mongoose');
 
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
-    const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
-
-    const filter = {};
-    if (isFullAccess) {
-        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
-    } else {
-        const userId = req.principal.id;
-        const queryUserId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
-        filter['assignments.userId'] = queryUserId;
-    }
+    const filter = await buildProjectQueryForUser(req.principal);
 
     const userFilter = {};
     if (req.principal.role !== 'superadmin') {

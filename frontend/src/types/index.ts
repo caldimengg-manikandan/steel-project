@@ -54,6 +54,7 @@ export interface User {
     assistant_project_manager?: string;
     team_lead?: string | string[];
     assistant_team_lead?: string;
+    team?: any;
 }
 
 export interface ProjectAssignment {
@@ -95,10 +96,15 @@ export interface Project {
     caldimProjectManagerName?: string;
     caldimAssistantProjectManager?: string;
     caldimAssistantProjectManagerName?: string;
+    caldimTeamLead?: string;
+    caldimTeamLeadName?: string;
+    teamId?: string;
+    teamName?: string;
     description: string;
     status: ProjectStatus;
     rawStatus?: string;
     location: string;
+    createdByUserId?: string;
     createdByUsername?: string;
     createdBy?: string;
     creationDate?: string;
@@ -197,10 +203,14 @@ export interface Project {
 export interface AuthUser {
     id: string;
     username: string;
+    displayName?: string;
     email: string;
     role: UserRole;
     adminId: string;
     token?: string;
+    project_manager?: any;
+    assistant_project_manager?: any;
+    team?: any;
 }
 
 export interface ActivityEntry {

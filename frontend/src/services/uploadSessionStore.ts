@@ -1,4 +1,5 @@
 import { listExtractions, deleteExtraction, resolveDuplicateExtraction } from './extractionApi';
+import { deleteFile } from './fileApi';
 
 export interface SessionFile {
     name: string;
@@ -229,6 +230,16 @@ export const uploadSessionStore = {
                 console.log(`[UploadSessionStore] Deleted extraction ${file.extractionId} from server`);
             } catch (err: any) {
                 console.error(`[UploadSessionStore] Failed to delete extraction from server:`, err.message);
+            }
+        }
+
+        // If this file has a storage path, delete it from the storage server
+        if (file.path) {
+            try {
+                await deleteFile(file.path);
+                console.log(`[UploadSessionStore] Deleted file ${file.path} from storage`);
+            } catch (err: any) {
+                console.error(`[UploadSessionStore] Failed to delete file ${file.path} from storage:`, err.message);
             }
         }
 

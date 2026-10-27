@@ -5,6 +5,7 @@ import { useMessage } from '../../context/MessageContext';
 import { adminListProjects, adminCreateProject, adminDeleteProject, adminUpdateProject, adminListExternalProjects } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { adminListUsers } from '../../services/adminUserApi';
+import { adminListTeams, type Team } from '../../services/adminTeamApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import { formatDate } from '../../utils/dateUtils';
 import type { Project, ProjectStatus, Client, ClientContact, User } from '../../types';
@@ -52,6 +53,10 @@ interface CreateProjectForm {
     caldimProjectManagerName?: string;
     caldimAssistantProjectManager?: string;
     caldimAssistantProjectManagerName?: string;
+    caldimTeamLead?: string;
+    caldimTeamLeadName?: string;
+    teamId?: string;
+    teamName?: string;
     description: string;
     status: ProjectStatus;
     location: string;
@@ -270,6 +275,10 @@ const DEFAULT_FORM: CreateProjectForm = {
     caldimProjectManagerName: '',
     caldimAssistantProjectManager: '',
     caldimAssistantProjectManagerName: '',
+    caldimTeamLead: '',
+    caldimTeamLeadName: '',
+    teamId: '',
+    teamName: '',
     description: '',
     status: 'in_progress',
     location: '',
@@ -287,6 +296,169 @@ const DEFAULT_FORM: CreateProjectForm = {
     division: '',
     projectManager: '',
 };
+
+interface PmTeamLeadOption {
+    type: 'apm' | 'team_lead';
+    id: string; // User ID
+    name: string;
+    email?: string;
+    teamId?: string;
+    teamName?: string;
+    label: string;
+}
+
+function getTeamOptionsForPm(pmId: string, allUsers: User[], allTeams: Team[]): PmTeamLeadOption[] {
+    if (!pmId) return [];
+    const pmIdStr = String(pmId);
+
+    const options: PmTeamLeadOption[] = [];
+    const seenKeys = new Set<string>();
+    const seenApmUserIds = new Set<string>();
+    const seenTlUserIds = new Set<string>();
+
+    // 1. Teams that belong to this PM (directly or via leads reporting to this PM)
+    const pmTeams = allTeams.filter(t => {
+        const tPmId = t.project_manager ? String(t.project_manager._id || t.project_manager.id || t.project_manager) : '';
+        if (tPmId === pmIdStr) return true;
+
+        const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+        return leads.some((l: any) => {
+            const leadId = String(l?._id || l?.id || l);
+            const lUser = allUsers.find(u => String(u.id || (u as any)._id) === leadId) || (typeof l === 'object' ? l : null);
+            const userPm = lUser?.project_manager ? String((lUser.project_manager as any)?._id || (lUser.project_manager as any)?.id || lUser.project_manager) : '';
+            return userPm === pmIdStr;
+        });
+    });
+
+    // For each team under this PM:
+    // If there is an APM in the team, show ONLY the APM — DO NOT fetch their team lead!
+    // If there is NO APM in the team, ONLY then populate the Team Lead(s).
+    pmTeams.forEach(t => {
+        const teamId = String(t._id || t.id);
+        const teamName = t.name;
+
+        let apmUser: User | null = null;
+
+        // A. Check if APM is set directly on the team
+        if (t.assistant_project_manager) {
+            const apmId = String(t.assistant_project_manager._id || t.assistant_project_manager.id || t.assistant_project_manager);
+            apmUser = allUsers.find(u => String(u.id || (u as any)._id) === apmId) || (typeof t.assistant_project_manager === 'object' ? t.assistant_project_manager : null);
+        }
+
+        // B. Check if any team lead of this team reports to an APM
+        if (!apmUser && Array.isArray(t.lead)) {
+            for (const l of t.lead) {
+                const leadId = String(l?._id || l?.id || l);
+                const leadDoc = allUsers.find(u => String(u.id || (u as any)._id) === leadId) || (typeof l === 'object' ? l : null);
+                if (leadDoc?.assistant_project_manager) {
+                    const apmId = String((leadDoc.assistant_project_manager as any)?._id || (leadDoc.assistant_project_manager as any)?.id || leadDoc.assistant_project_manager);
+                    apmUser = allUsers.find(u => String(u.id || (u as any)._id) === apmId) || null;
+                    if (apmUser) break;
+                }
+            }
+        }
+
+        // C. Check if any APM user has this team as their team or is in members
+        if (!apmUser) {
+            apmUser = allUsers.find(u => {
+                if (u.role !== 'assistant_project_manager') return false;
+                const uTeamId = u.team ? String((u.team as any)?._id || (u.team as any)?.id || u.team) : '';
+                if (uTeamId && uTeamId === teamId) return true;
+                const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                return members.some((m: any) => String(m?._id || m?.id || m) === String(u.id || (u as any)._id));
+            }) || null;
+        }
+
+        if (apmUser) {
+            // Team HAS an Assistant Project Manager:
+            // Output ONLY the APM for this team. NEVER fetch the team lead!
+            const apmId = String(apmUser.id || (apmUser as any)._id);
+            const apmName = apmUser.displayName || apmUser.username;
+            seenApmUserIds.add(apmId);
+            const key = `apm-${apmId}-${teamId}`;
+            if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                options.push({
+                    type: 'apm',
+                    id: apmId,
+                    name: apmName,
+                    email: apmUser.email,
+                    teamId,
+                    teamName,
+                    label: `${teamName} — APM: ${apmName}`
+                });
+            }
+        } else {
+            // Team has NO APM -> Only then populate the Team Lead(s)
+            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+            leads.forEach((l: any) => {
+                const leadId = String(l?._id || l?.id || l);
+                const leadDoc = allUsers.find(u => String(u.id || (u as any)._id) === leadId) || (typeof l === 'object' ? l : null);
+                if (leadDoc) {
+                    // If this lead reports to an APM, do not show as lead
+                    if (leadDoc.assistant_project_manager) {
+                        return;
+                    }
+                    const leadIdStr = String(leadDoc.id || (leadDoc as any)._id);
+                    const leadName = leadDoc.displayName || leadDoc.username;
+                    seenTlUserIds.add(leadIdStr);
+                    const key = `tl-${leadIdStr}-${teamId}`;
+                    if (!seenKeys.has(key)) {
+                        seenKeys.add(key);
+                        options.push({
+                            type: 'team_lead',
+                            id: leadIdStr,
+                            name: leadName,
+                            email: leadDoc.email,
+                            teamId,
+                            teamName,
+                            label: `${teamName} — Team Lead: ${leadName}`
+                        });
+                    }
+                }
+            });
+        }
+    });
+
+    // 2. Direct APMs under this PM not yet included as part of any team
+    const directApms = getApmsForPm(pmId, allUsers);
+    directApms.forEach(apm => {
+        const apmId = String(apm.id || (apm as any)._id);
+        if (!seenApmUserIds.has(apmId)) {
+            seenApmUserIds.add(apmId);
+            const apmName = apm.displayName || apm.username;
+            options.push({
+                type: 'apm',
+                id: apmId,
+                name: apmName,
+                email: apm.email,
+                label: `APM: ${apmName}`
+            });
+        }
+    });
+
+    // 3. Direct Team Leads reporting directly to this PM (not under any team with an APM, and not already included)
+    allUsers.filter(u => u.role === 'team_lead' || u.role === 'assistant_team_lead').forEach(tl => {
+        const tlPmId = tl.project_manager ? String((tl.project_manager as any)?._id || (tl.project_manager as any)?.id || tl.project_manager) : '';
+        if (tlPmId === pmIdStr) {
+            const tlId = String(tl.id || (tl as any)._id);
+            if (tl.assistant_project_manager || seenTlUserIds.has(tlId)) {
+                return;
+            }
+            const tlName = tl.displayName || tl.username;
+            options.push({
+                type: 'team_lead',
+                id: tlId,
+                name: tlName,
+                email: tl.email,
+                label: `Team Lead: ${tlName}`
+            });
+            seenTlUserIds.add(tlId);
+        }
+    });
+
+    return options;
+}
 
 function getApmsForPm(pmId: string, allUsers: User[]): User[] {
 
@@ -366,18 +538,20 @@ export default function AdminProjects() {
     const [isCreateSowCollapsed, setIsCreateSowCollapsed] = useState<boolean>(false);
     const [editSowInput, setEditSowInput] = useState<string>('');
     const [editSowNameInput, setEditSowNameInput] = useState<string>('');
+    const [teams, setTeams] = useState<Team[]>([]);
     const [showAdditionalSowFields, setShowAdditionalSowFields] = useState<boolean>(false);
-    const { logout } = useAuth();
+    const { user: authUser, logout } = useAuth();
     const fetchProjects = useCallback(async () => {
         try {
             setLoading(true);
             setError('');
 
-            const [projData, clientData, externalData, userData] = await Promise.all([
+            const [projData, clientData, externalData, userData, teamsData] = await Promise.all([
                 adminListProjects(),
                 adminListClients(),
                 adminListExternalProjects(),
-                adminListUsers().catch(() => ({ users: [] }))
+                adminListUsers().catch(() => ({ users: [] })),
+                adminListTeams().catch(() => [])
             ]);
 
             if (!projData || !Array.isArray(projData.projects)) {
@@ -387,6 +561,7 @@ export default function AdminProjects() {
             setClients(clientData.clients || []);
             setExternalProjects(externalData.projects || []);
             setUsers(userData.users || []);
+            setTeams(teamsData || []);
 
             const mapped = projData.projects.map((p: any) => ({
                 ...p,
@@ -427,6 +602,92 @@ export default function AdminProjects() {
                 .filter(v => typeof v === 'string' && v.trim() !== '')
         )
     );
+
+    const handleOpenCreateModal = () => {
+        let initialForm: CreateProjectForm = { ...DEFAULT_FORM };
+        if (authUser) {
+            const authUserId = String(authUser.id || (authUser as any)._id);
+            const authRole = authUser.role;
+
+            if (authRole === 'project_manager') {
+                initialForm.caldimProjectManager = authUserId;
+                initialForm.caldimProjectManagerName = authUser.displayName || authUser.username;
+            } else if (authRole === 'assistant_project_manager') {
+                initialForm.caldimAssistantProjectManager = authUserId;
+                initialForm.caldimAssistantProjectManagerName = authUser.displayName || authUser.username;
+
+                // Find their PM
+                const pmRef = authUser.project_manager;
+                const pmId = pmRef ? String((pmRef as any)._id || (pmRef as any).id || pmRef) : '';
+                if (pmId) {
+                    const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
+                    if (pmUser) {
+                        initialForm.caldimProjectManager = pmId;
+                        initialForm.caldimProjectManagerName = pmUser.displayName || pmUser.username;
+                    }
+                }
+
+                // Find their team
+                const myTeam = teams.find(t => {
+                    const apmId = t.assistant_project_manager ? String((t.assistant_project_manager as any)._id || (t.assistant_project_manager as any).id || t.assistant_project_manager) : '';
+                    if (apmId === authUserId) return true;
+                    const teamMembers = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                    return teamMembers.some((u: any) => String(u._id || u.id || u) === authUserId);
+                });
+                if (myTeam) {
+                    initialForm.teamId = String(myTeam._id || myTeam.id);
+                    initialForm.teamName = myTeam.name;
+                    if (!initialForm.caldimProjectManager && myTeam.project_manager) {
+                        const tPmId = String((myTeam.project_manager as any)._id || (myTeam.project_manager as any).id || myTeam.project_manager);
+                        const pmUser = users.find(u => String(u.id || (u as any)._id) === tPmId);
+                        if (pmUser) {
+                            initialForm.caldimProjectManager = tPmId;
+                            initialForm.caldimProjectManagerName = pmUser.displayName || pmUser.username;
+                        }
+                    }
+                }
+            } else if (authRole === 'team_lead' || authRole === 'assistant_team_lead') {
+                initialForm.caldimTeamLead = authUserId;
+                initialForm.caldimTeamLeadName = authUser.displayName || authUser.username;
+
+                // Find their team
+                const myTeam = teams.find(t => {
+                    const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+                    if (leads.some((l: any) => String(l._id || l.id || l) === authUserId)) return true;
+                    const teamMembers = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
+                    return teamMembers.some((u: any) => String(u._id || u.id || u) === authUserId);
+                });
+                if (myTeam) {
+                    initialForm.teamId = String(myTeam._id || myTeam.id);
+                    initialForm.teamName = myTeam.name;
+                    if (myTeam.project_manager) {
+                        const tPmId = String((myTeam.project_manager as any)._id || (myTeam.project_manager as any).id || myTeam.project_manager);
+                        const pmUser = users.find(u => String(u.id || (u as any)._id) === tPmId);
+                        if (pmUser) {
+                            initialForm.caldimProjectManager = tPmId;
+                            initialForm.caldimProjectManagerName = pmUser.displayName || pmUser.username;
+                        }
+                    }
+                }
+
+                if (!initialForm.caldimProjectManager && authUser.project_manager) {
+                    const pmRef = authUser.project_manager;
+                    const pmId = String((pmRef as any)._id || (pmRef as any).id || pmRef);
+                    const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
+                    if (pmUser) {
+                        initialForm.caldimProjectManager = pmId;
+                        initialForm.caldimProjectManagerName = pmUser.displayName || pmUser.username;
+                    }
+                }
+            }
+        }
+        setForm(initialForm);
+        setSeqInput('0');
+        setSowInput('0');
+        setSowNameInput('');
+        setIsCreateSowCollapsed(false);
+        setShowCreate(true);
+    };
 
     async function handleCreate() {
         if (!form.name.trim() || !form.clientId) return;
@@ -472,6 +733,10 @@ export default function AdminProjects() {
                 caldimProjectManagerName: form.caldimProjectManagerName || undefined,
                 caldimAssistantProjectManager: form.caldimAssistantProjectManager || undefined,
                 caldimAssistantProjectManagerName: form.caldimAssistantProjectManagerName || undefined,
+                caldimTeamLead: form.caldimTeamLead || undefined,
+                caldimTeamLeadName: form.caldimTeamLeadName || undefined,
+                teamId: form.teamId || undefined,
+                teamName: form.teamName || undefined,
                 description: form.description.trim(),
                 status: form.status,
                 trackingMode: form.trackingMode,
@@ -587,6 +852,10 @@ export default function AdminProjects() {
                 caldimProjectManagerName: editTarget.caldimProjectManagerName || undefined,
                 caldimAssistantProjectManager: editTarget.caldimAssistantProjectManager || undefined,
                 caldimAssistantProjectManagerName: editTarget.caldimAssistantProjectManagerName || undefined,
+                caldimTeamLead: editTarget.caldimTeamLead || undefined,
+                caldimTeamLeadName: editTarget.caldimTeamLeadName || undefined,
+                teamId: editTarget.teamId || undefined,
+                teamName: editTarget.teamName || undefined,
                 description: editTarget.description,
                 status: editTarget.status,
                 scopeOfWork: preparedScopeOfWork,
@@ -636,7 +905,7 @@ export default function AdminProjects() {
                     <h2 className="page-title">Projects</h2>
                     <p className="page-subtitle">Manage all steel detailing projects</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setSeqInput('0'); setSowInput('0'); setSowNameInput(''); setIsCreateSowCollapsed(false); }}>
+                <button className="btn btn-primary" onClick={handleOpenCreateModal}>
                     <span style={{ marginRight: 8, display: 'inline-flex' }}><IconPlus /></span> Create Project
                 </button>
             </div>
@@ -747,55 +1016,33 @@ export default function AdminProjects() {
                                             </div>
                                         </td>
                                         <td>
-                                            {p.trackingMode === 'sow' ? (
-                                                <div
-                                                    onClick={() => {
-                                                        setEditTarget({ ...p });
-                                                        setEditMode('sequences');
-                                                        setSeqInput((p.sequences?.length || 0).toString());
-                                                    }}
-                                                    title="Manage SOW Sequences"
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 6,
-                                                        background: '#f8fafc',
-                                                        padding: '4px 12px',
-                                                        borderRadius: '8px',
-                                                        border: '1px solid #e2e8f0',
-                                                        width: 'fit-content'
-                                                    }}
-                                                >
-                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{p.sequences?.length || 0}</span>
-                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
-                                                    <div style={{ color: '#94a3b8', display: 'flex', width: 12, height: 12, marginLeft: 2 }}><IconEdit /></div>
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    onClick={() => {
-                                                        setEditTarget({ ...p });
-                                                        setEditMode('full');
-                                                        setSeqInput((p.sequences?.length || 0).toString());
-                                                        setEditSowInput((p.additionalScopeOfWork?.length || 0).toString());
-                                                    }}
-                                                    title="Edit Sequence Project"
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 6,
-                                                        background: '#f8fafc',
-                                                        padding: '4px 12px',
-                                                        borderRadius: '8px',
-                                                        border: '1px solid #e2e8f0',
-                                                        width: 'fit-content'
-                                                    }}
-                                                >
-                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{(p.scopeOfWork && p.scopeOfWork.length > 0) ? p.scopeOfWork.length : (p.sequences?.length || 0)}</span>
-                                                    <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>SEQ</span>
-                                                </div>
-                                            )}
+                                            <div
+                                                onClick={() => {
+                                                    setEditTarget({ ...p });
+                                                    setEditMode('full');
+                                                    setSeqInput((p.sequences?.length || 0).toString());
+                                                    setEditSowInput((p.additionalScopeOfWork?.length || 0).toString());
+                                                }}
+                                                title="View / Edit Sequences"
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    background: '#f8fafc',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #e2e8f0',
+                                                    width: 'fit-content'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>
+                                                    {p.sequences?.length || (p.scopeOfWork?.length || 0)}
+                                                </span>
+                                                <span style={{ fontSize: 10, fontWeight: 650, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                                    SEQ
+                                                </span>
+                                            </div>
                                         </td>
                                         <td>
                                             <span className={`badge ${getBadgeClass(p.rawStatus || STATUS_LABEL[p.status as ProjectStatus] || p.status)}`}>
@@ -989,7 +1236,7 @@ export default function AdminProjects() {
                                 </div>
                             )}
 
-                            {/* Caldim Contact Person (PM dropdown + APM radio button) */}
+                            {/* Caldim Contact Person (PM dropdown + APM / Team Lead options) */}
                             <div className="form-group" style={{ marginTop: 12 }}>
                                 <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Caldim Contact Person</label>
                                 <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1001,14 +1248,18 @@ export default function AdminProjects() {
                                             onChange={(e) => {
                                                 const pmId = e.target.value;
                                                 const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
-                                                const availableApms = getApmsForPm(pmId, users);
-                                                const autoApm = availableApms.length === 1 ? availableApms[0] : null;
+                                                const teamOpts = getTeamOptionsForPm(pmId, users, teams);
+                                                const autoOpt = teamOpts.length === 1 ? teamOpts[0] : null;
                                                 setForm({
                                                     ...form,
                                                     caldimProjectManager: pmId,
                                                     caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
-                                                    caldimAssistantProjectManager: autoApm ? String(autoApm.id || (autoApm as any)._id) : '',
-                                                    caldimAssistantProjectManagerName: autoApm ? (autoApm.displayName || autoApm.username) : ''
+                                                    caldimAssistantProjectManager: autoOpt && autoOpt.type === 'apm' ? autoOpt.id : '',
+                                                    caldimAssistantProjectManagerName: autoOpt && autoOpt.type === 'apm' ? autoOpt.name : '',
+                                                    caldimTeamLead: autoOpt && autoOpt.type === 'team_lead' ? autoOpt.id : '',
+                                                    caldimTeamLeadName: autoOpt && autoOpt.type === 'team_lead' ? autoOpt.name : '',
+                                                    teamId: autoOpt?.teamId || '',
+                                                    teamName: autoOpt?.teamName || ''
                                                 });
                                             }}
                                         >
@@ -1022,52 +1273,70 @@ export default function AdminProjects() {
                                     </div>
 
                                     {form.caldimProjectManager && (() => {
-                                        const apmsForPm = getApmsForPm(form.caldimProjectManager, users);
+                                        const teamOptions = getTeamOptionsForPm(form.caldimProjectManager, users, teams);
 
                                         return (
                                             <div style={{ marginTop: 4 }}>
                                                 <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
-                                                    Assistant Project Manager
+                                                    Assigned Team / APM or Team Lead
                                                 </label>
-                                                {apmsForPm.length === 0 ? (
+                                                {teamOptions.length === 0 ? (
                                                     <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
-                                                        No Assistant Project Manager assigned to this Project Manager.
+                                                        No Assistant Project Manager or Team Lead assigned under this Project Manager.
                                                     </div>
                                                 ) : (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                        {apmsForPm.map(apm => {
-                                                            const apmId = String(apm.id || (apm as any)._id);
-                                                            const isSelected = form.caldimAssistantProjectManager === apmId;
+                                                        {teamOptions.map((opt, idx) => {
+                                                            const isSelected = (opt.type === 'apm' && form.caldimAssistantProjectManager === opt.id) ||
+                                                                               (opt.type === 'team_lead' && form.caldimTeamLead === opt.id);
                                                             return (
                                                                 <label
-                                                                    key={apmId}
+                                                                    key={`${opt.type}-${opt.id}-${opt.teamId || idx}`}
                                                                     style={{
                                                                         display: 'flex', alignItems: 'center', gap: 10,
                                                                         padding: '8px 12px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                        borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                        borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light, #eff6ff)' : '#fff',
                                                                         transition: 'all 0.2s', margin: 0
                                                                     }}
                                                                 >
                                                                     <input
                                                                         type="radio"
-                                                                        name="createCaldimApmRadio"
+                                                                        name="createCaldimTeamOptionRadio"
                                                                         checked={isSelected}
                                                                         onChange={() => {
-                                                                            setForm({
-                                                                                ...form,
-                                                                                caldimAssistantProjectManager: apmId,
-                                                                                caldimAssistantProjectManagerName: apm.displayName || apm.username
-                                                                            });
+                                                                            if (opt.type === 'apm') {
+                                                                                setForm({
+                                                                                    ...form,
+                                                                                    caldimAssistantProjectManager: opt.id,
+                                                                                    caldimAssistantProjectManagerName: opt.name,
+                                                                                    caldimTeamLead: '',
+                                                                                    caldimTeamLeadName: '',
+                                                                                    teamId: opt.teamId || '',
+                                                                                    teamName: opt.teamName || ''
+                                                                                });
+                                                                            } else {
+                                                                                setForm({
+                                                                                    ...form,
+                                                                                    caldimAssistantProjectManager: '',
+                                                                                    caldimAssistantProjectManagerName: '',
+                                                                                    caldimTeamLead: opt.id,
+                                                                                    caldimTeamLeadName: opt.name,
+                                                                                    teamId: opt.teamId || '',
+                                                                                    teamName: opt.teamName || ''
+                                                                                });
+                                                                            }
                                                                         }}
                                                                         style={{ cursor: 'pointer' }}
                                                                     />
                                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                                            {apm.displayName || apm.username}
+                                                                            {opt.label}
                                                                         </span>
-                                                                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                                                                            {apm.email}
-                                                                        </span>
+                                                                        {opt.email && (
+                                                                            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                                {opt.email}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </label>
                                                             );
@@ -1675,14 +1944,18 @@ export default function AdminProjects() {
                                                     onChange={(e) => {
                                                         const pmId = e.target.value;
                                                         const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
-                                                        const availableApms = getApmsForPm(pmId, users);
-                                                        const autoApm = availableApms.length === 1 ? availableApms[0] : null;
+                                                        const teamOpts = getTeamOptionsForPm(pmId, users, teams);
+                                                        const autoOpt = teamOpts.length === 1 ? teamOpts[0] : null;
                                                         setEditTarget({
                                                             ...editTarget,
                                                             caldimProjectManager: pmId,
                                                             caldimProjectManagerName: pmUser ? (pmUser.displayName || pmUser.username) : '',
-                                                            caldimAssistantProjectManager: autoApm ? String(autoApm.id || (autoApm as any)._id) : '',
-                                                            caldimAssistantProjectManagerName: autoApm ? (autoApm.displayName || autoApm.username) : ''
+                                                            caldimAssistantProjectManager: autoOpt && autoOpt.type === 'apm' ? autoOpt.id : '',
+                                                            caldimAssistantProjectManagerName: autoOpt && autoOpt.type === 'apm' ? autoOpt.name : '',
+                                                            caldimTeamLead: autoOpt && autoOpt.type === 'team_lead' ? autoOpt.id : '',
+                                                            caldimTeamLeadName: autoOpt && autoOpt.type === 'team_lead' ? autoOpt.name : '',
+                                                            teamId: autoOpt?.teamId || '',
+                                                            teamName: autoOpt?.teamName || ''
                                                         });
                                                     }}
                                                 >
@@ -1696,52 +1969,70 @@ export default function AdminProjects() {
                                             </div>
 
                                             {editTarget.caldimProjectManager && (() => {
-                                                const apmsForPm = getApmsForPm(editTarget.caldimProjectManager, users);
+                                                const teamOptions = getTeamOptionsForPm(editTarget.caldimProjectManager, users, teams);
 
                                                 return (
                                                     <div style={{ marginTop: 4 }}>
                                                         <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>
-                                                            Assistant Project Manager
+                                                            Assigned Team / APM or Team Lead
                                                         </label>
-                                                        {apmsForPm.length === 0 ? (
-                                                             <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
-                                                                No Assistant Project Manager assigned to this Project Manager.
+                                                        {teamOptions.length === 0 ? (
+                                                            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
+                                                                No Assistant Project Manager or Team Lead assigned under this Project Manager.
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                                {apmsForPm.map(apm => {
-                                                                    const apmId = String(apm.id || (apm as any)._id);
-                                                                    const isSelected = editTarget.caldimAssistantProjectManager === apmId;
+                                                                {teamOptions.map((opt, idx) => {
+                                                                    const isSelected = (opt.type === 'apm' && editTarget.caldimAssistantProjectManager === opt.id) ||
+                                                                                       (opt.type === 'team_lead' && editTarget.caldimTeamLead === opt.id);
                                                                     return (
                                                                         <label
-                                                                            key={apmId}
+                                                                            key={`${opt.type}-${opt.id}-${opt.teamId || idx}`}
                                                                             style={{
                                                                                 display: 'flex', alignItems: 'center', gap: 10,
                                                                                 padding: '8px 12px', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                                borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light)' : '#fff',
+                                                                                borderRadius: 6, cursor: 'pointer', background: isSelected ? 'var(--color-primary-light, #eff6ff)' : '#fff',
                                                                                 transition: 'all 0.2s', margin: 0
                                                                             }}
                                                                         >
                                                                             <input
                                                                                 type="radio"
-                                                                                name="editCaldimApmRadio"
+                                                                                name="editCaldimTeamOptionRadio"
                                                                                 checked={isSelected}
                                                                                 onChange={() => {
-                                                                                    setEditTarget({
-                                                                                        ...editTarget,
-                                                                                        caldimAssistantProjectManager: apmId,
-                                                                                        caldimAssistantProjectManagerName: apm.displayName || apm.username
-                                                                                    });
+                                                                                    if (opt.type === 'apm') {
+                                                                                        setEditTarget({
+                                                                                            ...editTarget,
+                                                                                            caldimAssistantProjectManager: opt.id,
+                                                                                            caldimAssistantProjectManagerName: opt.name,
+                                                                                            caldimTeamLead: '',
+                                                                                            caldimTeamLeadName: '',
+                                                                                            teamId: opt.teamId || '',
+                                                                                            teamName: opt.teamName || ''
+                                                                                        });
+                                                                                    } else {
+                                                                                        setEditTarget({
+                                                                                            ...editTarget,
+                                                                                            caldimAssistantProjectManager: '',
+                                                                                            caldimAssistantProjectManagerName: '',
+                                                                                            caldimTeamLead: opt.id,
+                                                                                            caldimTeamLeadName: opt.name,
+                                                                                            teamId: opt.teamId || '',
+                                                                                            teamName: opt.teamName || ''
+                                                                                        });
+                                                                                    }
                                                                                 }}
                                                                                 style={{ cursor: 'pointer' }}
                                                                             />
                                                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                                                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)' }}>
-                                                                                    {apm.displayName || apm.username}
+                                                                                    {opt.label}
                                                                                 </span>
-                                                                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                                                                                    {apm.email}
-                                                                                </span>
+                                                                                {opt.email && (
+                                                                                    <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                                        {opt.email}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </label>
                                                                     );
@@ -1751,7 +2042,6 @@ export default function AdminProjects() {
                                                     </div>
                                                 );
                                             })()}
-
                                         </div>
                                     </div>
 

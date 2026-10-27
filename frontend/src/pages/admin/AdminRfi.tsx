@@ -200,13 +200,23 @@ export default function AdminRfi() {
         const projectId = String(selectedProject._id || selectedProject.id);
         const projectName = selectedProject.name;
 
-        // Validation: Filename must contain project name
-        const invalidFiles = files.filter(f => !f.name.toLowerCase().includes(projectName.toLowerCase()));
+        // Validation: Filename must contain at least one word from the project name
+        const projectWords: string[] = (projectName || '')
+            .toLowerCase()
+            .split(/[\s_\-#.,/()\[\]]+/)
+            .map((w: string) => w.trim())
+            .filter((w: string) => w.length >= 2 || (w.length === 1 && /[a-z0-9]/i.test(w)));
+
+        const invalidFiles = files.filter(f => {
+            const fileLower = f.name.toLowerCase();
+            return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+        });
+
         if (invalidFiles.length > 0) {
-            showMessage('Naming Validation Error', `The following files do not contain the project name "${projectName}":\n\n` + 
+            showMessage('Naming Validation Error', `The following files do not contain any word from the project name "${projectName}":\n\n` + 
                         invalidFiles.map(f => `• ${f.name}`).join(', ') + 
-                        `\n\nPlease ensure your drawing filenames include the project name.`, 'error');
-            setUploadError(`Drawing filenames must include the project name "${projectName}".`);
+                        `\n\nPlease ensure your drawing filenames include at least one word from the project name.`, 'error');
+            setUploadError(`Drawing filenames must include at least one word from the project name "${projectName}".`);
             return;
         }
 
@@ -414,21 +424,34 @@ export default function AdminRfi() {
         queued: { label: 'Queued', color: '#374151', bg: '#f3f4f6', dot: '#9ca3af' },
     };
 
-    const StatusChip = ({ status }: { status: string }) => {
-        if (status === 'completed') {
+    const StatusChip = ({ status, rfis }: { status: string; rfis?: any[] }) => {
+        if (status === 'processing') return <span className="badge badge-warning">Parsing...</span>;
+        if (status === 'queued') return <span className="badge badge-neutral">Queued</span>;
+        if (status === 'failed') return <span className="badge badge-danger">Failed</span>;
+
+        const items = rfis || [];
+        if (items.length === 0) {
+            return <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>—</span>;
+        }
+
+        const allClosed = items.every((r: any) => (r.status || '').toUpperCase() === 'CLOSED');
+
+        if (allClosed) {
             return (
-                <span title="Completed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
+                <span title="All Responses Closed" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#dcfce7', color: '#16a34a' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </span>
             );
         }
-        const s = statusConfig[status] || statusConfig.queued;
+
         return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: s.bg, color: s.color, fontSize: 12, fontWeight: 600 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
-                {s.label}
+            <span title="Open Questions Pending" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#fee2e2', color: '#dc2626' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
             </span>
         );
     };
@@ -946,10 +969,22 @@ export default function AdminRfi() {
                                                                         <span /> {/* Spacer for the Description column if I split it */}
                                                                         <span style={{ fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rfi.description}</span>
 
-                                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: s.bg, color: s.color, fontSize: 11, fontWeight: 700, width: 'fit-content' }}>
-                                                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />
-                                                                            {s.label}
-                                                                        </span>
+                                                                        {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                            <span title="Closed" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 700, width: 'fit-content' }}>
+                                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                    <polyline points="20 6 9 17 4 12" />
+                                                                                </svg>
+                                                                                Closed
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span title="Open" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: '#fee2e2', color: '#991b1b', fontSize: 11, fontWeight: 700, width: 'fit-content' }}>
+                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                                                </svg>
+                                                                                Open
+                                                                            </span>
+                                                                        )}
                                                                         {hasAnyClientRfi && <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{rfi.clientRfiNumber || '—'}</span>}
                                                                         <div style={{ fontSize: 12, fontWeight: 500, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                             <span title={parent.originalFileName}>{parent.originalFileName.split('_').pop()?.replace('.pdf', '') || 'Drawing'}</span>
@@ -1009,10 +1044,11 @@ export default function AdminRfi() {
                                             // ──────────────────────────────────────────────────────────────────
                                             <>
                                                 {/* Header for Drawing View */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 110px 105px 40px', padding: '12px 20px', background: 'var(--color-background)', borderBottom: '1px solid var(--color-border-light)', fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px 100px 110px 105px 40px', padding: '12px 20px', background: 'var(--color-background)', borderBottom: '1px solid var(--color-border-light)', fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                                     <span>Drawing File</span>
                                                     <span>Status</span>
                                                     <span style={{ textAlign: 'center' }}>RFIs</span>
+                                                    <span style={{ textAlign: 'center' }}>Unanswered</span>
                                                     <span>Uploaded By</span>
                                                     <span>Date</span>
                                                     <span />
@@ -1031,15 +1067,17 @@ export default function AdminRfi() {
                                                     const isExp = expanded === ext._id || (searchTerm !== '' && rfiMatches.some((r: any) => (r.description || '').toLowerCase().includes(searchTerm.toLowerCase())));
                                                     const isLast = idx === arr.length - 1;
                                                     const rfiCount = rfiMatches.length;
+                                                    const unansweredCount = (ext.rfis || []).filter((r: any) => (r.status || '').toUpperCase() !== 'CLOSED').length;
                                                     return (
                                                         <div key={ext._id} style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border-light)' }}>
-                                                            <div onClick={() => setExpanded(isExp ? null : ext._id)} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 110px 105px 40px', padding: '14px 20px', cursor: 'pointer', alignItems: 'center', background: isExp ? 'rgba(37,99,235,0.03)' : 'transparent' }}>
+                                                            <div onClick={() => setExpanded(isExp ? null : ext._id)} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px 100px 110px 105px 40px', padding: '14px 20px', cursor: 'pointer', alignItems: 'center', background: isExp ? 'rgba(37,99,235,0.03)' : 'transparent' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                                                                     <IconChevron open={isExp} />
                                                                     <span style={{ fontSize: 13, fontWeight: 500, color: '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ext.originalFileName}</span>
                                                                 </div>
-                                                                <StatusChip status={ext.status} />
+                                                                <StatusChip status={ext.status} rfis={ext.rfis} />
                                                                 <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: rfiCount > 0 ? '#2563eb' : '#94a3b8' }}>{rfiCount}</span>
+                                                                <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: unansweredCount > 0 ? '#dc2626' : '#16a34a' }}>{unansweredCount}</span>
                                                                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{ext.uploadedBy}</span>
                                                                 <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{formatDate(ext.createdAt)}</span>
                                                                 {isAdmin && (
@@ -1102,7 +1140,19 @@ export default function AdminRfi() {
                                                                                     </div>
                                                                                     <div>
                                                                                         <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
-                                                                                        <div style={{ fontSize: 11, fontWeight: 700, color: 'white', background: rfi.status === 'CLOSED' ? '#16a34a' : '#dc2626', padding: '3px 8px', borderRadius: 20, textAlign: 'center' }}>{rfi.status || 'OPEN'}</div>
+                                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: (rfi.status || '').toUpperCase() === 'CLOSED' ? '#dcfce7' : '#fee2e2', color: (rfi.status || '').toUpperCase() === 'CLOSED' ? '#16a34a' : '#dc2626', fontSize: 11, fontWeight: 700 }}>
+                                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? (
+                                                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                    <polyline points="20 6 9 17 4 12" />
+                                                                                                </svg>
+                                                                                            ) : (
+                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                                                                </svg>
+                                                                                            )}
+                                                                                            {(rfi.status || '').toUpperCase() === 'CLOSED' ? 'Closed' : 'Open'}
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
                                                                             );

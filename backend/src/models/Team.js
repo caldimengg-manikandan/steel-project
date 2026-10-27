@@ -7,6 +7,16 @@ const teamSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
+    project_manager: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    assistant_project_manager: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
     lead: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

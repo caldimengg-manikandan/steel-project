@@ -13,29 +13,16 @@ const Project = require('../models/Project');
 const Drawing = require('../models/Drawing');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { attachProjectStats } = require('../services/projectStatsService');
+const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 
 async function listMyProjects(req, res) {
     const userId = req.principal.id;
-    const mongoose = require('mongoose');
 
-    let queryUserId = userId;
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-        queryUserId = new mongoose.Types.ObjectId(userId);
-    }
-
-    const FULL_ACCESS_ROLES = ['admin', 'superadmin', 'project_manager', 'team_lead', 'assistant_project_manager', 'assistant_team_lead'];
-    const isFullAccess = FULL_ACCESS_ROLES.includes(req.principal.role);
-
+    const baseFilter = await buildProjectQueryForUser(req.principal);
     const query = {
+        ...baseFilter,
         status: { $ne: 'archived' }
     };
-
-    if (isFullAccess) {
-        // Full access roles (admin, superadmin, project_manager, team_lead) see ALL projects
-    } else {
-        // Limited access roles see ONLY their assigned projects
-        query['assignments.userId'] = queryUserId;
-    }
 
     const projects = await Project
         .find(query)
