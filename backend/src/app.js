@@ -191,6 +191,11 @@ app.use('/steel/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, '../../uploads')));
 app.use('/steel/uploads', express.static(path.join(__dirname, '../../uploads')));
+if (process.env.UPLOADS_DIR) {
+    app.use('/uploads', express.static(process.env.UPLOADS_DIR));
+    app.use('/api/uploads', express.static(process.env.UPLOADS_DIR));
+    app.use('/steel/uploads', express.static(process.env.UPLOADS_DIR));
+}
 // â”€â”€ Mail router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
     // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token

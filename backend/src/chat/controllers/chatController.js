@@ -452,7 +452,7 @@ exports.uploadAttachment = async (req, res) => {
     }
 
     const file = req.file;
-    const relativeUrl = `/uploads/chat/${file.filename}`;
+    const relativeUrl = `/chat/attachments/${file.filename}`;
 
     res.json({
         success: true,
@@ -464,6 +464,37 @@ exports.uploadAttachment = async (req, res) => {
             mimetype: file.mimetype,
         },
     });
+};
+
+/**
+ * View / download a chat attachment directly
+ * GET /api/chat/attachments/:filename
+ */
+exports.viewAttachment = (req, res) => {
+    const path = require('path');
+    const fs = require('fs');
+    const filename = path.basename(req.params.filename);
+
+    const possibleDirs = [
+        path.resolve(__dirname, '../../../uploads/chat'),
+        path.resolve(__dirname, '../../../../uploads/chat'),
+        path.resolve(__dirname, '../../uploads/chat'),
+        path.resolve(process.cwd(), 'uploads/chat'),
+        path.resolve(process.cwd(), 'backend/uploads/chat'),
+    ];
+    if (process.env.UPLOADS_DIR) {
+        possibleDirs.unshift(path.join(process.env.UPLOADS_DIR, 'chat'));
+    }
+
+    for (const dir of possibleDirs) {
+        const fullPath = path.join(dir, filename);
+        if (fs.existsSync(fullPath)) {
+            return res.sendFile(fullPath);
+        }
+    }
+
+    console.warn('[Chat] Attachment file not found on disk:', filename, 'Checked:', possibleDirs);
+    return res.status(404).send('Attachment not found');
 };
 
 /**

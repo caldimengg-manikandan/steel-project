@@ -149,3 +149,29 @@ export async function deleteMessage(conversationId: string, messageId: string): 
     await handleResponse<{ success: boolean }>(res);
 }
 
+export function getChatFileUrl(att: ChatAttachment): string {
+    if (!att || (!att.url && !att.filename)) return '#';
+
+    const rawUrl = att.url || '';
+    const filename = att.filename || rawUrl.split('/').pop()?.split('?')[0] || '';
+    const cleanBase = BASE.replace(/\/+$/, '');
+
+    // For any chat attachment, route safely through the API endpoint
+    if (filename && (filename.startsWith('chat-') || rawUrl.includes('/chat/') || rawUrl.includes('/uploads/chat/'))) {
+        if (window.location.hostname === 'localhost') {
+            return `http://localhost:5000/api/chat/attachments/${encodeURIComponent(filename)}`;
+        }
+        return `${cleanBase}/chat/attachments/${encodeURIComponent(filename)}`;
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+        return rawUrl;
+    }
+
+    if (window.location.hostname === 'localhost') {
+        return `http://localhost:5000/api/chat/attachments/${encodeURIComponent(filename)}`;
+    }
+    return `${cleanBase}/chat/attachments/${encodeURIComponent(filename)}`;
+}
+
+

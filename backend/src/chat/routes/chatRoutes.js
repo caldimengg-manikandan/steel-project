@@ -13,7 +13,9 @@ const chatController = require('../controllers/chatController');
 const router = express.Router();
 
 // Ensure upload directory exists
-const chatUploadDir = path.join(__dirname, '../../../uploads/chat');
+const chatUploadDir = process.env.UPLOADS_DIR
+    ? path.join(process.env.UPLOADS_DIR, 'chat')
+    : path.resolve(__dirname, '../../../uploads/chat');
 if (!fs.existsSync(chatUploadDir)) {
     fs.mkdirSync(chatUploadDir, { recursive: true });
 }
@@ -44,7 +46,10 @@ const upload = multer({
     },
 });
 
-// Protect all chat endpoints with standard authentication
+// Stream or view chat attachment directly (supports browser <img> and target="_blank")
+router.get('/attachments/:filename', chatController.viewAttachment);
+
+// Protect all other chat endpoints with standard authentication
 router.use(verifyToken);
 
 // Realtime socket token helper

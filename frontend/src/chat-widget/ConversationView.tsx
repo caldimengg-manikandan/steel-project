@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Conversation, ChatMessage, ChatAttachment } from './chatTypes';
-import { fetchMessages, sendMessage, markAsRead, deleteMessage } from './chatApi';
+import { fetchMessages, sendMessage, markAsRead, deleteMessage, getChatFileUrl } from './chatApi';
 import { MessageInput } from './MessageInput';
 
 interface ConversationViewProps {
@@ -330,8 +330,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                                             {/* Attachments */}
                                             {msg.attachments?.map((att, attIdx) => {
                                                 const isImg = isImageMime(att.mimetype, att.filename);
-                                                const backendOrigin = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
-                                                const fileUrl = att.url?.startsWith('http') ? att.url : `${backendOrigin}${att.url}`;
+                                                const fileUrl = getChatFileUrl(att);
 
                                                 if (isImg) {
                                                     return (

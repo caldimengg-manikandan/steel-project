@@ -55,6 +55,7 @@ function initUploadDirectories() {
         'storage_fallback',
         'drawings',
         'rfis',
+        'chat',
     ];
 
     for (const base of baseDirs) {
