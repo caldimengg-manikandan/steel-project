@@ -37,15 +37,17 @@ exports.browse = async (req, res) => {
     try {
         const requestedPath = req.query.path || '';
         let entries = [];
+        let agentBrowseFailed = false;
         try {
             entries = await storageGateway.listDirectory(requestedPath);
         } catch(err) {
+            agentBrowseFailed = true;
             console.warn('[FileGateway] Storage Agent browse failed, falling back to DB:', err.message);
         }
 
-        // Database Fallback: Reconstruct folder view from Extraction records
-        // Helpful if Storage Agent API Key is lost or disconnected.
-        if (requestedPath) {
+        // Database Fallback: ONLY reconstruct folder view from Extraction records
+        // IF the Storage Agent is offline, disconnected, or threw an error.
+        if (agentBrowseFailed && requestedPath) {
             const pathRegex = new RegExp('^' + requestedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/');
             const [drawingDocs, rfiDocs, cdrfiDocs] = await Promise.all([
                 DrawingExtraction.find({ storageGatewayPath: { $regex: pathRegex } }).lean(),
@@ -105,6 +107,13 @@ exports.browse = async (req, res) => {
                 }
             });
         }
+
+        // Filter out leftover test folders from testing sessions
+        entries = entries.filter(e => 
+            !e.name.startsWith('test_delete') && 
+            !e.name.startsWith('test_folder') && 
+            !e.name.startsWith('test_nested')
+        );
 
         res.json({
             path: requestedPath || '/',
@@ -325,6 +334,8 @@ exports.remove = async (req, res) => {
             }
 
             const deleteResult = await DrawingExtraction.deleteMany({ $or: searchConditions });
+            await RfiExtraction.deleteMany({ $or: searchConditions }).catch(() => {});
+            await CdrfiExtraction.deleteMany({ $or: searchConditions }).catch(() => {});
 
             if (deleteResult.deletedCount > 0) {
                 console.log(`[FileGateway] Removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
