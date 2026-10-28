@@ -278,14 +278,26 @@ exports.remove = async (req, res) => {
         // This covers single-file deletes, subfolder deletes, and root project folder deletes
         try {
             const DrawingExtraction = require('../models/DrawingExtraction');
+            const DrawingLog = require('../models/DrawingLog');
+            const Transmittal = require('../models/Transmittal');
+            const RfiExtraction = require('../models/RfiExtraction');
+            const CdrfiExtraction = require('../models/CdrfiExtraction');
             const Project = require('../models/Project');
-            const cleanPath = deletedPath.replace(/\\/g, '/').replace(/\/+$/, '');
+
+            const cleanPath = deletedPath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+            const altPath = cleanPath.includes('_') ? cleanPath.replace(/_/g, ' ') : cleanPath.replace(/ /g, '_');
             const pathParts = cleanPath.split('/').filter(Boolean);
 
             const searchConditions = [
                 { storageGatewayPath: cleanPath },
-                { storageGatewayPath: { $regex: `^${cleanPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`, $options: 'i' } }
+                { storageGatewayPath: { $regex: `^${cleanPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, $options: 'i' } }
             ];
+            if (altPath !== cleanPath) {
+                searchConditions.push(
+                    { storageGatewayPath: altPath },
+                    { storageGatewayPath: { $regex: `^${altPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, $options: 'i' } }
+                );
+            }
 
             // If deleting a specific file (e.g. filename.pdf)
             const fileName = pathParts[pathParts.length - 1];
@@ -310,11 +322,8 @@ exports.remove = async (req, res) => {
                 isProjectRoot = pathParts.length === 2;
                 folderPathInProject = isProjectRoot ? `Project Root Folder (${cleanPath})` : pathParts.slice(2).join('/');
 
-                if (proj) {
-                    // If deleting the root project folder, also match by projectId
-                    if (isProjectRoot) {
-                        searchConditions.push({ projectId: proj._id });
-                    }
+                if (proj && isProjectRoot) {
+                    searchConditions.push({ projectId: proj._id });
                 }
             } else if (pathParts.length >= 1) {
                 const projName = pathParts[0].replace(/_/g, ' ');
@@ -333,13 +342,54 @@ exports.remove = async (req, res) => {
                 }
             }
 
+            // 1. Identify affected drawings before deletion for DrawingLog cleanup
+            const matchingExts = await DrawingExtraction.find({ $or: searchConditions })
+                .select('extractedFields.drawingNumber originalFileName')
+                .lean();
+            const deletedDrawingNumbers = matchingExts.map(e => e.extractedFields?.drawingNumber).filter(Boolean);
+            const deletedFileNames = matchingExts.map(e => e.originalFileName).filter(Boolean);
+            if (fileName && fileName.includes('.')) {
+                deletedFileNames.push(fileName);
+            }
+
+            // 2. Delete matching extractions across all types
             const deleteResult = await DrawingExtraction.deleteMany({ $or: searchConditions });
             await RfiExtraction.deleteMany({ $or: searchConditions }).catch(() => {});
             await CdrfiExtraction.deleteMany({ $or: searchConditions }).catch(() => {});
 
-            if (deleteResult.deletedCount > 0) {
-                console.log(`[FileGateway] Removed ${deleteResult.deletedCount} DrawingExtraction record(s) matching "${cleanPath}".`);
-                if (proj) {
+            // 3. Clean up DrawingLog, Transmittals, and Project counters
+            if (proj) {
+                if (isProjectRoot) {
+                    // Full project folder deleted -> wipe DrawingLog and Transmittals
+                    await DrawingLog.deleteMany({ projectId: proj._id }).catch(() => {});
+                    await Transmittal.deleteMany({ projectId: proj._id }).catch(() => {});
+                    await Project.findByIdAndUpdate(proj._id, { drawingCount: 0, approximateDrawingsCount: 0, transmittalCount: 0 });
+                    console.log(`[FileGateway] Full project root deleted for "${proj.name}". Wiped DrawingLog and Transmittals.`);
+                } else {
+                    // Subfolder or files deleted -> remove affected drawings from DrawingLog
+                    const pullOr = [];
+                    if (deletedDrawingNumbers.length > 0) {
+                        pullOr.push({ drawingNumber: { $in: deletedDrawingNumbers } });
+                    }
+                    if (deletedFileNames.length > 0) {
+                        pullOr.push({ originalFileName: { $in: deletedFileNames } });
+                    }
+                    if (pullOr.length > 0) {
+                        await DrawingLog.updateMany(
+                            { projectId: proj._id },
+                            { $pull: { drawings: { $or: pullOr } } }
+                        ).catch(e => console.warn('[FileGateway] Error updating DrawingLog:', e.message));
+                    }
+
+                    // If a specific transmittal Excel file in Logs/ was deleted (e.g. TR-001_Transmittal.xlsx)
+                    const trMatch = fileName && fileName.match(/TR-?(\d+)/i);
+                    if (trMatch) {
+                        const trNum = parseInt(trMatch[1], 10);
+                        await Transmittal.deleteMany({ projectId: proj._id, transmittalNumber: trNum }).catch(() => {});
+                        console.log(`[FileGateway] Removed Transmittal #${trNum} matching deleted Excel log.`);
+                    }
+
+                    // Recalculate remaining project drawing count
                     const remainingCount = await DrawingExtraction.countDocuments({ projectId: proj._id, status: 'completed' });
                     await Project.findByIdAndUpdate(proj._id, { drawingCount: remainingCount, approximateDrawingsCount: remainingCount });
                     console.log(`[FileGateway] Updated Project "${proj.name}" drawing count to ${remainingCount}.`);

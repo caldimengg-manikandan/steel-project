@@ -360,8 +360,9 @@ async function uploadFile(targetDir, filename, buffer) {
     return { message: 'File saved successfully to local server disk.' };
 }
 
-async function getRemoteFilesRecursively(dirPath) {
+async function getRemoteItemsRecursively(dirPath) {
     const files = [];
+    const dirs = [];
     const queue = [dirPath];
 
     while (queue.length > 0) {
@@ -374,6 +375,7 @@ async function getRemoteFilesRecursively(dirPath) {
             for (const entry of entries) {
                 const entryPath = current ? `${current}/${entry.name}` : entry.name;
                 if (entry.type === 'directory') {
+                    dirs.push(entryPath);
                     queue.push(entryPath);
                 } else {
                     files.push(entryPath);
@@ -383,66 +385,92 @@ async function getRemoteFilesRecursively(dirPath) {
             console.warn(`[StorageGateway] Error browsing "${current}" during recursive delete:`, err.message);
         }
     }
-    return files;
+    return { files, dirs };
 }
 
 async function deleteFile(relativePath) {
     if (!relativePath) return false;
 
+    const cleanPath = relativePath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+    if (!cleanPath) return false;
+
+    // Both the original path and its space/underscore alternative
+    const pathsToDelete = [cleanPath];
+    const altPath = cleanPath.includes('_') ? cleanPath.replace(/_/g, ' ') : cleanPath.replace(/ /g, '_');
+    if (altPath !== cleanPath) {
+        pathsToDelete.push(altPath);
+    }
+
     let remoteSuccess = false;
     let localSuccess = false;
     let lastError = null;
 
-    // 1. Delete from Remote Windows Storage Agent if active
-    if (isRemoteAgent()) {
-        try {
-            const response = await agentFetch(
-                `/delete?path=${encodeURIComponent(relativePath)}`,
-                { method: 'DELETE' }
-            );
+    for (const p of pathsToDelete) {
+        // 1. Delete from Remote Windows Storage Agent if active
+        if (isRemoteAgent()) {
+            try {
+                const response = await agentFetch(
+                    `/delete?path=${encodeURIComponent(p)}`,
+                    { method: 'DELETE' }
+                );
 
-            if (response.ok || response.status === 404) {
-                remoteSuccess = true;
-            } else {
-                const errJson = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-                const errMsg = errJson.error || '';
-
-                // If remote agent rejected because it's a directory:
-                // "Path is not a file. Directory deletion is not allowed."
-                if (response.status === 400 && (errMsg.includes('not a file') || errMsg.includes('Directory deletion'))) {
-                    console.log(`[StorageGateway] Target "${relativePath}" is a directory. Recursively deleting remote files...`);
-                    const nestedFiles = await getRemoteFilesRecursively(relativePath);
-                    console.log(`[StorageGateway] Found ${nestedFiles.length} file(s) in remote directory to delete.`);
-
-                    for (const f of nestedFiles) {
-                        try {
-                            await agentFetch(`/delete?path=${encodeURIComponent(f)}`, { method: 'DELETE' });
-                        } catch (nestedErr) {
-                            console.warn(`[StorageGateway] Failed to delete nested file "${f}":`, nestedErr.message);
-                        }
-                    }
+                if (response.ok || response.status === 404) {
                     remoteSuccess = true;
                 } else {
-                    lastError = new Error(errMsg || `Delete failed on remote agent: HTTP ${response.status}`);
-                }
-            }
-        } catch (err) {
-            console.warn(`[StorageGateway] Remote agent delete error for "${relativePath}":`, err.message);
-            lastError = err;
-        }
-    }
+                    const errJson = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    const errMsg = errJson.error || '';
 
-    // 2. ALWAYS delete from Local Server Disk (VPS / hosted application server)
-    const targetPath = getLocalPath(relativePath);
-    try {
-        if (fs.existsSync(targetPath)) {
-            await fsPromises.rm(targetPath, { recursive: true, force: true });
-            console.log(`[StorageGateway] Successfully removed from local server disk: "${targetPath}"`);
+                    // If remote agent rejected because it's a directory:
+                    if (response.status === 400 && (errMsg.includes('not a file') || errMsg.includes('Directory deletion'))) {
+                        console.log(`[StorageGateway] Target "${p}" is a directory. Recursively deleting remote items...`);
+                        const { files, dirs } = await getRemoteItemsRecursively(p);
+                        console.log(`[StorageGateway] Found ${files.length} file(s) and ${dirs.length} directory/ies to delete.`);
+
+                        for (const f of files) {
+                            try {
+                                await agentFetch(`/delete?path=${encodeURIComponent(f)}`, { method: 'DELETE' });
+                            } catch (nestedErr) {
+                                console.warn(`[StorageGateway] Failed to delete nested file "${f}":`, nestedErr.message);
+                            }
+                        }
+
+                        // Delete subdirectories deepest first
+                        for (const d of dirs.reverse()) {
+                            try {
+                                await agentFetch(`/delete?path=${encodeURIComponent(d)}`, { method: 'DELETE' });
+                            } catch (dErr) {
+                                console.warn(`[StorageGateway] Failed to delete nested dir "${d}":`, dErr.message);
+                            }
+                        }
+
+                        // Delete the directory itself
+                        try {
+                            await agentFetch(`/delete?path=${encodeURIComponent(p)}`, { method: 'DELETE' });
+                        } catch (_) {}
+
+                        remoteSuccess = true;
+                    } else {
+                        lastError = new Error(errMsg || `Delete failed on remote agent: HTTP ${response.status}`);
+                    }
+                }
+            } catch (err) {
+                console.warn(`[StorageGateway] Remote agent delete error for "${p}":`, err.message);
+                lastError = err;
+            }
         }
-        localSuccess = true;
-    } catch (err) {
-        console.warn(`[StorageGateway] Local server disk delete error for "${targetPath}":`, err.message);
-        if (!lastError) lastError = err;
+
+        // 2. ALWAYS delete from Local Server Disk (VPS / hosted application server)
+        const targetPath = getLocalPath(p);
+        try {
+            if (fs.existsSync(targetPath)) {
+                await fsPromises.rm(targetPath, { recursive: true, force: true });
+                console.log(`[StorageGateway] Successfully removed from local server disk: "${targetPath}"`);
+            }
+            localSuccess = true;
+        } catch (err) {
+            console.warn(`[StorageGateway] Local server disk delete error for "${targetPath}":`, err.message);
+            if (!lastError) lastError = err;
+        }
     }
 
     // If both failed and we have an error, throw it
