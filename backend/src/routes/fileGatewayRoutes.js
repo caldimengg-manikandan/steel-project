@@ -67,6 +67,9 @@ router.post(
     ctrl.upload
 );
 
-router.delete('/remove', requireAdmin, ctrl.remove);
+// Individual deletion in Project Storage is completely disabled
+router.delete('/remove', (_req, res) => {
+    res.status(403).json({ error: 'Individual deletion in Project Storage is disabled. Project data is managed and deleted via the Projects module.' });
+});
 
 module.exports = router;

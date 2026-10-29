@@ -187,7 +187,29 @@ async function attachProjectStats(projects) {
             pendingAmount: 0 
         };
         const approx = pObj.approximateDrawingsCount || 0;
-        const allSows = pObj.scopeOfWork || [];
+        let allSows = pObj.scopeOfWork || [];
+
+        // Auto-upgrade old projects: if scopeOfWork is empty but sequences exist, wrap sequences into SOW
+        if ((!allSows || allSows.length === 0) && Array.isArray(pObj.sequences) && pObj.sequences.length > 0) {
+            allSows = [{
+                name: 'SOW 01',
+                percentage: 100,
+                approval: 0,
+                fabrication: 0,
+                status: pObj.status === 'completed' ? 'Completed' : 'Yet to Start',
+                approvalDate: pObj.createdAt || new Date(),
+                fabricationDate: null,
+                deadline: null,
+                sequences: pObj.sequences.map((seq, seqIdx) => ({
+                    name: seq.name || SEQ ,
+                    status: seq.status === 'Completed' ? 'Completed' : 'Not Completed',
+                    deadline: seq.deadline || null,
+                    approvalDate: seq.approvalDate || new Date(),
+                    fabricationDate: seq.fabricationDate || null
+                }))
+            }];
+        }
+
         const sowProgress = calculateSowProgress(allSows);
 
         const nameLower = (pObj.name || '').toLowerCase().trim();
@@ -269,7 +291,16 @@ async function attachProjectStats(projects) {
             sowContributions: sowProgress.sowContributions,
             corStatus: mergedCorStatus,
             rawStatus: matchingExt?.rawStatus,
-            updatedAtFromAppA: matchingExt?.updatedAt || null
+            updatedAtFromAppA: matchingExt?.updatedAt || null,
+            trackingMode: pObj.trackingMode || 'sow',
+            scopeOfWork: allSows,
+            additionalScopeOfWork: pObj.additionalScopeOfWork || [],
+            sequences: pObj.sequences || [],
+            clientContactPersons: Array.isArray(pObj.clientContactPersons) && pObj.clientContactPersons.length > 0 ? pObj.clientContactPersons : (pObj.contactPerson ? [pObj.contactPerson] : []),
+            caldimTeamLead: pObj.caldimTeamLead || null,
+            caldimTeamLeadName: pObj.caldimTeamLeadName || '',
+            teamId: pObj.teamId || null,
+            teamName: pObj.teamName || ''
         };
     });
 

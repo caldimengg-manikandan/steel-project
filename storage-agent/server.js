@@ -635,11 +635,29 @@ app.delete('/delete', readOnlyGuard, async (req, res) => {
         const stat = await fsPromises.stat(filePath);
 
         if (stat.isDirectory()) {
-            await fsPromises.rm(filePath, { recursive: true, force: true });
+            try {
+                await fsPromises.rm(filePath, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+            } catch (rmErr) {
+                if (process.platform === 'win32') {
+                    const { execSync } = require('child_process');
+                    execSync(`rmdir /s /q "${filePath}"`, { stdio: 'ignore' });
+                } else {
+                    throw rmErr;
+                }
+            }
             auditLog('DELETE_DIR', req.query.path, req.ip);
             res.json({ message: 'Directory deleted.', path: req.query.path });
         } else {
-            await fsPromises.unlink(filePath);
+            try {
+                await fsPromises.unlink(filePath);
+            } catch (unlinkErr) {
+                if (process.platform === 'win32') {
+                    const { execSync } = require('child_process');
+                    execSync(`del /f /q "${filePath}"`, { stdio: 'ignore' });
+                } else {
+                    throw unlinkErr;
+                }
+            }
             auditLog('DELETE', req.query.path, req.ip);
             res.json({ message: 'File deleted.', path: req.query.path });
         }

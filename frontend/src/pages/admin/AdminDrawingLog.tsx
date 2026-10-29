@@ -1,3 +1,4 @@
+import { getProjectTargetSequences } from '../../utils/sequenceUtils';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
@@ -63,6 +64,10 @@ export default function AdminDrawingLog() {
                             <DrawingExtractionPanel
                                 projectId={urlProjectId}
                                 canUpload={true}
+                                project={selectedProject}
+                                sequences={selectedProject ? getProjectTargetSequences(selectedProject) : []}
+                                projectYear={selectedProject?.year}
+                                startingTransmittalNumber={selectedProject?.startingTransmittalNumber}
                             />
                         </div>
                     </>

@@ -1,3 +1,5 @@
+import { getProjectTargetSequences } from '../utils/sequenceUtils';
+import { getProjectById } from '../services/projectApi';
 /**
  * ============================================================
  * DrawingExtractionPanel
@@ -12,7 +14,7 @@
  *  • Reprocess button for failed extractions
  *  • Full admin-scoped isolation (only shows this project's data)
  */
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { formatDate } from '../utils/dateUtils';
 import { useMessage } from '../context/MessageContext';
 import type { DrawingExtraction, ExtractionStatus } from '../types';
@@ -213,6 +215,7 @@ interface DrawingExtractionPanelProps {
     sequences?: any[];
     projectYear?: number;
     startingTransmittalNumber?: number;
+    project?: any;
 }
 
 export default function DrawingExtractionPanel({
@@ -221,6 +224,7 @@ export default function DrawingExtractionPanel({
     sequences = [],
     projectYear,
     startingTransmittalNumber,
+    project,
 }: DrawingExtractionPanelProps) {
 
     const [extractions, setExtractions] = useState<DrawingExtraction[]>([]);
@@ -249,6 +253,34 @@ export default function DrawingExtractionPanel({
     // Target sequences state
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
+
+    const [fetchedSequences, setFetchedSequences] = useState<any[]>([]);
+
+    useEffect(() => {
+        if ((!sequences || sequences.length === 0) && projectId) {
+            if (project) {
+                setFetchedSequences(getProjectTargetSequences(project));
+            } else {
+                getProjectById(projectId)
+                    .then(res => {
+                        if (res?.project) {
+                            setFetchedSequences(getProjectTargetSequences(res.project));
+                        }
+                    })
+                    .catch(err => console.warn('[DrawingExtractionPanel] Failed to fetch project for sequences:', err));
+            }
+        }
+    }, [projectId, project, sequences]);
+
+    const effectiveSequences = useMemo(() => {
+        if (sequences && sequences.length > 0) return sequences;
+        if (project) {
+            const derived = getProjectTargetSequences(project);
+            if (derived.length > 0) return derived;
+        }
+        return fetchedSequences;
+    }, [sequences, project, fetchedSequences]);
+
     
     const { showMessage, showConfirm } = useMessage();
 
@@ -343,28 +375,33 @@ export default function DrawingExtractionPanel({
     // Called by ALL upload entry points before handleUploads.
     // Opens the transmittal selection modal; when user confirms,
     // processUploads() runs with the chosen transmittal number.
-    const ALLOWED_FOLDERS = [
-        'd sheet', 'detail sheet', 'd sheets', 'detail sheets',
-        'e sheet', 'e sheets', 'erection sheet', 'erection sheets',
-        'gather sheet', 'gather sheets',
-        'e-sheets', 'e-sheet', 'd-sheets', 'd-sheet'
-    ];
+    function isDrawingFolderPdf(f: File): boolean {
+        const path = ((f as any).customRelativePath || f.webkitRelativePath || '').replace(/\\/g, '/');
+        if (!path || !path.includes('/')) return true; // Direct file upload, allow
+
+        const parts = path.split('/');
+        const dirParts = parts.slice(0, parts.length - 1);
+
+        for (const dir of dirParts) {
+            const trimmed = dir.trim();
+            // Never allow binders or gather sheets
+            if (/binder/i.test(trimmed) || /gather[\s_-]*sheets?/i.test(trimmed)) {
+                return false;
+            }
+            // Detail Sheets
+            if (/^(d[\s\-_]*sheets?|detail[\s\-_]*sheets?|detail[\s\-_]*drawings?)$/i.test(trimmed)) {
+                return true;
+            }
+            // Erection Sheets
+            if (/^(e[\s\-_]*sheets?|erection[\s\-_]*sheets?|erection[\s\-_]*drawings?|erection[\s\-_]*plans?)$/i.test(trimmed)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     async function requestTransmittalThenUpload(files: FileList | File[]) {
-        let fileArray = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-
-        // Filter out files that are not in allowed subfolders (only applies to folder uploads where paths are available)
-        fileArray = fileArray.filter(f => {
-            const path = (f as any).customRelativePath || f.webkitRelativePath;
-            if (!path || !path.includes('/')) return true; // Direct file upload, allow
-            const parts = path.toLowerCase().split('/');
-            // Check if any directory part exactly matches an allowed folder name (ignoring symbols like spaces/dashes for robust matching)
-            const normalizedAllowed = ALLOWED_FOLDERS.map(a => a.replace(/[^a-z0-9]/g, ''));
-            return parts.some((part: string) => {
-                const normalizedPart = part.replace(/[^a-z0-9]/g, '');
-                return normalizedAllowed.some(allowed => normalizedPart.includes(allowed));
-            });
-        });
+        let fileArray = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf') && isDrawingFolderPdf(f));
 
         if (fileArray.length === 0) {
             setUploadError('No valid PDF files found in allowed folders.');
@@ -904,24 +941,27 @@ export default function DrawingExtractionPanel({
 
                             </div>
 
-                            {sequences && sequences.length > 0 && (
+                            {effectiveSequences && effectiveSequences.length > 0 && (
                                 <div style={{ marginBottom: 20, padding: '14px 16px', background: 'var(--color-background)', borderRadius: 10, border: '1px solid var(--color-border-light)' }}>
                                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target Sequences</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                                        {sequences.map((seq: any, idx: number) => (
-                                            <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedSequences.includes(seq.name)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
-                                                        else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
-                                                    }}
-                                                    style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
-                                                />
-                                                {seq.name}
-                                            </label>
-                                        ))}
+                                        {effectiveSequences.map((seq: any, idx: number) => {
+                                            const seqName = typeof seq === 'string' ? seq : (seq.name || seq);
+                                            return (
+                                                <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, userSelect: 'none' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedSequences.includes(seqName)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedSequences(prev => [...prev, seqName]);
+                                                            else setSelectedSequences(prev => prev.filter(s => s !== seqName));
+                                                        }}
+                                                        style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                    />
+                                                    {seqName}
+                                                </label>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -969,8 +1009,8 @@ export default function DrawingExtractionPanel({
                                 <button
                                     className="btn btn-primary"
                                     onClick={() => {
-                                        if (sequences && sequences.length > 0 && selectedSequences.length === 0) {
-                                            showMessage('Sequence Required', 'Please select at least one Sequence (e.g., SEQ 01) before continuing with the upload.', 'error');
+                                        if (effectiveSequences && effectiveSequences.length > 0 && selectedSequences.length === 0) {
+                                            showMessage('Sequence Required', 'Please select at least one Sequence or Scope of Work before continuing with the upload.', 'error');
                                             return;
                                         }
                                         // Validate manual transmittal number for older projects

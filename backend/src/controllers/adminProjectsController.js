@@ -116,6 +116,40 @@ async function createProject(req, res) {
         return res.status(400).json({ error: 'name and either clientName or clientId are required.' });
     }
 
+    // Ensure absolutely NO residual data from any previously deleted project with the same name exists
+    try {
+        const safeCleanName = name.trim();
+        const nameRegex = new RegExp(`^${safeCleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        const pathRegex = new RegExp(`^Projects/${safeCleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, 'i');
+        const altPathRegex = new RegExp(`^Projects/${safeCleanName.replace(/ /g, '_').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, 'i');
+
+        const Transmittal = require('../models/Transmittal');
+        const DrawingLog = require('../models/DrawingLog');
+        const WeeklyProgress = require('../models/WeeklyProgress');
+        const DeletedStoragePath = require('../models/DeletedStoragePath');
+
+        await Promise.all([
+            Drawing.deleteMany({ projectName: nameRegex }),
+            DrawingExtraction.deleteMany({ $or: [{ storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+            RfiExtraction.deleteMany({ $or: [{ storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+            CdrfiExtraction.deleteMany({ $or: [{ storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+            ChangeOrder.deleteMany({ projectName: nameRegex }),
+            Transmittal.deleteMany({ projectName: nameRegex }),
+            DrawingLog.deleteMany({ projectName: nameRegex }),
+            WeeklyProgress.deleteMany({ projectName: nameRegex }),
+            DeletedStoragePath.deleteMany({
+                $or: [
+                    { path: `Projects/${safeCleanName}` },
+                    { path: `Projects/${safeCleanName.replace(/ /g, '_')}` },
+                    { path: { $regex: pathRegex } },
+                    { path: { $regex: altPathRegex } }
+                ]
+            })
+        ]);
+    } catch (cleanupErr) {
+        console.warn('[CreateProject] Pre-clean residual data warning:', cleanupErr.message);
+    }
+
     const projectYear = year ? Number(year) : new Date().getFullYear();
     const startNum = (projectYear <= 2026 && startingTransmittalNumber) ? Number(startingTransmittalNumber) : 1;
     // Pre-seed transmittalCount so first reserve = startNum
@@ -415,47 +449,137 @@ async function updateProject(req, res) {
 async function deleteProject(req, res) {
     const project = req.scopedProject;
     const projectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+    const projectId = project._id;
 
-    // 1. Delete all files from the remote storage server (entire project folder)
+    // 1. Delete all project folders from remote storage server and local storage drive
     if (storageGateway.isEnabled()) {
-        const projectFolder = `Projects/${projectName}`;
-        try {
-            await storageGateway.deleteFile(projectFolder);
-            console.log(`[DeleteProject] Storage folder "${projectFolder}" deleted from server.`);
-        } catch (err) {
-            // If folder doesn't exist on storage, that's fine — continue with DB cleanup
-            if (!err.message.includes('not found') && !err.message.includes('404')) {
-                console.error(`[DeleteProject] Failed to delete storage folder "${projectFolder}":`, err.message);
+        const foldersToDelete = new Set([
+            `Projects/${projectName}`,
+            `Projects/${project.name}`,
+            `Projects/${project.name.replace(/ /g, '_')}`,
+            `Projects/${project.name.replace(/_/g, ' ')}`
+        ]);
+        const DeletedStoragePath = require('../models/DeletedStoragePath');
+        for (const folder of foldersToDelete) {
+            try {
+                await storageGateway.deleteFile(folder);
+                console.log(`[DeleteProject] Storage folder "${folder}" deleted from server.`);
+            } catch (err) {
+                if (!err.message.includes('not found') && !err.message.includes('404')) {
+                    console.warn(`[DeleteProject] Warning deleting "${folder}":`, err.message);
+                }
             }
+            try {
+                await DeletedStoragePath.updateOne(
+                    { path: folder },
+                    { $set: { path: folder, deletedAt: new Date(), deletedBy: req.principal?.username || 'admin' } },
+                    { upsert: true }
+                );
+            } catch (_) {}
         }
     }
 
-    // 2. Clean up local temp files for any DrawingExtraction records
-    const extractions = await DrawingExtraction.find({ projectId: project._id }).lean();
+    // 2. Clean up local temp files and local Excel workbooks
+    const extractions = await DrawingExtraction.find({ projectId }).lean();
     for (const doc of extractions) {
         if (doc.fileUrl && fs.existsSync(doc.fileUrl)) {
             try { fs.unlinkSync(doc.fileUrl); } catch (_) { }
         }
     }
 
-    // 3. Delete all associated DB records
-    await Drawing.deleteMany({ projectId: project._id });
-    await DrawingExtraction.deleteMany({ projectId: project._id });
-    await RfiExtraction.deleteMany({ projectId: project._id });
-    await CdrfiExtraction.deleteMany({ projectId: project._id });
-    await ChangeOrder.deleteMany({ projectId: project._id });
-
-    // Clean up Transmittals if the model exists
+    // Clean up generated project Excel sheets from uploads/excel/
     try {
-        const Transmittal = require('../models/Transmittal');
-        await Transmittal.deleteMany({ projectId: project._id });
-    } catch (_) { }
+        const excelDir = path.join(__dirname, '../../uploads/excel');
+        if (fs.existsSync(excelDir)) {
+            const files = fs.readdirSync(excelDir);
+            for (const f of files) {
+                if (f.startsWith(String(projectId))) {
+                    try { fs.unlinkSync(path.join(excelDir, f)); } catch (_) {}
+                }
+            }
+        }
+    } catch (_) {}
 
-    // Clean up DrawingLogs if the model exists
+    // Clean up temp files from uploads/temp/
     try {
-        const DrawingLog = require('../models/DrawingLog');
-        await DrawingLog.deleteMany({ projectId: project._id });
-    } catch (_) { }
+        const tempDir = path.join(__dirname, '../../uploads/temp');
+        if (fs.existsSync(tempDir)) {
+            const files = fs.readdirSync(tempDir);
+            for (const f of files) {
+                if (f.includes(String(projectId))) {
+                    try { fs.unlinkSync(path.join(tempDir, f)); } catch (_) {}
+                }
+            }
+        }
+    } catch (_) {}
+
+    // 3. Delete all GridFS files in Atlas to completely free up database quota
+    try {
+        const { getBucket } = require('../utils/gridfs');
+        const bucket = getBucket();
+        if (bucket) {
+            const [extDocs, rfiDocs, cdrfiDocs] = await Promise.all([
+                DrawingExtraction.find({ projectId }).select('fileId fileUrl').lean(),
+                RfiExtraction.find({ projectId }).select('attachments.fileId attachments.fileUrl').lean(),
+                CdrfiExtraction.find({ projectId }).select('attachments.fileId attachments.fileUrl').lean()
+            ]);
+
+            const fileIdsToDelete = new Set();
+            for (const d of extDocs) {
+                if (d.fileId && mongoose.Types.ObjectId.isValid(d.fileId)) fileIdsToDelete.add(String(d.fileId));
+                if (d.fileUrl && mongoose.Types.ObjectId.isValid(d.fileUrl)) fileIdsToDelete.add(String(d.fileUrl));
+            }
+            for (const d of rfiDocs) {
+                (d.attachments || []).forEach(a => {
+                    if (a.fileId && mongoose.Types.ObjectId.isValid(a.fileId)) fileIdsToDelete.add(String(a.fileId));
+                });
+            }
+            for (const d of cdrfiDocs) {
+                (d.attachments || []).forEach(a => {
+                    if (a.fileId && mongoose.Types.ObjectId.isValid(a.fileId)) fileIdsToDelete.add(String(a.fileId));
+                });
+            }
+
+            for (const fid of fileIdsToDelete) {
+                try {
+                    await bucket.delete(new mongoose.Types.ObjectId(fid));
+                } catch (_) {}
+            }
+            if (fileIdsToDelete.size > 0) {
+                console.log(`[DeleteProject] Cleaned up ${fileIdsToDelete.size} GridFS file(s) for project "${project.name}".`);
+            }
+        }
+    } catch (gfsErr) {
+        console.warn('[DeleteProject] Error cleaning up GridFS files:', gfsErr.message);
+    }
+
+    // 4. Delete all associated DB records across all models (by projectId AND by name/path to guarantee 100% removal)
+    const nameRegex = new RegExp(`^${project.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const pathRegex = new RegExp(`^Projects/${project.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, 'i');
+    const altPathRegex = new RegExp(`^Projects/${project.name.replace(/ /g, '_').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`, 'i');
+
+    const Transmittal = require('../models/Transmittal');
+    const DrawingLog = require('../models/DrawingLog');
+    const WeeklyProgress = require('../models/WeeklyProgress');
+    const Notification = require('../models/Notification');
+
+    await Promise.all([
+        Drawing.deleteMany({ $or: [{ projectId }, { projectName: nameRegex }] }),
+        DrawingExtraction.deleteMany({ $or: [{ projectId }, { storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+        RfiExtraction.deleteMany({ $or: [{ projectId }, { storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+        CdrfiExtraction.deleteMany({ $or: [{ projectId }, { storageGatewayPath: pathRegex }, { storageGatewayPath: altPathRegex }] }),
+        ChangeOrder.deleteMany({ $or: [{ projectId }, { projectName: nameRegex }] }),
+        Transmittal.deleteMany({ $or: [{ projectId }, { projectName: nameRegex }] }),
+        DrawingLog.deleteMany({ $or: [{ projectId }, { projectName: nameRegex }] }),
+        WeeklyProgress.deleteMany({ $or: [{ projectId }, { projectName: nameRegex }] }),
+        Notification.deleteMany({
+            $or: [
+                { projectId },
+                { title: nameRegex },
+                { body: nameRegex }
+            ]
+        })
+    ]);
 
     // 4. Send email alert to that particular team (PM, APM, Team Lead)
     try {
@@ -846,33 +970,41 @@ async function uploadFolder(req, res) {
         // For flat files, relativePath might just be the filename. We want to test the full intended target path.
         const fullVirtualPath = `${cleanTargetDir}/${originalName}`.replace(/\/+/g, '/');
 
-        const isDrawingFolder = DRAWING_FOLDER_PATTERN.test('/' + fullVirtualPath + '/');
-        const isBinderFolder = BINDER_PATTERN.test('/' + fullVirtualPath + '/');
-        const isGatherSheetFolder = GATHER_SHEET_PATTERN.test('/' + fullVirtualPath + '/');
-
-        if (isPdf && isDrawingFolder && !isBinderFolder && !isGatherSheetFolder) {
-            // Determine folderName (the parent folder like "Detail sheets" or "E-Sheets", ignoring subfolders)
-            const parts = fullVirtualPath.split('/');
-            let folderName = parts.length > 1 ? parts[parts.length - 2].trim().toUpperCase() : 'DRAWINGS';
-            for (let j = 0; j < parts.length - 1; j++) {
-                const p = parts[j].trim();
-                if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?)$/i.test(p)) {
-                    folderName = 'DETAIL SHEET';
-                    break;
-                } else if (/^(e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(p)) {
-                    folderName = 'ERECTION SHEET';
-                    break;
+        // STRICT CHECK: ONLY files located inside Detail Sheets or Erection Sheets folders may be extracted
+        function getDrawingSheetCategory(testPath) {
+            if (!testPath) return null;
+            const normalized = testPath.replace(/\\/g, '/');
+            const parts = normalized.split('/');
+            const dirParts = parts.slice(0, parts.length - 1);
+            for (const p of dirParts) {
+                const trimmed = p.trim();
+                // Exclude binders or gather sheets completely
+                if (/binder/i.test(trimmed) || /gather[\s_-]*sheets?/i.test(trimmed)) {
+                    return null;
+                }
+                // Detail Sheets
+                if (/^(d[\s\-_]*sheets?|detail[\s\-_]*sheets?|detail[\s\-_]*drawings?)$/i.test(trimmed)) {
+                    return 'DETAIL SHEET';
+                }
+                // Erection Sheets
+                if (/^(e[\s\-_]*sheets?|erection[\s\-_]*sheets?|erection[\s\-_]*drawings?|erection[\s\-_]*plans?)$/i.test(trimmed)) {
+                    return 'ERECTION SHEET';
                 }
             }
+            return null;
+        }
 
+        const detectedSheetCategory = getDrawingSheetCategory(fullVirtualPath) || getDrawingSheetCategory(relativePath);
+
+        if (isPdf && detectedSheetCategory) {
             drawingFiles.push({
                 file,
                 relativePath,
-                folderName,
+                folderName: detectedSheetCategory,
                 storageGatewayPath,
             });
         } else {
-            // Not a drawing PDF, clean up from local disk since it was successfully uploaded to gateway
+            // Not a drawing PDF in Detail Sheets or Erection Sheets folder, skip extraction and clean up disk copy
             try { fs.unlinkSync(file.path); } catch (_) { }
         }
     }

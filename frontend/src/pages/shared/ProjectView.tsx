@@ -1,3 +1,4 @@
+import { getProjectTargetSequences } from '../../utils/sequenceUtils';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -86,141 +87,157 @@ export default function ProjectView() {
     const eligibleUsers = useMemo(() => {
         if (!project) return [];
 
-        const projectTeamId = project.teamId ? String(project.teamId) : '';
+        const getId = (val: any): string => {
+            if (!val) return '';
+            if (typeof val === 'string') return val.trim();
+            return String(val._id || val.id || '').trim();
+        };
+
+        const getIds = (val: any): string[] => {
+            if (!val) return [];
+            if (Array.isArray(val)) {
+                return val.map(getId).filter(Boolean);
+            }
+            const id = getId(val);
+            return id ? [id] : [];
+        };
+
+        const projectTeamId = getId(project.teamId);
         const projectTeamName = project.teamName ? String(project.teamName).toLowerCase().trim() : '';
-        const projectApmId = project.caldimAssistantProjectManager ? String(project.caldimAssistantProjectManager) : '';
-        const projectTlId = project.caldimTeamLead ? String(project.caldimTeamLead) : '';
-        const projectPmId = project.caldimProjectManager ? String(project.caldimProjectManager) : '';
+        const projectApmId = getId(project.caldimAssistantProjectManager);
+        const projectTlId = getId(project.caldimTeamLead);
+        const projectPmId = getId(project.caldimProjectManager);
+        const creatorId = getId(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : ''));
 
-        // Find matched team documents by ID or name
-        const matchedTeams = allTeams.filter(t => {
-            const tid = String(t._id || t.id);
-            const tname = String(t.name || '').toLowerCase().trim();
-            if (projectTeamId && tid === projectTeamId) return true;
-            if (projectTeamName && tname === projectTeamName) return true;
-            return false;
-        });
+        // Check if the project creator is a PM, APM, or TL
+        const creator = allUsers.find(u => getId(u) === creatorId);
+        const effectivePmId = projectPmId || (creator?.role === 'project_manager' ? creatorId : '');
+        const effectiveApmId = projectApmId || (creator?.role === 'assistant_project_manager' ? creatorId : '');
+        const effectiveTlId = projectTlId || ((creator?.role === 'team_lead' || creator?.role === 'assistant_team_lead') ? creatorId : '');
 
-        // Gather allowed user IDs for this project's team
+        // Gather allowed user IDs for this project's team hierarchy
         const teamUserIds = new Set<string>();
 
-        // 1. Members and leads of the matched team
-        matchedTeams.forEach(t => {
-            const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
-            members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
+        // Find all matched teams
+        const matchedTeams = new Set<Team>();
 
-            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-            leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
+        allTeams.forEach(t => {
+            const tid = getId(t._id || t.id);
+            const tname = String(t.name || '').toLowerCase().trim();
+            const tPm = getId(t.project_manager);
+            const tApm = getId(t.assistant_project_manager);
+            const tLeads = getIds(t.lead);
+
+            // 1. Matches team by ID or name
+            if ((projectTeamId && tid === projectTeamId) || (projectTeamName && tname === projectTeamName)) {
+                matchedTeams.add(t);
+            }
+            // 2. Matches project manager
+            if (effectivePmId && tPm === effectivePmId) {
+                matchedTeams.add(t);
+            }
+            // 3. Matches assistant project manager
+            if (effectiveApmId && tApm === effectiveApmId) {
+                matchedTeams.add(t);
+            }
+            // 4. Matches team lead
+            if (effectiveTlId && tLeads.includes(effectiveTlId)) {
+                matchedTeams.add(t);
+            }
         });
 
-        // 2. Users explicitly assigned to this team via user.team
+        // Collect all members and leads from all matched teams
+        matchedTeams.forEach(t => {
+            const members = Array.isArray(t.members) ? t.members : (Array.isArray((t as any).users) ? (t as any).users : []);
+            members.forEach((m: any) => {
+                const mid = getId(m);
+                if (mid) teamUserIds.add(mid);
+            });
+
+            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+            leads.forEach((l: any) => {
+                const lid = getId(l);
+                if (lid) teamUserIds.add(lid);
+            });
+        });
+
+        // Include users reporting to effective TL directly
+        if (effectiveTlId) {
+            teamUserIds.add(effectiveTlId);
+            allUsers.forEach(u => {
+                const uLeads = getIds(u.team_lead);
+                if (uLeads.includes(effectiveTlId)) {
+                    teamUserIds.add(getId(u));
+                }
+            });
+        }
+
+        // Include users reporting to effective APM directly
+        if (effectiveApmId) {
+            allUsers.forEach(u => {
+                if (getId(u.assistant_project_manager) === effectiveApmId) {
+                    teamUserIds.add(getId(u));
+                }
+            });
+        }
+
+        // Include users reporting to effective PM directly
+        if (effectivePmId) {
+            allUsers.forEach(u => {
+                if (getId(u.project_manager) === effectivePmId) {
+                    teamUserIds.add(getId(u));
+                }
+            });
+        }
+
+        // Include users explicitly assigned to the team by ID
         if (projectTeamId) {
             allUsers.forEach(u => {
-                const uTeam = u.team ? String((u.team as any)?._id || (u.team as any)?.id || u.team) : '';
-                if (uTeam === projectTeamId) {
-                    teamUserIds.add(String(u.id || u._id));
+                const uTeamId = getId((u as any).team);
+                if (uTeamId === projectTeamId) {
+                    teamUserIds.add(getId(u));
                 }
             });
         }
 
-        // 3. If APM is assigned on the project, all users and teams reporting to this APM
-        if (projectApmId) {
-            allTeams.forEach(t => {
-                const tApm = t.assistant_project_manager ? String((t.assistant_project_manager as any)?._id || (t.assistant_project_manager as any)?.id || t.assistant_project_manager) : '';
-                if (tApm === projectApmId) {
-                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
-                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
-                    const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
-                }
-            });
-            allUsers.forEach(u => {
-                const uApm = u.assistant_project_manager ? String((u.assistant_project_manager as any)?._id || (u.assistant_project_manager as any)?.id || u.assistant_project_manager) : '';
-                if (uApm === projectApmId) {
-                    teamUserIds.add(String(u.id || u._id));
-                }
-            });
-        }
-
-        // 4. If Team Lead is assigned on the project, users reporting to this TL
-        if (projectTlId) {
-            allTeams.forEach(t => {
-                const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-                const isLeadOfTeam = leads.some((l: any) => String(l?._id || l?.id || l) === projectTlId);
-                if (isLeadOfTeam) {
-                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
-                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
-                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
-                }
-            });
-            allUsers.forEach(u => {
-                const uTl = u.team_lead ? String((u.team_lead as any)?._id || (u.team_lead as any)?.id || u.team_lead) : '';
-                if (uTl === projectTlId) {
-                    teamUserIds.add(String(u.id || u._id));
-                }
-            });
-        }
-
-        // 5. If still no team members found, check creator from assignments or createdByUserId
-        if (teamUserIds.size === 0) {
-            const creatorId = String(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : '') || '');
-            if (creatorId) {
-                const creator = allUsers.find(u => String(u.id || u._id) === creatorId);
-                if (creator) {
-                    allTeams.forEach(t => {
-                        const tApm = t.assistant_project_manager ? String((t.assistant_project_manager as any)?._id || (t.assistant_project_manager as any)?.id || t.assistant_project_manager) : '';
-                        const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-                        const isLead = leads.some((l: any) => String(l?._id || l?.id || l) === creatorId);
-                        if (tApm === creatorId || isLead) {
-                            const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
-                            members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
-                            leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
-                        }
-                    });
-                }
+        // Also include any users reporting to any team leads collected so far
+        const collectedLeadIds = new Set<string>();
+        teamUserIds.forEach(uid => {
+            const u = allUsers.find(usr => getId(usr) === uid);
+            if (u && (u.role === 'team_lead' || u.role === 'assistant_team_lead')) {
+                collectedLeadIds.add(uid);
             }
-        }
-
-        // 6. If no team/APM/TL identified, but PM is set: users and teams under this PM
-        if (teamUserIds.size === 0 && projectPmId) {
-            allTeams.forEach(t => {
-                const tPm = t.project_manager ? String((t.project_manager as any)?._id || (t.project_manager as any)?.id || t.project_manager) : '';
-                if (tPm === projectPmId) {
-                    const members = Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : []);
-                    members.forEach((m: any) => teamUserIds.add(String(m?._id || m?.id || m)));
-                    const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-                    leads.forEach((l: any) => teamUserIds.add(String(l?._id || l?.id || l)));
-                }
-            });
+        });
+        if (collectedLeadIds.size > 0) {
             allUsers.forEach(u => {
-                const uPm = u.project_manager ? String((u.project_manager as any)?._id || (u.project_manager as any)?.id || u.project_manager) : '';
-                if (uPm === projectPmId) {
-                    teamUserIds.add(String(u.id || u._id));
+                const uLeads = getIds(u.team_lead);
+                if (uLeads.some(lid => collectedLeadIds.has(lid))) {
+                    teamUserIds.add(getId(u));
                 }
             });
         }
-
-        const creatorId = String(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : '') || '');
 
         return allUsers.filter(u => {
-            const uid = String(u.id || u._id);
+            const uid = getId(u);
             const r = u.role;
 
             // 1. Only team members and team leads can be allocated (excludes PMs, APMs, Admins)
             const isRoleEligible = r === 'team_member' || r === 'team_lead' || r === 'assistant_team_lead';
             if (!isRoleEligible) return false;
 
-            // 2. Never show the creator of the project, managing PM, or managing APM
+            // 2. Never show the creator of the project ("other than who created the project")
             if (creatorId && uid === creatorId) return false;
-            if (projectPmId && uid === projectPmId) return false;
-            if (projectApmId && uid === projectApmId) return false;
 
-            // 4. If a team was identified, restrict to that team's members
+            // 3. Never show managing PM or managing APM as an allocatable team member/lead
+            if (effectivePmId && uid === effectivePmId) return false;
+            if (effectiveApmId && uid === effectiveApmId) return false;
+
+            // 4. If team hierarchy was identified, restrict to those users
             if (teamUserIds.size > 0) {
                 return teamUserIds.has(uid);
             }
 
-            // Fallback: show all eligible team members/leads
+            // Fallback if no team/PM/APM/TL at all: show all eligible team members/leads
             return true;
         });
     }, [allUsers, allTeams, project]);
@@ -348,85 +365,7 @@ export default function ProjectView() {
     }, [fetchData]);
 
     const derivedSequences = useMemo(() => {
-        const seqs: any[] = [];
-        const defaultAppDate = project?.creationDate || (project?.createdAt ? new Date(project.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-
-        if (project?.trackingMode === 'sow') {
-            let hasAnySeq = false;
-            if (project.scopeOfWork) {
-                project.scopeOfWork.forEach((sow: any) => { if (sow.sequences && sow.sequences.length > 0) hasAnySeq = true; });
-            }
-            if (project.additionalScopeOfWork) {
-                project.additionalScopeOfWork.forEach((sow: any) => { if (sow.sequences && sow.sequences.length > 0) hasAnySeq = true; });
-            }
-
-            if (hasAnySeq) {
-                if (project.scopeOfWork) {
-                    project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
-                        if (sow.sequences) {
-                            sow.sequences.forEach((seq: any, seqIdx: number) => {
-                                const effectiveApprovalDate = seq.approvalDate || sow.approvalDate || defaultAppDate;
-                                seqs.push({ 
-                                    ...seq, 
-                                    approvalDate: effectiveApprovalDate,
-                                    source: 'sow', 
-                                    sowIndex: sowIdx, 
-                                    seqIndex: seqIdx, 
-                                    sowStatus: sow.status,
-                                    parentStatus: sow.status,
-                                    name: `${seq.name} (${sow.name})` 
-                                });
-                            });
-                        }
-                    });
-                }
-                if (project.additionalScopeOfWork) {
-                    project.additionalScopeOfWork.forEach((sow: any, sowIdx: number) => {
-                        if (sow.sequences) {
-                            sow.sequences.forEach((seq: any, seqIdx: number) => {
-                                const effectiveApprovalDate = seq.approvalDate || sow.approvalDate || defaultAppDate;
-                                seqs.push({ 
-                                    ...seq, 
-                                    approvalDate: effectiveApprovalDate,
-                                    source: 'additionalSow', 
-                                    sowIndex: sowIdx, 
-                                    seqIndex: seqIdx, 
-                                    sowStatus: sow.status,
-                                    parentStatus: sow.status,
-                                    name: `${seq.name} (${sow.name})` 
-                                });
-                            });
-                        }
-                    });
-                }
-            } else {
-                if (project.scopeOfWork) {
-                    project.scopeOfWork.forEach((sow: any, sowIdx: number) => {
-                        const effectiveApprovalDate = sow.approvalDate || defaultAppDate;
-                        seqs.push({ 
-                            ...sow, 
-                            approvalDate: effectiveApprovalDate,
-                            source: 'sow-fallback', 
-                            sowIndex: sowIdx, 
-                            sowStatus: sow.status,
-                            parentStatus: sow.status,
-                            name: sow.name 
-                        });
-                    });
-                }
-            }
-        } else if (project?.sequences) {
-            project.sequences.forEach((seq: any, idx: number) => {
-                const effectiveApprovalDate = seq.approvalDate || defaultAppDate;
-                seqs.push({ 
-                    ...seq, 
-                    approvalDate: effectiveApprovalDate,
-                    source: 'project', 
-                    seqIndex: idx 
-                });
-            });
-        }
-        return seqs;
+        return getProjectTargetSequences(project);
     }, [project]);
 
     // ── Reusable upload helper ────────────────────────────────
@@ -870,7 +809,7 @@ export default function ProjectView() {
                         projectId={(project?._id || project?.id) as string}
                         projectName={project.name}
                         canUpload={canUpload}
-                        sequences={project?.sequences?.map((s: any) => s.name || s) || []}
+                        sequences={derivedSequences.map((s: any) => s.name || s)}
                     />
                 </div>
             )}
@@ -881,7 +820,8 @@ export default function ProjectView() {
                     <DrawingExtractionPanel
                         projectId={(project?._id || project?.id) as string}
                         canUpload={canUpload}
-                        sequences={project.sequences}
+                        sequences={derivedSequences}
+                        project={project}
                         projectYear={project.year}
                         startingTransmittalNumber={project.startingTransmittalNumber}
                     />
@@ -2197,7 +2137,7 @@ export default function ProjectView() {
                                 >
                                     Cancel
                                 </button>
-                                {project.sequences && project.sequences.length > 0 && selectedSequences.length === 0 && (
+                                {derivedSequences.length > 0 && selectedSequences.length === 0 && (
                                     <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 12, fontWeight: 700, textAlign: 'right' }}>
                                         * Please select at least one Sequence to continue
                                     </div>
@@ -2205,8 +2145,8 @@ export default function ProjectView() {
                                 <button
                                     className="btn btn-primary"
                                     onClick={() => {
-                                        if (project.sequences && project.sequences.length > 0 && selectedSequences.length === 0) {
-                                            alert('Please select at least one Sequence before continuing.');
+                                        if (derivedSequences.length > 0 && selectedSequences.length === 0) {
+                                            showMessage('Sequence Required', 'Please select at least one Target Sequence / Scope of Work before continuing.', 'error');
                                             return;
                                         }
                                         setTransmittalSelectModal(false);

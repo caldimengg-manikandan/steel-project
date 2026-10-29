@@ -1,3 +1,4 @@
+import { getProjectTargetSequences } from '../../utils/sequenceUtils';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { userListProjects } from '../../services/projectApi';
@@ -86,25 +87,7 @@ export default function UserRfi() {
         return '';
     };
 
-    const getSequencesOrSows = () => {
-        if (selectedProject?.sequences && selectedProject.sequences.length > 0) {
-            return selectedProject.sequences;
-        }
-        const fallback: any[] = [];
-        if (selectedProject?.scopeOfWork) {
-            selectedProject.scopeOfWork.forEach((sow: any) => {
-                if (sow.name) fallback.push({ name: sow.name });
-            });
-        }
-        if (selectedProject?.additionalScopeOfWork) {
-            selectedProject.additionalScopeOfWork.forEach((sow: any) => {
-                if (sow.name) fallback.push({ name: sow.name });
-            });
-        }
-        return fallback;
-    };
-
-    const sequencesToDisplay = getSequencesOrSows();
+    const sequencesToDisplay = getProjectTargetSequences(selectedProject);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');

@@ -230,6 +230,18 @@ const { startAiService } = require('./utils/aiServiceManager');
 connectDB().then(async () => {
     initGridFS();
 
+    // Ensure all existing projects have modern schema defaults retroactively applied
+    try {
+        const Project = require('./models/Project');
+        await Project.updateMany({ trackingMode: { $exists: false } }, { $set: { trackingMode: 'sow' } });
+        await Project.updateMany({ scopeOfWork: { $exists: false } }, { $set: { scopeOfWork: [] } });
+        await Project.updateMany({ additionalScopeOfWork: { $exists: false } }, { $set: { additionalScopeOfWork: [] } });
+        await Project.updateMany({ sequences: { $exists: false } }, { $set: { sequences: [] } });
+        await Project.updateMany({ startingTransmittalNumber: { $exists: false } }, { $set: { startingTransmittalNumber: 1 } });
+    } catch (syncErr) {
+        console.warn('[Sync] Startup project sync warning:', syncErr.message);
+    }
+
     // Validate remote Storage Agent connectivity safely
     try {
         const storageGateway = require('./utils/storageGateway');

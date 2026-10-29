@@ -46,49 +46,42 @@ exports.uploadAndExtract = async (req, res) => {
 
     const category = req.body.category || req.body.purpose || '';
 
-    // Filter and determine folder name
+    // STRICT Filter: Only Detail Sheets or Erection Sheets
+    function getDrawingSheetCategory(testPath) {
+        if (!testPath) return null;
+        const normalized = testPath.replace(/\\/g, '/');
+        const parts = normalized.split('/');
+        const dirParts = parts.slice(0, parts.length - 1);
+        for (const p of dirParts) {
+            const trimmed = p.trim();
+            if (/binder/i.test(trimmed) || /gather[\s_-]*sheets?/i.test(trimmed)) {
+                return null;
+            }
+            if (/^(d[\s\-_]*sheets?|detail[\s\-_]*sheets?|detail[\s\-_]*drawings?)$/i.test(trimmed)) {
+                return 'DETAIL SHEET';
+            }
+            if (/^(e[\s\-_]*sheets?|erection[\s\-_]*sheets?|erection[\s\-_]*drawings?|erection[\s\-_]*plans?)$/i.test(trimmed)) {
+                return 'ERECTION SHEET';
+            }
+        }
+        return null;
+    }
+
     const validFiles = [];
     req.files.forEach((file, i) => {
         const fullPath = pathArray[i] || file.originalname;
-        const lowerPath = fullPath.toLowerCase();
-
-        let folderName = '';
-        const titleRegex = /(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)/i;
-        let matchedTitle = null;
         const inFolder = fullPath.includes('/') || fullPath.includes('\\');
 
-        if (fullPath.includes('/')) {
-            const parts = fullPath.split('/');
-            for (let i = 0; i < parts.length - 1; i++) {
-                if (titleRegex.test(parts[i].trim())) {
-                    matchedTitle = parts[i].trim();
-                }
+        let folderName = '';
+        if (inFolder) {
+            const sheetCategory = getDrawingSheetCategory(fullPath);
+            if (!sheetCategory) {
+                console.log(`[Upload] Skipping file not in Detail Sheets or Erection Sheets: ${fullPath}`);
+                return; // skip this file
             }
-        } else if (fullPath.includes('\\')) {
-            const parts = fullPath.split('\\');
-            for (let i = 0; i < parts.length - 1; i++) {
-                if (titleRegex.test(parts[i].trim())) {
-                    matchedTitle = parts[i].trim();
-                }
-            }
-        }
-
-        if (inFolder && !matchedTitle) {
-            console.log(`[Upload] Skipping file not in an allowed drawing folder: ${fullPath}`);
-            return; // skip this file
-        }
-
-        if (matchedTitle) {
-            if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?)$/i.test(matchedTitle)) {
-                folderName = 'DETAIL SHEET';
-            } else if (/^(e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(matchedTitle)) {
-                folderName = 'ERECTION SHEET';
-            } else {
-                folderName = matchedTitle.toUpperCase();
-            }
+            folderName = sheetCategory;
         } else {
-            const parts = fullPath.replace(/\\/g, '/').split('/');
-            folderName = parts.length > 1 ? parts[parts.length - 2].trim().toUpperCase() : 'DRAWINGS';
+            folderName = 'DRAWINGS';
         }
 
         validFiles.push({ file, folderName });

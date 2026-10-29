@@ -115,6 +115,29 @@ exports.browse = async (req, res) => {
             !e.name.startsWith('test_nested')
         );
 
+        // Filter out paths that have been deleted so they never reappear in the UI
+        try {
+            const DeletedStoragePath = require('../models/DeletedStoragePath');
+            const deletedDocs = await DeletedStoragePath.find({}).select('path').lean();
+            if (deletedDocs && deletedDocs.length > 0) {
+                const deletedSet = new Set(
+                    deletedDocs.map(d => d.path.toLowerCase().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, ''))
+                );
+                const reqNorm = (requestedPath || '').toLowerCase().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+
+                entries = entries.filter(e => {
+                    const itemNorm = reqNorm ? `${reqNorm}/${e.name.toLowerCase()}` : e.name.toLowerCase();
+                    if (deletedSet.has(itemNorm)) return false;
+                    for (const del of deletedSet) {
+                        if (itemNorm.startsWith(del + '/')) return false;
+                    }
+                    return true;
+                });
+            }
+        } catch (filterErr) {
+            console.warn('[FileGateway] Error filtering deleted paths in browse:', filterErr.message);
+        }
+
         res.json({
             path: requestedPath || '/',
             entries,
@@ -271,8 +294,14 @@ exports.remove = async (req, res) => {
 
         const deletedPath = req.query.path;
 
-        // Delete from remote storage server
-        await storageGateway.deleteFile(deletedPath);
+        // Delete from remote storage server (try/catch to avoid blocking DB cleanup on storage errors)
+        let storageError = null;
+        try {
+            await storageGateway.deleteFile(deletedPath);
+        } catch (sErr) {
+            console.warn(`[FileGateway] Storage server delete warning for "${deletedPath}":`, sErr.message);
+            storageError = sErr;
+        }
 
         // Clean up matching DrawingExtraction records from the database
         // This covers single-file deletes, subfolder deletes, and root project folder deletes
@@ -426,6 +455,27 @@ exports.remove = async (req, res) => {
             }
         } catch (dbErr) {
             console.error('[FileGateway] DB cleanup warning:', dbErr.message);
+        }
+
+        // Record in DeletedStoragePath so it is permanently filtered out of project storage
+        try {
+            const DeletedStoragePath = require('../models/DeletedStoragePath');
+            const cleanPath = deletedPath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+            const altPath = cleanPath.includes('_') ? cleanPath.replace(/_/g, ' ') : cleanPath.replace(/ /g, '_');
+            await DeletedStoragePath.updateOne(
+                { path: cleanPath },
+                { $set: { path: cleanPath, deletedAt: new Date(), deletedBy: req.principal?.username || 'user' } },
+                { upsert: true }
+            );
+            if (altPath !== cleanPath) {
+                await DeletedStoragePath.updateOne(
+                    { path: altPath },
+                    { $set: { path: altPath, deletedAt: new Date(), deletedBy: req.principal?.username || 'user' } },
+                    { upsert: true }
+                );
+            }
+        } catch (delPathErr) {
+            console.warn('[FileGateway] Error saving DeletedStoragePath:', delPathErr.message);
         }
 
         res.json({

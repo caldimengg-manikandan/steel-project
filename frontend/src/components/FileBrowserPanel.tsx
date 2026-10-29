@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { getProjectTargetSequences } from '../utils/sequenceUtils';
+import { getProjectById } from '../services/projectApi';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     browseFiles, 
     uploadFiles, 
@@ -15,7 +17,6 @@ import {
     IconFolder, 
     IconFile, 
     IconDownload, 
-    IconTrash, 
     IconUpload
 } from './Icons';
 
@@ -92,8 +93,28 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
     const [selectedUploadSequences, setSelectedUploadSequences] = useState<string[]>([]);
     const [sequenceFilter, setSequenceFilter] = useState<string>('ALL');
-    const [deleteModalItem, setDeleteModalItem] = useState<{ name: string; isDirectory: boolean } | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+
+    const [fetchedSequences, setFetchedSequences] = useState<string[]>([]);
+
+    useEffect(() => {
+        if ((!sequences || sequences.length === 0) && projectId) {
+            getProjectById(projectId)
+                .then(res => {
+                    if (res?.project) {
+                        const derived = getProjectTargetSequences(res.project);
+                        setFetchedSequences(derived.map(s => s.name || s));
+                    }
+                })
+                .catch(err => console.warn('[FileBrowserPanel] Failed to fetch project for sequences:', err));
+        }
+    }, [projectId, sequences]);
+
+    const effectiveSequences = useMemo(() => {
+        if (sequences && sequences.length > 0) return sequences;
+        return fetchedSequences;
+    }, [sequences, fetchedSequences]);
+
+
 
     const loadFiles = async (path: string) => {
         setLoading(true);
@@ -220,26 +241,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         }
     };
 
-    const handleDelete = (fileName: string, isDirectory?: boolean) => {
-        setDeleteModalItem({ name: fileName, isDirectory: !!isDirectory });
-    };
 
-    const confirmDelete = async () => {
-        if (!deleteModalItem) return;
-        setIsDeleting(true);
-        const { name, isDirectory } = deleteModalItem;
-        try {
-            const filePath = currentPath ? `${currentPath}/${name}` : name;
-            await deleteFile(filePath);
-            showMessage('Deleted', `${isDirectory ? 'Folder' : 'File'} "${name}" was permanently removed from the server.`, 'success');
-            setDeleteModalItem(null);
-            loadFiles(currentPath);
-        } catch (err: any) {
-            showMessage('Delete Failed', err.message, 'error');
-        } finally {
-            setIsDeleting(false);
-        }
-    };
 
     // ── Upload Configuration Handlers ─────────────────────────────
     const handleInitiateUpload = async (filesToUpload: FileList | null, mode: 'files' | 'folder') => {
@@ -255,8 +257,8 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
         setTransmittalChoice('new');
         setUploadPurpose('Fabrication');
 
-        const availableSeqs = sequences && sequences.length > 0 ? sequences : ['Seq 1'];
-        setSelectedUploadSequences([availableSeqs[0]]);
+        const availableSeqs = (sequences && sequences.length > 0 ? sequences : effectiveSequences);
+        setSelectedUploadSequences(availableSeqs.length > 0 ? [availableSeqs[0]] : []);
 
         if (projectId) {
             setLoadingTransmittals(true);
@@ -282,7 +284,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     const handleConfirmUpload = async () => {
         if (!pendingUploadFiles || pendingUploadFiles.length === 0) return;
         if (selectedUploadSequences.length === 0) {
-            showMessage('Required Field', 'Please select at least one Sequence.', 'error');
+            showMessage('Required Field', 'Please select at least one Sequence / Scope of Work.', 'error');
             return;
         }
         if (transmittalChoice === 'existing' && !selectedTransmittalNum) {
@@ -1007,16 +1009,6 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                                     <IconDownload />
                                                 </button>
                                             )}
-                                            {canUpload && (
-                                                <button 
-                                                    className="btn btn-ghost btn-sm btn-icon" 
-                                                    style={{ color: 'var(--color-danger-mid)' }}
-                                                    onClick={() => handleDelete(file.name, file.type === 'directory')}
-                                                    title={file.type === 'directory' ? "Delete Folder" : "Delete"}
-                                                >
-                                                    <IconTrash />
-                                                </button>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -1033,159 +1025,6 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                     to { transform: rotate(360deg); }
                 }
             `}} />
-
-
-
-            {/* Delete Confirmation Modal */}
-            {deleteModalItem && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(15, 23, 42, 0.65)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999,
-                    padding: 24,
-                }}>
-                    <div style={{
-                        background: 'var(--color-bg-card, #ffffff)',
-                        border: '1px solid var(--color-border, #e2e8f0)',
-                        borderRadius: '16px',
-                        width: '100%',
-                        maxWidth: 480,
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            padding: '20px 24px',
-                            borderBottom: '1px solid var(--color-border, #e2e8f0)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: 'rgba(239, 68, 68, 0.05)',
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: '50%',
-                                    background: 'rgba(239, 68, 68, 0.12)',
-                                    color: '#ef4444',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 18
-                                }}>
-                                    ⚠️
-                                </div>
-                                <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: 'var(--color-text-primary, #0f172a)' }}>
-                                    Delete {deleteModalItem.isDirectory ? 'Folder' : 'File'}
-                                </h3>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => !isDeleting && setDeleteModalItem(null)}
-                                disabled={isDeleting}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: isDeleting ? 'not-allowed' : 'pointer',
-                                    color: '#94a3b8',
-                                    fontSize: 18,
-                                    padding: 4
-                                }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div style={{ padding: '24px' }}>
-                            <p style={{ margin: '0 0 16px 0', fontSize: 14, color: 'var(--color-text-secondary, #475569)', lineHeight: 1.5 }}>
-                                Are you sure you want to permanently delete{' '}
-                                <strong style={{ color: 'var(--color-text-primary, #0f172a)', wordBreak: 'break-all' }}>
-                                    "{deleteModalItem.name}"
-                                </strong>
-                                ?
-                            </p>
-                            {deleteModalItem.isDirectory && (
-                                <div style={{
-                                    padding: '12px 14px',
-                                    background: '#fef2f2',
-                                    border: '1px solid #fecaca',
-                                    borderRadius: 8,
-                                    color: '#991b1b',
-                                    fontSize: 13,
-                                    lineHeight: 1.4,
-                                    display: 'flex',
-                                    gap: 8,
-                                    alignItems: 'flex-start'
-                                }}>
-                                    <span style={{ fontSize: 15 }}>🚨</span>
-                                    <div>
-                                        <strong>Warning:</strong> This will permanently delete this folder and <strong>all files and subfolders inside</strong> from both the application server and the remote storage drive.
-                                    </div>
-                                </div>
-                            )}
-                            <p style={{ margin: '14px 0 0 0', fontSize: 12, color: '#64748b' }}>
-                                This action cannot be undone.
-                            </p>
-                        </div>
-
-                        <div style={{
-                            padding: '16px 24px',
-                            borderTop: '1px solid var(--color-border, #e2e8f0)',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            gap: 12,
-                            background: 'var(--color-bg-page, #f8fafc)'
-                        }}>
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => setDeleteModalItem(null)}
-                                disabled={isDeleting}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-danger"
-                                style={{
-                                    background: '#ef4444',
-                                    color: '#ffffff',
-                                    borderColor: '#ef4444',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    cursor: isDeleting ? 'not-allowed' : 'pointer'
-                                }}
-                                onClick={confirmDelete}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? (
-                                    <>
-                                        <svg className="animate-spin" style={{ width: 14, height: 14 }} viewBox="0 0 24 24" fill="none">
-                                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} />
-                                            <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4" style={{ opacity: 0.75 }} />
-                                        </svg>
-                                        Deleting from server...
-                                    </>
-                                ) : (
-                                    <>
-                                        <IconTrash />
-                                        Delete {deleteModalItem.isDirectory ? 'Folder' : 'File'}
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Folder Upload Complete / Details Modal */}
             {uploadResultModal && uploadResultDetails && (
@@ -1583,10 +1422,11 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                             {/* 3. Sequence Tagging (Mandatory) */}
                             <div>
                                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
-                                    Sequence <span style={{ color: '#ef4444' }}>*</span>
+                                    Sequence / Scope of Work <span style={{ color: '#ef4444' }}>*</span>
                                 </label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                    {((sequences && sequences.length > 0) ? sequences : ['Seq 1']).map((seq) => {
+                                    {effectiveSequences && effectiveSequences.length > 0 ? (
+                                        effectiveSequences.map((seq) => {
                                         const isSelected = selectedUploadSequences.includes(seq);
                                         return (
                                             <button
@@ -1612,7 +1452,12 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                                                 {isSelected ? '✓ ' : ''}{seq}
                                             </button>
                                         );
-                                    })}
+                                    })
+                                    ) : (
+                                        <span style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
+                                            No sequences or Scope of Work defined for this project.
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1631,7 +1476,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                             <button
                                 className="btn btn-primary"
                                 onClick={handleConfirmUpload}
-                                disabled={selectedUploadSequences.length === 0 || (transmittalChoice === 'existing' && !selectedTransmittalNum)}
+                                disabled={(effectiveSequences && effectiveSequences.length > 0 && selectedUploadSequences.length === 0) || (transmittalChoice === 'existing' && !selectedTransmittalNum)}
                             >
                                 Start Upload
                             </button>
