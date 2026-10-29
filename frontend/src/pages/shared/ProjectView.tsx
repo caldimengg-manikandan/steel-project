@@ -1438,35 +1438,40 @@ export default function ProjectView() {
                                             try {
                                                 if (seq.source === 'sow') {
                                                     const updatedSow = [...(project.scopeOfWork || [])];
-                                                    const updatedSeqs = [...(updatedSow[seq.sowIndex].sequences || [])];
-                                                    const currentSeq = updatedSeqs[seq.seqIndex];
+                                                    const sIdx = seq.sowIndex ?? 0;
+                                                    const qIdx = seq.seqIndex ?? 0;
+                                                    const updatedSeqs = [...(updatedSow[sIdx]?.sequences || [])];
+                                                    const currentSeq = updatedSeqs[qIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                    updatedSeqs[seq.seqIndex] = { 
+                                                    updatedSeqs[qIdx] = { 
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
                                                     };
-                                                    updatedSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    if (updatedSow[sIdx]) updatedSow[sIdx].sequences = updatedSeqs;
                                                     setProject({ ...project, scopeOfWork: updatedSow });
                                                     await updateProjectScopeOfWork(id, updatedSow);
                                                 } else if (seq.source === 'additionalSow') {
                                                     const updatedAddSow = [...(project.additionalScopeOfWork || [])];
-                                                    const updatedSeqs = [...(updatedAddSow[seq.sowIndex].sequences || [])];
-                                                    const currentSeq = updatedSeqs[seq.seqIndex];
+                                                    const sIdx = seq.sowIndex ?? 0;
+                                                    const qIdx = seq.seqIndex ?? 0;
+                                                    const updatedSeqs = [...(updatedAddSow[sIdx]?.sequences || [])];
+                                                    const currentSeq = updatedSeqs[qIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                    updatedSeqs[seq.seqIndex] = { 
+                                                    updatedSeqs[qIdx] = { 
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
                                                     };
-                                                    updatedAddSow[seq.sowIndex].sequences = updatedSeqs;
+                                                    if (updatedAddSow[sIdx]) updatedAddSow[sIdx].sequences = updatedSeqs;
                                                     setProject({ ...project, additionalScopeOfWork: updatedAddSow });
                                                     await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
                                                 } else if (seq.source === 'project') {
                                                     const newSeqs = [...(project.sequences || [])];
-                                                    const currentSeq = newSeqs[seq.seqIndex];
+                                                    const qIdx = seq.seqIndex ?? 0;
+                                                    const currentSeq = newSeqs[qIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : currentSeq.status;
-                                                    newSeqs[seq.seqIndex] = { 
+                                                    newSeqs[qIdx] = { 
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
@@ -1475,9 +1480,10 @@ export default function ProjectView() {
                                                     await updateProjectSequences(id, newSeqs);
                                                 } else if (seq.source === 'sow-fallback') {
                                                     const updatedSow = [...(project.scopeOfWork || [])];
-                                                    const targetSow = updatedSow[seq.sowIndex];
+                                                    const sIdx = seq.sowIndex ?? 0;
+                                                    const targetSow = updatedSow[sIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
-                                                    updatedSow[seq.sowIndex] = { 
+                                                    updatedSow[sIdx] = { 
                                                         ...targetSow, 
                                                         status: nextStatus,
                                                         approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
@@ -1604,7 +1610,7 @@ export default function ProjectView() {
                                                             type="date"
                                                             className="form-control form-control-sm"
                                                             style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
-                                                            value={seq.approvalDate ? seq.approvalDate.split('T')[0] : ''}
+                                                            value={seq.approvalDate ? String(seq.approvalDate).split('T')[0] : ''}
                                                             onChange={(e) => handleUpdateSequence({ approvalDate: e.target.value })}
                                                             disabled={isHold || !canEditSequences}
                                                         />
@@ -1615,7 +1621,7 @@ export default function ProjectView() {
                                                             type="date"
                                                             className="form-control form-control-sm"
                                                             style={{ height: 28, fontSize: 11, cursor: (isHold || !canEditSequences) ? 'not-allowed' : undefined }}
-                                                            value={seq.fabricationDate ? seq.fabricationDate.split('T')[0] : ''}
+                                                            value={seq.fabricationDate ? String(seq.fabricationDate).split('T')[0] : ''}
                                                             onChange={(e) => handleUpdateSequence({ fabricationDate: e.target.value })}
                                                             disabled={isHold || !canEditSequences}
                                                         />

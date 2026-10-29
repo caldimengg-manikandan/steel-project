@@ -102,7 +102,7 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                 .then(res => {
                     if (res?.project) {
                         const derived = getProjectTargetSequences(res.project);
-                        setFetchedSequences(derived.map(s => s.name || s));
+                        setFetchedSequences(derived.map(s => (typeof s === "string" ? s : s.name || "")));
                     }
                 })
                 .catch(err => console.warn('[FileBrowserPanel] Failed to fetch project for sequences:', err));
