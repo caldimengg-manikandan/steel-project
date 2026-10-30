@@ -102,8 +102,10 @@ export default function ProjectView() {
             return id ? [id] : [];
         };
 
+        const norm = (s?: string) => (s || '').toLowerCase().replace(/[\s\-_]+/g, '').trim();
+
         const projectTeamId = getId(project.teamId);
-        const projectTeamName = project.teamName ? String(project.teamName).toLowerCase().trim() : '';
+        const projectTeamName = norm(project.teamName);
         const projectApmId = getId(project.caldimAssistantProjectManager);
         const projectTlId = getId(project.caldimTeamLead);
         const projectPmId = getId(project.caldimProjectManager);
@@ -118,61 +120,42 @@ export default function ProjectView() {
         // Gather allowed user IDs for this project's team hierarchy
         const teamUserIds = new Set<string>();
 
-        // Find all matched teams
-        const matchedTeams = new Set<Team>();
-
+        // 1. Match teams by ID, normalized name, PM, APM, or TL
         allTeams.forEach(t => {
             const tid = getId(t._id || t.id);
-            const tname = String(t.name || '').toLowerCase().trim();
+            const tname = norm(t.name);
             const tPm = getId(t.project_manager);
             const tApm = getId(t.assistant_project_manager);
             const tLeads = getIds(t.lead);
 
-            // 1. Matches team by ID or name
             if ((projectTeamId && tid === projectTeamId) || (projectTeamName && tname === projectTeamName)) {
-                matchedTeams.add(t);
+                (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            // 2. Matches project manager
             if (effectivePmId && tPm === effectivePmId) {
-                matchedTeams.add(t);
+                (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            // 3. Matches assistant project manager
             if (effectiveApmId && tApm === effectiveApmId) {
-                matchedTeams.add(t);
+                (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            // 4. Matches team lead
             if (effectiveTlId && tLeads.includes(effectiveTlId)) {
-                matchedTeams.add(t);
+                (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
         });
 
-        // Collect all members and leads from all matched teams
-        matchedTeams.forEach(t => {
-            const members = Array.isArray(t.members) ? t.members : (Array.isArray((t as any).users) ? (t as any).users : []);
-            members.forEach((m: any) => {
-                const mid = getId(m);
-                if (mid) teamUserIds.add(mid);
-            });
-
-            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-            leads.forEach((l: any) => {
-                const lid = getId(l);
-                if (lid) teamUserIds.add(lid);
-            });
-        });
-
-        // Include users reporting to effective TL directly
+        // 2. Direct reporting or team membership under TL
         if (effectiveTlId) {
             teamUserIds.add(effectiveTlId);
             allUsers.forEach(u => {
-                const uLeads = getIds(u.team_lead);
-                if (uLeads.includes(effectiveTlId)) {
-                    teamUserIds.add(getId(u));
+                if (getIds(u.team_lead).includes(effectiveTlId)) teamUserIds.add(getId(u));
+            });
+            allTeams.forEach(t => {
+                if (getIds(t.lead).includes(effectiveTlId)) {
+                    (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
                 }
             });
         }
 
-        // Include users reporting to effective APM directly
+        // 3. Direct reporting or team membership under APM
         if (effectiveApmId) {
             allUsers.forEach(u => {
                 if (getId(u.assistant_project_manager) === effectiveApmId) {
@@ -180,9 +163,14 @@ export default function ProjectView() {
                     getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
+            allTeams.forEach(t => {
+                if (getId(t.assistant_project_manager) === effectiveApmId) {
+                    (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
+                }
+            });
         }
 
-        // Include users reporting to effective PM directly
+        // 4. Direct reporting or team membership under PM
         if (effectivePmId) {
             allUsers.forEach(u => {
                 if (getId(u.project_manager) === effectivePmId) {
@@ -190,9 +178,19 @@ export default function ProjectView() {
                     getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
+            allTeams.forEach(t => {
+                const tLeads = getIds(t.lead);
+                const tPm = getId(t.project_manager);
+                if (tPm === effectivePmId || tLeads.some(lid => {
+                    const lUser = allUsers.find(u => getId(u) === lid);
+                    return getId(lUser?.project_manager) === effectivePmId;
+                })) {
+                    (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
+                }
+            });
         }
 
-        // Include users explicitly assigned to the team by ID
+        // 5. Users assigned to team by ID
         if (projectTeamId) {
             allUsers.forEach(u => {
                 const uTeamId = getId((u as any).team);
@@ -202,7 +200,7 @@ export default function ProjectView() {
             });
         }
 
-        // Full bidirectional closure across APM, PM, TL, and Teams
+        // 6. Full bidirectional closure across APM, PM, TL, and Teams
         let changed = true;
         while (changed) {
             const prevSize = teamUserIds.size;
@@ -259,13 +257,8 @@ export default function ProjectView() {
             if (effectivePmId && uid === effectivePmId) return false;
             if (effectiveApmId && uid === effectiveApmId) return false;
 
-            // 4. If team hierarchy was identified, restrict to those users
-            if (teamUserIds.size > 0) {
-                return teamUserIds.has(uid);
-            }
-
-            // Fallback if no team/PM/APM/TL at all: show all eligible team members/leads
-            return true;
+            // 4. Strict Team Hierarchy (Option 2): Only users within the identified team hierarchy
+            return teamUserIds.has(uid);
         });
     }, [allUsers, allTeams, project]);
 
@@ -1822,8 +1815,14 @@ export default function ProjectView() {
                         {displayedUsers.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
                                 <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
-                                <div style={{ fontWeight: 600, fontSize: 14, color: '#475569' }}>No users found</div>
-                                <div style={{ fontSize: 12 }}>Try adjusting your search or role filter.</div>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: '#475569' }}>
+                                    {eligibleUsers.length === 0 ? 'No Team Members Found for this Project' : 'No users match your filter'}
+                                </div>
+                                <div style={{ fontSize: 12, marginTop: 4 }}>
+                                    {eligibleUsers.length === 0 
+                                        ? 'This project does not have an assigned Team, Team Lead, or Project Manager. Please assign a Team in project settings to allocate team members.' 
+                                        : 'Try adjusting your search or role filter.'}
+                                </div>
                             </div>
                         ) : (
                             <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
