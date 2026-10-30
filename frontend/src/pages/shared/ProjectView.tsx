@@ -1447,7 +1447,7 @@ export default function ProjectView() {
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
-                                                    };
+                                                    } as any;
                                                     if (updatedSow[sIdx]) updatedSow[sIdx].sequences = updatedSeqs;
                                                     setProject({ ...project, scopeOfWork: updatedSow });
                                                     await updateProjectScopeOfWork(id, updatedSow);
@@ -1462,7 +1462,7 @@ export default function ProjectView() {
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
-                                                    };
+                                                    } as any;
                                                     if (updatedAddSow[sIdx]) updatedAddSow[sIdx].sequences = updatedSeqs;
                                                     setProject({ ...project, additionalScopeOfWork: updatedAddSow });
                                                     await updateProjectAdditionalScopeOfWork(id, updatedAddSow);
@@ -1475,7 +1475,7 @@ export default function ProjectView() {
                                                         ...currentSeq, 
                                                         ...updates,
                                                         status: nextStatus
-                                                    };
+                                                    } as any;
                                                     setProject({ ...project, sequences: newSeqs });
                                                     await updateProjectSequences(id, newSeqs);
                                                 } else if (seq.source === 'sow-fallback') {
@@ -1485,10 +1485,10 @@ export default function ProjectView() {
                                                     const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
                                                     updatedSow[sIdx] = { 
                                                         ...targetSow, 
-                                                        status: nextStatus,
-                                                        approvalDate: updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate,
-                                                        fabricationDate: updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate
-                                                    };
+                                                        status: (nextStatus as any),
+                                                        approvalDate: (updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate) as any,
+                                                        fabricationDate: (updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate) as any
+                                                    } as any;
                                                     setProject({ ...project, scopeOfWork: updatedSow });
                                                     await updateProjectScopeOfWork(id, updatedSow);
                                                 }
