@@ -370,8 +370,6 @@ function getTeamOptionsForPm(pmId: string, allUsers: User[], allTeams: Team[]): 
         }
 
         if (apmUser) {
-            // Team HAS an Assistant Project Manager:
-            // Output ONLY the APM for this team. NEVER fetch the team lead!
             const apmId = String(apmUser.id || (apmUser as any)._id);
             const apmName = apmUser.displayName || apmUser.username;
             seenApmUserIds.add(apmId);
@@ -388,36 +386,32 @@ function getTeamOptionsForPm(pmId: string, allUsers: User[], allTeams: Team[]): 
                     label: `${teamName} — APM: ${apmName}`
                 });
             }
-        } else {
-            // Team has NO APM -> Only then populate the Team Lead(s)
-            const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
-            leads.forEach((l: any) => {
-                const leadId = String(l?._id || l?.id || l);
-                const leadDoc = allUsers.find(u => String(u.id || (u as any)._id) === leadId) || (typeof l === 'object' ? l : null);
-                if (leadDoc) {
-                    // If this lead reports to an APM, do not show as lead
-                    if (leadDoc.assistant_project_manager) {
-                        return;
-                    }
-                    const leadIdStr = String(leadDoc.id || (leadDoc as any)._id);
-                    const leadName = leadDoc.displayName || leadDoc.username;
-                    seenTlUserIds.add(leadIdStr);
-                    const key = `tl-${leadIdStr}-${teamId}`;
-                    if (!seenKeys.has(key)) {
-                        seenKeys.add(key);
-                        options.push({
-                            type: 'team_lead',
-                            id: leadIdStr,
-                            name: leadName,
-                            email: leadDoc.email,
-                            teamId,
-                            teamName,
-                            label: `${teamName} — Team Lead: ${leadName}`
-                        });
-                    }
-                }
-            });
         }
+
+        // Always also populate Team Lead(s) for the team
+        const leads = Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : []);
+        leads.forEach((l: any) => {
+            const leadId = String(l?._id || l?.id || l);
+            const leadDoc = allUsers.find(u => String(u.id || (u as any)._id) === leadId) || (typeof l === 'object' ? l : null);
+            if (leadDoc) {
+                const leadIdStr = String(leadDoc.id || (leadDoc as any)._id);
+                const leadName = leadDoc.displayName || leadDoc.username;
+                seenTlUserIds.add(leadIdStr);
+                const key = `tl-${leadIdStr}-${teamId}`;
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    options.push({
+                        type: 'team_lead',
+                        id: leadIdStr,
+                        name: leadName,
+                        email: leadDoc.email,
+                        teamId,
+                        teamName,
+                        label: `${teamName} — Team Lead: ${leadName}`
+                    });
+                }
+            }
+        });
     });
 
     // 2. Direct APMs under this PM not yet included as part of any team

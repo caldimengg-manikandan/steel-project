@@ -177,6 +177,7 @@ export default function ProjectView() {
             allUsers.forEach(u => {
                 if (getId(u.assistant_project_manager) === effectiveApmId) {
                     teamUserIds.add(getId(u));
+                    getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
         }
@@ -186,6 +187,7 @@ export default function ProjectView() {
             allUsers.forEach(u => {
                 if (getId(u.project_manager) === effectivePmId) {
                     teamUserIds.add(getId(u));
+                    getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
         }
@@ -200,21 +202,46 @@ export default function ProjectView() {
             });
         }
 
-        // Also include any users reporting to any team leads collected so far
-        const collectedLeadIds = new Set<string>();
-        teamUserIds.forEach(uid => {
-            const u = allUsers.find(usr => getId(usr) === uid);
-            if (u && (u.role === 'team_lead' || u.role === 'assistant_team_lead')) {
-                collectedLeadIds.add(uid);
-            }
-        });
-        if (collectedLeadIds.size > 0) {
+        // Full bidirectional closure across APM, PM, TL, and Teams
+        let changed = true;
+        while (changed) {
+            const prevSize = teamUserIds.size;
+
+            // For any user in teamUserIds, include their team leads
             allUsers.forEach(u => {
-                const uLeads = getIds(u.team_lead);
-                if (uLeads.some(lid => collectedLeadIds.has(lid))) {
-                    teamUserIds.add(getId(u));
+                if (teamUserIds.has(getId(u))) {
+                    getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
+
+            // For any team lead in teamUserIds, include all members reporting to that lead
+            const currentLeadIds = new Set<string>();
+            teamUserIds.forEach(uid => {
+                const u = allUsers.find(usr => getId(usr) === uid);
+                if (u && (u.role === 'team_lead' || u.role === 'assistant_team_lead')) {
+                    currentLeadIds.add(uid);
+                }
+            });
+            if (currentLeadIds.size > 0) {
+                allUsers.forEach(u => {
+                    const uLeads = getIds(u.team_lead);
+                    if (uLeads.some(lid => currentLeadIds.has(lid))) {
+                        teamUserIds.add(getId(u));
+                    }
+                });
+            }
+
+            // For any team containing ANY user in teamUserIds, include all its members and leads
+            allTeams.forEach(t => {
+                const tMembers = (Array.isArray(t.members) ? t.members : (Array.isArray((t as any).users) ? (t as any).users : [])).map(getId);
+                const tLeads = (Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : [])).map(getId);
+                const allTUsers = [...tMembers, ...tLeads];
+                if (allTUsers.some(uid => teamUserIds.has(uid))) {
+                    allTUsers.forEach(uid => teamUserIds.add(uid));
+                }
+            });
+
+            changed = teamUserIds.size > prevSize;
         }
 
         return allUsers.filter(u => {
