@@ -47,3 +47,15 @@ brain/
 # Machine Learning Weights
 *.pt
 **/*.pyc
+
+# AI Extraction Datasets and Training Artifacts
+backend/AiExtraction/datasets/
+backend/AiExtraction/images/
+backend/AiExtraction/drawings/
+backend/AiExtraction/backup_other_clients/
+backend/AiExtraction/runs/
+backend/AiExtraction/*.zip
+backend/AiExtraction/*.tar.gz
+backend/AiExtraction/*.cache
+backend/AiExtraction/**/train.cache
+backend/AiExtraction/**/val.cache
