@@ -8,32 +8,17 @@ const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 /**
  * GET /api/admin/reports
  * Returns LIVE data for reports and analytics dashboard.
- * Supports date filtering via ?days=7,30 or custom range.
+ * Projects shown strictly match the projects accessible to the user in the Projects module.
  */
 async function getReportsData(req, res) {
     try {
         const accessFilter = await buildProjectQueryForUser(req.principal);
-        const days = parseInt(req.query.days);
-        
-        let query;
-        if (!isNaN(days) && days > 0) {
-            const startDate = new Date();
-            startDate.setDate(startDate.getDate() - days);
-            query = {
-                $and: [
-                    accessFilter,
-                    { createdAt: { $gte: startDate } }
-                ]
-            };
-        } else {
-            query = accessFilter;
-        }
 
-        const rawProjects = await Project.find(query).populate('clientId').sort({ createdAt: -1 }).lean();
+        // Fetch all projects matching user's access permissions (same as Projects module)
+        const rawProjects = await Project.find(accessFilter).populate('clientId').sort({ createdAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)
         const projects = await attachProjectStats(rawProjects);
-        const projectIds = projects.map(p => p._id);
 
         // 1. Calculate Overview Totals by summing cached Project fields
         let totalDrw = 0;
@@ -56,7 +41,6 @@ async function getReportsData(req, res) {
         });
 
         // 2. Project Progress Data (for Bar Chart)
-        // Return up to 100 projects for the chart to allow effective frontend filtering
         const chartProjects = projects.slice(0, 100).map(p => {
             return {
                 id: p._id.toString(),

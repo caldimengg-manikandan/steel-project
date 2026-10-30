@@ -481,11 +481,11 @@ export default function ProjectView() {
         if (!project) return null;
 
         let pmName = project.caldimProjectManagerName || project.projectManager || '';
-        let pmEmail = '';
+        let pmEmail = (project as any).caldimProjectManagerEmail || '';
         let apmName = project.caldimAssistantProjectManagerName || '';
-        let apmEmail = '';
+        let apmEmail = (project as any).caldimAssistantProjectManagerEmail || '';
         let tlName = project.caldimTeamLeadName || '';
-        let tlEmail = '';
+        let tlEmail = (project as any).caldimTeamLeadEmail || '';
         let teamName = project.teamName || '';
 
         if (project.caldimProjectManager) {
@@ -534,9 +534,14 @@ export default function ProjectView() {
                 if (!teamName) teamName = matchingTeam.name;
                 const teamApms: User[] = [];
                 if (matchingTeam.assistant_project_manager) {
-                    const apmId = String((matchingTeam.assistant_project_manager as any)?._id || (matchingTeam.assistant_project_manager as any)?.id || matchingTeam.assistant_project_manager);
-                    const apmDoc = allUsers.find(u => String(u.id || (u as any)._id) === apmId);
-                    if (apmDoc) teamApms.push(apmDoc);
+                    const apmObj = matchingTeam.assistant_project_manager as any;
+                    if (apmObj && typeof apmObj === 'object' && (apmObj.displayName || apmObj.username)) {
+                        teamApms.push(apmObj);
+                    } else {
+                        const apmId = String(apmObj?._id || apmObj?.id || apmObj);
+                        const apmDoc = allUsers.find(u => String(u.id || (u as any)._id) === apmId);
+                        if (apmDoc) teamApms.push(apmDoc);
+                    }
                 }
                 const members = Array.isArray(matchingTeam.members) ? matchingTeam.members : (Array.isArray(matchingTeam.users) ? matchingTeam.users : []);
                 members.forEach((m) => {
@@ -549,11 +554,17 @@ export default function ProjectView() {
 
                 const teamTls: User[] = [];
                 const leads = Array.isArray(matchingTeam.lead) ? matchingTeam.lead : (matchingTeam.lead ? [matchingTeam.lead] : []);
-                leads.forEach((l) => {
-                    const lId = String(l?._id || l?.id || l);
-                    const lUser = allUsers.find(u => String(u.id || (u as any)._id) === lId);
-                    if (lUser && !teamTls.some(t => String(t.id || (t as any)._id) === lId)) {
-                        teamTls.push(lUser);
+                leads.forEach((l: any) => {
+                    if (l && typeof l === 'object' && (l.displayName || l.username)) {
+                        if (!teamTls.some(t => String(t.id || (t as any)._id) === String(l._id || l.id))) {
+                            teamTls.push(l);
+                        }
+                    } else {
+                        const lId = String(l?._id || l?.id || l);
+                        const lUser = allUsers.find(u => String(u.id || (u as any)._id) === lId);
+                        if (lUser && !teamTls.some(t => String(t.id || (t as any)._id) === lId)) {
+                            teamTls.push(lUser);
+                        }
                     }
                 });
 

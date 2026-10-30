@@ -179,6 +179,30 @@ async function createProject(req, res) {
             if (pmUser) effectivePmName = pmUser.displayName || pmUser.username;
         }
 
+        // Check creator's team in Team model
+        const creatorTeam = await Team.findOne({
+            $or: [
+                { assistant_project_manager: creatorId },
+                { lead: creatorId },
+                { members: creatorId }
+            ]
+        }).populate('project_manager assistant_project_manager lead');
+
+        if (creatorTeam) {
+            if (!effectiveTeamId) {
+                effectiveTeamId = creatorTeam._id;
+                effectiveTeamName = creatorTeam.name;
+            }
+            if (!effectivePm && creatorTeam.project_manager) {
+                effectivePm = creatorTeam.project_manager._id || creatorTeam.project_manager;
+                effectivePmName = creatorTeam.project_manager.displayName || creatorTeam.project_manager.username || '';
+            }
+            if (!effectiveApm && creatorTeam.assistant_project_manager) {
+                effectiveApm = creatorTeam.assistant_project_manager._id || creatorTeam.assistant_project_manager;
+                effectiveApmName = creatorTeam.assistant_project_manager.displayName || creatorTeam.assistant_project_manager.username || '';
+            }
+        }
+
         // If creator is APM, set APM to creator
         if (req.principal.role === 'assistant_project_manager') {
             if (!effectiveApm) {
@@ -191,10 +215,9 @@ async function createProject(req, res) {
                 effectiveTl = creatorId;
                 effectiveTlName = creatorUser.displayName || creatorUser.username;
             }
-            if (!effectiveApm && creatorUser.assistant_project_manager) {
-                effectiveApm = creatorUser.assistant_project_manager;
-                const apmUser = await User.findById(effectiveApm);
-                if (apmUser) effectiveApmName = apmUser.displayName || apmUser.username;
+            if (!effectiveApm && creatorTeam && creatorTeam.assistant_project_manager) {
+                effectiveApm = creatorTeam.assistant_project_manager._id || creatorTeam.assistant_project_manager;
+                effectiveApmName = creatorTeam.assistant_project_manager.displayName || creatorTeam.assistant_project_manager.username || '';
             }
         }
 
@@ -352,6 +375,83 @@ async function getProject(req, res) {
         return res.json({ project: projectWithStats });
     }
     const projectWithStats = await attachProjectStats(req.scopedProject);
+
+    if (projectWithStats) {
+        let p = projectWithStats;
+        let pmId = p.caldimProjectManager;
+        let pmName = p.caldimProjectManagerName || p.projectManager || '';
+        let apmId = p.caldimAssistantProjectManager;
+        let apmName = p.caldimAssistantProjectManagerName || '';
+        let tlId = p.caldimTeamLead;
+        let tlName = p.caldimTeamLeadName || '';
+        let teamId = p.teamId;
+        let teamName = p.teamName || '';
+
+        // Auto-resolve team and contacts if missing
+        if (!apmName && !tlName) {
+            let matchingTeam = null;
+            if (teamId) {
+                matchingTeam = await Team.findById(teamId).populate('project_manager assistant_project_manager lead');
+            } else if (teamName) {
+                matchingTeam = await Team.findOne({ name: new RegExp(`^${teamName}$`, 'i') }).populate('project_manager assistant_project_manager lead');
+            } else if (pmId) {
+                matchingTeam = await Team.findOne({ project_manager: pmId }).populate('project_manager assistant_project_manager lead');
+            } else if (p.createdByUserId) {
+                matchingTeam = await Team.findOne({
+                    $or: [
+                        { assistant_project_manager: p.createdByUserId },
+                        { lead: p.createdByUserId },
+                        { members: p.createdByUserId }
+                    ]
+                }).populate('project_manager assistant_project_manager lead');
+            }
+
+            if (matchingTeam) {
+                if (!teamName) teamName = matchingTeam.name;
+                if (!teamId) teamId = matchingTeam._id;
+                if (!pmName && matchingTeam.project_manager) {
+                    pmId = matchingTeam.project_manager._id || matchingTeam.project_manager;
+                    pmName = matchingTeam.project_manager.displayName || matchingTeam.project_manager.username || '';
+                }
+                if (matchingTeam.assistant_project_manager) {
+                    apmId = matchingTeam.assistant_project_manager._id || matchingTeam.assistant_project_manager;
+                    apmName = matchingTeam.assistant_project_manager.displayName || matchingTeam.assistant_project_manager.username || '';
+                } else if (Array.isArray(matchingTeam.lead) && matchingTeam.lead.length === 1) {
+                    tlId = matchingTeam.lead[0]._id || matchingTeam.lead[0];
+                    tlName = matchingTeam.lead[0].displayName || matchingTeam.lead[0].username || '';
+                }
+            }
+        }
+
+        // Attach emails
+        let pmEmail = '';
+        let apmEmail = '';
+        let tlEmail = '';
+
+        const idsToFetch = [pmId, apmId, tlId].filter(Boolean);
+        const users = idsToFetch.length > 0 ? await User.find({ _id: { $in: idsToFetch } }).select('email displayName username') : [];
+        const userMap = {};
+        users.forEach(u => {
+            userMap[u._id.toString()] = u;
+        });
+
+        if (pmId && userMap[pmId.toString()]) pmEmail = userMap[pmId.toString()].email || '';
+        if (apmId && userMap[apmId.toString()]) apmEmail = userMap[apmId.toString()].email || '';
+        if (tlId && userMap[tlId.toString()]) tlEmail = userMap[tlId.toString()].email || '';
+
+        projectWithStats.caldimProjectManager = pmId;
+        projectWithStats.caldimProjectManagerName = pmName;
+        projectWithStats.caldimProjectManagerEmail = pmEmail;
+        projectWithStats.caldimAssistantProjectManager = apmId;
+        projectWithStats.caldimAssistantProjectManagerName = apmName;
+        projectWithStats.caldimAssistantProjectManagerEmail = apmEmail;
+        projectWithStats.caldimTeamLead = tlId;
+        projectWithStats.caldimTeamLeadName = tlName;
+        projectWithStats.caldimTeamLeadEmail = tlEmail;
+        projectWithStats.teamId = teamId;
+        projectWithStats.teamName = teamName;
+    }
+
     res.json({ project: projectWithStats });
 }
 
