@@ -454,6 +454,18 @@ function getTeamOptionsForPm(pmId: string, allUsers: User[], allTeams: Team[]): 
     return options;
 }
 
+function resolveAutoSelectionForPm(teamOpts: PmTeamLeadOption[]): PmTeamLeadOption | null {
+    const apmOpts = teamOpts.filter(o => o.type === 'apm');
+    const tlOpts = teamOpts.filter(o => o.type === 'team_lead');
+    if (apmOpts.length === 1) {
+        return apmOpts[0];
+    }
+    if (apmOpts.length === 0 && tlOpts.length === 1) {
+        return tlOpts[0];
+    }
+    return null;
+}
+
 function getApmsForPm(pmId: string, allUsers: User[]): User[] {
 
     if (!pmId) return [];
@@ -1137,7 +1149,7 @@ export default function AdminProjects() {
                                                     }
 
                                                     const isOldYear = Number(fetchedYear) <= 2025 && Number(fetchedYear) >= 2000;
-                                                    const creationDateVal = fetchedStartDate || (isOldYear ? (form.creationDate || `${fetchedYear}-01-01`) : '');
+                                                    const creationDateVal = isOldYear ? (form.creationDate || `${fetchedYear}-01-01`) : '';
 
                                                     setForm(prev => ({
                                                         ...prev,
@@ -1243,7 +1255,7 @@ export default function AdminProjects() {
                                                 const pmId = e.target.value;
                                                 const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
                                                 const teamOpts = getTeamOptionsForPm(pmId, users, teams);
-                                                const autoOpt = teamOpts.length === 1 ? teamOpts[0] : null;
+                                                const autoOpt = resolveAutoSelectionForPm(teamOpts);
                                                 setForm({
                                                     ...form,
                                                     caldimProjectManager: pmId,
@@ -1939,7 +1951,7 @@ export default function AdminProjects() {
                                                         const pmId = e.target.value;
                                                         const pmUser = users.find(u => String(u.id || (u as any)._id) === pmId);
                                                         const teamOpts = getTeamOptionsForPm(pmId, users, teams);
-                                                        const autoOpt = teamOpts.length === 1 ? teamOpts[0] : null;
+                                                        const autoOpt = resolveAutoSelectionForPm(teamOpts);
                                                         setEditTarget({
                                                             ...editTarget,
                                                             caldimProjectManager: pmId,

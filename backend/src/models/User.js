@@ -130,7 +130,11 @@ userSchema.pre('save', async function (next) {
 /* ── Methods ──────────────────────────────────────────── */
 
 userSchema.methods.matchPassword = async function (plain) {
-    return bcrypt.compare(plain, this.password_hash);
+    if (!plain) return false;
+    const trimmed = typeof plain === 'string' ? plain.trim() : plain;
+    if (await bcrypt.compare(plain, this.password_hash)) return true;
+    if (await bcrypt.compare(trimmed, this.password_hash)) return true;
+    return false;
 };
 
 userSchema.methods.toSafeObject = function () {

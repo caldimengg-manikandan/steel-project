@@ -4,6 +4,8 @@
 // using native Mongoose repositories and MongoDB.
 // -----------------------------------------------------------------------------
 
+const path = require('path');
+const fs = require('fs');
 const { localRangeToUtcWindow, getTodayUtcWindow } = require('../../services/mail/timezone');
 const { getMailProvider } = require('../../services/mail/provider-factory');
 const { updateAccountSyncStatus } = require('./accountService');
@@ -265,10 +267,9 @@ function isInlineCidImage(att, bodyHtml) {
 
 /**
  * Optimized attachment sync for a message:
- * 1. Fetch & save attachment metadata (filename, MIME type, size, providerAttachmentId, CID).
- * 2. Download ONLY inline/CID images required for email preview rendering.
- * 3. Never download normal attachments during sync (deferred to on-demand preview/download).
- * 4. Never download an attachment if it is already cached in MongoDB.
+ * 1. Fetch & save attachment metadata and server pathway ONLY (filename, MIME, size, storageGatewayPath).
+ * 2. Download ONLY inline/CID images required for email preview rendering and store directly on Server Storage.
+ * 3. NEVER store raw binary Buffer in MongoDB Atlas — only the server storage pathway!
  */
 async function syncAttachmentsForMessage(provider, account, message, emailId) {
   try {
@@ -277,32 +278,55 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
       return;
     }
 
-    let hasNewInlineContent = false;
+    const storageGateway = require('../../../utils/storageGateway');
 
     for (const att of attachmentList) {
       const providerAttachmentId = att.providerAttachmentId || att.id;
       if (!providerAttachmentId) continue;
 
-      // Check whether attachment is already cached in MongoDB
+      // Check whether attachment pathway is already stored
       const existing = await Attachment.findOne({
         emailId,
         providerAttachmentId,
-      }).select('_id content').lean();
+      }).select('_id storageGatewayPath').lean();
 
-      const isAlreadyCached = Boolean(existing && existing.content && existing.content.length > 0);
+      let storageGatewayPath = existing?.storageGatewayPath || '';
+      const isAlreadyCached = Boolean(storageGatewayPath);
 
       // Check if this is an inline/CID image needed for email preview
       const isInline = isInlineCidImage(att, message.bodyHtml);
 
-      let contentToSave = undefined;
-
-      // Download ONLY if it is an inline/CID image and not already cached
+      // Download ONLY if it is an inline/CID image and not already stored on the server
       if (isInline && !isAlreadyCached) {
         try {
           const download = await provider.downloadAttachment(message.providerMessageId, providerAttachmentId, account, att.contentId);
           if (download && download.content) {
-            contentToSave = download.content;
-            hasNewInlineContent = true;
+            // 1. Persist to Windows Server Storage (via Storage Gateway)
+            if (storageGateway && typeof storageGateway.uploadFile === 'function') {
+              try {
+                const date = new Date(message.receivedAt || Date.now());
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const targetDir = `Mails/Attachments/${year}/${month}`;
+                const cleanExt = path.extname(att.filename || download.filename || '') || '';
+                const baseName = path.basename(att.filename || download.filename || 'attachment', cleanExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const safeFilename = `${existing?._id || providerAttachmentId}_${baseName}${cleanExt}`;
+
+                await storageGateway.uploadFile(targetDir, safeFilename, download.content);
+                storageGatewayPath = `${targetDir}/${safeFilename}`;
+                console.log(`[mailSyncService] Persisted inline image to Server Storage: ${storageGatewayPath}`);
+              } catch (sgErr) {
+                console.warn('[mailSyncService] Could not persist inline image to Storage Gateway:', sgErr.message);
+              }
+            }
+
+            // 2. Also cache to local disk
+            try {
+              const cacheDir = path.resolve(__dirname, '../../../../uploads/mail-attachments');
+              if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+              const localFilePath = path.join(cacheDir, String(existing?._id || providerAttachmentId));
+              await fs.promises.writeFile(localFilePath, download.content);
+            } catch (diskErr) {}
           }
         } catch (downloadErr) {
           console.warn(
@@ -312,8 +336,7 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
         }
       }
 
-      // Save attachment metadata. Normal attachments are saved with no content (deferred).
-      // If already cached, upsertAttachment preserves existing content in MongoDB.
+      // Save attachment metadata and pathway ONLY. NEVER save binary Buffer in MongoDB Atlas!
       await upsertAttachment({
         emailId,
         providerAttachmentId,
@@ -322,18 +345,18 @@ async function syncAttachmentsForMessage(provider, account, message, emailId) {
         sizeBytes: att.sizeBytes ?? null,
         isInline: Boolean(att.isInline || isInline),
         contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
-        ...(contentToSave ? { content: contentToSave } : {}),
+        ...(storageGatewayPath ? { storageGatewayPath } : {}),
       });
     }
 
-    // If message HTML contains inline references and we have inline content, resolve and persist updated bodyHtml
+    // If message HTML contains inline references, resolve and persist updated bodyHtml using clean endpoint paths
     if (message.bodyHtml && (message.bodyHtml.includes('cid:') || message.bodyHtml.includes('ImageDisplay'))) {
       try {
         const { resolveInlineImages } = require('./inlineImageService');
         const Email = require('../models/Email');
-        const fullAtts = await Attachment.find({ emailId, content: { $exists: true, $ne: null } }).lean();
-        if (fullAtts.length > 0) {
-          const { html: resolvedHtml } = resolveInlineImages(message.bodyHtml, fullAtts);
+        const atts = await Attachment.find({ emailId }).lean();
+        if (atts.length > 0) {
+          const { html: resolvedHtml } = resolveInlineImages(message.bodyHtml, atts);
           if (resolvedHtml && resolvedHtml !== message.bodyHtml) {
             await Email.updateOne({ _id: emailId }, { bodyHtml: resolvedHtml });
           }

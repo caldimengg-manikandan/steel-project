@@ -1,34 +1,9 @@
 // backend-cjs/mongoose/services/inlineImageService.js
 // -----------------------------------------------------------------------------
-// Resolves inline `cid:` image references in email HTML bodies
-// by converting matching image attachments into base64 data URIs.
+// Resolves inline `cid:` and Zoho `ImageDisplay` image references in email HTML bodies
+// by converting them into lightweight server endpoint URLs (/steel/api/mail/attachments/:id).
+// Keeps email document size in MongoDB minimal (a few KB instead of megabytes).
 // -----------------------------------------------------------------------------
-
-function getImageMime(att) {
-  let mime = att.contentType;
-  if (mime && mime.includes(';')) {
-    mime = mime.split(';')[0].trim();
-  }
-  if (mime && mime.startsWith('image/')) {
-    return mime;
-  }
-  const filename = (att.filename || '').toLowerCase();
-  if (/\.jpe?g$/i.test(filename)) return 'image/jpeg';
-  if (/\.png$/i.test(filename)) return 'image/png';
-  if (/\.gif$/i.test(filename)) return 'image/gif';
-  if (/\.webp$/i.test(filename)) return 'image/webp';
-  if (/\.svg$/i.test(filename)) return 'image/svg+xml';
-  if (/\.bmp$/i.test(filename)) return 'image/bmp';
-  if (/\.ico$/i.test(filename)) return 'image/x-icon';
-
-  if (att.content && Buffer.isBuffer(att.content) && att.content.length >= 4) {
-    if (att.content[0] === 0xFF && att.content[1] === 0xD8 && att.content[2] === 0xFF) return 'image/jpeg';
-    if (att.content[0] === 0x89 && att.content[1] === 0x50 && att.content[2] === 0x4E && att.content[3] === 0x47) return 'image/png';
-    if (att.content[0] === 0x47 && att.content[1] === 0x49 && att.content[2] === 0x46) return 'image/gif';
-    if (att.content[0] === 0x52 && att.content[1] === 0x49 && att.content[2] === 0x46 && att.content[3] === 0x46) return 'image/webp';
-  }
-  return 'image/png';
-}
 
 function cleanCidString(str) {
   if (!str) return '';
@@ -37,17 +12,17 @@ function cleanCidString(str) {
 
 /**
  * Resolves inline `cid:` and Zoho `ImageDisplay` image references in an email's bodyHtml
- * by converting matching image attachments into base64 data URIs.
+ * by converting matching image attachments into endpoint URLs.
  *
  * @param {string} bodyHtml - Raw email HTML body
- * @param {Array} attachmentsWithContent - Attachment documents from DB (including `content` Buffer)
+ * @param {Array} attachments - Attachment documents from DB (metadata only, no content buffer required)
  * @returns {{ html: string, inlineAttachmentIds: string[] }}
  */
-function resolveInlineImages(bodyHtml, attachmentsWithContent) {
+function resolveInlineImages(bodyHtml, attachments) {
   if (!bodyHtml || typeof bodyHtml !== 'string') {
     return { html: bodyHtml || '', inlineAttachmentIds: [] };
   }
-  if (!attachmentsWithContent || !Array.isArray(attachmentsWithContent) || attachmentsWithContent.length === 0) {
+  if (!attachments || !Array.isArray(attachments) || attachments.length === 0) {
     return { html: bodyHtml, inlineAttachmentIds: [] };
   }
 
@@ -66,19 +41,19 @@ function resolveInlineImages(bodyHtml, attachmentsWithContent) {
 
   for (const cid of cidsFound) {
     const cleanCid = cleanCidString(cid);
-    const att = attachmentsWithContent.find(a => {
+    const att = attachments.find(a => {
       const aCid = cleanCidString(a.contentId);
       if (aCid && aCid.toLowerCase() === cleanCid.toLowerCase()) return true;
       if (a.filename && cleanCid.toLowerCase().includes(a.filename.toLowerCase())) return true;
       return false;
     });
 
-    if (att && att.content) {
-      const mime = getImageMime(att);
-      const dataUri = `data:${mime};base64,${att.content.toString('base64')}`;
+    if (att) {
+      const attId = String(att._id || att.id);
+      const viewUrl = `/steel/api/mail/attachments/${attId}`;
       const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      updatedHtml = updatedHtml.replace(new RegExp(`src=["']cid:${escapedCid}["']`, 'gi'), `src="${dataUri}"`);
-      matchedAttIds.add(String(att._id || att.id));
+      updatedHtml = updatedHtml.replace(new RegExp(`src=["']cid:${escapedCid}["']`, 'gi'), `src="${viewUrl}"`);
+      matchedAttIds.add(attId);
     }
   }
 
@@ -90,21 +65,21 @@ function resolveInlineImages(bodyHtml, attachmentsWithContent) {
   }
 
   if (remainingCids.length > 0) {
-    const availableImageAtts = attachmentsWithContent.filter(a => {
+    const availableImageAtts = attachments.filter(a => {
       if (matchedAttIds.has(String(a._id || a.id))) return false;
       const isImg = (a.contentType && a.contentType.startsWith('image/')) ||
                     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(a.filename || '');
-      return isImg && a.content;
+      return isImg;
     });
 
     for (let i = 0; i < remainingCids.length && i < availableImageAtts.length; i++) {
       const cid = remainingCids[i];
       const att = availableImageAtts[i];
-      const mime = getImageMime(att);
-      const dataUri = `data:${mime};base64,${att.content.toString('base64')}`;
+      const attId = String(att._id || att.id);
+      const viewUrl = `/steel/api/mail/attachments/${attId}`;
       const escapedCid = cleanCidString(cid).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      updatedHtml = updatedHtml.replace(new RegExp(`src=["']cid:${escapedCid}["']`, 'gi'), `src="${dataUri}"`);
-      matchedAttIds.add(String(att._id || att.id));
+      updatedHtml = updatedHtml.replace(new RegExp(`src=["']cid:${escapedCid}["']`, 'gi'), `src="${viewUrl}"`);
+      matchedAttIds.add(attId);
     }
   }
 
@@ -123,7 +98,6 @@ function resolveInlineImages(bodyHtml, attachmentsWithContent) {
   }
 
   for (const { rawUrl } of zohoMatches) {
-    // Extract query parameters
     const cidMatch = /(?:[?&]|&amp;)cid=([^&"'\s>]+)/i.exec(rawUrl);
     const fMatch = /(?:[?&]|&amp;)f=([^&"'\s>]+)/i.exec(rawUrl);
     const cid = cidMatch ? decodeURIComponent(cidMatch[1]).trim() : null;
@@ -131,39 +105,35 @@ function resolveInlineImages(bodyHtml, attachmentsWithContent) {
 
     let att = null;
 
-    // Try matching by CID first
     if (cid) {
       const cleanCid = cleanCidString(cid);
-      att = attachmentsWithContent.find(a => {
+      att = attachments.find(a => {
         const aCid = cleanCidString(a.contentId);
         return aCid && aCid.toLowerCase() === cleanCid.toLowerCase();
       });
     }
 
-    // Try matching by filename
     if (!att && filename) {
-      att = attachmentsWithContent.find(a => {
+      att = attachments.find(a => {
         return a.filename && a.filename.toLowerCase() === filename.toLowerCase();
       });
     }
 
-    // Try matching by filename inside CID
     if (!att && cid) {
-      att = attachmentsWithContent.find(a => {
+      att = attachments.find(a => {
         return a.filename && cid.toLowerCase().includes(a.filename.toLowerCase());
       });
     }
 
-    // Fallback: match any unused image attachment
     if (!att) {
-      att = attachmentsWithContent.find(a => !matchedAttIds.has(String(a._id || a.id)) && a.content);
+      att = attachments.find(a => !matchedAttIds.has(String(a._id || a.id)));
     }
 
-    if (att && att.content) {
-      const mime = getImageMime(att);
-      const dataUri = `data:${mime};base64,${att.content.toString('base64')}`;
-      updatedHtml = updatedHtml.split(rawUrl).join(dataUri);
-      matchedAttIds.add(String(att._id || att.id));
+    if (att) {
+      const attId = String(att._id || att.id);
+      const viewUrl = `/steel/api/mail/attachments/${attId}`;
+      updatedHtml = updatedHtml.split(rawUrl).join(viewUrl);
+      matchedAttIds.add(attId);
     }
   }
 
@@ -172,5 +142,4 @@ function resolveInlineImages(bodyHtml, attachmentsWithContent) {
 
 module.exports = {
   resolveInlineImages,
-  getImageMime,
 };

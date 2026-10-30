@@ -520,12 +520,12 @@ export default function AdminUsers() {
                             {[...teams].sort((a, b) => a.name.localeCompare(b.name)).map((t, idx) => {
                                 const rawPm = t.project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l.project_manager).filter(Boolean)[0] : null);
                                 const pmId = rawPm ? String(rawPm._id || rawPm.id || rawPm) : null;
-                                const pmUser = pmId ? (typeof rawPm === 'object' && (rawPm.displayName || rawPm.username) ? rawPm : users.find(u => String(u.id || u._id) === pmId)) : null;
+                                const pmUser = pmId ? (rawPm && typeof rawPm === 'object' && (rawPm.displayName || rawPm.username) ? rawPm : users.find(u => String(u.id || u._id) === pmId)) : null;
                                 const pmDisplayName = pmUser ? (pmUser.displayName || pmUser.username) : 'Not Assigned';
 
                                 const rawApm = t.assistant_project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l.assistant_project_manager).filter(Boolean)[0] : null);
                                 const apmId = rawApm ? String(rawApm._id || rawApm.id || rawApm) : null;
-                                const apmUser = apmId ? (typeof rawApm === 'object' && (rawApm.displayName || rawApm.username) ? rawApm : users.find(u => String(u.id || u._id) === apmId)) : null;
+                                const apmUser = apmId ? (rawApm && typeof rawApm === 'object' && (rawApm.displayName || rawApm.username) ? rawApm : users.find(u => String(u.id || u._id) === apmId)) : null;
                                 const apmDisplayName = apmUser ? (apmUser.displayName || apmUser.username) : null;
 
                                 const leadDisplayNames = Array.isArray(t.lead) 
@@ -726,25 +726,25 @@ export default function AdminUsers() {
             {/* ── View Team Modal ── */}
             {viewingTeam && (() => {
                 const viewPmId = viewingTeam.project_manager ? String(viewingTeam.project_manager._id || viewingTeam.project_manager.id || viewingTeam.project_manager) : '';
-                const viewPmUser = (typeof viewingTeam.project_manager === 'object' && (viewingTeam.project_manager.displayName || viewingTeam.project_manager.username))
+                const viewPmUser = (viewingTeam.project_manager && typeof viewingTeam.project_manager === 'object' && (viewingTeam.project_manager.displayName || viewingTeam.project_manager.username))
                     ? viewingTeam.project_manager
                     : users.find(u => String(u.id || u._id) === viewPmId);
                 const viewPmName = viewPmUser ? (viewPmUser.displayName || viewPmUser.username) : (viewPmId ? 'Not Assigned' : null);
 
                 const viewApmId = viewingTeam.assistant_project_manager ? String(viewingTeam.assistant_project_manager._id || viewingTeam.assistant_project_manager.id || viewingTeam.assistant_project_manager) : '';
-                const viewApmUser = (typeof viewingTeam.assistant_project_manager === 'object' && (viewingTeam.assistant_project_manager.displayName || viewingTeam.assistant_project_manager.username))
+                const viewApmUser = (viewingTeam.assistant_project_manager && typeof viewingTeam.assistant_project_manager === 'object' && (viewingTeam.assistant_project_manager.displayName || viewingTeam.assistant_project_manager.username))
                     ? viewingTeam.assistant_project_manager
                     : users.find(u => String(u.id || u._id) === viewApmId);
                 const viewApmName = viewApmUser ? (viewApmUser.displayName || viewApmUser.username) : null;
 
-                const viewLeads = Array.isArray(viewingTeam.lead) ? viewingTeam.lead : (viewingTeam.lead ? [viewingTeam.lead] : []);
+                const viewLeads = (Array.isArray(viewingTeam.lead) ? viewingTeam.lead : (viewingTeam.lead ? [viewingTeam.lead] : [])).filter(Boolean);
                 const viewLeadNames = viewLeads.map((l: any) => {
-                    if (typeof l === 'object' && (l.displayName || l.username)) return l.displayName || l.username;
+                    if (l && typeof l === 'object' && (l.displayName || l.username)) return l.displayName || l.username;
                     const found = users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l));
                     return found ? (found.displayName || found.username) : 'Lead';
                 }).filter(Boolean).join(', ');
 
-                const viewMembers = Array.isArray(viewingTeam.members) ? viewingTeam.members : (Array.isArray(viewingTeam.users) ? viewingTeam.users : []);
+                const viewMembers = (Array.isArray(viewingTeam.members) ? viewingTeam.members : (Array.isArray(viewingTeam.users) ? viewingTeam.users : [])).filter(Boolean);
 
                 return (
                     <div className="modal-overlay" onMouseDown={(e) => { if(e.target === e.currentTarget) setViewingTeam(null) }}>
@@ -771,7 +771,7 @@ export default function AdminUsers() {
                                 <h4 style={{ margin: '0 0 10px 0' }}>Team Leads</h4>
                                 <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
                                     {viewLeads.map((l: any) => {
-                                        const leadUser = (typeof l === 'object' && (l.displayName || l.username)) ? l : users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l));
+                                        const leadUser = (l && typeof l === 'object' && (l.displayName || l.username)) ? l : users.find(u => String(u.id || u._id) === String(l?._id || l?.id || l));
                                         const name = leadUser ? (leadUser.displayName || leadUser.username) : 'Team Lead';
                                         const email = leadUser?.email ? `(${leadUser.email})` : '';
                                         return <li key={String(leadUser?._id || leadUser?.id || l?._id || l)}>{name} {email}</li>;
@@ -781,7 +781,7 @@ export default function AdminUsers() {
                                 <h4 style={{ margin: '0 0 10px 0' }}>Team Members</h4>
                                 <ul style={{ paddingLeft: 20 }}>
                                     {viewMembers.map((m: any) => {
-                                        const memUser = (typeof m === 'object' && (m.displayName || m.username)) ? m : users.find(u => String(u.id || u._id) === String(m?._id || m?.id || m));
+                                        const memUser = (m && typeof m === 'object' && (m.displayName || m.username)) ? m : users.find(u => String(u.id || u._id) === String(m?._id || m?.id || m));
                                         const name = memUser ? (memUser.displayName || memUser.username) : 'Team Member';
                                         const email = memUser?.email ? `(${memUser.email})` : '';
                                         return <li key={String(memUser?._id || memUser?.id || m?._id || m)}>{name} {email}</li>;

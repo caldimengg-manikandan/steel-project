@@ -3,6 +3,7 @@ const RfiExtraction = require('../models/RfiExtraction');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const User = require('../models/User');
 const { attachProjectStats } = require('../services/projectStatsService');
+const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 
 /**
  * GET /api/admin/reports
@@ -11,12 +12,23 @@ const { attachProjectStats } = require('../services/projectStatsService');
  */
 async function getReportsData(req, res) {
     try {
-        const adminId = req.principal.adminId;
-        const days = parseInt(req.query.days) || 30;
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
+        const accessFilter = await buildProjectQueryForUser(req.principal);
+        const days = parseInt(req.query.days);
+        
+        let query;
+        if (!isNaN(days) && days > 0) {
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+            query = {
+                $and: [
+                    accessFilter,
+                    { createdAt: { $gte: startDate } }
+                ]
+            };
+        } else {
+            query = accessFilter;
+        }
 
-        const query = req.principal.role === 'superadmin' ? { createdAt: { $gte: startDate } } : { createdAt: { $gte: startDate }, createdByAdminId: adminId };
         const rawProjects = await Project.find(query).populate('clientId').sort({ createdAt: -1 }).lean();
         
         // Attach dynamic stats (drawingCount, openRfiCount, etc.)

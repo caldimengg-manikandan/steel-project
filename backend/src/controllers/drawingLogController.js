@@ -11,11 +11,21 @@ const SystemSettings = require('../models/SystemSettings');
  */
 exports.getProjectsWithDrawings = async (req, res) => {
     try {
+        const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
+        const accessFilter = await buildProjectQueryForUser(req.principal);
+
         // Find distinct project IDs in DrawingExtraction
         const projectIds = await DrawingExtraction.distinct('projectId');
         
-        // Fetch full project details for those IDs
-        const projects = await Project.find({ _id: { $in: projectIds } }).sort({ createdAt: -1 }).lean();
+        // Fetch full project details for those IDs matching user access filter
+        const filter = {
+            $and: [
+                accessFilter,
+                { _id: { $in: projectIds } }
+            ]
+        };
+
+        const projects = await Project.find(filter).sort({ createdAt: -1 }).lean();
         
         res.json({ count: projects.length, projects });
     } catch (err) {

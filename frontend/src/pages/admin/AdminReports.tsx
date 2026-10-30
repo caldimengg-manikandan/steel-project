@@ -98,7 +98,7 @@ export default function AdminReports() {
         }, 0), icon: <IconTrendingUp />, variant: 'danger' },
     ];
 
-    const uniqueClients = clients.map(c => c.name).sort();
+    const uniqueClients = Array.from(new Set((projects || []).map((p: any) => p.clientName).filter(Boolean))).sort() as string[];
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', transition: 'opacity 0.2s ease', opacity: loading ? 0.6 : 1, pointerEvents: loading ? 'none' : 'auto' }}>

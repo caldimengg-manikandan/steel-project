@@ -477,6 +477,99 @@ export default function ProjectView() {
         setTransmittalSelectModal(true);
     };
 
+    const caldimInfo = useMemo(() => {
+        if (!project) return null;
+
+        let pmName = project.caldimProjectManagerName || project.projectManager || '';
+        let pmEmail = '';
+        let apmName = project.caldimAssistantProjectManagerName || '';
+        let apmEmail = '';
+        let tlName = project.caldimTeamLeadName || '';
+        let tlEmail = '';
+        let teamName = project.teamName || '';
+
+        if (project.caldimProjectManager) {
+            const pmDoc = allUsers.find(u => String(u.id || (u as any)._id) === String(project.caldimProjectManager));
+            if (pmDoc) {
+                if (!pmName) pmName = pmDoc.displayName || pmDoc.username;
+                pmEmail = pmDoc.email || '';
+            }
+        } else if (pmName) {
+            const pmDoc = allUsers.find(u => (u.displayName === pmName || u.username === pmName) && u.role === 'project_manager');
+            if (pmDoc) pmEmail = pmDoc.email || '';
+        }
+
+        if (project.caldimAssistantProjectManager) {
+            const apmDoc = allUsers.find(u => String(u.id || (u as any)._id) === String(project.caldimAssistantProjectManager));
+            if (apmDoc) {
+                if (!apmName) apmName = apmDoc.displayName || apmDoc.username;
+                apmEmail = apmDoc.email || '';
+            }
+        } else if (apmName) {
+            const apmDoc = allUsers.find(u => u.displayName === apmName || u.username === apmName);
+            if (apmDoc) apmEmail = apmDoc.email || '';
+        }
+
+        if (project.caldimTeamLead) {
+            const tlDoc = allUsers.find(u => String(u.id || (u as any)._id) === String(project.caldimTeamLead));
+            if (tlDoc) {
+                if (!tlName) tlName = tlDoc.displayName || tlDoc.username;
+                tlEmail = tlDoc.email || '';
+            }
+        } else if (tlName) {
+            const tlDoc = allUsers.find(u => u.displayName === tlName || u.username === tlName);
+            if (tlDoc) tlEmail = tlDoc.email || '';
+        }
+
+        // Fallback: If neither APM nor TL is set directly, resolve from the team
+        if (!apmName && !tlName && (allTeams.length > 0 || allUsers.length > 0)) {
+            const pmIdStr = project.caldimProjectManager ? String(project.caldimProjectManager) : '';
+            const matchingTeam = allTeams.find(t => 
+                (project.teamId && String(t._id || t.id) === String(project.teamId)) ||
+                (project.teamName && t.name && t.name.toLowerCase() === project.teamName.toLowerCase()) ||
+                (pmIdStr && t.project_manager && String((t.project_manager as any)?._id || (t.project_manager as any)?.id || t.project_manager) === pmIdStr)
+            );
+
+            if (matchingTeam) {
+                if (!teamName) teamName = matchingTeam.name;
+                const teamApms: User[] = [];
+                if (matchingTeam.assistant_project_manager) {
+                    const apmId = String((matchingTeam.assistant_project_manager as any)?._id || (matchingTeam.assistant_project_manager as any)?.id || matchingTeam.assistant_project_manager);
+                    const apmDoc = allUsers.find(u => String(u.id || (u as any)._id) === apmId);
+                    if (apmDoc) teamApms.push(apmDoc);
+                }
+                const members = Array.isArray(matchingTeam.members) ? matchingTeam.members : (Array.isArray(matchingTeam.users) ? matchingTeam.users : []);
+                members.forEach((m) => {
+                    const mId = String(m?._id || m?.id || m);
+                    const mUser = allUsers.find(u => String(u.id || (u as any)._id) === mId);
+                    if (mUser && mUser.role === 'assistant_project_manager' && !teamApms.some(a => String(a.id || (a as any)._id) === mId)) {
+                        teamApms.push(mUser);
+                    }
+                });
+
+                const teamTls: User[] = [];
+                const leads = Array.isArray(matchingTeam.lead) ? matchingTeam.lead : (matchingTeam.lead ? [matchingTeam.lead] : []);
+                leads.forEach((l) => {
+                    const lId = String(l?._id || l?.id || l);
+                    const lUser = allUsers.find(u => String(u.id || (u as any)._id) === lId);
+                    if (lUser && !teamTls.some(t => String(t.id || (t as any)._id) === lId)) {
+                        teamTls.push(lUser);
+                    }
+                });
+
+                if (teamApms.length === 1) {
+                    apmName = teamApms[0].displayName || teamApms[0].username;
+                    apmEmail = teamApms[0].email || '';
+                } else if (teamApms.length === 0 && teamTls.length === 1) {
+                    tlName = teamTls[0].displayName || teamTls[0].username;
+                    tlEmail = teamTls[0].email || '';
+                }
+            }
+        }
+
+        return { pmName, pmEmail, apmName, apmEmail, tlName, tlEmail, teamName };
+    }, [project, allUsers, allTeams]);
+
     if (loading) {
         return (
             <div className="text-center py-xl" style={{ marginTop: 100 }}>
@@ -561,6 +654,9 @@ export default function ProjectView() {
 
     const assignedUsers = project?.assignments?.filter(a => a.permission !== 'admin') || [];
     const creatorName = project?.createdByUsername || project?.createdBy || (project?.assignments?.find(a => a.permission === 'admin')?.username) || '';
+
+
+
 
     return (
         <div>
@@ -969,7 +1065,7 @@ export default function ProjectView() {
                             <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Project Start Date</div>
                                 <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-primary)' }}>
-                                    {formatCreationDate(project.projectStartDate || project.creationDate, project.createdAt)}
+                                    {project.projectStartDate ? formatCreationDate(project.projectStartDate) : ((project as any).startDate ? formatCreationDate((project as any).startDate) : '—')}
                                 </div>
                             </div>
                             <div>
@@ -1017,7 +1113,7 @@ export default function ProjectView() {
                         <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
                             <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Created Date</div>
-                                <div className="text-muted">{formatCreationDate(project.creationDate, project.createdAt)}</div>
+                                <div className="text-muted">{project.createdAt ? formatCreationDate(project.createdAt) : (project.creationDate ? formatCreationDate(project.creationDate) : '—')}</div>
                             </div>
                             {project.location && (
                                 <div>
@@ -1059,22 +1155,37 @@ export default function ProjectView() {
                                 <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Project Manager</div>
                                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
-                                        {project.caldimProjectManagerName || project.projectManager || 'Not Assigned'}
+                                        {caldimInfo?.pmName || 'Not Assigned'}
                                     </div>
+                                    {caldimInfo?.pmEmail && (
+                                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                            {caldimInfo.pmEmail}
+                                        </div>
+                                    )}
                                 </div>
-                                {project.caldimAssistantProjectManagerName ? (
+                                {caldimInfo?.apmName ? (
                                     <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assistant Project Manager</div>
                                         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
-                                            {project.caldimAssistantProjectManagerName}
+                                            {caldimInfo.apmName}
                                         </div>
+                                        {caldimInfo.apmEmail && (
+                                            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                                {caldimInfo.apmEmail}
+                                            </div>
+                                        )}
                                     </div>
-                                ) : project.caldimTeamLeadName ? (
+                                ) : caldimInfo?.tlName ? (
                                     <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Team Lead</div>
                                         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
-                                            {project.caldimTeamLeadName}
+                                            {caldimInfo.tlName}
                                         </div>
+                                        {caldimInfo.tlEmail && (
+                                            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                                {caldimInfo.tlEmail}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
@@ -1084,11 +1195,11 @@ export default function ProjectView() {
                                         </div>
                                     </div>
                                 )}
-                                {project.teamName && (
+                                {(caldimInfo?.teamName || project.teamName) && (
                                     <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assigned Team</div>
                                         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', marginTop: 3 }}>
-                                            {project.teamName}
+                                            {caldimInfo?.teamName || project.teamName}
                                         </div>
                                     </div>
                                 )}

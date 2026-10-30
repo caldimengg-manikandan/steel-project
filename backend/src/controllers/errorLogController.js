@@ -92,9 +92,9 @@ exports.saveErrorLogs = async (req, res) => {
             await ErrorLog.bulkWrite(bulkOps);
         }
 
-        // Send email notification for the update
-        if (addedByRole && (newEntries.length > 0 || editedEntries.length > 0 || struckOutEntries.length > 0)) {
-            sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries, editedEntries, struckOutEntries).catch(err =>
+        // Send email notification for the update - ONLY when items are struck out
+        if (addedByRole && struckOutEntries.length > 0) {
+            sendErrorLogUpdateSummary(addedByRole, addedByName, [], [], struckOutEntries).catch(err =>
                 console.error('[Email] Notification error:', err.message)
             );
         }

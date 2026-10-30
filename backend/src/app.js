@@ -197,9 +197,9 @@ if (process.env.UPLOADS_DIR) {
     app.use('/steel/uploads', express.static(process.env.UPLOADS_DIR));
 }
 // â”€â”€ Mail router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router'], (req, res, next) => {
+app.use(['/api/mail', '/api/mail-router', '/mail', '/mail-router', '/steel/api/mail', '/steel/api/mail-router'], (req, res, next) => {
     // Allow OAuth callbacks and convert-doc utility to pass through without requiring Bearer token
-    if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc')) {
+    if (req.path.startsWith('/auth/microsoft/callback') || req.path.startsWith('/auth/zoho/callback') || req.path.startsWith('/convert-doc') || req.path.startsWith('/attachments/')) {
         if (req.headers.authorization || req.query.token || req.cookies?.sdms_token) {
             return authMiddleware(req, res, () => next());
         }

@@ -1114,12 +1114,29 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
                 ));
 
               let downloadedContent = null;
+              let storageGatewayPath = '';
               // Download only inline/body images for rendering the email preview; regular files are deferred to on-demand download
               if (isImg && matchesBody && hasCid) {
                 try {
                   const dl = await provider.downloadAttachment(email.providerMessageId, providerAttachmentId, account, att.contentId);
                   if (dl && dl.content) {
                     downloadedContent = dl.content;
+                    const storageGateway = require('../../../utils/storageGateway');
+                    if (storageGateway && typeof storageGateway.uploadFile === 'function') {
+                      try {
+                        const date = new Date(email.receivedAt || Date.now());
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const targetDir = `Mails/Attachments/${year}/${month}`;
+                        const cleanExt = path.extname(att.filename || '') || '';
+                        const baseName = path.basename(att.filename || 'attachment', cleanExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+                        const safeFilename = `${providerAttachmentId}_${baseName}${cleanExt}`;
+                        await storageGateway.uploadFile(targetDir, safeFilename, dl.content);
+                        storageGatewayPath = `${targetDir}/${safeFilename}`;
+                      } catch (sgErr) {
+                        console.warn('[mailRouter:lazy-att] Storage upload failed:', sgErr.message);
+                      }
+                    }
                   }
                 } catch (dlErr) {
                   console.warn(`[mailRouter:lazy-att] Download failed for inline image ${att.filename}:`, dlErr.message);
@@ -1134,13 +1151,13 @@ router.get('/emails/:id', requireRoles(...MANAGER_ROLES), async (req, res) => {
                 sizeBytes: att.sizeBytes ?? null,
                 isInline: Boolean(att.isInline),
                 contentId: att.contentId ? String(att.contentId).replace(/^<|>$/g, '').trim() : null,
-                ...(downloadedContent ? { content: downloadedContent } : {}),
+                ...(storageGatewayPath ? { storageGatewayPath } : {}),
               });
 
               if (downloadedContent) {
                 fullAttachments.push({
                   ...(savedAtt.toObject ? savedAtt.toObject() : savedAtt),
-                  content: downloadedContent,
+                  // Attachment metadata without heavy content buffer
                 });
               }
             }
@@ -1489,7 +1506,7 @@ async function fetchAndCacheAttachment(attachment) {
     // Cache to MongoDB Atlas only for small inline images (<= 500KB) if not already persisted to storage gateway
     // This preserves MongoDB Atlas quota while keeping email body previews instant
     if ((!savedStorageGatewayPath || attachment.isInline) && downloaded.content.length <= 500 * 1024) {
-      updateFields.content = downloaded.content;
+      // Omitted to prevent storing binary buffers in MongoDB Atlas
     }
 
     Attachment.findByIdAndUpdate(attachment._id, updateFields).catch(dbErr => {
@@ -1511,7 +1528,7 @@ async function fetchAndCacheAttachment(attachment) {
 
 // GET /api/mail-router/attachments/:id — Download / Preview drawing / attachment file
 // Accessible by both Managers and Employees who have been forwarded the email
-router.get('/attachments/:id', requireRoles(), async (req, res) => {
+router.get('/attachments/:id', async (req, res) => {
   const attachmentIdStr = String(req.params.id);
   const localFilePath = path.join(ATTACHMENT_CACHE_DIR, attachmentIdStr);
 
@@ -1531,7 +1548,11 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
     }
 
     if (targetPath) {
-      const meta = await Attachment.findById(attachmentIdStr).select('_id filename contentType sizeBytes').lean();
+      const meta = await Attachment.findById(attachmentIdStr).select('_id filename contentType sizeBytes isInline').lean();
+      const user = getAuthUser(req);
+      if (meta && !meta.isInline && !user) {
+        return res.status(401).json({ error: 'Unauthorized: Authentication required.' });
+      }
       const filename = meta?.filename || 'attachment';
       const contentType = meta?.contentType || 'application/octet-stream';
       const stat = fs.statSync(targetPath);
@@ -1551,6 +1572,11 @@ router.get('/attachments/:id', requireRoles(), async (req, res) => {
     // Step 1: Check whether the attachment is already in MongoDB
     const attachment = await getAttachmentById(attachmentIdStr);
     if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
+
+    const user = getAuthUser(req);
+    if (!attachment.isInline && !user) {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required.' });
+    }
 
     const disposition = isDownload ? 'attachment' : 'inline';
 

@@ -507,10 +507,14 @@ async function sendErrorLogUpdateSummary(addedByRole, addedByName, newEntries = 
 </body>
 </html>`;
 
+        const emailSubject = (struckOutEntries && struckOutEntries.length > 0 && (!newEntries || newEntries.length === 0) && (!editedEntries || editedEntries.length === 0))
+            ? `🚨 [Error Log] Entry Struck Out by ${addedByName || roleLabel}`
+            : `🚨 [Error Log] Updates made by ${addedByName || roleLabel}`;
+
         await transporter.sendMail({
             from,
             to: recipients.join(', '),
-            subject: `🚨 [Error Log] Updates made by ${addedByName || roleLabel}`,
+            subject: emailSubject,
             html
         });
 

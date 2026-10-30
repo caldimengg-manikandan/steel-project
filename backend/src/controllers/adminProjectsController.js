@@ -155,7 +155,7 @@ async function createProject(req, res) {
     // Pre-seed transmittalCount so first reserve = startNum
     const initialTransmittalCount = startNum - 1;
 
-    const effectiveCreationDate = creationDate || (projectStartDate ? new Date(projectStartDate).toISOString().split('T')[0] : null);
+    const effectiveCreationDate = creationDate || (projectYear <= 2025 ? `${projectYear}-01-01` : null);
 
     const effectiveContactPerson = contactPerson || (Array.isArray(clientContactPersons) && clientContactPersons.length > 0 ? clientContactPersons[0] : null);
 
@@ -195,6 +195,40 @@ async function createProject(req, res) {
                 effectiveApm = creatorUser.assistant_project_manager;
                 const apmUser = await User.findById(effectiveApm);
                 if (apmUser) effectiveApmName = apmUser.displayName || apmUser.username;
+            }
+        }
+
+        // Auto-resolve APM / TL from team under PM if not already selected
+        if (effectivePm && !effectiveApm && !effectiveTl) {
+            const pmTeams = await Team.find({ project_manager: effectivePm }).populate('assistant_project_manager').populate('lead');
+            if (pmTeams.length > 0) {
+                let foundApms = [];
+                let foundTls = [];
+                pmTeams.forEach(t => {
+                    if (t.assistant_project_manager) {
+                        foundApms.push(t.assistant_project_manager);
+                    }
+                    if (Array.isArray(t.lead)) {
+                        foundTls.push(...t.lead);
+                    }
+                });
+                if (foundApms.length === 1) {
+                    const apm = foundApms[0];
+                    effectiveApm = apm._id || apm;
+                    effectiveApmName = apm.displayName || apm.username || '';
+                    if (!effectiveTeamId && pmTeams[0]) {
+                        effectiveTeamId = pmTeams[0]._id;
+                        effectiveTeamName = pmTeams[0].name;
+                    }
+                } else if (foundApms.length === 0 && foundTls.length === 1) {
+                    const tl = foundTls[0];
+                    effectiveTl = tl._id || tl;
+                    effectiveTlName = tl.displayName || tl.username || '';
+                    if (!effectiveTeamId && pmTeams[0]) {
+                        effectiveTeamId = pmTeams[0]._id;
+                        effectiveTeamName = pmTeams[0].name;
+                    }
+                }
             }
         }
 
@@ -261,7 +295,7 @@ async function createProject(req, res) {
         createdByUserId: creatorId,
         createdByUsername: req.principal.username || '',
         creationDate: effectiveCreationDate,
-        projectStartDate: projectStartDate || (effectiveCreationDate ? new Date(effectiveCreationDate).toISOString() : null),
+        projectStartDate: projectStartDate || null,
         financialYear: financialYear || '',
         projectCode: projectCode || '',
         division: division || '',
@@ -269,8 +303,8 @@ async function createProject(req, res) {
         assignments: assignments,
         drawingCount: 0,
     };
-    if (effectiveCreationDate) {
-        projectPayload.createdAt = new Date(effectiveCreationDate);
+    if (creationDate) {
+        projectPayload.createdAt = new Date(creationDate);
     }
 
     const project = await Project.create(projectPayload);
@@ -372,8 +406,6 @@ async function updateProject(req, res) {
         if (creationDate) {
             project.createdAt = new Date(creationDate);
         }
-    } else if (projectStartDate && !project.creationDate) {
-        project.creationDate = new Date(projectStartDate).toISOString().split('T')[0];
     }
     const today = new Date();
     if (sequences !== undefined && Array.isArray(sequences)) {
@@ -705,12 +737,8 @@ async function removeAssignment(req, res) {
  *           Hold Count, Pending Count, Failed Count, Overall Status, Last Updated
  */
 async function downloadAllProjectsStatusExcel(req, res) {
-    const adminId = req.principal.adminId;
-
-    const filter = {};
-    if (req.principal.role !== 'superadmin') {
-        filter.createdByAdminId = adminId;
-    }
+    const accessFilter = await buildProjectQueryForUser(req.principal);
+    const filter = { ...accessFilter };
 
     const projectsData = await getProjectStatusReportData(filter);
     if (!projectsData || projectsData.length === 0) {

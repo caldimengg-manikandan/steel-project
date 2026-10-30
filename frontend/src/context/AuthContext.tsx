@@ -51,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = useCallback(async (identifier: string, password: string): Promise<AuthUser | null> => {
         const BASE = import.meta.env.VITE_API_URL || '/steel/api';
+        const cleanId = (identifier || '').trim();
+        const cleanPassword = (password || '').trim();
 
         try {
             // First, try Admin login
@@ -58,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ username: identifier, password }),
+                body: JSON.stringify({ username: cleanId, password: cleanPassword }),
             });
 
             if (!res.ok) {
@@ -67,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ employeeId: identifier, password }),
+                    body: JSON.stringify({ employeeId: cleanId, password: cleanPassword }),
                 });
             }
 
