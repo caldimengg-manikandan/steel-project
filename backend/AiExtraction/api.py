@@ -7,6 +7,7 @@ from inference import get_latest_model, setup_predictor, process_pdf
 from extraction import process_extracted_data
 from extraction_steelfab import process_extracted_data as process_steelfab_data
 from extraction_ironfab import process_extracted_data as process_ironfab_data
+from extraction_rastiron import process_rastiron_data
 
 app = FastAPI()
 
@@ -18,7 +19,8 @@ default_model = None
 models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Models'))
 MODEL_PATHS = {
     'steelfab': os.path.join(models_dir, 'steelfab_best.pt'),
-    'ironfab': os.path.join(models_dir, 'ironfab_best.pt')
+    'ironfab': os.path.join(models_dir, 'ironfab_best.pt'),
+    'rastiron': os.path.join(models_dir, 'rastiron_best.pt')
 }
 
 # Warm up default model on startup
@@ -34,7 +36,10 @@ def get_model_for_client(client_name: str):
     client_clean = (client_name or '').lower().replace(" ", "").replace("-", "")
     
     model_key = None
-    if 'steelfab' in client_clean or 'steel' in client_clean:
+    # Note: 'rastiron' / 'rast' MUST be checked before 'ironfab' / 'iron' to prevent misrouting
+    if 'rastiron' in client_clean or 'rast' in client_clean:
+        model_key = 'rastiron'
+    elif 'steelfab' in client_clean or 'steel' in client_clean:
         model_key = 'steelfab'
     elif 'ironfab' in client_clean or 'iron' in client_clean:
         model_key = 'ironfab'
@@ -69,7 +74,10 @@ def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(No
     
     # Determine the processing function based on client name
     client_clean = (client_name or '').lower().replace(" ", "").replace("-", "")
-    if 'steelfab' in client_clean or 'steel' in client_clean:
+    if 'rastiron' in client_clean or 'rast' in client_clean:
+        formatter_func = process_rastiron_data
+        print(f"[AI API] Using Rast Iron post-processing formatter for client: {client_name}")
+    elif 'steelfab' in client_clean or 'steel' in client_clean:
         formatter_func = process_steelfab_data
         print(f"[AI API] Using Steelfab post-processing formatter for client: {client_name}")
     elif 'ironfab' in client_clean or 'iron' in client_clean:
@@ -104,6 +112,4 @@ def extract_data(files: list[UploadFile] = File(...), client_name: str = Form(No
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    port = int(os.environ.get("AI_SERVICE_PORT", 8085))
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=8085)

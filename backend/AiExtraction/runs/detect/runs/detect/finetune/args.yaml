@@ -1,6 +1,6 @@
 task: detect
 mode: train
-model: yolo11s.pt
+model: Models\steelfab_best.pt
 data: data.yaml
 epochs: 80
 time: null
@@ -10,7 +10,7 @@ imgsz: 1280
 save: true
 save_period: -1
 cache: false
-device: '0'
+device: cpu
 workers: 0
 project: runs/detect
 name: finetune
@@ -106,4 +106,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: D:\gokul\AI-Text-Extraction(C)\backend\runs\detect\runs\detect\finetune
+save_dir: C:\steel-project(2)\steel-project\steel-project\backend\AiExtraction\runs\detect\runs\detect\finetune
