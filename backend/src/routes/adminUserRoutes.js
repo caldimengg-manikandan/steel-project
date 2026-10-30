@@ -33,9 +33,14 @@ const upload = multer({ storage });
 const router = express.Router();
 
 // Apply auth to all routes in this file
-router.use(verifyToken, requireAdmin);
+router.use(verifyToken);
 
+// All authenticated users can read users list (needed for project allocations and assignments)
 router.get('/', listUsers);
+
+// Mutating operations and specific user detail management require admin / manager access
+router.use(requireAdmin);
+
 router.post('/', createUser);
 router.post('/bulk', upload.single('file'), bulkCreateUsers);
 router.get('/:userId', scopeUserToAdmin, getUser);

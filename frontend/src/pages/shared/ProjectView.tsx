@@ -111,11 +111,39 @@ export default function ProjectView() {
         const projectPmId = getId(project.caldimProjectManager);
         const creatorId = getId(project.createdByUserId || (project.assignments && project.assignments[0] ? project.assignments[0].userId : ''));
 
-        // Check if the project creator is a PM, APM, or TL
+        // Collect all managers and leads associated with this project or session
+        const pmIds = new Set<string>();
+        const apmIds = new Set<string>();
+        const tlIds = new Set<string>();
+
+        if (projectPmId) pmIds.add(projectPmId);
+        if (projectApmId) apmIds.add(projectApmId);
+        if (projectTlId) tlIds.add(projectTlId);
+
+        // Check creator role
         const creator = allUsers.find(u => getId(u) === creatorId);
-        const effectivePmId = projectPmId || (creator?.role === 'project_manager' ? creatorId : '');
-        const effectiveApmId = projectApmId || (creator?.role === 'assistant_project_manager' ? creatorId : '');
-        const effectiveTlId = projectTlId || ((creator?.role === 'team_lead' || creator?.role === 'assistant_team_lead') ? creatorId : '');
+        if (creator?.role === 'project_manager') pmIds.add(creatorId);
+        if (creator?.role === 'assistant_project_manager') apmIds.add(creatorId);
+        if (creator?.role === 'team_lead' || creator?.role === 'assistant_team_lead') tlIds.add(creatorId);
+
+        // Check all assigned users on project
+        (project.assignments || []).forEach(a => {
+            const aId = getId(a.userId);
+            const aUser = allUsers.find(u => getId(u) === aId);
+            if (aUser?.role === 'project_manager') pmIds.add(aId);
+            if (aUser?.role === 'assistant_project_manager') apmIds.add(aId);
+            if (aUser?.role === 'team_lead' || aUser?.role === 'assistant_team_lead') tlIds.add(aId);
+        });
+
+        // Check currently logged-in user role (if viewing/managing project)
+        if (user) {
+            const currentUserId = getId(user.id || (user as any)._id);
+            const currentUserDoc = allUsers.find(u => getId(u) === currentUserId);
+            const effectiveRole = currentUserDoc?.role || user.role;
+            if (effectiveRole === 'project_manager') pmIds.add(currentUserId);
+            if (effectiveRole === 'assistant_project_manager') apmIds.add(currentUserId);
+            if (effectiveRole === 'team_lead' || effectiveRole === 'assistant_team_lead') tlIds.add(currentUserId);
+        }
 
         // Gather allowed user IDs for this project's team hierarchy
         const teamUserIds = new Set<string>();
@@ -131,49 +159,49 @@ export default function ProjectView() {
             if ((projectTeamId && tid === projectTeamId) || (projectTeamName && tname === projectTeamName)) {
                 (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            if (effectivePmId && tPm === effectivePmId) {
+            if (tPm && pmIds.has(tPm)) {
                 (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            if (effectiveApmId && tApm === effectiveApmId) {
+            if (tApm && apmIds.has(tApm)) {
                 (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
-            if (effectiveTlId && tLeads.includes(effectiveTlId)) {
+            if (tLeads.some(lid => tlIds.has(lid))) {
                 (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
             }
         });
 
-        // 2. Direct reporting or team membership under TL
-        if (effectiveTlId) {
-            teamUserIds.add(effectiveTlId);
+        // 2. Direct reporting or team membership under all identified TLs
+        tlIds.forEach(tlId => {
+            teamUserIds.add(tlId);
             allUsers.forEach(u => {
-                if (getIds(u.team_lead).includes(effectiveTlId)) teamUserIds.add(getId(u));
+                if (getIds(u.team_lead).includes(tlId)) teamUserIds.add(getId(u));
             });
             allTeams.forEach(t => {
-                if (getIds(t.lead).includes(effectiveTlId)) {
+                if (getIds(t.lead).includes(tlId)) {
                     (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
                 }
             });
-        }
+        });
 
-        // 3. Direct reporting or team membership under APM
-        if (effectiveApmId) {
+        // 3. Direct reporting or team membership under all identified APMs
+        apmIds.forEach(apmId => {
             allUsers.forEach(u => {
-                if (getId(u.assistant_project_manager) === effectiveApmId) {
+                if (getId(u.assistant_project_manager) === apmId) {
                     teamUserIds.add(getId(u));
                     getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
             });
             allTeams.forEach(t => {
-                if (getId(t.assistant_project_manager) === effectiveApmId) {
+                if (getId(t.assistant_project_manager) === apmId) {
                     (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
                 }
             });
-        }
+        });
 
-        // 4. Direct reporting or team membership under PM
-        if (effectivePmId) {
+        // 4. Direct reporting or team membership under all identified PMs
+        pmIds.forEach(pmId => {
             allUsers.forEach(u => {
-                if (getId(u.project_manager) === effectivePmId) {
+                if (getId(u.project_manager) === pmId) {
                     teamUserIds.add(getId(u));
                     getIds(u.team_lead).forEach(tlId => teamUserIds.add(tlId));
                 }
@@ -181,14 +209,14 @@ export default function ProjectView() {
             allTeams.forEach(t => {
                 const tLeads = getIds(t.lead);
                 const tPm = getId(t.project_manager);
-                if (tPm === effectivePmId || tLeads.some(lid => {
+                if (tPm === pmId || tLeads.some(lid => {
                     const lUser = allUsers.find(u => getId(u) === lid);
-                    return getId(lUser?.project_manager) === effectivePmId;
+                    return getId(lUser?.project_manager) === pmId;
                 })) {
                     (t.members || []).concat(t.lead || []).forEach(m => teamUserIds.add(getId(m)));
                 }
             });
-        }
+        });
 
         // 5. Users assigned to team by ID
         if (projectTeamId) {
@@ -254,13 +282,19 @@ export default function ProjectView() {
             if (creatorId && uid === creatorId) return false;
 
             // 3. Never show managing PM or managing APM as an allocatable team member/lead
-            if (effectivePmId && uid === effectivePmId) return false;
-            if (effectiveApmId && uid === effectiveApmId) return false;
+            if (pmIds.has(uid)) return false;
+            if (apmIds.has(uid)) return false;
 
             // 4. Strict Team Hierarchy (Option 2): Only users within the identified team hierarchy
-            return teamUserIds.has(uid);
+            // If the project or session has identified team users, strictly filter by them.
+            if (teamUserIds.size > 0) {
+                return teamUserIds.has(uid);
+            }
+
+            // Fallback for unassigned/initial project setup
+            return true;
         });
-    }, [allUsers, allTeams, project]);
+    }, [allUsers, allTeams, project, user]);
 
     const displayedUsers = useMemo(() => {
         return eligibleUsers.filter(u => {
