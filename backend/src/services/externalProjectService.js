@@ -120,7 +120,7 @@ async function fetchAndCache(projectsUrl, countUrl) {
                 location: p.location || p.projectLocation || '',
                 status: mappedStatus,
                 rawStatus: p.projectStatus || p.status || '',
-                createdAt: p.createdAt || p.projectStartDate || p.created_at || new Date().toISOString(),
+                createdAt: p.createdAt || p.created_at || null,
                 updatedAt: p.updatedAt || p.updated_at || null,
                 approximateDrawingsCount: p.approximateDrawingsCount || p.drawingsCount || 0,
                 approvalPercentage: p.approvalPercentage ?? p.approval_percentage ?? 0,

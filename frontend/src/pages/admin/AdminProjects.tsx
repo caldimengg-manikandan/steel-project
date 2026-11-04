@@ -7,7 +7,7 @@ import { adminListClients } from '../../services/adminClientApi';
 import { adminListUsers } from '../../services/adminUserApi';
 import { adminListTeams, type Team } from '../../services/adminTeamApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
-import { formatDate } from '../../utils/dateUtils';
+import { formatDate, getProjectAppCreationDate } from '../../utils/dateUtils';
 import type { Project, ProjectStatus, Client, ClientContact, User } from '../../types';
 
 const STATUS_OPTIONS: ProjectStatus[] = ['in_progress', 'on_hold', 'completed', 'archived'];
@@ -1003,7 +1003,7 @@ export default function AdminProjects() {
                                             </span>
                                         </td>
                                         <td className="text-muted font-mono" style={{ fontSize: 12.5 }}>
-                                            {formatDate(p.creationDate || p.createdAt)}
+                                            {formatDate(getProjectAppCreationDate(p))}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>

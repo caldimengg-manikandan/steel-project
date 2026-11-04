@@ -259,10 +259,38 @@ async function attachProjectStats(projects) {
         const mergedDivision = pObj.division || matchingExt?.division || '';
         const mergedProjectManager = pObj.projectManager || matchingExt?.projectManager || '';
         const mergedLocation = pObj.location || matchingExt?.location || '';
-        const mergedCreationDate = pObj.creationDate || (mergedProjectStartDate ? new Date(mergedProjectStartDate).toISOString().split('T')[0] : null);
+        // Retrieve the true date the project was created in the application:
+        // MongoDB ObjectId holds the immutable creation timestamp in its first 4 bytes
+        let appCreatedDate = null;
+        if (pObj._id && mongoose.Types.ObjectId.isValid(pObj._id)) {
+            try {
+                const idDate = new mongoose.Types.ObjectId(pObj._id).getTimestamp();
+                if (idDate && !isNaN(idDate.getTime())) {
+                    appCreatedDate = idDate.toISOString();
+                }
+            } catch (e) {}
+        }
+        if (!appCreatedDate && pObj.createdAt) {
+            appCreatedDate = pObj.createdAt instanceof Date ? pObj.createdAt.toISOString() : pObj.createdAt;
+        }
+
+        // Only use creationDate if it is an explicit legacy date NOT equal to project start date
+        let resolvedCreationDate = pObj.creationDate;
+        if (resolvedCreationDate && mergedProjectStartDate) {
+            const cDateOnly = String(resolvedCreationDate).split('T')[0];
+            const sDateOnly = new Date(mergedProjectStartDate).toISOString().split('T')[0];
+            if (cDateOnly === sDateOnly && appCreatedDate) {
+                resolvedCreationDate = appCreatedDate;
+            }
+        }
+        if (!resolvedCreationDate) {
+            resolvedCreationDate = appCreatedDate || null;
+        }
+        const mergedCreationDate = resolvedCreationDate;
 
         return {
             ...pObj,
+            createdAt: appCreatedDate || pObj.createdAt,
             creationDate: mergedCreationDate,
             projectStartDate: mergedProjectStartDate,
             financialYear: mergedFinancialYear,

@@ -11,7 +11,7 @@ import { uploadDrawing, listExtractions, checkDuplicates, reserveTransmittalNumb
 import { adminListUsers } from '../../services/adminUserApi';
 import { adminListTeams, type Team } from '../../services/adminTeamApi';
 import DrawingExtractionPanel from '../../components/DrawingExtractionPanel';
-import { formatDate } from '../../utils/dateUtils';
+import { formatDate, getProjectAppCreationDate } from '../../utils/dateUtils';
 import TransmittalPanel from '../../components/TransmittalPanel';
 import { listTransmittals } from '../../services/transmittalApi';
 import RfiExtractionPanel from '../../components/RfiPanel';
@@ -1124,7 +1124,7 @@ export default function ProjectView() {
                         <div className="form-row" style={{ marginBottom: 'var(--space-md)' }}>
                             <div>
                                 <div className="form-label" style={{ marginBottom: 4 }}>Created Date</div>
-                                <div className="text-muted">{project.createdAt ? formatCreationDate(project.createdAt) : (project.creationDate ? formatCreationDate(project.creationDate) : '—')}</div>
+                                <div className="text-muted">{formatCreationDate(getProjectAppCreationDate(project) || undefined)}</div>
                             </div>
                             {project.location && (
                                 <div>
