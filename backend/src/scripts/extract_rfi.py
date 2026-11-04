@@ -499,6 +499,61 @@ def extract_rfi(pdf_path, original_filename):
                 if not skip_rfi:
                     rfis.append(rfi)
 
+        # Fallback: if no RFIs were matched by standard Q-markers,
+        # extract any words/text available in the file (annotations or page text)
+        if len(rfis) == 0:
+            fallback_items = []
+            annot_blocks = []
+            for page in doc:
+                try:
+                    page_annots = page.annots()
+                    if page_annots:
+                        for a in page_annots:
+                            c = (a.info.get('content') or '').strip()
+                            if c and len(c) > 2 and c.lower() not in ['void', 'closed', 'deleted', 'cancelled']:
+                                annot_blocks.append(c)
+                except Exception:
+                    pass
+
+            if annot_blocks:
+                for idx, txt in enumerate(annot_blocks):
+                    fallback_items.append({
+                        'rfiNumber': f"Q{idx + 1}",
+                        'refDrawing': original_filename,
+                        'description': clean_duplicate_sentences(txt),
+                        'response': '',
+                        'status': 'OPEN',
+                        'remarks': '',
+                        'skNumber': sk_number
+                    })
+            else:
+                raw_paragraphs = []
+                for page in doc:
+                    try:
+                        p_text = page.get_text("text").strip()
+                        if p_text:
+                            splits = [p.strip() for p in re.split(r'\n\s*\n', p_text) if len(p.strip()) > 5]
+                            for sp in splits:
+                                if sp.lower() not in ['void', 'closed', 'deleted', 'cancelled']:
+                                    raw_paragraphs.append(sp)
+                    except Exception:
+                        pass
+
+                if raw_paragraphs:
+                    for idx, para in enumerate(raw_paragraphs[:20]):
+                        fallback_items.append({
+                            'rfiNumber': f"Q{idx + 1}",
+                            'refDrawing': original_filename,
+                            'description': clean_duplicate_sentences(para),
+                            'response': '',
+                            'status': 'OPEN',
+                            'remarks': '',
+                            'skNumber': sk_number
+                        })
+
+            if fallback_items:
+                rfis.extend(fallback_items)
+
         doc.close()
 
         # 4. Cleanup and Deduplicate across the whole document

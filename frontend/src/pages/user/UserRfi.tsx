@@ -10,6 +10,7 @@ import {
     updateRfiResponse,
     uploadRfiResponseAttachment,
     deleteRfiResponseAttachment,
+    deleteRfiQuestion,
     getRfiAttachmentUrl
 } from '../../services/rfiApi';
 import { useAuth } from '../../context/AuthContext';
@@ -183,7 +184,7 @@ export default function UserRfi() {
 
         const invalidFiles = files.filter(f => {
             const fileLower = f.name.toLowerCase();
-            return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+            return false;
         });
 
         if (invalidFiles.length > 0) {
@@ -378,6 +379,29 @@ export default function UserRfi() {
         } finally {
             setSavingResponse(prev => ({ ...prev, [key]: false }));
         }
+    };
+
+    const handleDeleteQuestion = (extractionId: string, rfiIndex: number, qLabel: string) => {
+        showConfirm('Delete Question', `Are you sure you want to delete this question (${qLabel})?`, async () => {
+            const key = `${extractionId}_${rfiIndex}`;
+            setSavingResponse(prev => ({ ...prev, [key]: true }));
+            try {
+                const resData = await deleteRfiQuestion(
+                    String(selectedProject._id || selectedProject.id),
+                    extractionId,
+                    rfiIndex
+                );
+                setExtractions(prev => prev.map(ext => {
+                    if (ext._id !== extractionId) return ext;
+                    return { ...ext, rfis: resData.rfis || [] };
+                }));
+                showMessage('Question Deleted', 'Question removed successfully.', 'success');
+            } catch (err: any) {
+                showMessage('Delete Failed', `Failed to delete question: ${err.message}`, 'error');
+            } finally {
+                setSavingResponse(prev => ({ ...prev, [key]: false }));
+            }
+        });
     };
 
     const completedCount = extractions.filter(e => e.status === 'completed').length;
@@ -900,7 +924,49 @@ export default function UserRfi() {
                                                                 </div>
                                                                 {isExp && (
                                                                     <div style={{ background: '#f8fafc', padding: 20 }}>
-                                                                        <div style={{ background: 'white', borderRadius: 10, padding: 20, border: '1px solid #e2e8f0' }}>
+                                                                        <div style={{ position: 'relative', background: 'white', borderRadius: 10, padding: canEdit ? '20px 40px 20px 20px' : 20, border: '1px solid #e2e8f0' }}>
+                                                                            {canEdit && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    title="Delete question"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleDeleteQuestion(parent._id, idxInOrig, rfi.rfiNumber || `Question`);
+                                                                                    }}
+                                                                                    style={{
+                                                                                        position: 'absolute',
+                                                                                        top: 10,
+                                                                                        right: 10,
+                                                                                        width: 26,
+                                                                                        height: 26,
+                                                                                        display: 'flex',
+                                                                                        alignItems: 'center',
+                                                                                        justifyContent: 'center',
+                                                                                        background: '#f8fafc',
+                                                                                        border: '1px solid #e2e8f0',
+                                                                                        borderRadius: '50%',
+                                                                                        color: '#94a3b8',
+                                                                                        cursor: 'pointer',
+                                                                                        fontSize: 14,
+                                                                                        fontWeight: 'bold',
+                                                                                        lineHeight: 1,
+                                                                                        transition: 'all 0.15s ease',
+                                                                                        zIndex: 5
+                                                                                    }}
+                                                                                    onMouseEnter={(e) => {
+                                                                                        e.currentTarget.style.color = '#ef4444';
+                                                                                        e.currentTarget.style.background = '#fee2e2';
+                                                                                        e.currentTarget.style.borderColor = '#fca5a5';
+                                                                                    }}
+                                                                                    onMouseLeave={(e) => {
+                                                                                        e.currentTarget.style.color = '#94a3b8';
+                                                                                        e.currentTarget.style.background = '#f8fafc';
+                                                                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                                                                    }}
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            )}
                                                                             <div style={{ marginBottom: 12, fontSize: 13 }}>{rfi.description}</div>
                                                                             {canEdit ? (
                                                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -998,7 +1064,49 @@ export default function UserRfi() {
                                                         const justSaved = savedResponse[key] || false;
                                                         return (
                                                             <div key={i} style={{ background: '#f8fafc', padding: '16px 20px 24px 46px' }}>
-                                                                <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, display: 'grid', gridTemplateColumns: '70px 1.2fr 130px 1fr 1fr 80px', gap: 14, alignItems: 'start' }}>
+                                                                <div style={{ position: 'relative', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, padding: canEdit ? '16px 36px 16px 16px' : 16, display: 'grid', gridTemplateColumns: '70px 1.2fr 130px 1fr 1fr 80px', gap: 14, alignItems: 'start' }}>
+                                                                    {canEdit && (
+                                                                        <button
+                                                                            type="button"
+                                                                            title="Delete question"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleDeleteQuestion(ext._id, i, rfi.rfiNumber || `Q${i + 1}`);
+                                                                            }}
+                                                                            style={{
+                                                                                position: 'absolute',
+                                                                                top: 8,
+                                                                                right: 8,
+                                                                                width: 24,
+                                                                                height: 24,
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                background: '#f8fafc',
+                                                                                border: '1px solid #e2e8f0',
+                                                                                borderRadius: '50%',
+                                                                                color: '#94a3b8',
+                                                                                cursor: 'pointer',
+                                                                                fontSize: 14,
+                                                                                fontWeight: 'bold',
+                                                                                lineHeight: 1,
+                                                                                transition: 'all 0.15s ease',
+                                                                                zIndex: 5
+                                                                            }}
+                                                                            onMouseEnter={(e) => {
+                                                                                e.currentTarget.style.color = '#ef4444';
+                                                                                e.currentTarget.style.background = '#fee2e2';
+                                                                                e.currentTarget.style.borderColor = '#fca5a5';
+                                                                            }}
+                                                                            onMouseLeave={(e) => {
+                                                                                e.currentTarget.style.color = '#94a3b8';
+                                                                                e.currentTarget.style.background = '#f8fafc';
+                                                                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                                                            }}
+                                                                        >
+                                                                            ✕
+                                                                        </button>
+                                                                    )}
                                                                     <div style={{ fontSize: 12, fontWeight: 800, background: '#2563eb', color: 'white', borderRadius: 6, padding: '4px 8px', textAlign: 'center' }}>{rfi.rfiNumber}</div>
                                                                     <div>
                                                                         <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Description</div>

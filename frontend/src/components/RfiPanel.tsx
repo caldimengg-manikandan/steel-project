@@ -119,7 +119,7 @@ export default function RfiExtractionPanel({
 
             const invalidFiles = fileArray.filter(f => {
                 const fileLower = f.name.toLowerCase();
-                return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+                return false;
             });
 
             if (invalidFiles.length > 0) {

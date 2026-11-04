@@ -674,7 +674,77 @@ exports.deleteRfiResponseAttachment = async (req, res) => {
     }
 };
 
-// Stream source PDF for RFI extraction (GridFS / Disk)
+// Delete a specific question from an RFI extraction
+exports.deleteRfiQuestion = async (req, res) => {
+    const { projectId, id, rfiIndex } = req.params;
+    const idx = parseInt(rfiIndex, 10);
+
+    if (isNaN(idx) || idx < 0) {
+        return res.status(400).json({ error: 'Invalid rfiIndex.' });
+    }
+
+    try {
+        const extraction = await RfiExtraction.findOne({ _id: id, projectId });
+        if (!extraction) return res.status(404).json({ error: 'RFI extraction not found.' });
+
+        if (!extraction.rfis || !extraction.rfis[idx]) {
+            return res.status(404).json({ error: `RFI item at index ${idx} not found.` });
+        }
+
+        const rfi = extraction.rfis[idx];
+
+        // 1. Delete associated attachment if present
+        if (rfi.responseAttachmentUrl) {
+            const filename = path.basename(rfi.responseAttachmentUrl.replace(/\\/g, '/'));
+            const candidatePaths = [
+                path.join(__dirname, '../../uploads/steel-dms-uploads', filename),
+                path.join(__dirname, '../../../uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'uploads/steel-dms-uploads', filename),
+                path.resolve(process.cwd(), 'backend/uploads/steel-dms-uploads', filename),
+            ];
+            candidatePaths.forEach(p => {
+                if (fs.existsSync(p)) {
+                    try { fs.unlinkSync(p); } catch (_) {}
+                }
+            });
+        }
+
+        if (rfi.responseAttachmentGridFsId) {
+            try {
+                const { getBucket } = require('../utils/gridfs');
+                const bucket = getBucket();
+                if (bucket) {
+                    await bucket.delete(new mongoose.Types.ObjectId(rfi.responseAttachmentGridFsId));
+                }
+            } catch (gfsErr) {
+                console.warn('[RfiQuestion] GridFS delete error:', gfsErr.message);
+            }
+        }
+
+        if (rfi.responseAttachmentStorageGatewayPath) {
+            try {
+                const storageGateway = require('../utils/storageGateway');
+                if (storageGateway.isEnabled()) {
+                    await storageGateway.deleteFile(rfi.responseAttachmentStorageGatewayPath);
+                }
+            } catch (sgErr) {
+                console.warn('[RfiQuestion] Storage Gateway delete error:', sgErr.message);
+            }
+        }
+
+        // 2. Remove question from array
+        extraction.rfis.splice(idx, 1);
+        await extraction.save();
+
+        res.json({
+            message: 'Question deleted successfully.',
+            rfis: extraction.rfis
+        });
+    } catch (err) {
+        console.error('[RfiController] deleteRfiQuestion error:', err);
+        res.status(500).json({ error: 'Failed to delete question.' });
+    }
+};
 exports.viewRfiPdf = async (req, res) => {
     const { projectId, id } = req.params;
     const adminId = req.principal.adminId;

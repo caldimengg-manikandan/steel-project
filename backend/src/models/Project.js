@@ -60,7 +60,7 @@ const projectSchema = new mongoose.Schema(
             type: {
                 name: String,
                 email: { type: String, match: [/(^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$)/, 'Invalid email format'] },
-                phone: { type: String, match: [/(^$|^[0-9]{10}$)/, 'Contact number must be exactly 10 digits'] },
+                phone: { type: String, match: [/(^$|^[0-9+\-()\s.]{7,25}$)/, 'Please enter a valid contact number (e.g., 1-443-996-0514)'] },
                 designation: String
             },
             default: null
@@ -316,7 +316,7 @@ const projectSchema = new mongoose.Schema(
         connectionDesignContact: {
             type: String,
             default: '',
-            match: [/(^$|^[0-9]{10}$)/, 'Contact number must be exactly 10 digits']
+            match: [/(^$|^[0-9+\-()\s.]{7,25}$)/, 'Please enter a valid contact number (e.g., 1-443-996-0514)']
         },
         connectionDesignEmail: {
             type: String,

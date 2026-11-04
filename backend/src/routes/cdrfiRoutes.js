@@ -16,6 +16,7 @@ const {
     updateCdrfiStatus,
     uploadCdrfiResponseAttachment,
     deleteCdrfiResponseAttachment,
+    deleteCdrfiQuestion,
     viewCdrfiPdf,
     viewCdrfiAttachment,
 } = require('../controllers/cdrfiController');
@@ -84,6 +85,10 @@ router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), u
 
 // Delete attachment from a CDRFI response (editor + admin)
 router.delete('/:id/response/:rfiIndex/attachment', requirePermission('editor'), deleteCdrfiResponseAttachment);
+
+// Delete single question from a CDRFI extraction (editor + admin)
+router.delete('/:id/question/:rfiIndex', requirePermission('editor'), deleteCdrfiQuestion);
+router.delete('/:id/questions/:rfiIndex', requirePermission('editor'), deleteCdrfiQuestion);
 
 // Stream PDF for viewing
 router.get('/:id/view.pdf', viewCdrfiPdf);

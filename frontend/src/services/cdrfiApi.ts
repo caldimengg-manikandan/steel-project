@@ -175,3 +175,21 @@ export const deleteCdrfiResponseAttachment = async (
     }
     return res.json();
 };
+
+
+export const deleteCdrfiQuestion = async (
+    projectId: string,
+    extractionId: string,
+    rfiIndex: number
+) => {
+    const res = await fetch(`${BASE}/cdrfis/${String(projectId)}/${String(extractionId)}/question/${rfiIndex}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete question');
+    }
+    return res.json();
+};

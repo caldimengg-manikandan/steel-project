@@ -7,6 +7,26 @@ import {
     IconEdit, IconFilter, IconClose, IconUpload
 } from '../../components/Icons';
 
+export const formatUSAPhone = (input: string): string => {
+    if (!input) return '';
+    if (input === '1-') return '';
+
+    let digits = input.replace(/\D/g, '');
+    if (!digits) return '';
+
+    if (digits === '1') return '1-';
+
+    if (digits.startsWith('1')) {
+        digits = digits.slice(1);
+    }
+    digits = digits.slice(0, 10);
+
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `1-${digits}`;
+    if (digits.length <= 6) return `1-${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `1-${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+};
+
 export default function AdminClients() {
     const { showMessage, showConfirm } = useMessage();
     const [clients, setClients] = useState<Client[]>([]);
@@ -64,7 +84,10 @@ export default function AdminClients() {
             setEditingClient(client);
             setName(client.name);
             setStatus(client.status || 'active');
-            setContacts(client.contacts.length > 0 ? [...client.contacts] : [{ name: '', email: '', phone: '', designation: '' }]);
+            setContacts(client.contacts.length > 0 ? client.contacts.map(c => ({
+                ...c,
+                phone: formatUSAPhone(c.phone || '')
+            })) : [{ name: '', email: '', phone: '', designation: '' }]);
         } else {
             setEditingClient(null);
             setName('');
@@ -337,13 +360,11 @@ export default function AdminClients() {
                                                     type="tel" 
                                                     className="form-control" 
                                                     value={contact.phone}
-                                                    placeholder="e.g., 9876543210"
-                                                    pattern="^[0-9]{10}$"
-                                                    maxLength={10}
-                                                    title="Please enter exactly 10 digits."
+                                                    placeholder="e.g., 1-443-996-0514"
+                                                    maxLength={14}
+                                                    title="Please enter a valid USA phone number (e.g., 1-443-996-0514)"
                                                     onChange={e => {
-                                                        const onlyDigits = e.target.value.replace(/\D/g, '');
-                                                        updateContact(index, 'phone', onlyDigits);
+                                                        updateContact(index, 'phone', formatUSAPhone(e.target.value));
                                                     }}
                                                 />
                                             </div>

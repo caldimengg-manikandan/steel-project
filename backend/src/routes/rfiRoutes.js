@@ -16,6 +16,7 @@ const {
     updateRfiStatus,
     uploadRfiResponseAttachment,
     deleteRfiResponseAttachment,
+    deleteRfiQuestion,
     viewRfiPdf,
     viewRfiAttachment,
 } = require('../controllers/rfiController');
@@ -85,6 +86,10 @@ router.post('/:id/response/:rfiIndex/attachment', requirePermission('editor'), u
 
 // Delete attachment from an RFI response (editor + admin)
 router.delete('/:id/response/:rfiIndex/attachment', requirePermission('editor'), deleteRfiResponseAttachment);
+
+// Delete single question from an RFI extraction (editor + admin)
+router.delete('/:id/question/:rfiIndex', requirePermission('editor'), deleteRfiQuestion);
+router.delete('/:id/questions/:rfiIndex', requirePermission('editor'), deleteRfiQuestion);
 
 // Stream PDF for viewing (supports both /view and /view.pdf for compatibility with existing Excel files)
 router.get('/:id/view.pdf', viewRfiPdf);

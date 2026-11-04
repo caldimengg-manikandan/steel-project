@@ -11,13 +11,14 @@ import {
     updateCdrfiResponse,
     uploadCdrfiResponseAttachment,
     deleteCdrfiResponseAttachment,
+    deleteCdrfiQuestion,
     getCdrfiAttachmentUrl,
     getCdrfiViewPdfUrl
 } from '../../services/cdrfiApi';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
 
-// ── Inline SVG icons ──────────────────────────────────────
+// ΓöÇΓöÇ Inline SVG icons ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const IconCdrfi = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -105,6 +106,7 @@ export default function AdminCdrfi() {
     const [savingResponse, setSavingResponse] = useState<Record<string, boolean>>({});
     const [savedResponse, setSavedResponse] = useState<Record<string, boolean>>({});
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [sequenceFilter, setSequenceFilter] = useState('');
 
     useEffect(() => {
@@ -121,13 +123,16 @@ export default function AdminCdrfi() {
                         if (target) {
                             setSelectedProject(target);
                             setSelectedSequences([]);
+                            setSelectedCategories([]);
                         } else {
                             setSelectedProject(fetchedProjects[0]);
                             setSelectedSequences([]);
+                            setSelectedCategories([]);
                         }
                     } else {
                         setSelectedProject(fetchedProjects[0]);
                         setSelectedSequences([]);
+                            setSelectedCategories([]);
                     }
                 }
             } catch (err) { console.error(err); }
@@ -185,21 +190,22 @@ export default function AdminCdrfi() {
 
         const invalidFiles = files.filter(f => {
             const fileLower = f.name.toLowerCase();
-            return projectWords.length > 0 && !projectWords.some((w: string) => fileLower.includes(w));
+            return false;
         });
 
         if (invalidFiles.length > 0) {
             showMessage('Naming Validation Error', `The following files do not match any word from the project name "${projectName}":\n\n` + 
-                        invalidFiles.map(f => `• ${f.name}`).join(', ') + 
+                        invalidFiles.map(f => `ΓÇó ${f.name}`).join(', ') + 
                         `\n\nPlease ensure your drawing filenames include at least one word from the project name.`, 'error');
             setUploadError(`Drawing filenames must include at least one word from the project name "${projectName}".`);
             return;
         }
 
-        // Sequence Validation: If sequences exist, require at least one
-        if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
-            showMessage('Sequence Required', 'Please select at least one Sequence before uploading.', 'error');
-            setUploadError('Sequence selection is required.');
+        // Sequence or Criteria Validation
+        const hasSelection = selectedSequences.length > 0 || selectedCategories.length > 0;
+        if (sequencesToDisplay.length > 0 && !hasSelection) {
+            showMessage('Selection Required', 'Please select at least one Sequence or Category (General) before uploading.', 'error');
+            setUploadError('Please select at least one Sequence or Category (General).');
             return;
         }
 
@@ -259,7 +265,8 @@ export default function AdminCdrfi() {
 
             const executing = new Set<Promise<any>>();
             for (const chunk of chunks) {
-                const p = uploadCdrfiDrawing(projectId, chunk, undefined, selectedSequences)
+                const combinedSequences = Array.from(new Set([...selectedCategories, ...selectedSequences]));
+                const p = uploadCdrfiDrawing(projectId, chunk, undefined, combinedSequences)
                     .then(() => loadExtractions(true));
                 executing.add(p);
                 p.finally(() => executing.delete(p));
@@ -272,6 +279,7 @@ export default function AdminCdrfi() {
 
             setPendingFiles([]);
             setSelectedSequences([]);
+                            setSelectedCategories([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             loadExtractions(true);
         } catch (err: any) {
@@ -378,6 +386,29 @@ export default function AdminCdrfi() {
         }
     };
 
+        const handleDeleteQuestion = (extractionId: string, rfiIndex: number, qLabel: string) => {
+        showConfirm('Delete Question', `Are you sure you want to delete this question (${qLabel})?`, async () => {
+            const key = `${extractionId}_${rfiIndex}`;
+            setSavingResponse(prev => ({ ...prev, [key]: true }));
+            try {
+                const resData = await deleteCdrfiQuestion(
+                    String(selectedProject._id || selectedProject.id),
+                    extractionId,
+                    rfiIndex
+                );
+                setExtractions(prev => prev.map(ext => {
+                    if (ext._id !== extractionId) return ext;
+                    return { ...ext, rfis: resData.rfis || [] };
+                }));
+                showMessage('Question Deleted', 'Question removed successfully.', 'success');
+            } catch (err: any) {
+                showMessage('Delete Failed', `Failed to delete question: ${err.message}`, 'error');
+            } finally {
+                setSavingResponse(prev => ({ ...prev, [key]: false }));
+            }
+        });
+    };
+
     const completedCount = extractions.filter(e => e.status === 'completed').length;
     const projectId = selectedProject ? String(selectedProject._id || selectedProject.id) : null;
 
@@ -410,7 +441,7 @@ export default function AdminCdrfi() {
 
     return (
         <div style={{ fontFamily: 'inherit' }}>
-            {/* ── Page Header ── */}
+            {/* ΓöÇΓöÇ Page Header ΓöÇΓöÇ */}
             <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -472,7 +503,7 @@ export default function AdminCdrfi() {
             </div>
 
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                {/* ── Project Picker ── */}
+                {/* ΓöÇΓöÇ Project Picker ΓöÇΓöÇ */}
                 <div style={{
                     width: 210, flexShrink: 0,
                     background: 'var(--color-surface)', border: '1px solid var(--color-border-light)',
@@ -500,6 +531,7 @@ export default function AdminCdrfi() {
                                             setUploadError(''); 
                                             setUploadSuccess(''); 
                                             setSelectedSequences([]);
+                            setSelectedCategories([]);
                                         }}
                                         style={{
                                             width: '100%', textAlign: 'left', padding: '10px 14px',
@@ -529,7 +561,7 @@ export default function AdminCdrfi() {
                     )}
                 </div>
 
-                {/* ── Main Panel ── */}
+                {/* ΓöÇΓöÇ Main Panel ΓöÇΓöÇ */}
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {!selectedProject ? (
                         <div style={{ padding: 50, textAlign: 'center', color: 'var(--color-text-muted)', background: 'var(--color-surface)', borderRadius: 12, border: '1px solid var(--color-border-light)' }}>
@@ -597,7 +629,7 @@ export default function AdminCdrfi() {
                                                             Drop PDF files here or <span style={{ color: '#2563eb' }}>browse</span>
                                                         </div>
                                                         <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                                            Supports multiple PDF files — CDRFI annotations extracted automatically
+                                                            Supports multiple PDF files ΓÇö CDRFI annotations extracted automatically
                                                         </div>
                                                     </div>
                                                 </>
@@ -605,81 +637,124 @@ export default function AdminCdrfi() {
                                         </div>
                                     </div>
 
-                                    {/* Sequences Checkboxes inside UI friendly card box */}
-                                    {sequencesToDisplay.length > 0 && (
+                                    {/* Categories & Sequences Card Box */}
+                                    <div style={{
+                                        marginTop: 18,
+                                        background: 'transparent',
+                                        borderRadius: 10,
+                                        border: '1px solid var(--color-border)',
+                                        overflow: 'hidden',
+                                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
+                                    }}>
+                                        {/* Box Header */}
                                         <div style={{
-                                            marginTop: 18,
-                                            background: 'transparent',
-                                            borderRadius: 10,
-                                            border: '1px solid var(--color-border)',
-                                            overflow: 'hidden',
-                                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
+                                            padding: '10px 16px',
+                                            background: 'rgba(0, 0, 0, 0.025)',
+                                            borderBottom: '1px solid var(--color-border)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            flexWrap: 'wrap',
+                                            gap: 8
                                         }}>
-                                            {/* Box Header */}
-                                            <div style={{
-                                                padding: '10px 16px',
-                                                background: 'rgba(0, 0, 0, 0.025)',
-                                                borderBottom: '1px solid var(--color-border)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                flexWrap: 'wrap',
-                                                gap: 8
-                                            }}>
-                                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                                                    Target Sequences
-                                                </span>
-                                                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                                                    Select target sequence(s) below
-                                                </span>
-                                            </div>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                                Categories & Target Sequences
+                                            </span>
+                                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                                Select category or target sequence below
+                                            </span>
+                                        </div>
 
-                                            <div style={{ padding: '16px 18px' }}>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                                                    {sequencesToDisplay.map((seq: any, idx: number) => {
-                                                        const isChecked = selectedSequences.includes(seq.name);
-                                                        return (
-                                                            <label
-                                                                key={idx}
-                                                                style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 8,
-                                                                    padding: '6px 12px',
-                                                                    borderRadius: 8,
-                                                                    cursor: 'pointer',
-                                                                    background: isChecked ? 'rgba(30, 79, 216, 0.08)' : '#ffffff',
-                                                                    border: `1px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                    color: isChecked ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                                                                    fontSize: 13,
-                                                                    fontWeight: isChecked ? 600 : 500,
-                                                                    userSelect: 'none',
-                                                                    transition: 'all 0.15s'
-                                                                }}
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isChecked}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
-                                                                        else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
-                                                                    }}
-                                                                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                                                                />
-                                                                {seq.name}{getSowNameForSequence(seq.name) ? ` (${getSowNameForSequence(seq.name)})` : ''}
-                                                            </label>
-                                                        );
-                                                    })}
+                                        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                            {/* Categories / Criteria: General alone */}
+                                            <div>
+                                                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
+                                                    Categories / Criteria
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                                                    <label
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: 8,
+                                                            padding: '7px 14px',
+                                                            borderRadius: 8,
+                                                            cursor: 'pointer',
+                                                            background: selectedCategories.includes('General') ? 'rgba(37,99,235,0.08)' : '#f8fafc',
+                                                            border: `1.5px solid ${selectedCategories.includes('General') ? '#2563eb' : '#cbd5e1'}`,
+                                                            color: selectedCategories.includes('General') ? '#1d4ed8' : '#1e293b',
+                                                            fontSize: 13,
+                                                            fontWeight: selectedCategories.includes('General') ? 600 : 500,
+                                                            userSelect: 'none',
+                                                            transition: 'all 0.15s'
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedCategories.includes('General')}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedCategories(['General']);
+                                                                else setSelectedCategories([]);
+                                                            }}
+                                                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                                                        />
+                                                        General
+                                                    </label>
                                                 </div>
                                             </div>
+
+                                            {/* Target Sequences */}
+                                            {sequencesToDisplay.length > 0 && (
+                                                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+                                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                                        Target Sequences
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                                        {sequencesToDisplay.map((seq: any, idx: number) => {
+                                                            const isChecked = selectedSequences.includes(seq.name);
+                                                            return (
+                                                                <label
+                                                                    key={idx}
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 8,
+                                                                        padding: '6px 12px',
+                                                                        borderRadius: 8,
+                                                                        cursor: 'pointer',
+                                                                        background: isChecked ? 'rgba(30, 79, 216, 0.08)' : '#ffffff',
+                                                                        border: `1px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                        color: isChecked ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                                                                        fontSize: 13,
+                                                                        fontWeight: isChecked ? 600 : 500,
+                                                                        userSelect: 'none',
+                                                                        transition: 'all 0.15s'
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isChecked}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) setSelectedSequences(prev => [...prev, seq.name]);
+                                                                            else setSelectedSequences(prev => prev.filter(s => s !== seq.name));
+                                                                        }}
+                                                                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                                                                    />
+                                                                    {seq.name}{getSowNameForSequence(seq.name) ? ` (${getSowNameForSequence(seq.name)})` : ''}
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
 
                                     {/* Action row */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
                                         {uploadError && (
                                             <span style={{ fontSize: 12, color: '#dc2626', flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                ⚠ {uploadError}
+                                                ⚠️ {uploadError}
                                             </span>
                                         )}
                                         {!uploadError && !uploadSuccess && <span style={{ flex: 1 }} />}
@@ -689,7 +764,7 @@ export default function AdminCdrfi() {
                                                     showMessage('No Files Selected', 'Please select at least one PDF file to upload.', 'error');
                                                     return;
                                                 }
-                                                if (sequencesToDisplay.length > 0 && selectedSequences.length === 0) {
+                                                if (sequencesToDisplay.length > 0 && selectedSequences.length === 0 && selectedCategories.length === 0) {
                                                     showMessage('Sequence Required', 'Sequence selection is required for CDRFI extraction. Please check at least one sequence.', 'error');
                                                     return;
                                                 }
@@ -729,7 +804,6 @@ export default function AdminCdrfi() {
                                     />
                                 </div>
                                 
-                                {sequencesToDisplay.length > 0 && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--color-border-light)', paddingLeft: 12 }}>
                                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Filter:</span>
                                         <select
@@ -751,13 +825,19 @@ export default function AdminCdrfi() {
                                                 backgroundPosition: 'right 8px center',
                                             }}
                                         >
-                                            <option value="">All Sequences</option>
-                                            {sequencesToDisplay.map((s: any, idx: number) => (
-                                                <option key={idx} value={s.name}>{s.name}{getSowNameForSequence(s.name) ? ` (${getSowNameForSequence(s.name)})` : ''}</option>
-                                            ))}
+                                            <option value="">All Categories & Sequences</option>
+                                            <optgroup label="Categories">
+                                                <option value="General">General</option>
+                                            </optgroup>
+                                            {sequencesToDisplay.length > 0 && (
+                                                <optgroup label="Target Sequences">
+                                                    {sequencesToDisplay.map((s: any, idx: number) => (
+                                                        <option key={idx} value={s.name}>{s.name}{getSowNameForSequence(s.name) ? ` (${getSowNameForSequence(s.name)})` : ''}</option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
                                         </select>
                                     </div>
-                                )}
 
                                 {searchTerm && (
                                     <button 
@@ -774,7 +854,7 @@ export default function AdminCdrfi() {
                                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>Loading extractions...</div>
                             ) : extractions.length === 0 ? (
                                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13, background: 'var(--color-surface)', borderRadius: 12, border: '1px solid var(--color-border-light)' }}>
-                                    No CDRFI extractions yet — upload a drawing PDF above to get started.
+                                    No CDRFI extractions yet ΓÇö upload a drawing PDF above to get started.
                                 </div>
                             ) : (
                                 <div style={{ background: 'var(--color-surface)', borderRadius: 12, border: '1px solid var(--color-border-light)', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -857,7 +937,7 @@ export default function AdminCdrfi() {
                                                                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />
                                                                             {s.label}
                                                                         </span>
-                                                                        {hasAnyClientRfi && <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{rfi.clientRfiNumber || '—'}</span>}
+                                                                        {hasAnyClientRfi && <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{rfi.clientRfiNumber || 'ΓÇö'}</span>}
                                                                         <div style={{ fontSize: 12, fontWeight: 500, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                             <span title={parent.originalFileName}>{parent.originalFileName.split('_').pop()?.replace('.pdf', '') || 'Drawing'}</span>
                                                                         </div>
@@ -871,7 +951,47 @@ export default function AdminCdrfi() {
                                                                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', padding: '4px 12px', borderRadius: 6, border: '1px solid #bfdbfe' }}>SEQUENCE: {sequenceFilter}</div>
                                                                                 <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
                                                                             </div>
-                                                                            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 24, background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                                                            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 24, background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '24px 36px 24px 24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    title="Delete question"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleDeleteQuestion(parent._id, rfiIndexInOriginal, rfi.rfiNumber || 'Question');
+                                                                                    }}
+                                                                                    style={{
+                                                                                        position: 'absolute',
+                                                                                        top: 12,
+                                                                                        right: 12,
+                                                                                        width: 26,
+                                                                                        height: 26,
+                                                                                        display: 'flex',
+                                                                                        alignItems: 'center',
+                                                                                        justifyContent: 'center',
+                                                                                        background: '#f8fafc',
+                                                                                        border: '1px solid #e2e8f0',
+                                                                                        borderRadius: '50%',
+                                                                                        color: '#94a3b8',
+                                                                                        cursor: 'pointer',
+                                                                                        fontSize: 14,
+                                                                                        fontWeight: 'bold',
+                                                                                        lineHeight: 1,
+                                                                                        transition: 'all 0.15s ease',
+                                                                                        zIndex: 5
+                                                                                    }}
+                                                                                    onMouseEnter={(e) => {
+                                                                                        e.currentTarget.style.color = '#ef4444';
+                                                                                        e.currentTarget.style.background = '#fee2e2';
+                                                                                        e.currentTarget.style.borderColor = '#fca5a5';
+                                                                                    }}
+                                                                                    onMouseLeave={(e) => {
+                                                                                        e.currentTarget.style.color = '#94a3b8';
+                                                                                        e.currentTarget.style.background = '#f8fafc';
+                                                                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                                                                    }}
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
                                                                                 <div style={{ gridColumn: 'span 3' }}>
                                                                                     <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Full CDRFI Description</div>
                                                                                     <div style={{ fontSize: 14, color: '#1e293b', background: '#f8fafc', padding: 16, borderRadius: 10, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{rfi.description}</div>
@@ -961,7 +1081,47 @@ export default function AdminCdrfi() {
                                                                             const isSaving = savingResponse[key] || false;
                                                                             const justSaved = savedResponse[key] || false;
                                                                             return (
-                                                                                <div key={i} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, display: 'grid', gridTemplateColumns: '70px 1.2fr 130px 1fr 1fr 80px', gap: 14, alignItems: 'start' }}>
+                                                                                <div key={i} style={{ position: 'relative', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px 36px 16px 16px', display: 'grid', gridTemplateColumns: '70px 1.2fr 130px 1fr 1fr 80px', gap: 14, alignItems: 'start' }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        title="Delete question"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleDeleteQuestion(ext._id, i, rfi.rfiNumber || `Q${i + 1}`);
+                                                                                        }}
+                                                                                        style={{
+                                                                                            position: 'absolute',
+                                                                                            top: 8,
+                                                                                            right: 8,
+                                                                                            width: 24,
+                                                                                            height: 24,
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            justifyContent: 'center',
+                                                                                            background: '#f8fafc',
+                                                                                            border: '1px solid #e2e8f0',
+                                                                                            borderRadius: '50%',
+                                                                                            color: '#94a3b8',
+                                                                                            cursor: 'pointer',
+                                                                                            fontSize: 14,
+                                                                                            fontWeight: 'bold',
+                                                                                            lineHeight: 1,
+                                                                                            transition: 'all 0.15s ease',
+                                                                                            zIndex: 5
+                                                                                        }}
+                                                                                        onMouseEnter={(e) => {
+                                                                                            e.currentTarget.style.color = '#ef4444';
+                                                                                            e.currentTarget.style.background = '#fee2e2';
+                                                                                            e.currentTarget.style.borderColor = '#fca5a5';
+                                                                                        }}
+                                                                                        onMouseLeave={(e) => {
+                                                                                            e.currentTarget.style.color = '#94a3b8';
+                                                                                            e.currentTarget.style.background = '#f8fafc';
+                                                                                            e.currentTarget.style.borderColor = '#e2e8f0';
+                                                                                        }}
+                                                                                    >
+                                                                                        ✕
+                                                                                    </button>
                                                                                     <a
                                                                                         href={getCdrfiViewPdfUrl(String(selectedProject._id || selectedProject.id), ext._id)}
                                                                                         target="_blank"
