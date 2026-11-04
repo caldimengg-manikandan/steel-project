@@ -7,6 +7,7 @@ import {
     IconPlus, IconEdit, IconSearch
 } from '../../components/Icons';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 
 type TabId = 'access' | 'email' | 'ui' | 'branding' | 'security' | 'audit';
 
@@ -90,6 +91,8 @@ const Card = ({ title, children, action }: { title: string, children: React.Reac
 const BASE = import.meta.env.VITE_API_URL || '/steel/api';
 
 export default function AdminSettings() {
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [logSearch, setLogSearch] = useState('');
@@ -164,9 +167,13 @@ export default function AdminSettings() {
 
     useEffect(() => {
         if (activeTab === 'audit') {
-            fetchLogs();
+            if (!isSuperAdmin) {
+                setActiveTab('access');
+            } else {
+                fetchLogs();
+            }
         }
-    }, [activeTab]);
+    }, [activeTab, isSuperAdmin]);
 
     const fetchLogs = async () => {
         setLoadingLogs(true);
@@ -289,7 +296,7 @@ export default function AdminSettings() {
             <div className="settings-layout">
                 {/* Navigation */}
                 <aside className="settings-nav">
-                    {TABS.map(tab => (
+                    {TABS.filter(tab => tab.id !== 'audit' || isSuperAdmin).map(tab => (
                         <div
                             key={tab.id}
                             className={`settings-nav-item ${activeTab === tab.id ? 'active' : ''}`}
@@ -754,7 +761,7 @@ export default function AdminSettings() {
                         </Card>
                     )}
 
-                    {activeTab === 'audit' && (
+                    {activeTab === 'audit' && isSuperAdmin && (
                         <Card title="System Activity & Login Audit" action={
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', background: 'var(--color-bg-page)', borderRadius: 20, padding: 3, border: '1px solid var(--color-border-light)' }}>
