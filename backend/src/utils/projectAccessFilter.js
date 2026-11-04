@@ -224,6 +224,28 @@ async function buildProjectQueryForUser(principal) {
     };
 }
 
+/**
+ * Checks if a specific project is accessible to the principal.
+ */
+async function canUserAccessProject(principal, projectId) {
+    if (!principal || !projectId) return false;
+    if (principal.role === 'superadmin' || principal.role === 'admin') return true;
+
+    const baseFilter = await buildProjectQueryForUser(principal);
+    const targetId = mongoose.Types.ObjectId.isValid(projectId) ? new mongoose.Types.ObjectId(projectId) : projectId;
+
+    const query = {
+        $and: [
+            { _id: targetId },
+            baseFilter
+        ]
+    };
+
+    const exists = await Project.exists(query);
+    return !!exists;
+}
+
 module.exports = {
-    buildProjectQueryForUser
+    buildProjectQueryForUser,
+    canUserAccessProject
 };
