@@ -93,6 +93,7 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<TabId>('access');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [logSearch, setLogSearch] = useState('');
+    const [logCategory, setLogCategory] = useState<'all' | 'auth' | 'config'>('all');
     const [logs, setLogs] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -175,12 +176,12 @@ export default function AdminSettings() {
             });
             if (res.ok) {
                 const data = await res.json();
-                const rawLogs = data.logs || [];
-                const settingsLogs = rawLogs.filter((l: any) => {
-                    const text = `${l.event || ''} ${l.module || ''} ${l.action || ''}`.toLowerCase();
-                    return !text.includes('login') && !text.includes('logout') && !text.includes('logged in') && !text.includes('logged out');
-                });
-                setLogs(settingsLogs);
+
+
+
+
+
+                setLogs(data.logs || []);
             } else {
                 showMessage('Error', 'Failed to fetch logs', 'error');
             }
@@ -417,6 +418,7 @@ export default function AdminSettings() {
                                     credentials: 'include',
                                     body: JSON.stringify(emailForm)
                                 });
+                
                                 if (res.ok) {
                                     showMessage('Saved', 'Email settings saved successfully.', 'success');
                                     refreshSettings();
@@ -731,6 +733,7 @@ export default function AdminSettings() {
                                                 credentials: 'include',
                                                 body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
                                             });
+                            
                                             const data = await res.json();
                                             if (res.ok) {
                                                 showMessage('Success', 'Password updated successfully! Use it next time you log in.', 'success');
@@ -752,52 +755,130 @@ export default function AdminSettings() {
                     )}
 
                     {activeTab === 'audit' && (
-                        <Card title="System Activity Log" action={
-                            <div className="search-input-wrapper" style={{ width: 240, background: 'var(--color-bg-page)', border: '1px solid var(--color-border-light)', borderRadius: 20, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-                                <span style={{ opacity: 0.5, flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}><IconSearch /></span>
-                                <input 
-                                    type="text" 
-                                    className="form-control" 
-                                    placeholder="Search logs..." 
-                                    style={{ border: 'none', background: 'transparent', height: 32, fontSize: 13 }}
-                                    value={logSearch}
-                                    onChange={(e) => setLogSearch(e.target.value)}
-                                />
+                        <Card title="System Activity & Login Audit" action={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', background: 'var(--color-bg-page)', borderRadius: 20, padding: 3, border: '1px solid var(--color-border-light)' }}>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setLogCategory('all')}
+                                        style={{ 
+                                            background: logCategory === 'all' ? 'var(--color-primary)' : 'transparent', 
+                                            color: logCategory === 'all' ? '#fff' : 'var(--color-text-muted)',
+                                            border: 'none', borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer'
+                                        }}
+                                    >
+                                        All ({logs.length})
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setLogCategory('auth')}
+                                        style={{ 
+                                            background: logCategory === 'auth' ? 'var(--color-primary)' : 'transparent', 
+                                            color: logCategory === 'auth' ? '#fff' : 'var(--color-text-muted)',
+                                            border: 'none', borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer'
+                                        }}
+                                    >
+                                        Logins & Auth ({logs.filter(l => (l.module || '').toLowerCase() === 'auth' || (l.event || '').toLowerCase().includes('log')).length})
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setLogCategory('config')}
+                                        style={{ 
+                                            background: logCategory === 'config' ? 'var(--color-primary)' : 'transparent', 
+                                            color: logCategory === 'config' ? '#fff' : 'var(--color-text-muted)',
+                                            border: 'none', borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer'
+                                        }}
+                                    >
+                                        Settings & Config ({logs.filter(l => (l.module || '').toLowerCase() === 'config').length})
+                                    </button>
+                                </div>
+                                <div className="search-input-wrapper" style={{ width: 180, background: 'var(--color-bg-page)', border: '1px solid var(--color-border-light)', borderRadius: 20, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+                                    <span style={{ opacity: 0.5, flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}><IconSearch /></span>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        placeholder="Search logs..." 
+                                        style={{ border: 'none', background: 'transparent', height: 32, fontSize: 13 }}
+                                        value={logSearch}
+                                        onChange={(e) => setLogSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={fetchLogs}
+                                    title="Refresh logs"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ height: 32, padding: '0 10px', borderRadius: 16, cursor: 'pointer' }}
+                                >
+                                    ↻ Refresh
+                                </button>
                             </div>
                         }>
                             <div className="table-wrapper">
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Timestamp</th>
-                                            <th>User</th>
-                                            <th>Module</th>
-                                            <th>Event</th>
+                                            <th style={{ width: 180 }}>Timestamp</th>
+                                            <th style={{ width: 220 }}>User / Actor</th>
+                                            <th style={{ width: 130 }}>Category</th>
+                                            <th>Activity Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {loadingLogs ? (
-                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>Loading logs...</td></tr>
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px 0' }}>Loading logs...</td></tr>
                                         ) : logs.length === 0 ? (
-                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px 0' }}>No activity logs found.</td></tr>
-                                        ) : logs.filter(l => 
-                                            (l.user && l.user.toLowerCase().includes(logSearch.toLowerCase())) || 
-                                            (l.module && l.module.toLowerCase().includes(logSearch.toLowerCase())) || 
-                                            (l.event && l.event.toLowerCase().includes(logSearch.toLowerCase()))
-                                        ).map((l, i) => (
-                                            <tr key={i}>
-                                                <td className="font-mono" style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleString()}</td>
-                                                <td><span style={{ fontWeight: 600 }}>{l.user}</span></td>
-                                                <td><span style={{ color: 'var(--color-text-muted)' }}>{l.module}</span></td>
-                                                <td>{l.event}</td>
-                                            </tr>
-                                        ))}
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px 0' }}>No activity logs found.</td></tr>
+                                        ) : logs.filter(l => {
+                                            if (logCategory === 'auth') {
+                                                const isAuth = (l.module || '').toLowerCase() === 'auth' || (l.event || '').toLowerCase().includes('log');
+                                                if (!isAuth) return false;
+                                            } else if (logCategory === 'config') {
+                                                if ((l.module || '').toLowerCase() !== 'config') return false;
+                                            }
+                                            if (!logSearch.trim()) return true;
+                                            const term = logSearch.toLowerCase();
+                                            return (
+                                                (l.user && l.user.toLowerCase().includes(term)) || 
+                                                (l.module && l.module.toLowerCase().includes(term)) || 
+                                                (l.event && l.event.toLowerCase().includes(term))
+                                            );
+                                        }).map((l, i) => {
+                                            const isAuth = (l.module || '').toLowerCase() === 'auth';
+                                            const isLogin = (l.event || '').toLowerCase().includes('logged in') || (l.event || '').toLowerCase().includes('login');
+                                            const isLogout = (l.event || '').toLowerCase().includes('logged out') || (l.event || '').toLowerCase().includes('logout');
+
+                                            return (
+                                                <tr key={i}>
+                                                    <td className="font-mono" style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                                        {new Date(l.timestamp).toLocaleString()}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ fontWeight: 600 }}>{l.user}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ 
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            fontSize: 11, 
+                                                            fontWeight: 600, 
+                                                            padding: '2px 8px', 
+                                                            borderRadius: 12,
+                                                            background: isAuth ? (isLogout ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.12)') : 'rgba(99, 102, 241, 0.12)',
+                                                            color: isAuth ? (isLogout ? '#ef4444' : '#10b981') : '#6366f1'
+                                                        }}>
+                                                            {isAuth ? (isLogin ? 'Login' : (isLogout ? 'Logout' : 'Auth')) : (l.module || 'System')}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 13 }}>{l.event}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
                         </Card>
                     )}
-
 
                 </main>
             </div>

@@ -58,8 +58,25 @@ exports.updateSettings = async (req, res) => {
         console.error('[Scheduler] Failed to reload scheduler:', err.message);
     }
     
-    const username = req.principal?.username || req.user?.username || 'Admin';
-    await logActivity(username, 'Config', 'System settings updated');
+    const username = req.principal?.displayName || req.principal?.username || req.user?.displayName || req.user?.username || 'Admin';
+    // Construct descriptive event message based on what changed
+    const changeList = [];
+    if (darkMode !== undefined) changeList.push(`Theme: ${darkMode ? 'Dark' : 'Light'} Mode`);
+    if (timezone !== undefined) changeList.push(`Timezone: ${timezone}`);
+    if (dateFormat !== undefined) changeList.push(`Date Format: ${dateFormat}`);
+    if (weeklyProgresss !== undefined) changeList.push(`Weekly Progress Report: ${weeklyProgresss ? 'Enabled' : 'Disabled'}`);
+    if (weeklyProgressDay !== undefined || weeklyProgressTime !== undefined) {
+        changeList.push(`Weekly Report Schedule: ${weeklyProgressDay || settings.weeklyProgressDay} at ${weeklyProgressTime || settings.weeklyProgressTime}`);
+    }
+    if (emailNotifications !== undefined) changeList.push(`Email Notifications: ${emailNotifications ? 'Enabled' : 'Disabled'}`);
+    if (twoFactor !== undefined) changeList.push(`Two-Factor Auth: ${twoFactor ? 'Enabled' : 'Disabled'}`);
+    if (activityLogging !== undefined) changeList.push(`Activity Logging: ${activityLogging ? 'Enabled' : 'Disabled'}`);
+    if (moduleProjects !== undefined || moduleRfi !== undefined || moduleReports !== undefined) {
+        changeList.push('Modules Access Updated');
+    }
+
+    const eventDesc = changeList.length > 0 ? changeList.join('; ') : 'General system preferences updated';
+    await logActivity(username, 'Config', eventDesc);
     
     res.json(settings);
 };
@@ -89,7 +106,7 @@ exports.uploadLogo = async (req, res) => {
     settings.logoPath = relativePath;
     await settings.save();
 
-    const username = req.principal?.username || req.user?.username || 'Admin';
+    const username = req.principal?.displayName || req.principal?.username || req.user?.displayName || req.user?.username || 'Admin';
     await logActivity(username, 'Config', 'Company logo updated');
 
     res.json({ message: 'Logo uploaded successfully', logoPath: relativePath });
@@ -126,7 +143,7 @@ exports.updateEmailSettings = async (req, res) => {
         }
         await settings.save();
 
-        const username = req.principal?.username || req.user?.username || 'Admin';
+        const username = req.principal?.displayName || req.principal?.username || req.user?.displayName || req.user?.username || 'Admin';
         await logActivity(username, 'Config', 'Email settings updated');
 
         const safeSettings = settings.toObject();

@@ -68,7 +68,7 @@ async function adminLogin(req, res) {
             maxAge: 8 * 60 * 60 * 1000
         });
         
-        await logActivity(admin.username, 'Auth', 'Admin logged in');
+        await logActivity(admin.displayName || admin.username, 'Auth', 'Admin logged in');
         
         res.json({ 
             user: admin.toSafeObject(),
@@ -132,7 +132,8 @@ async function userLogin(req, res) {
             maxAge: 8 * 60 * 60 * 1000
         });
         
-        await logActivity(user.username, 'Auth', 'User logged in');
+        const userDisplay = user.displayName ? `${user.displayName} (${user.username})` : user.username;
+        await logActivity(userDisplay, 'Auth', `User logged in [Role: ${user.role.replace(/_/g, ' ')}]`);
         res.json({ 
             user: user.toSafeObject(),
             token: token // Return token explicitly
