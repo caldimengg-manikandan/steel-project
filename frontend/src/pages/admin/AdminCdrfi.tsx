@@ -195,7 +195,7 @@ export default function AdminCdrfi() {
 
         if (invalidFiles.length > 0) {
             showMessage('Naming Validation Error', `The following files do not match any word from the project name "${projectName}":\n\n` + 
-                        invalidFiles.map(f => `ΓÇó ${f.name}`).join(', ') + 
+                        invalidFiles.map(f => `• ${f.name}`).join(', ') + 
                         `\n\nPlease ensure your drawing filenames include at least one word from the project name.`, 'error');
             setUploadError(`Drawing filenames must include at least one word from the project name "${projectName}".`);
             return;
@@ -629,7 +629,7 @@ export default function AdminCdrfi() {
                                                             Drop PDF files here or <span style={{ color: '#2563eb' }}>browse</span>
                                                         </div>
                                                         <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                                            Supports multiple PDF files ΓÇö CDRFI annotations extracted automatically
+                                                            Supports multiple PDF files — CDRFI annotations extracted automatically
                                                         </div>
                                                     </div>
                                                 </>
@@ -854,7 +854,7 @@ export default function AdminCdrfi() {
                                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>Loading extractions...</div>
                             ) : extractions.length === 0 ? (
                                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13, background: 'var(--color-surface)', borderRadius: 12, border: '1px solid var(--color-border-light)' }}>
-                                    No CDRFI extractions yet ΓÇö upload a drawing PDF above to get started.
+                                    No CDRFI extractions yet — upload a drawing PDF above to get started.
                                 </div>
                             ) : (
                                 <div style={{ background: 'var(--color-surface)', borderRadius: 12, border: '1px solid var(--color-border-light)', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -937,7 +937,7 @@ export default function AdminCdrfi() {
                                                                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />
                                                                             {s.label}
                                                                         </span>
-                                                                        {hasAnyClientRfi && <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{rfi.clientRfiNumber || 'ΓÇö'}</span>}
+                                                                        {hasAnyClientRfi && <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{rfi.clientRfiNumber || '—'}</span>}
                                                                         <div style={{ fontSize: 12, fontWeight: 500, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                             <span title={parent.originalFileName}>{parent.originalFileName.split('_').pop()?.replace('.pdf', '') || 'Drawing'}</span>
                                                                         </div>

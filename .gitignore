@@ -4,6 +4,7 @@ backend/node_modules/
 frontend/node_modules/
 frontend/node_modules_old/
 
+
 # Environment files
 .env
 .env*
@@ -49,13 +50,22 @@ brain/
 **/*.pyc
 
 # AI Extraction Datasets and Training Artifacts
+backend/AiExtraction/annotations.backup.json
 backend/AiExtraction/datasets/
 backend/AiExtraction/images/
 backend/AiExtraction/drawings/
 backend/AiExtraction/backup_other_clients/
+backend/AiExtraction/unannotated_drawings/
+backend/AiExtraction/drawings_deleted/
+backend/AiExtraction/deleted_images_for_labelstudio/
 backend/AiExtraction/runs/
 backend/AiExtraction/*.zip
 backend/AiExtraction/*.tar.gz
 backend/AiExtraction/*.cache
 backend/AiExtraction/**/train.cache
 backend/AiExtraction/**/val.cache
+
+*.bak
+backend/AiExtraction/Models/*.bak
+backend/AiExtraction/Models/*.pt
+backend/AiExtraction/Models/rastiron_best.pt*

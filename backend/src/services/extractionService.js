@@ -203,9 +203,11 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             throw new Error(`PDF file not found at ${localPath}. It may have been deleted.`);
         }
 
-        // Fetch the doc to get originalFileName
+        // Fetch the doc to get originalFileName and folder information
         const doc = await DrawingExtraction.findById(extractionId).lean();
         const originalFileName = doc ? doc.originalFileName : '';
+        const folderName = doc ? (doc.folderName || '') : '';
+        const storageGatewayPath = doc ? (doc.storageGatewayPath || '') : '';
 
         // Fetch the project to get clientName
         const Project = require('../models/Project');
@@ -213,7 +215,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         const clientName = project ? project.clientName : '';
 
         // ── Step 1+2: Call Python extraction bridge ────────────
-        result = await _callPythonBridge(localPath, originalFileName, clientName);
+        result = await _callPythonBridge(localPath, originalFileName, clientName, folderName, storageGatewayPath);
 
         // Cleanup temporary file immediately if we downloaded from GridFS
         if (isTemp && fs.existsSync(localPath)) {
@@ -436,7 +438,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
     }
 }
 
-async function _callPythonBridge(pdfPath, originalFileName = '', clientName = '') {
+async function _callPythonBridge(pdfPath, originalFileName = '', clientName = '', folderName = '', storageGatewayPath = '') {
     try {
         const fileName = originalFileName || path.basename(pdfPath);
         
@@ -446,6 +448,10 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
         const formData = new FormData();
         formData.append('files', fileBlob, fileName);
         formData.append('client_name', clientName || '');
+        const folderToCheck = [folderName, storageGatewayPath].filter(Boolean).join('/');
+        if (folderToCheck) {
+            formData.append('folder_name', folderToCheck);
+        }
 
         const aiPort = process.env.AI_SERVICE_PORT || '8085';
         console.log(`[AI API] Sending ${fileName} to AI model at http://localhost:${aiPort}/upload`);
@@ -500,12 +506,38 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
             };
         }
 
+        // Client specific handling for Rast Iron Works
+        const clientClean = (clientName || '').toLowerCase().replace(/[\s\-_]/g, '');
+        const isRastiron = clientClean.includes('rastiron') || clientClean.includes('rast');
+
+        // Check for Erection Sheets folder
+        const pathToCheck = [folderName, storageGatewayPath, fileName].filter(Boolean).join(' / ');
+        const isErection = /erection/i.test(pathToCheck) || /\b(e[\s-_]*sheets?|e[\s-_]*drawings?|e[\s-_]*plans?|esheets?|edrawings?)\b/i.test(pathToCheck);
+
+        let finalDescription = aiData.drawing_description || '';
+
+        if (isRastiron) {
+            if (isErection) {
+                // Rule 1: Erection sheet files inside erection folders must NOT extract description datas.
+                console.log(`[Rastiron Rule 1] File "${fileName}" in erection path "${pathToCheck}". Description cleared.`);
+                finalDescription = '';
+            } else if (aiData.is_deleted || aiData.bom_empty || (finalDescription || '').toUpperCase() === 'DELETED') {
+                // Rule 2: If the bill of materials box is empty, the drawing description should be shown as DELETED.
+                console.log(`[Rastiron Rule 2] Empty Bill of Materials detected for "${fileName}". Description set to DELETED.`);
+                finalDescription = 'DELETED';
+            } else if (aiData.has_bom === false) {
+                // Rule 3: If there is no box named bill of materials in files under detail sheets, leave description empty.
+                console.log(`[Rastiron Rule 3] No Bill of Materials box detected for "${fileName}". Description left empty.`);
+                finalDescription = '';
+            }
+        }
+
         // Map AI output to the fields expected by the rest of the pipeline
         const fields = {
             drawingNumber: aiData.drawing_no || '',
-            drawingTitle: aiData.drawing_description || '', 
+            drawingTitle: finalDescription, 
             description: '',
-            drawingDescription: aiData.drawing_description || '',
+            drawingDescription: finalDescription,
             revision: aiData.latest_revision ? aiData.latest_revision.rev : '0',
             date: aiData.latest_revision ? aiData.latest_revision.date : '',
             scale: '',

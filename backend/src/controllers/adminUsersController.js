@@ -28,6 +28,10 @@ async function listUsers(req, res) {
     const users = await User
         .find(query)
         .select('-password_hash')
+        .populate('project_manager', 'username email displayName role employeeId')
+        .populate('assistant_project_manager', 'username email displayName role employeeId')
+        .populate('team_lead', 'username email displayName role employeeId')
+        .populate('assistant_team_lead', 'username email displayName role employeeId')
         .sort({ createdAt: -1 })
         .lean();
 

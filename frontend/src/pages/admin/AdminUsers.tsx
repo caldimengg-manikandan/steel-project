@@ -6,7 +6,7 @@ import { adminListProjects, adminAssignUser } from '../../services/projectApi';
 import { adminListClients } from '../../services/adminClientApi';
 import { adminListTeams, adminCreateTeam, adminDeleteTeam, adminUpdateTeam, type Team } from '../../services/adminTeamApi';
 import { useMessage } from '../../context/MessageContext';
-import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit } from '../../components/Icons';
+import { IconTrash, IconClose, IconAssign, IconPlus, IconUpload, IconEdit, IconEye } from '../../components/Icons';
 
 interface CreateUserForm {
     username: string; 
@@ -55,6 +55,7 @@ export default function AdminUsers() {
     }>({ name: '', project_manager: '', assistant_project_manager: '', lead: [], members: [] });
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
+    const [viewingUser, setViewingUser] = useState<User | null>(null);
     const [teamLeadSearch, setTeamLeadSearch] = useState('');
     const [teamMemberSearch, setTeamMemberSearch] = useState('');
     const [assignTarget, setAssignTarget] = useState<User | null>(null);
@@ -448,6 +449,13 @@ export default function AdminUsers() {
                                              <div className="btn-group">
                                                  <button
                                                      className="btn btn-secondary btn-sm"
+                                                     onClick={() => setViewingUser(u)}
+                                                     title="View User Information"
+                                                 >
+                                                     <IconEye /> View
+                                                 </button>
+                                                 <button
+                                                     className="btn btn-secondary btn-sm"
                                                      onClick={() => {
                                                          setEditTarget(u);
                                                          setEditForm({
@@ -791,6 +799,376 @@ export default function AdminUsers() {
                             </div>
                             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 var(--space-lg) var(--space-lg) var(--space-lg)' }}>
                                 <button className="btn btn-primary" onClick={() => setViewingTeam(null)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── View User Modal ── */}
+            {viewingUser && (() => {
+                const u = viewingUser;
+                const userId = String(u.id || u._id);
+
+                const resolveUser = (val: any) => {
+                    if (!val) return null;
+                    if (typeof val === 'object' && (val.displayName || val.username)) {
+                        const id = String(val._id || val.id || '');
+                        const fullUser = id ? users.find(usr => String(usr.id || usr._id) === id) : null;
+                        return fullUser || val;
+                    }
+                    const id = typeof val === 'object' ? String(val._id || val.id) : String(val);
+                    return users.find(usr => String(usr.id || usr._id) === id || usr.username === id) || null;
+                };
+
+                const userTeams = teams.map(t => {
+                    const pmId = String(t.project_manager?._id || t.project_manager?.id || t.project_manager || '');
+                    const apmId = String(t.assistant_project_manager?._id || t.assistant_project_manager?.id || t.assistant_project_manager || '');
+                    const leads = (Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : [])).filter(Boolean);
+                    const isLead = leads.some((l: any) => String(l?._id || l?.id || l || '') === userId);
+                    const members = (Array.isArray(t.members) ? t.members : (Array.isArray(t.users) ? t.users : [])).filter(Boolean);
+                    const isMember = members.some((m: any) => String(m?._id || m?.id || m || '') === userId);
+
+                    const rolesInTeam: string[] = [];
+                    if (pmId === userId) rolesInTeam.push('Project Manager');
+                    if (apmId === userId) rolesInTeam.push('Assistant Project Manager');
+                    if (isLead) rolesInTeam.push('Team Lead');
+                    if (isMember) rolesInTeam.push('Team Member');
+
+                    if (rolesInTeam.length > 0) {
+                        return {
+                            team: t,
+                            roles: rolesInTeam
+                        };
+                    }
+                    return null;
+                }).filter(Boolean) as { team: Team; roles: string[] }[];
+
+                // Direct User Hierarchy with fallback to assigned Team(s)
+                let pm = resolveUser(u.project_manager);
+                let apm = resolveUser(u.assistant_project_manager);
+                let atl = resolveUser(u.assistant_team_lead);
+                const rawLeads = Array.isArray(u.team_lead) ? u.team_lead : (u.team_lead ? [u.team_lead] : []);
+                let tls = rawLeads.map(resolveUser).filter(Boolean);
+
+                // Fallback to Team if not explicitly assigned on user document
+                if (!pm && userTeams.length > 0) {
+                    for (const { team: t, roles } of userTeams) {
+                        if (roles.includes('Project Manager')) {
+                            pm = u;
+                            break;
+                        }
+                        const rawTeamPm = t.project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l?.project_manager).filter(Boolean)[0] : null);
+                        const resolved = resolveUser(rawTeamPm);
+                        if (resolved) {
+                            pm = resolved;
+                            break;
+                        }
+                    }
+                }
+
+                if (!apm && userTeams.length > 0) {
+                    for (const { team: t, roles } of userTeams) {
+                        if (roles.includes('Assistant Project Manager')) {
+                            apm = u;
+                            break;
+                        }
+                        const rawTeamApm = t.assistant_project_manager || (Array.isArray(t.lead) ? t.lead.map((l: any) => l?.assistant_project_manager).filter(Boolean)[0] : null);
+                        const resolved = resolveUser(rawTeamApm);
+                        if (resolved) {
+                            apm = resolved;
+                            break;
+                        }
+                    }
+                }
+
+                if (tls.length === 0 && userTeams.length > 0) {
+                    for (const { team: t, roles } of userTeams) {
+                        if (roles.includes('Team Lead')) {
+                            tls = [u];
+                            break;
+                        }
+                        const rawTeamLeads = (Array.isArray(t.lead) ? t.lead : (t.lead ? [t.lead] : [])).filter(Boolean);
+                        const resolvedLeads = rawTeamLeads.map(resolveUser).filter(Boolean);
+                        if (resolvedLeads.length > 0) {
+                            tls = resolvedLeads;
+                            break;
+                        }
+                    }
+                }
+
+                const assignedProjects = projects
+                    .map(p => {
+                        const assignment = (p.assignments || []).find(a => String(a.userId) === userId);
+                        return assignment ? { project: p, assignment } : null;
+                    })
+                    .filter(Boolean) as { project: Project; assignment: any }[];
+
+                const roleName = (!u.role || u.role === 'user') ? 'Team Member' : u.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+                return (
+                    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewingUser(null); }}>
+                        <div className="modal" style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: '50%',
+                                        background: u.status === 'active' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : '#94a3b8',
+                                        color: '#fff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: 700,
+                                        fontSize: 18,
+                                        boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
+                                    }}>
+                                        {(u.displayName || u.username).charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                                {u.displayName || u.username}
+                                            </span>
+                                            <span className={`badge ${u.status === 'active' ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 11 }}>
+                                                {u.status === 'active' ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', gap: 10, marginTop: 2 }}>
+                                            <span>@{u.username}</span>
+                                            {u.employeeId && <span>• ID: <strong style={{ color: 'var(--color-text-secondary)' }}>{u.employeeId}</strong></span>}
+                                            <span>• Role: <strong style={{ color: '#2563eb' }}>{roleName}</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button className="modal-close" onClick={() => setViewingUser(null)}><IconClose /></button>
+                            </div>
+
+                            <div className="modal-body" style={{ padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                                {/* User Details Card */}
+                                <div style={{ background: 'var(--color-surface-subtle, #f8fafc)', padding: 14, borderRadius: 10, border: '1px solid var(--color-border)' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+                                        User Information
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 16px', fontSize: 13 }}>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Email Address</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{u.email || '—'}</span>
+                                        </div>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Employee ID</span>
+                                            <span className="font-mono" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{u.employeeId || '—'}</span>
+                                        </div>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Division</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{u.division || 'Not Assigned'}</span>
+                                        </div>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Account Created</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{formatDate(u.createdAt)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Team Membership Card */}
+                                <div style={{ background: 'var(--color-surface-subtle, #f8fafc)', padding: 14, borderRadius: 10, border: '1px solid var(--color-border)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                        <h4 style={{ margin: 0, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+                                            Team Membership
+                                        </h4>
+                                        <span style={{ fontSize: 11.5, fontWeight: 600, color: userTeams.length > 0 ? '#2563eb' : 'var(--color-text-muted)' }}>
+                                            {userTeams.length} {userTeams.length === 1 ? 'Team' : 'Teams'}
+                                        </span>
+                                    </div>
+                                    {userTeams.length === 0 ? (
+                                        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                            This user is not currently assigned to any team.
+                                        </p>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            {userTeams.map(({ team: t, roles }) => (
+                                                <div key={t._id || t.id} style={{
+                                                    background: '#fff',
+                                                    padding: '10px 14px',
+                                                    borderRadius: 8,
+                                                    border: '1px solid var(--color-border-light, #e2e8f0)',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-text-primary)' }}>
+                                                            {t.name}
+                                                        </div>
+                                                        <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                                                            {((t.members?.length || 0) + (Array.isArray(t.lead) ? t.lead.length : (t.lead ? 1 : 0)))} Team Members
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                        {roles.map(r => (
+                                                            <span key={r} style={{
+                                                                fontSize: 11,
+                                                                fontWeight: 600,
+                                                                padding: '3px 8px',
+                                                                borderRadius: 6,
+                                                                background: r === 'Project Manager' ? 'rgba(37,99,235,0.1)' :
+                                                                            r === 'Team Lead' ? 'rgba(22,163,74,0.1)' :
+                                                                            r === 'Assistant Project Manager' ? 'rgba(147,51,234,0.1)' : 'rgba(100,116,139,0.1)',
+                                                                color: r === 'Project Manager' ? '#2563eb' :
+                                                                       r === 'Team Lead' ? '#16a34a' :
+                                                                       r === 'Assistant Project Manager' ? '#9333ea' : '#475569'
+                                                            }}>
+                                                                {r}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Reporting Hierarchy Card */}
+                                <div style={{ background: 'var(--color-surface-subtle, #f8fafc)', padding: 14, borderRadius: 10, border: '1px solid var(--color-border)' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+                                        Reporting Hierarchy
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 16px', fontSize: 13 }}>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Project Manager</span>
+                                            <span style={{ fontWeight: 600, color: pm ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                                {pm ? (String(pm._id || pm.id) === userId ? `${pm.displayName || pm.username} (Self - PM)` : (pm.displayName || pm.username)) : 'Not Assigned'}
+                                            </span>
+                                            {pm?.email && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block' }}>{pm.email}</span>}
+                                        </div>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Assistant Project Manager</span>
+                                            <span style={{ fontWeight: 600, color: apm ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                                {apm ? (String(apm._id || apm.id) === userId ? `${apm.displayName || apm.username} (Self - APM)` : (apm.displayName || apm.username)) : 'Not Assigned'}
+                                            </span>
+                                            {apm?.email && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block' }}>{apm.email}</span>}
+                                        </div>
+                                        <div>
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Team Lead(s)</span>
+                                            {tls.length === 0 ? (
+                                                <span style={{ fontWeight: 500, color: 'var(--color-text-muted)' }}>Not Assigned</span>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                                    {tls.map((tl: any) => {
+                                                        const isSelf = String(tl._id || tl.id) === userId;
+                                                        return (
+                                                            <div key={String(tl._id || tl.id)} style={{ fontWeight: 600 }}>
+                                                                {tl.displayName || tl.username}{isSelf ? ' (Self - Team Lead)' : ''}
+                                                                {tl.email && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>({tl.email})</span>}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {atl && (
+                                            <div>
+                                                <span style={{ color: 'var(--color-text-muted)', fontSize: 11.5, display: 'block' }}>Assistant Team Lead</span>
+                                                <span style={{ fontWeight: 600 }}>{atl.displayName || atl.username}</span>
+                                                {atl.email && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block' }}>{atl.email}</span>}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Assigned Projects Card */}
+                                <div style={{ background: 'var(--color-surface-subtle, #f8fafc)', padding: 14, borderRadius: 10, border: '1px solid var(--color-border)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                        <h4 style={{ margin: 0, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+                                            Assigned Projects
+                                        </h4>
+                                        <span style={{ fontSize: 11.5, fontWeight: 600, color: assignedProjects.length > 0 ? '#2563eb' : 'var(--color-text-muted)' }}>
+                                            {assignedProjects.length} {assignedProjects.length === 1 ? 'Project' : 'Projects'}
+                                        </span>
+                                    </div>
+                                    {assignedProjects.length === 0 ? (
+                                        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                            No projects assigned to this user yet.
+                                        </p>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                                            {assignedProjects.map(({ project: p, assignment: a }) => (
+                                                <div key={p.id} style={{
+                                                    background: '#fff',
+                                                    padding: '8px 12px',
+                                                    borderRadius: 6,
+                                                    border: '1px solid var(--color-border-light, #e2e8f0)',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    fontSize: 12.5
+                                                }}>
+                                                    <div>
+                                                        <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.name}</span>
+                                                        {(p as any).jobNumber && <span className="font-mono text-muted" style={{ marginLeft: 8, fontSize: 11.5 }}>#{(p as any).jobNumber}</span>}
+                                                        {p.clientName && <span style={{ color: 'var(--color-text-muted)', marginLeft: 8, fontSize: 11.5 }}>({p.clientName})</span>}
+                                                    </div>
+                                                    <span style={{
+                                                        textTransform: 'capitalize',
+                                                        fontSize: 11,
+                                                        fontWeight: 600,
+                                                        padding: '2px 8px',
+                                                        borderRadius: 4,
+                                                        background: a.permission === 'admin' ? 'rgba(239, 68, 68, 0.1)' :
+                                                                    a.permission === 'editor' ? 'rgba(37, 99, 235, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                                                        color: a.permission === 'admin' ? '#dc2626' :
+                                                               a.permission === 'editor' ? '#2563eb' : '#64748b'
+                                                    }}>
+                                                        {a.permission}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => {
+                                            const target = viewingUser;
+                                            setViewingUser(null);
+                                            setAssignTarget(target);
+                                            setAssignProject('');
+                                            setAssignRole(target.role === 'team_member' ? 'editor' : 'viewer');
+                                            setAssignClient('ALL');
+                                        }}
+                                    >
+                                        <IconAssign /> Assign Project
+                                    </button>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => {
+                                            const target = viewingUser;
+                                            setViewingUser(null);
+                                            setEditTarget(target);
+                                            setEditForm({
+                                                displayName: target.displayName || '',
+                                                employeeId: target.employeeId || '',
+                                                email: target.email || '',
+                                                role: (target.role as any) || 'team_member',
+                                                password: '',
+                                                division: target.division || '',
+                                                project_manager: typeof target.project_manager === 'object' ? (target.project_manager as any)?._id : (target.project_manager || ''),
+                                                assistant_project_manager: typeof target.assistant_project_manager === 'object' ? (target.assistant_project_manager as any)?._id : (target.assistant_project_manager || ''),
+                                                team_lead: Array.isArray(target.team_lead) ? target.team_lead.map(tl => typeof tl === 'object' ? (tl as any)._id : tl) : (typeof target.team_lead === 'object' ? [(target.team_lead as any)._id] : (target.team_lead ? [target.team_lead as string] : []))
+                                            });
+                                        }}
+                                    >
+                                        <IconEdit /> Edit User
+                                    </button>
+                                </div>
+                                <button className="btn btn-primary" onClick={() => setViewingUser(null)}>
+                                    Close
+                                </button>
                             </div>
                         </div>
                     </div>
