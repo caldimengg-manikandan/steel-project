@@ -151,7 +151,8 @@ async function createProject(req, res) {
     }
 
     const projectYear = year ? Number(year) : new Date().getFullYear();
-    const startNum = (projectYear <= 2026 && startingTransmittalNumber) ? Number(startingTransmittalNumber) : 1;
+    const submittedLastTr = req.body.lastTransmittalNumber !== undefined ? (Number(req.body.lastTransmittalNumber) || 0) : 0;
+    const startNum = startingTransmittalNumber ? Math.max(1, Number(startingTransmittalNumber)) : (submittedLastTr > 0 ? (submittedLastTr + 1) : 1);
     // Pre-seed transmittalCount so first reserve = startNum
     const initialTransmittalCount = startNum - 1;
 
@@ -313,6 +314,9 @@ async function createProject(req, res) {
         connectionDesignEmail: connectionDesignEmail || '',
         year: projectYear,
         startingTransmittalNumber: startNum,
+        lastTransmittalNumber: submittedLastTr > 0 ? submittedLastTr : (startNum - 1),
+        historicalTransmittalsPending: (submittedLastTr > 0 || (startNum - 1) > 0),
+        historicalBackfillCompleted: false,
         transmittalCount: initialTransmittalCount,
         createdByAdminId: adminId,
         createdByUserId: creatorId,
@@ -1067,10 +1071,12 @@ async function uploadFolder(req, res) {
             }
         }
 
-        // 3. Fallback to GridFS if Storage Gateway is not enabled or if it failed
         if (!uploadedToGateway) {
             try {
                 const gridfs = require('../utils/gridfs');
+                // Automatically prune oldest chunks if storage gets filled
+                await gridfs.ensureStorageQuota(200);
+
                 const bucket = gridfs.getBucket();
                 if (bucket) {
                     const uploadStream = bucket.openUploadStream(file.originalname, {
@@ -1082,10 +1088,10 @@ async function uploadFolder(req, res) {
                         uploadStream.on('finish', resolve);
                         uploadStream.on('error', reject);
                     });
-                    console.log(`[FolderUpload] Uploaded to GridFS as fallback: ${file.originalname}`);
+                    console.log(`[FolderUpload] Stored to GridFS (local fallback): ${file.originalname}`);
                 }
             } catch (err) {
-                console.error('[FolderUpload] Failed to upload to GridFS:', err.message);
+                console.warn('[FolderUpload] GridFS store skipped or failed:', err.message);
             }
         }
 
@@ -1272,6 +1278,285 @@ async function allocateUsers(req, res) {
     });
 }
 
+/**
+ * POST /api/admin/projects/:projectId/historical-transmittal-doc
+ * Uploads an existing past transmittal document (PDF/Excel) for a specific historical transmittal number.
+ */
+async function uploadHistoricalTransmittalDoc(req, res) {
+    const project = req.scopedProject;
+    const adminId = req.principal.adminId;
+    const projectId = project._id.toString();
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No transmittal document uploaded.' });
+    }
+
+    const transmittalNumber = parseInt(req.body.transmittalNumber, 10);
+    if (!transmittalNumber || isNaN(transmittalNumber) || transmittalNumber < 1) {
+        return res.status(400).json({ error: 'Valid transmittal number is required.' });
+    }
+
+    let sequences = [];
+    if (req.body.sequences) {
+        try {
+            sequences = Array.isArray(req.body.sequences) 
+                ? req.body.sequences 
+                : (typeof req.body.sequences === 'string' && req.body.sequences.startsWith('[') ? JSON.parse(req.body.sequences) : [req.body.sequences]);
+        } catch (e) {
+            sequences = [req.body.sequences];
+        }
+    }
+
+    const projectName = project.name.replace(/[^a-zA-Z0-9 _-]/g, '_');
+    const paddedNum = String(transmittalNumber).padStart(3, '0');
+    const targetDir = `Projects/${projectName}/Transmittals/TR-${paddedNum}`;
+    const cleanTargetDir = targetDir.replace(/\/+/g, '/').replace(/\/$/, '');
+    
+    let storageGatewayPath = null;
+    let uploadedToGateway = false;
+
+    // ── Parse drawings from Excel file if applicable ──
+    const ExcelJS = require('exceljs');
+    const DrawingLog = require('../models/DrawingLog');
+    const { appendRowsToProjectExcel } = require('../services/excelService');
+
+    let parsedDrawings = [];
+    try {
+        const isExcel = req.file.originalname.toLowerCase().endsWith('.xlsx') || req.file.originalname.toLowerCase().endsWith('.xls');
+        if (isExcel) {
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.readFile(req.file.path);
+            const worksheet = workbook.getWorksheet(1); // 1st sheet
+            if (worksheet) {
+                let headerRowIndex = -1;
+                let colMap = { dwgNo: -1, title: -1, rev: -1, date: -1, remarks: -1 };
+
+                // Scan first 30 rows for headers
+                for (let r = 1; r <= Math.min(30, worksheet.rowCount); r++) {
+                    const row = worksheet.getRow(r);
+                    let foundDwg = false;
+                    row.eachCell((cell, colNumber) => {
+                        const rawVal = cell.value ? (typeof cell.value === 'object' ? cell.value.text || cell.value.result || '' : cell.value) : '';
+                        const val = rawVal.toString().toLowerCase().trim();
+                        if (/sheet\s*no|drawing\s*no|dwg\s*no|sheet\s*#|drawing\s*#|mark/i.test(val)) {
+                            colMap.dwgNo = colNumber;
+                            foundDwg = true;
+                        } else if (/title|description|drawing\s*title/i.test(val)) {
+                            colMap.title = colNumber;
+                        } else if (/^rev$|rev\s*#|revision|revision\s*mark/i.test(val)) {
+                            colMap.rev = colNumber;
+                        } else if (/date/i.test(val)) {
+                            colMap.date = colNumber;
+                        } else if (/remarks|history/i.test(val)) {
+                            colMap.remarks = colNumber;
+                        }
+                    });
+                    if (foundDwg) {
+                        headerRowIndex = r;
+                        break;
+                    }
+                }
+
+                // Fallback column positions for standard Caldim transmittal format
+                if (colMap.dwgNo === -1) {
+                    colMap = { dwgNo: 2, title: 3, rev: 4, date: 5, remarks: 6 };
+                    headerRowIndex = 11;
+                }
+
+                const startRow = Math.max(headerRowIndex + 1, 2);
+                for (let r = startRow; r <= worksheet.rowCount; r++) {
+                    const row = worksheet.getRow(r);
+                    const dwgCell = colMap.dwgNo > 0 ? row.getCell(colMap.dwgNo) : null;
+                    const rawDwg = dwgCell && dwgCell.value 
+                        ? (typeof dwgCell.value === 'object' ? dwgCell.value.text || dwgCell.value.result || '' : dwgCell.value).toString().trim()
+                        : '';
+                    
+                    // Skip empty or header-like rows
+                    if (!rawDwg || /^(sheet|drawing|sl|total|page)/i.test(rawDwg)) continue;
+
+                    const getCellStr = (colIdx) => {
+                        if (colIdx <= 0) return '';
+                        const c = row.getCell(colIdx);
+                        if (!c || c.value == null) return '';
+                        if (c.value instanceof Date) return c.value.toISOString().slice(0, 10);
+                        if (typeof c.value === 'object') return (c.value.text || c.value.result || '').toString().trim();
+                        return c.value.toString().trim();
+                    };
+
+                    const titleVal = getCellStr(colMap.title);
+                    const revVal = getCellStr(colMap.rev) || '0';
+                    const dateVal = getCellStr(colMap.date) || new Date().toISOString().slice(0, 10);
+                    const remarksVal = getCellStr(colMap.remarks);
+
+                    parsedDrawings.push({
+                        extractionId: new mongoose.Types.ObjectId(),
+                        drawingNumber: rawDwg.toUpperCase(),
+                        drawingTitle: titleVal,
+                        revision: revVal.toUpperCase(),
+                        date: dateVal,
+                        remarks: remarksVal,
+                        changeType: 'new'
+                    });
+                }
+                console.log(`[HistoricalDoc] Parsed ${parsedDrawings.length} drawings from Excel transmittal.`);
+            }
+        }
+    } catch (parseErr) {
+        console.warn('[HistoricalDoc] Excel parse error:', parseErr.message);
+    }
+
+    if (storageGateway.isEnabled()) {
+        try {
+            const fileBuffer = fs.readFileSync(req.file.path);
+            await storageGateway.uploadFile(cleanTargetDir, req.file.originalname, fileBuffer);
+            storageGatewayPath = `${cleanTargetDir}/${req.file.originalname}`;
+            uploadedToGateway = true;
+            console.log(`[HistoricalDoc] Stored to Gateway: ${storageGatewayPath}`);
+        } catch (err) {
+            console.warn('[HistoricalDoc] Gateway upload failed (stored locally):', err.message);
+        }
+    }
+
+    if (!uploadedToGateway) {
+        try {
+            const gridfs = require('../utils/gridfs');
+            await gridfs.ensureStorageQuota(200);
+            const bucket = gridfs.getBucket();
+            if (bucket) {
+                const uploadStream = bucket.openUploadStream(req.file.originalname, {
+                    contentType: req.file.mimetype,
+                    metadata: { originalName: req.file.originalname, path: cleanTargetDir }
+                });
+                fs.createReadStream(req.file.path).pipe(uploadStream);
+                await new Promise((resolve, reject) => {
+                    uploadStream.on('finish', resolve);
+                    uploadStream.on('error', reject);
+                });
+                console.log(`[HistoricalDoc] Stored to GridFS (local fallback): ${req.file.originalname}`);
+            }
+        } catch (err) {
+            console.warn('[HistoricalDoc] GridFS store skipped or failed:', err.message);
+        }
+    }
+
+    // Clean up local temp file
+    if (fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+
+    // Upsert Transmittal record
+    const Transmittal = require('../models/Transmittal');
+    const transmittal = await Transmittal.findOneAndUpdate(
+        { projectId: project._id, transmittalNumber },
+        {
+            projectId: project._id,
+            createdByAdminId: adminId,
+            transmittalNumber,
+            isHistorical: true,
+            drawings: parsedDrawings,
+            newCount: parsedDrawings.length,
+            documentPath: storageGatewayPath || `${cleanTargetDir}/${req.file.originalname}`,
+            documentUrl: `/api/files/download?path=${encodeURIComponent(storageGatewayPath || `${cleanTargetDir}/${req.file.originalname}`)}`,
+            documentOriginalName: req.file.originalname,
+            sequences,
+            remarks: req.body.remarks || `Historical Transmittal #${transmittalNumber}`
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Update or populate DrawingLog so drawings appear in Drawing Log tab
+    if (parsedDrawings.length > 0) {
+        try {
+            const drawingEntries = parsedDrawings.map(d => ({
+                drawingNumber: d.drawingNumber,
+                drawingTitle: d.drawingTitle,
+                currentRevision: d.revision,
+                currentRevisionDate: d.date,
+                currentTransmittalNo: transmittalNumber,
+                firstTransmittalNo: transmittalNumber,
+                revisions: [{
+                    revision: d.revision,
+                    date: d.date,
+                    transmittalNo: transmittalNumber,
+                    remarks: d.remarks || ''
+                }],
+                remarks: d.remarks || ''
+            }));
+
+            let log = await DrawingLog.findOne({ projectId: project._id });
+            if (!log) {
+                log = new DrawingLog({
+                    projectId: project._id,
+                    createdByAdminId: adminId,
+                    lastTransmittalNo: transmittalNumber,
+                    drawings: drawingEntries
+                });
+                await log.save();
+            } else {
+                const existingMap = new Map();
+                (log.drawings || []).forEach(entry => existingMap.set(entry.drawingNumber, entry));
+                
+                for (const d of drawingEntries) {
+                    if (existingMap.has(d.drawingNumber)) {
+                        const ex = existingMap.get(d.drawingNumber);
+                        ex.currentRevision = d.currentRevision;
+                        ex.currentRevisionDate = d.currentRevisionDate;
+                        ex.currentTransmittalNo = transmittalNumber;
+                        if (!ex.revisions.some(r => r.transmittalNo === transmittalNumber && r.revision === d.currentRevision)) {
+                            ex.revisions.push(d.revisions[0]);
+                        }
+                    } else {
+                        log.drawings.push(d);
+                    }
+                }
+                log.lastTransmittalNo = Math.max(log.lastTransmittalNo || 0, transmittalNumber);
+                await log.save();
+            }
+
+            await Project.findByIdAndUpdate(project._id, { drawingCount: log.drawings.length });
+
+            const excelRows = parsedDrawings.map((d, idx) => ({
+                slNo: idx + 1,
+                drawingNumber: d.drawingNumber,
+                drawingTitle: d.drawingTitle,
+                revision: d.revision,
+                date: d.date,
+                remarks: d.remarks,
+                fileName: req.file.originalname,
+                targetTransmittalNumber: transmittalNumber
+            }));
+            await appendRowsToProjectExcel(project._id.toString(), excelRows);
+            console.log(`[HistoricalDoc] Successfully updated DrawingLog with ${parsedDrawings.length} drawings.`);
+        } catch (logErr) {
+            console.error('[HistoricalDoc] Failed to update DrawingLog:', logErr.message);
+        }
+    }
+
+    res.json({
+        message: `Historical Transmittal #${transmittalNumber} saved successfully.${parsedDrawings.length > 0 ? ` Parsed and added ${parsedDrawings.length} drawing(s) to Drawing Log.` : ''}`,
+        transmittal,
+        drawingsCount: parsedDrawings.length
+    });
+}
+
+/**
+ * PATCH /api/admin/projects/:projectId/historical-backfill-status
+ */
+async function updateHistoricalBackfillStatus(req, res) {
+    const project = req.scopedProject;
+    const completed = req.body.completed === true;
+
+    project.historicalBackfillCompleted = completed;
+    project.historicalTransmittalsPending = !completed;
+    await project.save({ validateModifiedOnly: true });
+
+    res.json({
+        message: completed ? 'Historical backfill marked as completed.' : 'Historical backfill marked as pending.',
+        historicalBackfillCompleted: project.historicalBackfillCompleted,
+        historicalTransmittalsPending: project.historicalTransmittalsPending
+    });
+}
+
 module.exports = {
     listProjects,
     createProject,
@@ -1286,4 +1571,6 @@ module.exports = {
     reserveTransmittalNumber,
     listExternalProjects,
     uploadFolder,
+    uploadHistoricalTransmittalDoc,
+    updateHistoricalBackfillStatus,
 };

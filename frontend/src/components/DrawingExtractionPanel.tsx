@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } fro
 import { formatDate } from '../utils/dateUtils';
 import { useMessage } from '../context/MessageContext';
 import type { DrawingExtraction, ExtractionStatus } from '../types';
+import HistoricalTransmittalModal from './HistoricalTransmittalModal';
 import {
     uploadDrawing,
     listExtractions,
@@ -254,7 +255,24 @@ export default function DrawingExtractionPanel({
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
 
+    const [currentProject, setCurrentProject] = useState<any>(project || null);
+    const [showHistoricalReminder, setShowHistoricalReminder] = useState(false);
+    const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+    const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+
     const [fetchedSequences, setFetchedSequences] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (project) {
+            setCurrentProject(project);
+        } else if (projectId) {
+            getProjectById(projectId)
+                .then(res => {
+                    if (res?.project) setCurrentProject(res.project);
+                })
+                .catch(() => {});
+        }
+    }, [projectId, project]);
 
     useEffect(() => {
         if ((!sequences || sequences.length === 0) && projectId) {
@@ -400,6 +418,19 @@ export default function DrawingExtractionPanel({
         return false;
     }
 
+    const proceedWithNormalTransmittalModal = (fileArray: File[]) => {
+        setLoadingTransmittals(true);
+        listTransmittals(projectId)
+            .then(data => setExistingTransmittals(data.transmittals || []))
+            .catch(() => setExistingTransmittals([]))
+            .finally(() => setLoadingTransmittals(false));
+
+        setSelectedTransmittalNumber(null);
+        setManualTransmittalNumber(startingTransmittalNumber ? String(startingTransmittalNumber) : '');
+        setPendingTransmittalFiles(fileArray);
+        setTransmittalModal(true);
+    };
+
     async function requestTransmittalThenUpload(files: FileList | File[]) {
         let fileArray = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf') && isDrawingFolderPdf(f));
 
@@ -408,23 +439,15 @@ export default function DrawingExtractionPanel({
             return;
         }
 
-        // Fetch transmittals in the background while the modal opens
-        setLoadingTransmittals(true);
-        try {
-            const data = await listTransmittals(projectId);
-            setExistingTransmittals(data.transmittals || []);
-        } catch {
-            setExistingTransmittals([]);
-        } finally {
-            setLoadingTransmittals(false);
+        // Check for pending historical transmittals
+        const hasPendingHistorical = currentProject?.historicalTransmittalsPending && !currentProject?.historicalBackfillCompleted;
+        if (hasPendingHistorical) {
+            setQueuedFiles(fileArray);
+            setShowHistoricalReminder(true);
+            return;
         }
 
-        // Default: Create New
-        setSelectedTransmittalNumber(null);
-        // For year < 2026 projects, pre-fill the manual number with startingTransmittalNumber
-        setManualTransmittalNumber(startingTransmittalNumber ? String(startingTransmittalNumber) : '');
-        setPendingTransmittalFiles(fileArray);
-        setTransmittalModal(true);
+        proceedWithNormalTransmittalModal(fileArray);
     }
 
     // ── Upload handler ────────────────────────────────────
@@ -870,7 +893,7 @@ export default function DrawingExtractionPanel({
                                             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>
                                                 Transmittal #{t.transmittalNumber}
                                                 <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                                    — {t.newCount + t.revisedCount} drawing{(t.newCount + t.revisedCount) !== 1 ? 's' : ''}
+                                                    — {t.isHistorical ? (t.documentOriginalName || 'Historical Document') : `${(Number(t.newCount) || 0) + (Number(t.revisedCount) || 0)} drawing(s)`}
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
@@ -1030,6 +1053,94 @@ export default function DrawingExtractionPanel({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ── Historical Transmittals Reminder Modal ── */}
+            {showHistoricalReminder && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 10000,
+                    background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                }}>
+                    <div style={{
+                        background: '#ffffff', borderRadius: 14, width: '100%', maxWidth: 500,
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', border: '1px solid #fde047',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            padding: '16px 20px', background: '#fffbeb', borderBottom: '1px solid #fef08a',
+                            display: 'flex', alignItems: 'center', gap: 10
+                        }}>
+                            <span style={{ fontSize: 24 }}>⚠️</span>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#92400e' }}>
+                                    Historical Transmittals Pending
+                                </h4>
+                                <span style={{ fontSize: 12, color: '#b45309' }}>
+                                    Previous project transmittals have not been backfilled yet
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{ padding: 20 }}>
+                            <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, marginBottom: 16 }}>
+                                This project has historical transmittals (up to <strong>#{currentProject?.lastTransmittalNumber > 1 ? currentProject?.lastTransmittalNumber - 1 : currentProject?.lastTransmittalNumber}</strong>) that have not been uploaded yet.
+                            </p>
+                            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 20, fontSize: 12, color: '#64748b' }}>
+                                💡 Backfilling past transmittals first ensures drawing revision histories and transmittal sequence numbers (#1, #2, etc.) are recorded in correct order.
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowHistoricalReminder(false);
+                                        if (queuedFiles.length > 0) {
+                                            proceedWithNormalTransmittalModal(queuedFiles);
+                                            setQueuedFiles([]);
+                                        }
+                                    }}
+                                >
+                                    Proceed With Current Upload
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    style={{ background: '#2563eb', fontWeight: 600 }}
+                                    onClick={() => {
+                                        setShowHistoricalReminder(false);
+                                        setShowHistoricalModal(true);
+                                    }}
+                                >
+                                    📁 Backfill Historical Data →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Historical Transmittal Backfill Modal ── */}
+            {showHistoricalModal && currentProject && (
+                <HistoricalTransmittalModal
+                    isOpen={showHistoricalModal}
+                    onClose={() => {
+                        setShowHistoricalModal(false);
+                        if (projectId) {
+                            getProjectById(projectId).then(res => res?.project && setCurrentProject(res.project));
+                        }
+                    }}
+                    project={currentProject}
+                    onComplete={() => {
+                        setShowHistoricalModal(false);
+                        if (projectId) {
+                            getProjectById(projectId).then(res => res?.project && setCurrentProject(res.project));
+                        }
+                        if (queuedFiles.length > 0) {
+                            proceedWithNormalTransmittalModal(queuedFiles);
+                            setQueuedFiles([]);
+                        }
+                    }}
+                />
             )}
 
             {/* Spinner keyframe */}

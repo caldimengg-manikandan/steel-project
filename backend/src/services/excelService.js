@@ -119,12 +119,19 @@ async function appendRowsToProjectExcel(projectId, rows) {
             if (sheetNo) sheetMap.set(sheetNo, r);
         });
 
+        const appBase = (process.env.APP_BASE_URL || 'https://caldimproducts.com/steel').replace(/\/$/, '');
+
         rows.forEach((row, index) => {
             const searchVal = (row.drawingNumber || '').toString().trim().toUpperCase();
             const existingRow = searchVal ? sheetMap.get(searchVal) : null;
+            const dwgHref = row.storageGatewayPath ? `${appBase}/api/files/download?path=${encodeURIComponent(row.storageGatewayPath)}` : null;
 
             if (existingRow) {
                 // Update existing row (Sheet No index is 2)
+                if (dwgHref) {
+                    existingRow.getCell(2).value = { text: row.drawingNumber || '', hyperlink: dwgHref };
+                    existingRow.getCell(2).font = { color: { argb: 'FF2563EB' }, underline: true };
+                }
                 existingRow.getCell(3).value = row.drawingTitle || row.drawingDescription || '';
                 existingRow.getCell(4).value = row.revision || '';
                 existingRow.getCell(5).value = row.date || '';
@@ -142,9 +149,9 @@ async function appendRowsToProjectExcel(projectId, rows) {
             } else {
                 // Add new row as before
                 const startSlNo = worksheet.rowCount - 1;
-                worksheet.addRow({
+                const newRow = worksheet.addRow({
                     slNo: startSlNo > 0 ? startSlNo : 1,
-                    drawingNumber: row.drawingNumber || '',
+                    drawingNumber: dwgHref ? { text: row.drawingNumber || '', hyperlink: dwgHref } : (row.drawingNumber || ''),
                     drawingTitle: row.drawingTitle || row.drawingDescription || '',
                     revision: row.revision || '',
                     date: row.date || '',
@@ -152,8 +159,11 @@ async function appendRowsToProjectExcel(projectId, rows) {
                     fileName: row.fileName || '',
                 });
 
+                if (dwgHref) {
+                    newRow.getCell(2).font = { color: { argb: 'FF2563EB' }, underline: true };
+                }
+
                 // Style the new row
-                const newRow = worksheet.lastRow;
                 newRow.eachCell((cell) => {
                     cell.border = {
                         top: { style: 'thin' }, bottom: { style: 'thin' },
@@ -688,9 +698,12 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
                 groupDwg[dNum] = {
                     drawingNumber: dNum,
                     drawingTitle: f.drawingTitle || f.drawingDescription || '',
+                    storageGatewayPath: r.storageGatewayPath || f.storageGatewayPath || '',
                     revisions: [],
                     remarks: []
                 };
+            } else if (!groupDwg[dNum].storageGatewayPath && (r.storageGatewayPath || f.storageGatewayPath)) {
+                groupDwg[dNum].storageGatewayPath = r.storageGatewayPath || f.storageGatewayPath;
             }
 
             const revHist = f.revisionHistory && Array.isArray(f.revisionHistory) && f.revisionHistory.length > 0
@@ -728,6 +741,14 @@ async function generateProjectExcel(rows, projectDetails, type, logoPath) {
 
             const rDataL = logSheet.addRow(rowData);
             rDataL.height = 22;
+
+            if (d.storageGatewayPath) {
+                const appBase = (process.env.APP_BASE_URL || 'https://caldimproducts.com/steel').replace(/\/$/, '');
+                const dwgHref = `${appBase}/api/files/download?path=${encodeURIComponent(d.storageGatewayPath)}`;
+                const c2 = rDataL.getCell(2);
+                c2.value = { text: d.drawingNumber, hyperlink: dwgHref };
+                c2.font = { color: { argb: 'FF2563EB' }, underline: true };
+            }
 
             // Highlight logic updated for "Skipped Approval" cases:
             // 1. If drawing has gone to Fabrication (numRevs) but skipped Approval (alphaRevs cells are blank)

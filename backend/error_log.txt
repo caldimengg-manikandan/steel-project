@@ -5304,3 +5304,19 @@
     at IncomingMessage.emit (node:events:509:28)
     at endReadableNT (node:internal/streams/readable:1735:12)
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+2026-11-10T09:55:11.442Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)
+2026-11-10T09:57:48.902Z: MongoBulkWriteError: you are over your space quota, using 514 MB of 512 MB. Writes are blocked on your cluster. Free up storage by deleting unnecessary data or add storage by updating cluster tier. Add a payment method and scale cluster tier in Atlas: https://cloud.mongodb.com/v2/69c250977259485142d5ad73#/clusters/upgradeTemplates/SteelDMS?limit=storage
+    at executeCommands (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:341:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:790:24
+    at async MongoClient.withSession (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\bulk\common.js:789:20)
+    at async Collection.bulkWrite (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:224:16)
+    at async Collection.insertMany (C:\steel-project(2)\steel-project\steel-project\backend\node_modules\mongodb\lib\collection.js:171:25)

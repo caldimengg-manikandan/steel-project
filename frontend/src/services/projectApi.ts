@@ -362,3 +362,44 @@ export async function updateProjectAllocations(
     return handleResponse(res);
 }
 
+/**
+ * Upload an existing historical transmittal document (PDF/Excel)
+ */
+export async function uploadHistoricalTransmittalDoc(
+    projectId: string,
+    file: File,
+    transmittalNumber: number,
+    sequences: string[] = [],
+    remarks: string = ''
+): Promise<{ message: string; transmittal: any }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('transmittalNumber', String(transmittalNumber));
+    formData.append('sequences', JSON.stringify(sequences));
+    formData.append('remarks', remarks);
+
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/historical-transmittal-doc`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+    });
+    return handleResponse(res);
+}
+
+/**
+ * Update project historical backfill status
+ */
+export async function updateHistoricalBackfillStatus(
+    projectId: string,
+    completed: boolean
+): Promise<{ message: string; historicalBackfillCompleted: boolean; historicalTransmittalsPending: boolean }> {
+    const res = await fetchWithAuth(`${BASE}/admin/projects/${String(projectId)}/historical-backfill-status`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed }),
+    });
+    return handleResponse(res);
+}
+
+

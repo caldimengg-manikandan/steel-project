@@ -79,6 +79,12 @@ const transmittalSchema = new mongoose.Schema(
         excelPath: { type: String, default: '' },
         excelUrl: { type: String, default: '' },
         
+        // ── Historical document uploads ──────────────────────────
+        isHistorical: { type: Boolean, default: false },
+        documentPath: { type: String, default: '' },
+        documentUrl: { type: String, default: '' },
+        documentOriginalName: { type: String, default: '' },
+
         // ── Void status ──────────────────────────────────────────
         isVoided: { type: Boolean, default: false },
     },

@@ -66,7 +66,8 @@ async function scopeProjectToAdmin(req, res, next) {
     let project = null;
     if (mongoose.Types.ObjectId.isValid(projectId)) {
         const query = { _id: projectId };
-        if (req.principal.role !== 'superadmin') {
+        // For tenant admins, ensure multi-tenant isolation
+        if (req.principal.role === 'admin' && adminId) {
             query.createdByAdminId = adminId;
         }
         project = await Project.findOne(query);

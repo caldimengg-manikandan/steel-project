@@ -19,6 +19,7 @@ const {
     updateProject, deleteProject, assignUser, removeAssignment, allocateUsers,
     downloadAllProjectsStatusExcel, uploadCOR,
     reserveTransmittalNumber, listExternalProjects, uploadFolder,
+    uploadHistoricalTransmittalDoc, updateHistoricalBackfillStatus,
 } = require('../controllers/adminProjectsController');
 const multer = require('multer');
 const path = require('path');
@@ -60,6 +61,17 @@ router.post(
         storage: storage,
     }).array('files'),
     uploadFolder
+);
+router.post(
+    '/:projectId/historical-transmittal-doc',
+    scopeProjectToAdmin,
+    upload.single('file'),
+    uploadHistoricalTransmittalDoc
+);
+router.patch(
+    '/:projectId/historical-backfill-status',
+    scopeProjectToAdmin,
+    updateHistoricalBackfillStatus
 );
 router.post('/:projectId/assignments', scopeProjectToAdmin, validateCrossAdminAssignment, assignUser);
 router.delete('/:projectId/assignments/:userId', scopeProjectToAdmin, removeAssignment);

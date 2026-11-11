@@ -74,9 +74,58 @@ const storage = {
     }
 };
 
+/**
+ * ensureStorageQuota
+ * ───────────────────
+ * Caps uploads.chunks size at maxAllowedMB (default 200 MB).
+ * If total GridFS files exceed this limit, oldest files and their chunks
+ * are automatically deleted to prevent Atlas quota crashes.
+ */
+async function ensureStorageQuota(maxAllowedMB = 200) {
+    try {
+        const conn = mongoose.connection;
+        if (!conn || !conn.db) return;
+        const db = conn.db;
+
+        const maxBytes = maxAllowedMB * 1024 * 1024;
+        const files = await db.collection('uploads.files').find({}).sort({ uploadDate: 1 }).toArray();
+        let totalBytes = files.reduce((sum, f) => sum + (f.length || 0), 0);
+
+        if (totalBytes <= maxBytes) {
+            return; // Within safe quota
+        }
+
+        console.log(`[GridFS Quota Guard] Usage (${(totalBytes / (1024 * 1024)).toFixed(1)} MB) exceeds ${maxAllowedMB} MB. Pruning oldest chunks...`);
+
+        const targetBytes = (maxAllowedMB * 0.5) * 1024 * 1024; // Prune down to 50%
+        const idsToDelete = [];
+        let bytesToPrune = totalBytes - targetBytes;
+        let prunedBytes = 0;
+
+        for (const file of files) {
+            if (prunedBytes >= bytesToPrune) break;
+            idsToDelete.push(file._id);
+            prunedBytes += (file.length || 0);
+        }
+
+        if (idsToDelete.length > 0) {
+            const batchSize = 100;
+            for (let i = 0; i < idsToDelete.length; i += batchSize) {
+                const batch = idsToDelete.slice(i, i + batchSize);
+                await db.collection('uploads.chunks').deleteMany({ files_id: { $in: batch } }).catch(() => {});
+            }
+            await db.collection('uploads.files').deleteMany({ _id: { $in: idsToDelete } }).catch(() => {});
+            console.log(`[GridFS Quota Guard] Cleaned up ${idsToDelete.length} oldest file(s) (${(prunedBytes / (1024 * 1024)).toFixed(1)} MB freed).`);
+        }
+    } catch (err) {
+        console.warn('[GridFS Quota Guard] Pruning warning:', err.message);
+    }
+}
+
 module.exports = {
     initGridFS,
     getGridFS: () => gfs,
     getBucket: () => bucket,
+    ensureStorageQuota,
     storage
 };

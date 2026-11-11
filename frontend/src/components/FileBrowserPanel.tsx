@@ -19,6 +19,7 @@ import {
     IconDownload, 
     IconUpload
 } from './Icons';
+import HistoricalTransmittalModal from './HistoricalTransmittalModal';
 
 const ExcelIcon = () => (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,9 +35,10 @@ interface FileBrowserPanelProps {
     projectName?: string;
     canUpload: boolean;
     sequences?: string[];
+    project?: any;
 }
 
-export default function FileBrowserPanel({ projectId, projectName, canUpload, sequences }: FileBrowserPanelProps) {
+export default function FileBrowserPanel({ projectId, projectName, canUpload, sequences, project }: FileBrowserPanelProps) {
     const { showMessage } = useMessage();
     
     // Determine the base path based on whether a project was passed
@@ -47,6 +49,11 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [uploading, setUploading] = useState<boolean>(false);
+
+    const [projectObj, setProjectObj] = useState<any>(project || null);
+    const [showHistoricalReminder, setShowHistoricalReminder] = useState(false);
+    const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+    const [queuedUpload, setQueuedUpload] = useState<{ files: File[]; mode: 'files' | 'folder' } | null>(null);
 
     // Global Upload Session Subscription
     const [session, setSession] = useState<UploadSession | null>(uploadSessionStore.getSession());
@@ -97,17 +104,21 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
     const [fetchedSequences, setFetchedSequences] = useState<string[]>([]);
 
     useEffect(() => {
-        if ((!sequences || sequences.length === 0) && projectId) {
+        if (project) {
+            setProjectObj(project);
+        }
+        if (projectId) {
             getProjectById(projectId)
                 .then(res => {
                     if (res?.project) {
+                        setProjectObj(res.project);
                         const derived = getProjectTargetSequences(res.project);
                         setFetchedSequences(derived.map(s => (typeof s === "string" ? s : s.name || "")));
                     }
                 })
                 .catch(err => console.warn('[FileBrowserPanel] Failed to fetch project for sequences:', err));
         }
-    }, [projectId, sequences]);
+    }, [projectId, project, sequences]);
 
     const effectiveSequences = useMemo(() => {
         if (sequences && sequences.length > 0) return sequences;
@@ -244,16 +255,9 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
 
 
     // ── Upload Configuration Handlers ─────────────────────────────
-    const handleInitiateUpload = async (filesToUpload: FileList | null, mode: 'files' | 'folder') => {
-        if (!filesToUpload || filesToUpload.length === 0) return;
-        if (!canUpload) {
-            showMessage('Access Denied', 'You do not have permission to upload files.', 'error');
-            return;
-        }
-
-        const fileArray = Array.from(filesToUpload);
-        setPendingUploadFiles(fileArray);
-        setPendingUploadMode(mode);
+    const proceedWithNormalUpload = (filesToUse: File[], modeToUse: 'files' | 'folder') => {
+        setPendingUploadFiles(filesToUse);
+        setPendingUploadMode(modeToUse);
         setTransmittalChoice('new');
         setUploadPurpose('Fabrication');
 
@@ -262,23 +266,45 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
 
         if (projectId) {
             setLoadingTransmittals(true);
-            try {
-                const data = await listTransmittals(projectId);
-                setExistingTransmittals(data.transmittals || []);
-                if (data.transmittals && data.transmittals.length > 0) {
-                    setSelectedTransmittalNum(data.transmittals[0].transmittalNumber);
-                } else {
-                    setSelectedTransmittalNum(null);
-                }
-            } catch (err) {
-                console.warn('[FileBrowser] Could not fetch transmittals:', err);
-                setExistingTransmittals([]);
-            } finally {
-                setLoadingTransmittals(false);
-            }
+            listTransmittals(projectId)
+                .then(data => {
+                    setExistingTransmittals(data.transmittals || []);
+                    if (data.transmittals && data.transmittals.length > 0) {
+                        setSelectedTransmittalNum(data.transmittals[0].transmittalNumber);
+                    } else {
+                        setSelectedTransmittalNum(null);
+                    }
+                })
+                .catch(err => {
+                    console.warn('[FileBrowser] Could not fetch transmittals:', err);
+                    setExistingTransmittals([]);
+                })
+                .finally(() => {
+                    setLoadingTransmittals(false);
+                });
         }
 
         setUploadModalOpen(true);
+    };
+
+    const handleInitiateUpload = async (filesToUpload: FileList | null, mode: 'files' | 'folder') => {
+        if (!filesToUpload || filesToUpload.length === 0) return;
+        if (!canUpload) {
+            showMessage('Access Denied', 'You do not have permission to upload files.', 'error');
+            return;
+        }
+
+        const fileArray = Array.from(filesToUpload);
+
+        // Check if project has uncompleted historical transmittals
+        const hasPendingHistorical = projectObj?.historicalTransmittalsPending && !projectObj?.historicalBackfillCompleted;
+        if (hasPendingHistorical) {
+            setQueuedUpload({ files: fileArray, mode });
+            setShowHistoricalReminder(true);
+            return;
+        }
+
+        proceedWithNormalUpload(fileArray, mode);
     };
 
     const handleConfirmUpload = async () => {
@@ -1561,6 +1587,94 @@ export default function FileBrowserPanel({ projectId, projectName, canUpload, se
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ── Historical Transmittals Reminder Modal ── */}
+            {showHistoricalReminder && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 10000,
+                    background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                }}>
+                    <div style={{
+                        background: '#ffffff', borderRadius: 14, width: '100%', maxWidth: 500,
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', border: '1px solid #fde047',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            padding: '16px 20px', background: '#fffbeb', borderBottom: '1px solid #fef08a',
+                            display: 'flex', alignItems: 'center', gap: 10
+                        }}>
+                            <span style={{ fontSize: 24 }}>⚠️</span>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#92400e' }}>
+                                    Historical Transmittals Pending
+                                </h4>
+                                <span style={{ fontSize: 12, color: '#b45309' }}>
+                                    Previous project data has not been backfilled yet
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{ padding: 20 }}>
+                            <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, marginBottom: 16 }}>
+                                This project has historical transmittals (up to <strong>#{projectObj?.lastTransmittalNumber > 1 ? projectObj?.lastTransmittalNumber - 1 : projectObj?.lastTransmittalNumber}</strong>) that have not been uploaded yet.
+                            </p>
+                            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 20, fontSize: 12, color: '#64748b' }}>
+                                💡 Backfilling past transmittals first ensures drawing revision histories and transmittal sequence numbers (#1, #2, etc.) are recorded in correct order.
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowHistoricalReminder(false);
+                                        if (queuedUpload) {
+                                            proceedWithNormalUpload(queuedUpload.files, queuedUpload.mode);
+                                            setQueuedUpload(null);
+                                        }
+                                    }}
+                                >
+                                    Proceed With Current Upload
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    style={{ background: '#2563eb', fontWeight: 600 }}
+                                    onClick={() => {
+                                        setShowHistoricalReminder(false);
+                                        setShowHistoricalModal(true);
+                                    }}
+                                >
+                                    📁 Backfill Historical Data →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Historical Transmittal Backfill Modal ── */}
+            {showHistoricalModal && projectObj && (
+                <HistoricalTransmittalModal
+                    isOpen={showHistoricalModal}
+                    onClose={() => {
+                        setShowHistoricalModal(false);
+                        if (projectId) {
+                            getProjectById(projectId).then(res => res?.project && setProjectObj(res.project));
+                        }
+                    }}
+                    project={projectObj}
+                    onComplete={() => {
+                        setShowHistoricalModal(false);
+                        if (projectId) {
+                            getProjectById(projectId).then(res => res?.project && setProjectObj(res.project));
+                        }
+                        if (queuedUpload) {
+                            proceedWithNormalUpload(queuedUpload.files, queuedUpload.mode);
+                            setQueuedUpload(null);
+                        }
+                    }}
+                />
             )}
         </div>
     );

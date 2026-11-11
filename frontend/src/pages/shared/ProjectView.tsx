@@ -16,6 +16,7 @@ import TransmittalPanel from '../../components/TransmittalPanel';
 import { listTransmittals } from '../../services/transmittalApi';
 import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
+import HistoricalTransmittalModal from '../../components/HistoricalTransmittalModal';
 
 
 export default function ProjectView() {
@@ -48,6 +49,7 @@ export default function ProjectView() {
     const [loadingTransmittals, setLoadingTransmittals] = useState(false);
     // null = "Create New Transmittal"; number = existing transmittal number
     const [selectedTransmittalNumber, setSelectedTransmittalNumber] = useState<number | null>(null);
+    const [showHistoricalBackfillModal, setShowHistoricalBackfillModal] = useState<boolean>(false);
     const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
     const [uploadPurpose, setUploadPurpose] = useState<'Fabrication' | 'Approval'>('Fabrication');
     const [isSowDataVisible, setIsSowDataVisible] = useState<boolean>(true);
@@ -716,6 +718,51 @@ export default function ProjectView() {
             </div>
 
 
+            {/* ── Historical Transmittals Pending Banner ── */}
+            {project?.historicalTransmittalsPending && !project?.historicalBackfillCompleted && (
+                <div style={{
+                    marginBottom: 16, padding: '12px 18px', borderRadius: 8,
+                    background: '#fffbeb', border: '1px solid #fde047',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>⚠️</span>
+                        <div>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: '#92400e' }}>
+                                Historical Transmittals Pending Backfill
+                            </span>
+                            <span style={{ marginLeft: 8, fontSize: 12, color: '#b45309' }}>
+                                This project has previous transmittals (up to #{Number(project.lastTransmittalNumber || 0) > 1 ? Number(project.lastTransmittalNumber) - 1 : project.lastTransmittalNumber}) that haven't been backfilled yet.
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        style={{ background: '#2563eb', fontWeight: 600, padding: '6px 14px' }}
+                        onClick={() => setShowHistoricalBackfillModal(true)}
+                    >
+                        📁 Backfill Historical Data
+                    </button>
+                </div>
+            )}
+
+            {/* ── Historical Transmittal Backfill Modal ── */}
+            {showHistoricalBackfillModal && project && (
+                <HistoricalTransmittalModal
+                    isOpen={showHistoricalBackfillModal}
+                    onClose={() => {
+                        setShowHistoricalBackfillModal(false);
+                        fetchData();
+                    }}
+                    project={project}
+                    onComplete={() => {
+                        setShowHistoricalBackfillModal(false);
+                        fetchData();
+                    }}
+                />
+            )}
+
             {/* Tabs */}
             <div className="tab-bar">
                 {(['dashboard', 'storage', 'transmittals', 'extraction', 'info', 'allocations'] as const).map((tab) => (
@@ -971,6 +1018,7 @@ export default function ProjectView() {
                         projectName={project.name}
                         canUpload={canUpload}
                         sequences={derivedSequences.map((s: any) => s.name || s)}
+                        project={project}
                     />
                 </div>
             )}

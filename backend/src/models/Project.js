@@ -231,6 +231,21 @@ const projectSchema = new mongoose.Schema(
             min: 1,
         },
 
+        // ── Historical / Last Transmittal Tracking ─────────────
+        lastTransmittalNumber: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        historicalTransmittalsPending: {
+            type: Boolean,
+            default: false,
+        },
+        historicalBackfillCompleted: {
+            type: Boolean,
+            default: false,
+        },
+
         // ── Transmittal Counter ────────────────────────────────
         // Auto-incremented each time a transmittal is downloaded.
         // Scoped per-project so each project starts from #01.

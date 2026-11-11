@@ -178,6 +178,9 @@ export interface Project {
     projectManager?: string;
     /** Starting transmittal number — only used when year <= 2025 */
     startingTransmittalNumber?: number;
+    lastTransmittalNumber?: number;
+    historicalTransmittalsPending?: boolean;
+    historicalBackfillCompleted?: boolean;
     /** Multi-tenant key: the admin who created this project */
     createdByAdminId: string;
     /** User-specific permission (injected for user dashboard) */

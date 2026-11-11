@@ -9,6 +9,7 @@ import { adminListTeams, type Team } from '../../services/adminTeamApi';
 import { IconPlus, IconEdit, IconTrash, IconOpen, IconClose } from '../../components/Icons';
 import { formatDate, getProjectAppCreationDate } from '../../utils/dateUtils';
 import type { Project, ProjectStatus, Client, ClientContact, User } from '../../types';
+import HistoricalTransmittalModal from '../../components/HistoricalTransmittalModal';
 
 const STATUS_OPTIONS: ProjectStatus[] = ['in_progress', 'on_hold', 'completed', 'archived'];
 const STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -546,6 +547,8 @@ export default function AdminProjects() {
     const [editSowNameInput, setEditSowNameInput] = useState<string>('');
     const [teams, setTeams] = useState<Team[]>([]);
     const [showAdditionalSowFields, setShowAdditionalSowFields] = useState<boolean>(false);
+    const [createdHistoricalProject, setCreatedHistoricalProject] = useState<any | null>(null);
+    const [historicalModalProject, setHistoricalModalProject] = useState<any | null>(null);
     const { user: authUser, logout } = useAuth();
     const fetchProjects = useCallback(async () => {
         try {
@@ -753,7 +756,7 @@ export default function AdminProjects() {
                 connectionDesignContact: form.connectionDesignContact,
                 connectionDesignEmail: form.connectionDesignEmail,
                 year: Number(form.year),
-                startingTransmittalNumber: Number(form.year) <= 2026 ? (Number(form.lastTransmittalNumber) || 0) + 1 : 1,
+                startingTransmittalNumber: (Number(form.lastTransmittalNumber) || 0) > 0 ? (Number(form.lastTransmittalNumber) + 1) : 1,
                 creationDate: form.creationDate || undefined,
                 projectStartDate: form.projectStartDate || undefined,
                 financialYear: form.financialYear || undefined,
@@ -762,9 +765,14 @@ export default function AdminProjects() {
                 projectManager: form.projectManager || undefined,
             } as any);
 
+            const submittedLastTr = Number(form.lastTransmittalNumber) || 0;
+            const hasHistorical = submittedLastTr > 0;
+
             const newProject = {
                 ...project,
-                id: project._id || project.id
+                id: project._id || project.id,
+                lastTransmittalNumber: submittedLastTr,
+                historicalTransmittalsPending: hasHistorical
             };
 
             setProjects((prev) => [newProject, ...prev]);
@@ -773,6 +781,10 @@ export default function AdminProjects() {
             setSeqInput('0');
             setSowInput('0');
             setSowNameInput('');
+
+            if (hasHistorical) {
+                setCreatedHistoricalProject(newProject);
+            }
         } catch (err: any) {
             setModalError(`Create failed: ${err.message}`);
         } finally {
@@ -1162,7 +1174,7 @@ export default function AdminProjects() {
                                                         division: ep.division || '',
                                                         projectManager: ep.projectManager || '',
                                                         location: ep.location || prev.location || '',
-                                                        lastTransmittalNumber: isOldYear ? (prev.lastTransmittalNumber || '0') : '0',
+                                                        lastTransmittalNumber: prev.lastTransmittalNumber || '0',
                                                     }));
                                                 } else {
                                                     setForm(prev => ({ ...prev, name: selectedProjectName }));
@@ -1375,7 +1387,6 @@ export default function AdminProjects() {
                                         setForm({
                                             ...form,
                                             year: yr,
-                                            lastTransmittalNumber: '0',
                                             creationDate: Number(yr) <= 2025 && Number(yr) >= 2000 ? (form.creationDate || `${yr}-01-01`) : ''
                                         });
                                     }}
@@ -1398,22 +1409,20 @@ export default function AdminProjects() {
                                 </div>
                             )}
 
-                            {Number(form.year) <= 2026 && Number(form.year) >= 2000 && (
-                                <div className="form-group" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 16px' }}>
-                                    <label className="form-label required" style={{ color: '#c2410c' }}>Last Transmittal Number</label>
-                                    <p style={{ fontSize: 12, color: '#9a3412', marginBottom: 8, marginTop: 2 }}>
-                                        Since this is a {form.year} project, enter the last transmittal number used (e.g. if previous transmittals went up to 12, enter 12. If none, enter 0).
-                                    </p>
-                                    <input
-                                        className="form-control"
-                                        type="number"
-                                        placeholder="e.g. 12"
-                                        min="0"
-                                        value={form.lastTransmittalNumber || ''}
-                                        onChange={(e) => setForm({ ...form, lastTransmittalNumber: e.target.value })}
-                                    />
-                                </div>
-                            )}
+                            <div className="form-group" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 16px' }}>
+                                <label className="form-label" style={{ color: '#c2410c', fontWeight: 600 }}>Last Transmittal Number</label>
+                                <p style={{ fontSize: 12, color: '#9a3412', marginBottom: 8, marginTop: 2 }}>
+                                    If this project has existing transmittals from before, enter the last transmittal number used (e.g. if previous transmittals went up to 12, enter 12. If this is a brand new project, enter 0).
+                                </p>
+                                <input
+                                    className="form-control"
+                                    type="number"
+                                    placeholder="0 (new project) or e.g. 12"
+                                    min="0"
+                                    value={form.lastTransmittalNumber || ''}
+                                    onChange={(e) => setForm({ ...form, lastTransmittalNumber: e.target.value })}
+                                />
+                            </div>
 
                             <div className="form-group">
                                         <label className="form-label">Description</label>
@@ -1815,9 +1824,6 @@ export default function AdminProjects() {
                                         if (!hasContact) missing.push('Client Contact Person');
                                         if (!form.name.trim()) missing.push('Project Name');
                                         if (!form.year || isNaN(Number(form.year))) missing.push('Project Year');
-                                        if (Number(form.year) <= 2026 && Number(form.year) >= 2000 && (form.lastTransmittalNumber === undefined || form.lastTransmittalNumber.toString().trim() === '')) {
-                                            missing.push('Last Transmittal Number');
-                                        }
                                         if (!form.location) missing.push('Location');
                                         if (!form.scopeOfWork || form.scopeOfWork.length === 0) missing.push(form.trackingMode === 'seq' ? 'Sequences' : 'Scope of Work');
 
@@ -2698,6 +2704,74 @@ export default function AdminProjects() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ── Historical Transmittals "Now or Later" Prompt ── */}
+            {createdHistoricalProject && (
+                <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setCreatedHistoricalProject(null); }}>
+                    <div className="modal" style={{ maxWidth: 520, borderRadius: 12 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header" style={{ background: '#f8fafc', borderBottom: '1px solid var(--color-border-light)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 20 }}>📁</span>
+                                <span className="modal-title" style={{ fontSize: 16, fontWeight: 700 }}>
+                                    Historical Transmittals & Drawings
+                                </span>
+                            </div>
+                            <button className="modal-close" onClick={() => setCreatedHistoricalProject(null)}><IconClose /></button>
+                        </div>
+                        <div className="modal-body" style={{ padding: 24 }}>
+                            <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, marginBottom: 16 }}>
+                                Project <strong>"{createdHistoricalProject.name}"</strong> has been created with Last Transmittal <strong>#{createdHistoricalProject.lastTransmittalNumber}</strong>.
+                            </p>
+                            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', marginBottom: 4 }}>
+                                    Backfill Transmittal Range: #01 to #{String(Math.max(1, createdHistoricalProject.lastTransmittalNumber - 1)).padStart(2, '0')}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#3b82f6' }}>
+                                    You can upload existing transmittal documents or folders of drawings for extraction line by line.
+                                </div>
+                            </div>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>
+                                Would you like to upload the previous transmittals and drawings now, or do it later?
+                            </p>
+                            <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setCreatedHistoricalProject(null);
+                                        showMessage('Backfill Later', 'You can backfill historical transmittals at any time from the project or when uploading folders.', 'info');
+                                    }}
+                                >
+                                    Do It Later
+                                </button>
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ padding: '8px 20px', fontWeight: 600 }}
+                                    onClick={() => {
+                                        const p = createdHistoricalProject;
+                                        setCreatedHistoricalProject(null);
+                                        setHistoricalModalProject(p);
+                                    }}
+                                >
+                                    Upload Now →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Historical Transmittal Backfill Modal ── */}
+            {historicalModalProject && (
+                <HistoricalTransmittalModal
+                    isOpen={!!historicalModalProject}
+                    onClose={() => setHistoricalModalProject(null)}
+                    project={historicalModalProject}
+                    onComplete={() => {
+                        setHistoricalModalProject(null);
+                        fetchProjects();
+                    }}
+                />
             )}
 
             {/* ── Delete Confirm ── */}
