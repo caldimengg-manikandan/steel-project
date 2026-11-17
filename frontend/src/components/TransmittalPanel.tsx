@@ -20,6 +20,37 @@ function normalizeFolderHeader(fName?: string) {
     return s;
 }
 
+function cleanRemarks(text?: any) {
+    if (!text) return '';
+    let s = String(text).trim();
+    s = s.replace(/^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])/, '').trim();
+    let changed = true;
+    while (changed) {
+        const orig = s;
+        // 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = s.replace(/^(?:[A-Za-z\s'’]{1,20}\bBY\s*[:\-])\s*/i, '').trim();
+        // 2. Standard column headers
+        s = s.replace(/^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/.]|\s*[A-Z]{3,})\s*)?/i, '').trim();
+        // 3. Standalone initials or mark with colon or dash: 'RBS :', '0 :', 'E :'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*[:\-]\s*/, '').trim();
+        // 4. Initials followed immediately by a date: 'RBS 05-11' -> '05-11'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/.]\d{1,2})/, '').trim();
+        // 5. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = s.replace(/^\d{1,2}\s*[-/.]\s*\d{1,2}(?:\s*[-/.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*/, '').trim();
+        // 6. Initials or mark followed by standard remark keywords: 'RBS ISSUED' -> 'ISSUED'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s+(?=(?:ISSUED|REVISED|FOR|APPROVED?|PRELIMINARY|SUBMITTED|BID|CONSTRUCTION|RELEASED|CHECKED|RECORD|AS[\s\-]BUILT)\b)/i, '').trim();
+        // 7. Initials that follow a date or colon (e.g. 'Y : ' or 'E : ')
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*[:\-]\s*/, '').trim();
+        // 8. Leading punctuation
+        s = s.replace(/^[:.\-/\s]+/, '').trim();
+        changed = (s !== orig);
+    }
+    s = s.replace(/\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$/i, '').trim();
+    s = s.replace(/[:.\-/\s]+$/, '').trim();
+    s = s.replace(/\s+/, ' ').trim();
+    return s;
+}
+
 export default function TransmittalPanel({ projectId, canEdit, sequences }: { projectId: string; canEdit: boolean; sequences?: any[] }) {
     const { showMessage, showConfirm } = useMessage();
     const [transmittals, setTransmittals] = useState<any[]>([]);
@@ -302,11 +333,13 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
 
                                         {/* Inline Excel-style Preview Row */}
                                         {expandedTransmittalId === t._id && !t.isVoided && (() => {
-                                            const groupedDrawings: { [category: string]: any[] } = {};
+                                            const groupedDrawings: { [category: string]: { [sequence: string]: any[] } } = {};
                                             (t.drawings || []).forEach((d: any) => {
                                                 const cat = normalizeFolderHeader(d.folderName);
-                                                if (!groupedDrawings[cat]) groupedDrawings[cat] = [];
-                                                groupedDrawings[cat].push(d);
+                                                const seq = d.sequence || '';
+                                                if (!groupedDrawings[cat]) groupedDrawings[cat] = {};
+                                                if (!groupedDrawings[cat][seq]) groupedDrawings[cat][seq] = [];
+                                                groupedDrawings[cat][seq].push(d);
                                             });
                                             const categories = Object.keys(groupedDrawings).sort((a, b) => a.localeCompare(b));
                                             let currentSlNo = 1;
@@ -387,8 +420,8 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                                             </tr>
                                                                         ) : (
                                                                             categories.map((catKey) => {
-                                                                                const sortedDrawings = [...groupedDrawings[catKey]].sort((a: any, b: any) =>
-                                                                                    (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+                                                                                const seqKeys = Object.keys(groupedDrawings[catKey]).sort((a, b) =>
+                                                                                    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
                                                                                 );
                                                                                 return (
                                                                                     <Fragment key={catKey}>
@@ -408,37 +441,69 @@ export default function TransmittalPanel({ projectId, canEdit, sequences }: { pr
                                                                                             </td>
                                                                                         </tr>
 
-                                                                                        {/* Drawing rows */}
-                                                                                        {sortedDrawings.map((d: any, dIdx: number) => {
-                                                                                            const rowSlNo = currentSlNo++;
-                                                                                            const revHistoryText = d.remarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED');
+                                                                                        {/* Sub-group by Sequence / SOW */}
+                                                                                        {seqKeys.map((seqKey) => {
+                                                                                            const sortedDrawings = [...groupedDrawings[catKey][seqKey]].sort((a: any, b: any) =>
+                                                                                                (a.drawingNumber || '').localeCompare(b.drawingNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+                                                                                            );
                                                                                             return (
-                                                                                                <tr
-                                                                                                    key={`${catKey}-${dIdx}`}
-                                                                                                    style={{
-                                                                                                        background: dIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                                                                                                        transition: 'background-color 0.15s ease'
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 600, color: '#64748b' }}>
-                                                                                                        {rowSlNo}
-                                                                                                    </td>
-                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#0f172a' }}>
-                                                                                                        {d.drawingNumber || '-'}
-                                                                                                    </td>
-                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#334155' }}>
-                                                                                                        {d.drawingTitle || '-'}
-                                                                                                    </td>
-                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#1d4ed8' }}>
-                                                                                                        {d.revision || '0'}
-                                                                                                    </td>
-                                                                                                    <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
-                                                                                                        {d.date || formatDate(t.createdAt)}
-                                                                                                    </td>
-                                                                                                    <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
-                                                                                                        {revHistoryText}
-                                                                                                    </td>
-                                                                                                </tr>
+                                                                                                <Fragment key={`${catKey}-${seqKey}`}>
+                                                                                                    {seqKey && (
+                                                                                                        <tr style={{ background: '#fff7ed', color: '#c2410c', fontWeight: 800 }}>
+                                                                                                            <td
+                                                                                                                colSpan={6}
+                                                                                                                style={{
+                                                                                                                    textAlign: 'center',
+                                                                                                                    padding: '6px 12px',
+                                                                                                                    border: '1px solid #fed7aa',
+                                                                                                                    letterSpacing: '0.5px',
+                                                                                                                    fontSize: 12
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                {seqKey.toUpperCase()}
+                                                                                                            </td>
+                                                                                                        </tr>
+                                                                                                    )}
+                                                                                                    {sortedDrawings.map((d: any, dIdx: number) => {
+                                                                                                        const rowSlNo = currentSlNo++;
+                                                                                                        const cleanedRemarks = cleanRemarks(d.remarks);
+                                                                                                        const revHistoryText = cleanedRemarks || (d.changeType === 'new' ? 'ISSUED FOR APPROVAL' : d.changeType === 'revised' ? 'ISSUED FOR RE-APPROVAL' : 'RE-ISSUED');
+                                                                                                        return (
+                                                                                                            <tr
+                                                                                                                key={`${catKey}-${seqKey}-${dIdx}`}
+                                                                                                                style={{
+                                                                                                                    background: dIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                                                                                                                    transition: 'background-color 0.15s ease'
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 600, color: '#64748b' }}>
+                                                                                                                    {rowSlNo}
+                                                                                                                </td>
+                                                                                                                <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#0f172a' }}>
+                                                                                                                    {d.drawingNumber || '-'}
+                                                                                                                </td>
+                                                                                                                <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#334155' }}>
+                                                                                                                    {d.drawingTitle || '-'}
+                                                                                                                </td>
+                                                                                                                <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', fontWeight: 700, color: '#1d4ed8' }}>
+                                                                                                                    {(() => {
+                                                                                                                        let r = d.revision ? String(d.revision).replace(/[^A-Za-z0-9]/g, '').trim().toUpperCase() : '0';
+                                                                                                                        if (!r || r.length > 3) {
+                                                                                                                            return '0';
+                                                                                                                        }
+                                                                                                                        return r;
+                                                                                                                    })()}
+                                                                                                                </td>
+                                                                                                                <td style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
+                                                                                                                    {d.date || formatDate(t.createdAt)}
+                                                                                                                </td>
+                                                                                                                <td style={{ textAlign: 'left', padding: '7px 12px', border: '1px solid #d9d9d9', color: '#475569', fontSize: 11.5 }}>
+                                                                                                                    {revHistoryText}
+                                                                                                                </td>
+                                                                                                            </tr>
+                                                                                                        );
+                                                                                                    })}
+                                                                                                </Fragment>
                                                                                             );
                                                                                         })}
                                                                                     </Fragment>

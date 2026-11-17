@@ -5,6 +5,37 @@ interface DrawingLogPanelProps {
     projectId: string;
 }
 
+function cleanRemarks(text?: any) {
+    if (!text) return '';
+    let s = String(text).trim();
+    s = s.replace(/^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])/, '').trim();
+    let changed = true;
+    while (changed) {
+        const orig = s;
+        // 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = s.replace(/^(?:[A-Za-z\s'’]{1,20}\bBY\s*[:\-])\s*/i, '').trim();
+        // 2. Standard column headers
+        s = s.replace(/^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/.]|\s*[A-Z]{3,})\s*)?/i, '').trim();
+        // 3. Standalone initials or mark with colon or dash: 'RBS :', '0 :', 'E :'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*[:\-]\s*/, '').trim();
+        // 4. Initials followed immediately by a date: 'RBS 05-11' -> '05-11'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/.]\d{1,2})/, '').trim();
+        // 5. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = s.replace(/^\d{1,2}\s*[-/.]\s*\d{1,2}(?:\s*[-/.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*/, '').trim();
+        // 6. Initials or mark followed by standard remark keywords: 'RBS ISSUED' -> 'ISSUED'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s+(?=(?:ISSUED|REVISED|FOR|APPROVED?|PRELIMINARY|SUBMITTED|BID|CONSTRUCTION|RELEASED|CHECKED|RECORD|AS[\s\-]BUILT)\b)/i, '').trim();
+        // 7. Initials that follow a date or colon (e.g. 'Y : ' or 'E : ')
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*[:\-]\s*/, '').trim();
+        // 8. Leading punctuation
+        s = s.replace(/^[:.\-/\s]+/, '').trim();
+        changed = (s !== orig);
+    }
+    s = s.replace(/\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$/i, '').trim();
+    s = s.replace(/[:.\-/\s]+$/, '').trim();
+    s = s.replace(/\s+/, ' ').trim();
+    return s;
+}
+
 export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
     const [logData, setLogData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -46,7 +77,11 @@ export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
         );
     }
 
-    const normalizeRev = (r: string) => (r || '').replace(/^rev[\s\-_]*/i, '').toUpperCase().trim();
+    const normalizeRev = (r: string) => {
+        let s = (r || '').replace(/^rev[\s\-_]*/i, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().trim();
+        if (!s || s.length > 3) return '';
+        return s;
+    };
 
     // Determine all revision marks across all drawings for dynamic columns
     const allRevsSet = new Set<string>();
@@ -149,7 +184,7 @@ export default function DrawingLogPanel({ projectId }: DrawingLogPanelProps) {
                                     })}
                                     <td>
                                         {d.revisionHistory && d.revisionHistory.length > 0 
-                                            ? d.revisionHistory[d.revisionHistory.length - 1].remarks 
+                                            ? cleanRemarks(d.revisionHistory[d.revisionHistory.length - 1].remarks) 
                                             : ''}
                                     </td>
                                 </tr>

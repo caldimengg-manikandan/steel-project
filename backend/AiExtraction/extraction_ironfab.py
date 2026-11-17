@@ -1,6 +1,38 @@
 import re
 from datetime import datetime
 
+def clean_remarks(text):
+    if not text:
+        return ""
+    s = str(text).strip()
+    s = re.sub(r'^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])', '', s).strip()
+    changed = True
+    while changed:
+        orig = s
+        # 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = re.sub(r'^(?:[A-Za-z\s\'’]{1,20}\bBY\s*[:\-])\s*', '', s, flags=re.I).strip()
+        # 2. Standard column headers
+        s = re.sub(r'^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/\.]|\s*[A-Z]{3,})\s*)?', '', s, flags=re.I).strip()
+        # 3. Standalone initials or mark followed by a colon or dash
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 4. Initials followed immediately by a date
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/\.]\d{1,2})', '', s).strip()
+        # 5. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = re.sub(r'^\d{1,2}\s*[-/\.]\s*\d{1,2}(?:\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*', '', s).strip()
+        # 6. Initials or rev mark followed by standard remark keywords
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=(?:ISSUED|REVISED|FOR|APPROVED?|PRELIMINARY|SUBMITTED|BID|CONSTRUCTION|RELEASED|CHECKED|RECORD|AS[\s\-]BUILT)\b)', '', s, flags=re.I).strip()
+        # 7. Initials that follow a date or colon
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 8. Leading punctuation
+        s = re.sub(r'^[:.\-\s/]+', '', s).strip()
+        changed = (s != orig)
+
+    # Clean trailing noise like 'DWN BY: MSN'
+    s = re.sub(r'\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP\'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$', '', s, flags=re.I).strip()
+    s = re.sub(r'[:.\-\s/]+$', '', s).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
 def is_date(s):
     date_patterns = [
         r'\d{1,2}-\d{1,2}-\d{2,4}',        # 04-09-2026, 4-9-26
@@ -42,6 +74,55 @@ def is_date_token(t):
 
 def is_remarks_token(t):
     return len(t) >= 3 and not is_date_token(t)
+
+def resolve_rev_mark(shorts):
+    """
+    Resolves the authoritative revision mark from short tokens (<= 2 chars)
+    using universal drafting standards (zero hardcoding of specific letters):
+    1. Pure punctuation/symbols (e.g. ':', '-', '.', '/') are stripped and discarded.
+    2. '0' is always Revision 0 (Issued for Fabrication); engineering row indices are strictly >= 1.
+    3. Sequential approval letters (A-G) paired with row index (1, 2, 3...) resolve to the approval letter.
+    4. Numeric revisions resolve to the revision number (minimum digit when paired with row index).
+    5. Standalone approval letter or alpha token.
+    6. Defaults cleanly to '0' if no alphanumeric characters exist.
+    """
+    if not shorts:
+        return '0'
+
+    clean_shorts = []
+    for s in shorts:
+        sc = re.sub(r'[^A-Za-z0-9]', '', str(s)).strip()
+        if sc:
+            clean_shorts.append(sc)
+
+    if not clean_shorts:
+        return '0'
+
+    digits = [s for s in clean_shorts if s.isdigit()]
+    alphas = [s for s in clean_shorts if s.isalpha()]
+
+    # Universal Rule: '0' is always Revision 0 (never a 1-based table row index)
+    if '0' in digits:
+        return '0'
+
+    # Alpha revision mark (len 1-2, e.g. A, B, S, AA) paired with row index (1, 2, 3...)
+    short_alphas = [a for a in alphas if len(a) <= 2]
+    if short_alphas and digits:
+        return short_alphas[0]
+
+    # Numeric revisions (if digits exist, the revision number is the digit)
+    if digits:
+        d_ints = [int(d) for d in digits]
+        return str(min(d_ints))
+
+    # Standalone alpha revision (A, B, S, etc.)
+    if short_alphas:
+        return short_alphas[0]
+
+    if alphas:
+        return alphas[0]
+
+    return clean_shorts[0]
 
 class RowContainer:
     def __init__(self):
@@ -171,6 +252,8 @@ def process_extracted_data(detections):
             
             filtered_tokens = []
             for t in all_tokens:
+                if not any(c.isalnum() for c in t):
+                    continue
                 tu = t.upper().strip()
                 is_header = False
                 for kw in remove_keywords_rev:
@@ -203,28 +286,9 @@ def process_extracted_data(detections):
                 
             # 4. Resolve revision mark and index for each container
             for c in containers:
-                rev = "0"
-                remarks = c.remarks or ""
+                remarks = clean_remarks(c.remarks or "")
                 date_val = c.date or ""
-                
-                shorts = c.shorts
-                if len(shorts) == 1:
-                    rev = shorts[0]
-                elif len(shorts) == 2:
-                    s1, s2 = shorts[0], shorts[1]
-                    if s1.isalpha() and s2.isdigit():
-                        rev = s1
-                    elif s2.isalpha() and s1.isdigit():
-                        rev = s2
-                    elif s1.isdigit() and s2.isdigit():
-                        d1, d2 = int(s1), int(s2)
-                        # Revision mark is the smaller digit, index is the larger
-                        if d1 < d2:
-                            rev = s1
-                        else:
-                            rev = s2
-                    else:
-                        rev = s1
+                rev = resolve_rev_mark(c.shorts)
                         
                 # Clean up "ISS" OCR misreads
                 if remarks and not re.search(r'ISS', remarks, re.IGNORECASE) and ('1SS' in remarks or 'lSS' in remarks):

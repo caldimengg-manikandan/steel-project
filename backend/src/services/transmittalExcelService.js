@@ -19,50 +19,13 @@ const mongoose = require('mongoose');
 const Transmittal = require('../models/Transmittal');
 
 const LOGO_DEFAULT = path.join(__dirname, '../../../frontend/src/assets/excel_im/excel_img.png');
-
+const { normalizeRevision, resolveSectionHeading } = require('./transmittalService');
 
 /**
  * Resolves the SOW heading from a file path using bottom-up traversal.
  */
 function resolveSowKey(fullPath, validSowNames, sowPrefixes) {
-    if (!fullPath) return '';
-    const parts = fullPath.replace(/\\/g, '/').split('/');
-    let detectedSow = null;
-    let sowKey = '';
-
-    const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
-
-    for (let i = parts.length - 2; i >= 0; i--) {
-        const upperPart = parts[i].trim().toUpperCase();
-
-        if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(upperPart)) {
-            continue;
-        }
-
-        for (const prefix of sortedPrefixes) {
-            const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\const commonBorderStyle = {');
-            const regex = new RegExp(`(${escapedPrefix}[\\s_#-]*\\d+)`, 'i');
-            const match = upperPart.match(regex);
-            if (match) {
-                detectedSow = match[1].trim();
-                break;
-            }
-        }
-
-        if (!detectedSow && validSowNames.length > 0) {
-            if (validSowNames.some(sow => upperPart.includes(sow))) {
-                detectedSow = validSowNames.find(sow => upperPart.includes(sow));
-            }
-        }
-
-        if (detectedSow) {
-            sowKey = upperPart;
-            break;
-        }
-    }
-
-
-    return sowKey || '';
+    return resolveSectionHeading(fullPath, validSowNames, sowPrefixes);
 }
 const commonBorderStyle = {
     top: { style: 'thin' }, bottom: { style: 'thin' },
@@ -185,7 +148,7 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
 
     const pId = transmittal.projectId?._id || transmittal.projectId;
     let validSowNames = [];
-    let sowPrefixes = new Set(['SOW', 'SOWLO', 'AREA']);
+    let sowPrefixes = new Set(['SOW', 'SOWLO', 'AREA', 'SEQ', 'SEQUENCE', 'PHASE', 'STAGE', 'PKG', 'PACKAGE', 'ZONE', 'BUILDING', 'BLDG', 'LEVEL']);
     if (pId) {
         const project = await Project.findById(pId).lean();
         if (project) {
@@ -211,50 +174,9 @@ async function generateTransmittalExcel(transmittal, projectDetails, logoPath) {
     (transmittal.drawings || []).forEach(d => {
         const ext = extMap[d.extractionId?.toString()];
         const fullPath = ext ? (ext.storageGatewayPath || ext.fileUrl || '') : '';
-        let sowKey = '';
-
-        if (fullPath) {
-            const parts = fullPath.replace(/\\/g, '/').split('/');
-            let detectedSow = null;
-
-            const sortedPrefixes = Array.from(sowPrefixes).sort((a, b) => b.length - a.length);
-
-            for (let i = parts.length - 2; i >= 0; i--) {
-                const upperPart = parts[i].trim().toUpperCase();
-
-                // Skip the main folder names so we don't accidentally match them as SOWs
-                if (/^(d[\s\-]*sheets?|detail[\s\-]*sheets?|e[\s\-]*sheets?|erection[\s\-]*sheets?)$/i.test(upperPart)) {
-                    continue;
-                }
-
-                // Detect dynamically
-                for (const prefix of sortedPrefixes) {
-                    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`(${escapedPrefix}[\\s_#-]*\\d+)`, 'i');
-                    const match = upperPart.match(regex);
-                    if (match) {
-                        detectedSow = match[1].trim();
-                        break;
-                    }
-                }
-
-                if (!detectedSow && validSowNames.length > 0) {
-                    if (validSowNames.some(sow => upperPart.includes(sow))) {
-                        detectedSow = validSowNames.find(sow => upperPart.includes(sow));
-                    }
-                }
-
-                if (detectedSow) {
-                    sowKey = upperPart; // The SOW folder name must become the section heading
-                    break;
-                }
-            }
-
-
-        }
+        const sowKey = d.sequence || resolveSectionHeading(fullPath, validSowNames, sowPrefixes) || '';
 
         const mainFolder = normalizeFolderHeader(d.folderName);
-        sowKey = sowKey || '';
 
         if (!groupedByMain[mainFolder]) groupedByMain[mainFolder] = {};
         if (!groupedByMain[mainFolder][sowKey]) groupedByMain[mainFolder][sowKey] = [];
@@ -364,7 +286,7 @@ async function generateDrawingLogExcel(drawingLog, projectDetails, logoPath) {
     const projectId = drawingLog.projectId;
     let transmittalDates = {};
     let validSowNames = [];
-    let sowPrefixes = new Set(['SOW', 'SOWLO', 'AREA']);
+    let sowPrefixes = new Set(['SOW', 'SOWLO', 'AREA', 'SEQ', 'SEQUENCE', 'PHASE', 'STAGE', 'PKG', 'PACKAGE', 'ZONE', 'BUILDING', 'BLDG', 'LEVEL']);
     let extMap = {};
 
     if (projectId) {

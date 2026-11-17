@@ -33,7 +33,7 @@ const { getExternalProjects } = require('../services/externalProjectService');
 const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
 const storageGateway = require('../utils/storageGateway');
 const { runExtractionPipeline } = require('../services/extractionService');
-const { calculateSowProgress } = require('../utils/sowCalculator');
+const { calculateSowProgress, rebalanceSowPercentages } = require('../utils/sowCalculator');
 
 /**
  * GET /api/admin/projects
@@ -522,7 +522,7 @@ async function updateProject(req, res) {
         }));
     }
     if (scopeOfWork !== undefined && Array.isArray(scopeOfWork)) {
-        project.scopeOfWork = scopeOfWork.map((s, idx) => ({
+        const mappedSow = scopeOfWork.map((s, idx) => ({
             name: (s.name || '').trim() || `SOW ${String(idx + 1).padStart(2, '0')}`,
             percentage: Number(s.percentage) || 0,
             approval: Number(s.approval) || 0,
@@ -539,6 +539,7 @@ async function updateProject(req, res) {
                 fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
             })) : []
         }));
+        project.scopeOfWork = rebalanceSowPercentages(mappedSow);
     }
     if (req.body.additionalScopeOfWork !== undefined && Array.isArray(req.body.additionalScopeOfWork)) {
         project.additionalScopeOfWork = req.body.additionalScopeOfWork.map((s, idx) => ({

@@ -18,6 +18,48 @@ import RfiExtractionPanel from '../../components/RfiPanel';
 import FileBrowserPanel from '../../components/FileBrowserPanel';
 import HistoricalTransmittalModal from '../../components/HistoricalTransmittalModal';
 
+/**
+ * Re-balances % of Total Work among SOW items.
+ * If any SOW is on Hold, its percentage is set to 0 and the 100% total
+ * is divided equally among the remaining active (non-hold) SOWs.
+ */
+function rebalanceSowPercentages(sows: any[]): any[] {
+    if (!Array.isArray(sows) || sows.length === 0) return sows;
+
+    const isHold = (status?: string) => {
+        const s = String(status || '').toLowerCase().trim();
+        return s === 'hold' || s === 'on hold' || s === 'on_hold';
+    };
+
+    const activeIndices: number[] = [];
+    sows.forEach((sow, idx) => {
+        if (!isHold(sow.status)) {
+            activeIndices.push(idx);
+        }
+    });
+
+    if (activeIndices.length === 0) {
+        return sows.map(sow => ({ ...sow, percentage: 0 }));
+    }
+
+    const totalAmount = 100;
+    const activeCount = activeIndices.length;
+    const defaultPct = Math.round((totalAmount / activeCount) * 100) / 100;
+
+    let sumOthers = 0;
+    return sows.map((sow, idx) => {
+        if (isHold(sow.status)) {
+            return { ...sow, percentage: 0 };
+        }
+        if (idx === activeIndices[activeCount - 1]) {
+            const remainder = Math.round((totalAmount - sumOthers) * 100) / 100;
+            return { ...sow, percentage: remainder };
+        } else {
+            sumOthers += defaultPct;
+            return { ...sow, percentage: defaultPct };
+        }
+    });
+}
 
 export default function ProjectView() {
     const { id } = useParams<{ id: string }>();
@@ -1424,8 +1466,14 @@ export default function ProjectView() {
                                                                 showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
                                                                 return;
                                                             }
-                                                            const updatedSow = [...(project.scopeOfWork || [])];
-                                                            updatedSow[idx] = { ...updatedSow[idx], status: newStatus };
+                                                            let updatedSow = [...(project.scopeOfWork || [])];
+                                                            const isNewHold = ['hold', 'on hold', 'on_hold'].includes(newStatus.toLowerCase().trim());
+                                                            updatedSow[idx] = { 
+                                                                ...updatedSow[idx], 
+                                                                status: newStatus,
+                                                                ...(isNewHold ? { approval: 0, fabrication: 0 } : {})
+                                                            };
+                                                            updatedSow = rebalanceSowPercentages(updatedSow);
                                                             setProject({ ...project, scopeOfWork: updatedSow });
                                                             try {
                                                                 await updateProjectScopeOfWork(id, updatedSow);
@@ -1454,15 +1502,23 @@ export default function ProjectView() {
                                                         const isHoldStatus = rawStatus === 'Hold' || rawStatus === 'On Hold';
 
                                                         return (
-                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                                                                <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-light)', background: isHoldStatus ? 'rgba(254, 243, 199, 0.2)' : 'transparent' }}>
+                                                                <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: isHoldStatus ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }}>
                                                                     {sow.name}
                                                                 </td>
                                                                 <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
-                                                                    {sowPct}%
+                                                                    {isHoldStatus ? (
+                                                                        <span style={{ color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700 }}>
+                                                                            0% (Hold)
+                                                                        </span>
+                                                                    ) : (
+                                                                        `${sowPct}%`
+                                                                    )}
                                                                 </td>
-                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                                                                    {canEditSow ? (
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: isHoldStatus ? 'var(--color-text-muted)' : '#2563eb', fontWeight: 600 }}>
+                                                                    {isHoldStatus ? (
+                                                                        <span style={{ color: 'var(--color-text-muted, #94a3b8)', fontStyle: 'italic', fontSize: 13 }}>-</span>
+                                                                    ) : canEditSow ? (
                                                                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                                                                             <input
                                                                                 type="number"
@@ -1483,8 +1539,10 @@ export default function ProjectView() {
                                                                         `${appPctVal}%`
                                                                     )}
                                                                 </td>
-                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
-                                                                    {canEditSow ? (
+                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 13, color: isHoldStatus ? 'var(--color-text-muted)' : '#16a34a', fontWeight: 600 }}>
+                                                                    {isHoldStatus ? (
+                                                                        <span style={{ color: 'var(--color-text-muted, #94a3b8)', fontStyle: 'italic', fontSize: 13 }}>-</span>
+                                                                    ) : canEditSow ? (
                                                                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                                                                             <input
                                                                                 type="number"
@@ -1703,7 +1761,7 @@ export default function ProjectView() {
                                                     setProject({ ...project, sequences: newSeqs });
                                                     await updateProjectSequences(id, newSeqs);
                                                 } else if (seq.source === 'sow-fallback') {
-                                                    const updatedSow = [...(project.scopeOfWork || [])];
+                                                    let updatedSow = [...(project.scopeOfWork || [])];
                                                     const sIdx = seq.sowIndex ?? 0;
                                                     const targetSow = updatedSow[sIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
@@ -1713,6 +1771,7 @@ export default function ProjectView() {
                                                         approvalDate: (updates.approvalDate !== undefined ? updates.approvalDate : targetSow.approvalDate) as any,
                                                         fabricationDate: (updates.fabricationDate !== undefined ? updates.fabricationDate : targetSow.fabricationDate) as any
                                                     } as any;
+                                                    updatedSow = rebalanceSowPercentages(updatedSow);
                                                     setProject({ ...project, scopeOfWork: updatedSow });
                                                     await updateProjectScopeOfWork(id, updatedSow);
                                                 }

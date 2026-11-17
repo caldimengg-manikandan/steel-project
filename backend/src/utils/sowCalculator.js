@@ -11,22 +11,34 @@ function calculateSowProgress(scopeOfWork) {
         };
     }
 
+    const isHold = (status) => {
+        const s = String(status || '').toLowerCase().trim();
+        return s === 'hold' || s === 'on hold' || s === 'on_hold';
+    };
+
     let totalApprovalRaw = 0;
     let totalFabricationRaw = 0;
     const sowCount = scopeOfWork.length;
 
     const sowContributions = scopeOfWork.map(item => {
-        // Use the actual Approval and Fabrication % value of each SOW.
-        // No null/missing-value handling is required per requirements.
-        const appPct = Number(item.approval);
-        const fabPct = Number(item.fabrication);
+        if (isHold(item.status)) {
+            return {
+                name: item.name || '',
+                sowPercentage: 0,
+                appPercentage: 0,
+                fabPercentage: 0,
+                status: item.status || 'Hold',
+                approvalContribution: 0,
+                fabricationContribution: 0,
+                overallContribution: 0
+            };
+        }
+
+        const appPct = Number(item.approval) || 0;
+        const fabPct = Number(item.fabrication) || 0;
 
         totalApprovalRaw += appPct;
         totalFabricationRaw += fabPct;
-        
-        console.log('SOW:', item.name);
-        console.log('APPROVAL:', item.approval);
-        console.log('FABRICATION:', item.fabrication);
 
         return {
             name: item.name || '',
@@ -48,6 +60,7 @@ function calculateSowProgress(scopeOfWork) {
 
     if (sowCount > 0) {
         scopeOfWork.forEach(item => {
+            if (isHold(item.status)) return; // Hold SOWs are not considered
             const sowWeight = Number(item.percentage) || 0;
             const appPct = Number(item.approval) || 0;
             const fabPct = Number(item.fabrication) || 0;
@@ -72,4 +85,47 @@ function calculateSowProgress(scopeOfWork) {
     };
 }
 
-module.exports = { calculateSowProgress };
+/**
+ * Re-balances % of Total Work among SOW items.
+ * If any SOW is on Hold, its percentage is set to 0 and the 100% total
+ * is divided equally among the remaining active (non-hold) SOWs.
+ */
+function rebalanceSowPercentages(sows) {
+    if (!Array.isArray(sows) || sows.length === 0) return sows;
+
+    const isHold = (status) => {
+        const s = String(status || '').toLowerCase().trim();
+        return s === 'hold' || s === 'on hold' || s === 'on_hold';
+    };
+
+    const activeIndices = [];
+    sows.forEach((sow, idx) => {
+        if (!isHold(sow.status)) {
+            activeIndices.push(idx);
+        }
+    });
+
+    if (activeIndices.length === 0) {
+        return sows.map(sow => ({ ...sow, percentage: 0 }));
+    }
+
+    const totalAmount = 100;
+    const activeCount = activeIndices.length;
+    const defaultPct = Math.round((totalAmount / activeCount) * 100) / 100;
+
+    let sumOthers = 0;
+    return sows.map((sow, idx) => {
+        if (isHold(sow.status)) {
+            return { ...sow, percentage: 0 };
+        }
+        if (idx === activeIndices[activeCount - 1]) {
+            const remainder = Math.round((totalAmount - sumOthers) * 100) / 100;
+            return { ...sow, percentage: remainder };
+        } else {
+            sumOthers += defaultPct;
+            return { ...sow, percentage: defaultPct };
+        }
+    });
+}
+
+module.exports = { calculateSowProgress, rebalanceSowPercentages };

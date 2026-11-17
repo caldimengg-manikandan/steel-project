@@ -26,6 +26,7 @@ const transmittalDrawingSchema = new mongoose.Schema(
         date: { type: String, default: '' },
         remarks: { type: String, default: '' },
         folderName: { type: String, default: '' },
+        sequence: { type: String, default: '' },
         originalFileName: { type: String, default: '' },
         // 'new' = first time this drawing number appears
         // 'revised' = drawing number existed but revision changed

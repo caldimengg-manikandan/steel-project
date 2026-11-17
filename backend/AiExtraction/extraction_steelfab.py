@@ -54,6 +54,92 @@ def parse_date(date_str):
             pass
     return datetime.min
 
+def clean_remarks(text):
+    if not text:
+        return ""
+    s = str(text).strip()
+    s = re.sub(r'^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])', '', s).strip()
+    changed = True
+    while changed:
+        orig = s
+        # 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = re.sub(r'^(?:[A-Za-z\s\'’]{1,20}\bBY\s*[:\-])\s*', '', s, flags=re.I).strip()
+        # 2. Standard column headers
+        s = re.sub(r'^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/\.]|\s*[A-Z]{3,})\s*)?', '', s, flags=re.I).strip()
+        # 3. Standalone initials or mark followed by a colon or dash
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 4. Initials followed immediately by a date
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/\.]\d{1,2})', '', s).strip()
+        # 5. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = re.sub(r'^\d{1,2}\s*[-/\.]\s*\d{1,2}(?:\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*', '', s).strip()
+        # 6. Initials or rev mark followed by standard remark keywords
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=(?:ISSUED|REVISED|FOR|APPROVED?|PRELIMINARY|SUBMITTED|BID|CONSTRUCTION|RELEASED|CHECKED|RECORD|AS[\s\-]BUILT)\b)', '', s, flags=re.I).strip()
+        # 7. Initials that follow a date or colon
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 8. Leading punctuation
+        s = re.sub(r'^[:.\-\s/]+', '', s).strip()
+        changed = (s != orig)
+
+    # Clean trailing noise like 'DWN BY: MSN'
+    s = re.sub(r'\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP\'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$', '', s, flags=re.I).strip()
+    s = re.sub(r'[:.\-\s/]+$', '', s).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def resolve_rev_mark(shorts):
+    """
+    Resolves the authoritative revision mark from short tokens (<= 2 chars)
+    using universal drafting standards (zero hardcoding of specific letters):
+    1. Pure punctuation/symbols (e.g. ':', '-', '.', '/') are stripped and discarded.
+    2. '0' is always Revision 0 (Issued for Fabrication); engineering row indices are strictly >= 1.
+    3. Alpha revision marks (e.g. A, B, C... S, etc.) paired with row index (1, 2, 3...) resolve to the alpha mark.
+    4. Numeric revisions resolve to the revision number (minimum digit when paired with row index).
+    5. Standalone alpha token (including 'S' or any letter).
+    6. Defaults cleanly to '0' if no alphanumeric characters exist.
+    """
+    if not shorts:
+        return '0'
+
+    clean_shorts = []
+    for s in shorts:
+        sc = re.sub(r'[^A-Za-z0-9]', '', str(s)).strip()
+        if sc:
+            clean_shorts.append(sc)
+
+    if not clean_shorts:
+        return '0'
+
+    ignore_tokens = {'REV', 'BY', 'NO', 'DWN', 'CHK', 'APP'}
+    clean_shorts = [s for s in clean_shorts if s.upper() not in ignore_tokens]
+    if not clean_shorts:
+        return '0'
+
+    digits = [s for s in clean_shorts if s.isdigit()]
+    alphas = [s.upper() for s in clean_shorts if s.isalpha()]
+
+    # Universal Rule: '0' is always Revision 0 (never a 1-based table row index)
+    if '0' in digits:
+        return '0'
+
+    # Alpha revision mark (len 1-2, e.g. A, B, S, AA) paired with row index (1, 2, 3...)
+    short_alphas = [a for a in alphas if len(a) <= 2]
+    if short_alphas and digits:
+        return short_alphas[0]
+
+    # Numeric revisions (if digits exist, the revision number is the digit)
+    if digits:
+        d_ints = [int(d) for d in digits]
+        return str(min(d_ints))
+
+    # Standalone alpha revision (A, B, S, etc.)
+    if short_alphas:
+        return short_alphas[0]
+
+    if alphas:
+        return alphas[0]
+
+    return clean_shorts[0]
+
 def assign_token(row_dict, t):
     if is_col3(t):
         if 3 in row_dict: return False
@@ -62,8 +148,10 @@ def assign_token(row_dict, t):
     
     if is_col2(t):
         if 2 in row_dict: return False
-        row_dict[2] = t
-        return True
+        cleaned = clean_remarks(t)
+        if cleaned:
+            row_dict[2] = cleaned
+            return True
 
     if is_col0(t) and 0 not in row_dict:
         row_dict[0] = t
@@ -207,11 +295,12 @@ def process_extracted_data(detections):
             for row in cleaned_rows:
                 if len(row) >= 4:
                     col0, col1, col2, col3 = row[0], row[1], row[2], row[3]
-                    rev_val = col1 if col1 else col0
+                    shorts = [s for s in [col0, col1] if s]
+                    rev_val = resolve_rev_mark(shorts)
                     revisions.append({
                         "rev": rev_val,
                         "date": col3,
-                        "remarks": col2
+                        "remarks": clean_remarks(col2)
                     })
 
     # Sort revisions by date (newest first)

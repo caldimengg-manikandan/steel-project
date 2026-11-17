@@ -1,276 +1,373 @@
-import json
 import re
 from datetime import datetime
 
-def is_col3(t):
-    # validate Date format: MM-DD-YYYY, etc.
-    return bool(re.search(r'\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}', t))
+def clean_remarks(text):
+    if not text:
+        return ""
+    s = str(text).strip()
+    s = re.sub(r'^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])', '', s).strip()
+    changed = True
+    while changed:
+        orig = s
+        # 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = re.sub(r'^(?:[A-Za-z\s\'’]{1,20}\bBY\s*[:\-])\s*', '', s, flags=re.I).strip()
+        # 2. Standard column headers
+        s = re.sub(r'^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/\.]|\s*[A-Z]{3,})\s*)?', '', s, flags=re.I).strip()
+        # 3. Standalone initials or mark followed by a colon or dash
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 4. Initials followed immediately by a date
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/\.]\d{1,2})', '', s).strip()
+        # 5. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = re.sub(r'^\d{1,2}\s*[-/\.]\s*\d{1,2}(?:\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*', '', s).strip()
+        # 6. Initials or rev mark followed by standard remark keywords
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s+(?=(?:ISSUED|REVISED|FOR|APPROVED?|PRELIMINARY|SUBMITTED|BID|CONSTRUCTION|RELEASED|CHECKED|RECORD|AS[\s\-]BUILT)\b)', '', s, flags=re.I).strip()
+        # 7. Initials that follow a date or colon
+        s = re.sub(r'^[A-Za-z0-9]{1,4}\s*[:\-]\s*', '', s).strip()
+        # 8. Leading punctuation
+        s = re.sub(r'^[:.\-\s/]+', '', s).strip()
+        changed = (s != orig)
 
-def is_col0(t):
-    # numbers [1 to N number]
-    return t.isdigit()
+    # Clean trailing noise like 'DWN BY: MSN'
+    s = re.sub(r'\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP\'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$', '', s, flags=re.I).strip()
+    s = re.sub(r'[:.\-\s/]+$', '', s).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
 
-def is_col1(t):
-    # any number or any alphabet max of two digit or character
-    return (t.isdigit() or t.isalpha()) and len(t) <= 2
-
-def is_col2(t):
-    # a sentences or a word - atleast 3 character
-    return len(t) >= 3 and not is_col3(t)
+def is_date(s):
+    if not s or len(s.strip()) > 18:
+        return False
+    date_patterns = [
+        r'^\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}$',
+        r'^\d{2,4}[-/\.]\d{1,2}[-/\.]\d{1,2}$',
+        r'^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',
+        r'^\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{2,4}$',
+        r'^\d{1,2}[-/\.]\d{1,2}$'
+    ]
+    s_clean = s.strip()
+    return any(re.match(p, s_clean) for p in date_patterns)
 
 def parse_date(date_str):
-    match = re.search(r'\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}', date_str)
-    if not match: return datetime.min
-    ds = match.group()
-    for fmt in ('%m-%d-%Y', '%d-%m-%Y', '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y'):
+    if not date_str:
+        return datetime.min
+    ds = date_str.strip()
+    for fmt in ('%b %d %Y', '%m-%d-%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y', '%m.%d.%Y', '%d.%m.%Y'):
         try:
             return datetime.strptime(ds, fmt)
         except ValueError:
             pass
+    m = re.match(r'^(\d{1,2})[-/\.](\d{1,2})$', ds)
+    if m:
+        try:
+            return datetime(datetime.now().year, int(m.group(1)), int(m.group(2)))
+        except ValueError:
+            pass
     return datetime.min
 
-def assign_token(row_dict, t):
-    if is_col3(t):
-        if 3 in row_dict: return False
-        row_dict[3] = t
-        return True
-    
-    if is_col2(t):
-        if 2 in row_dict: return False
-        row_dict[2] = t
-        return True
+def is_date_token(t):
+    return is_date(t)
 
-    if is_col0(t) and 0 not in row_dict:
-        row_dict[0] = t
-        return True
-    
-    if is_col1(t) and 1 not in row_dict:
-        row_dict[1] = t
-        return True
-        
-    return False
+def is_remarks_token(t):
+    return len(t) >= 3 and not is_date_token(t)
 
-def process_revision_table(rows):
-    if not rows: return rows
-    
-    remove_keywords_rev = ["#", "# of", "Copies", "# of Copies", "Revision", "Issue", "Revision/Issue", "Destination", "Date", "REVISION/"]
-    
-    all_tokens = []
-    for row in rows:
-        for cell in row:
-            all_tokens.extend([t.strip() for t in cell.split('\n') if t.strip()])
-            
-    filtered_tokens = []
-    for t in all_tokens:
-        tu = t.upper().strip()
-        is_header = False
-        for kw in remove_keywords_rev:
-            if kw.upper() == tu:
-                is_header = True
-                break
-        if not is_header:
-            filtered_tokens.append(t)
-            
-    final_rows = []
-    row_dict = {}
-    for t in filtered_tokens:
-        assigned = assign_token(row_dict, t)
-        if not assigned:
-            if row_dict:
-                final_rows.append([row_dict.get(0, ""), row_dict.get(1, ""), row_dict.get(2, ""), row_dict.get(3, "")])
-                row_dict = {}
-                assign_token(row_dict, t)
-                
-    if row_dict:
-        final_rows.append([row_dict.get(0, ""), row_dict.get(1, ""), row_dict.get(2, ""), row_dict.get(3, "")])
-        
-    # Sort the Rows according to the latest date
-    final_rows.sort(key=lambda x: parse_date(x[3]), reverse=True)
-    
-    return final_rows
+def resolve_rev_mark(shorts):
+    """
+    Resolves the authoritative revision mark from short tokens (<= 2 chars)
+    using universal drafting standards (zero hardcoding of specific letters):
+    1. Pure punctuation/symbols (e.g. ':', '-', '.', '/') are stripped and discarded.
+    2. '0' is always Revision 0 (Issued for Fabrication); engineering row indices are strictly >= 1.
+    3. Alpha revision marks (e.g. A, B, C... S, etc.) paired with row index (1, 2, 3...) resolve to the alpha mark.
+    4. Numeric revisions resolve to the revision number (minimum digit when paired with row index).
+    5. Standalone alpha token (including 'S' or any letter).
+    6. Defaults cleanly to '0' if no alphanumeric characters exist.
+    """
+    if not shorts:
+        return '0'
 
-def process_simple_field(rows, keywords):
-    if not rows: return rows
-    new_rows = []
-    for row in rows:
-        keep = True
-        for cell in row:
-            cu = cell.upper().strip()
-            for kw in keywords:
-                if kw.upper() in cu:
-                    keep = False
-                    break
-            if not keep: break
-        if keep:
-            new_rows.append(row)
-    return new_rows
+    clean_shorts = []
+    for s in shorts:
+        sc = re.sub(r'[^A-Za-z0-9]', '', str(s)).strip()
+        if sc:
+            clean_shorts.append(sc)
 
-def generate_excel(data, output_excel="extraction_results.xlsx"):
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, Border, Side
-    except ImportError:
-        print("openpyxl is not installed. Please install it using 'pip install openpyxl'")
-        return
+    if not clean_shorts:
+        return '0'
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Drawings"
+    ignore_tokens = {'REV', 'BY', 'NO', 'DWN', 'CHK', 'APP'}
+    clean_shorts = [s for s in clean_shorts if s.upper() not in ignore_tokens]
+    if not clean_shorts:
+        return '0'
 
-    # Define styles
-    green_font = Font(color="008000", bold=True)
-    red_font = Font(color="FF0000", bold=True)
-    black_bold = Font(bold=True)
-    title_font = Font(size=20, bold=True)
+    digits = [s for s in clean_shorts if s.isdigit()]
+    alphas = [s.upper() for s in clean_shorts if s.isalpha()]
 
-    thin = Side(border_style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    # Universal Rule: '0' is always Revision 0 (never a 1-based table row index)
+    if '0' in digits:
+        return '0'
 
-    # Title
-    ws.merge_cells('B2:F2')
-    ws['B2'] = "CALDIM ENGINEERING PRIVATE LIMITED"
-    ws['B2'].font = title_font
-    ws['B2'].alignment = Alignment(horizontal='center', vertical='center')
+    # Alpha revision mark (len 1-2, e.g. A, B, S, AA) paired with row index (1, 2, 3...)
+    short_alphas = [a for a in alphas if len(a) <= 2]
+    if short_alphas and digits:
+        return short_alphas[0]
 
-    # Project Info
-    ws.merge_cells('A4:C4')
-    ws['A4'] = "PROJECT NAME : AAAA"
-    ws['A4'].font = green_font
-    
-    ws.merge_cells('E4:F4')
-    ws['E4'] = "TRANSMITTAL NO: #333"
-    ws['E4'].font = green_font
-    ws['E4'].alignment = Alignment(horizontal='right')
+    # Numeric revisions (if digits exist, the revision number is the digit)
+    if digits:
+        d_ints = [int(d) for d in digits]
+        return str(min(d_ints))
 
-    project_no = "N/A"
-    for filename, detections in data.items():
-        for det in detections:
-            if det.get("label") == "PROJECT_NO" and det.get("rows"):
-                project_no = " ".join(det["rows"][0])
-                break
-        if project_no != "N/A":
-            break
+    # Standalone alpha revision (A, B, S, etc.)
+    if short_alphas:
+        return short_alphas[0]
 
-    ws.merge_cells('A5:C5')
-    ws['A5'] = f"PROJECT NO : {project_no}"
-    ws['A5'].font = green_font
+    if alphas:
+        return alphas[0]
 
-    from datetime import datetime
-    today_str = datetime.now().strftime("%m-%d-%Y")
-    ws.merge_cells('E5:F5')
-    ws['E5'] = f"Date: {today_str}"
-    ws['E5'].font = green_font
-    ws['E5'].alignment = Alignment(horizontal='right')
+    return clean_shorts[0]
 
-    ws.merge_cells('A6:C6')
-    ws['A6'] = "FABRICATOR : SSSS"
-    ws['A6'].font = green_font
+class RowContainer:
+    def __init__(self):
+        self.date = None
+        self.remarks = None
+        self.shorts = []
 
-    # Headers
-    headers = ["Sl. No.", "DrawingNo.", "Drawing Description", "REV#", "DATE", "Remarks"]
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=8, column=col_num)
-        cell.value = header
-        cell.font = black_bold
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        cell.border = border
+    def can_accept(self, t):
+        if is_date_token(t):
+            return self.date is None
+        elif is_remarks_token(t):
+            return self.remarks is None
+        else:
+            return len(self.shorts) < 2
 
-    # DRAWINGS separator
-    ws.merge_cells('A9:F9')
-    cell = ws['A9']
-    cell.value = "DRAWINGS"
-    cell.font = red_font
-    cell.alignment = Alignment(horizontal='center', vertical='center')
-    for col_num in range(1, 7):
-        ws.cell(row=9, column=col_num).border = border
+    def add(self, t):
+        if is_date_token(t):
+            self.date = t
+        elif is_remarks_token(t):
+            self.remarks = t
+        else:
+            self.shorts.append(t)
 
-    # Data Rows
-    row_num = 10
-    sl_no = 1
-    for filename, detections in data.items():
-        drawing_no = ""
-        drawing_desc = ""
-        rev = ""
-        date_str = ""
-        remarks = ""
-        
-        for det in detections:
-            label = det.get("label", "")
-            rows = det.get("rows", [])
-            if not rows: continue
-            
-            if label == "DRAWING_NO":
-                drawing_no = " ".join(rows[0])
-            elif label == "DRAWING_DESCRIPTION":
-                drawing_desc = " \n ".join([" ".join(r) for r in rows])
-            elif label == "REVISION_TABLE":
-                latest_row = rows[0]
-                if len(latest_row) >= 4:
-                    col0 = latest_row[0]
-                    col1 = latest_row[1]
-                    rev = col1 if col1 else col0
-                    remarks = latest_row[2]
-                    date_str = latest_row[3]
+def clean_drawing_no(text, rows=None):
+    if not text and not rows:
+        return ""
+    lines = []
+    if rows:
+        for r in rows:
+            if isinstance(r, list):
+                lines.extend([str(c).strip() for c in r if str(c).strip()])
+            elif r:
+                lines.append(str(r).strip())
+    if not lines and text:
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
 
-        if not drawing_no and not drawing_desc:
+    exclude_headers = {
+        'DRAWING NO', 'DRAWING NUMBER', 'DWG NO', 'DWG #', 'SHEET NO', 'SHEET #',
+        'DRAWING #', 'DWG', 'SHEET', 'NO.', 'NUMBER', '#', 'DRAWING', 'CONTRACT DWG'
+    }
+    candidates = []
+    for l in lines:
+        l_clean = re.sub(r'^(?:CONTRACT\s+)?(?:DRAWING|DWG|SHEET)?\s*(?:NO\.?|NUMBER|#)?\s*[:.\-]*\s*', '', l, flags=re.I).strip()
+        if l_clean and l_clean.upper() not in exclude_headers:
+            candidates.append(l_clean)
+    if candidates:
+        return candidates[0]
+    elif lines:
+        return re.sub(r'^(?:CONTRACT\s+)?(?:DRAWING|DWG|SHEET)?\s*(?:NO\.?|NUMBER|#)?\s*[:.\-]*\s*', '', lines[0], flags=re.I).strip()
+    return (text or "").strip()
+
+def clean_project_no(text, rows=None):
+    if not text and not rows:
+        return "N/A"
+    lines = []
+    if rows:
+        for r in rows:
+            if isinstance(r, list):
+                lines.extend([str(c).strip() for c in r if str(c).strip()])
+            elif r:
+                lines.append(str(r).strip())
+    if not lines and text:
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+    exclude_headers = {
+        'PROJECT NO', 'PROJECT NUMBER', 'PROJ NO', 'CONTRACT NO', 'CONTRACT #',
+        'PROJ #', 'PROJECT', 'CONTRACT', 'PROJ', 'JOB NO', 'JOB #', 'NO.', '#', 'JOB'
+    }
+
+    for l in lines:
+        l_clean = re.sub(r'^(?:PROJECT|CONTRACT|PROJ|JOB)?\s*(?:NO\.?|NUMBER|#)?\s*[:.\-]*\s*', '', l, flags=re.I).strip()
+        if l_clean and l_clean.upper() not in exclude_headers:
+            m = re.search(r'\b(?:\d{4,7}|[A-Z0-9]{2,6}-\d{2,6})\b', l_clean)
+            if m:
+                return m.group(0)
+
+    candidates = []
+    for l in lines:
+        l_clean = re.sub(r'^(?:PROJECT|CONTRACT|PROJ|JOB)?\s*(?:NO\.?|NUMBER|#)?\s*[:.\-]*\s*', '', l, flags=re.I).strip()
+        if l_clean and l_clean.upper() not in exclude_headers and not re.match(r'^(?:DRAWING|TITLE|SHEET)', l_clean, re.I):
+            candidates.append(l_clean)
+    if candidates:
+        return candidates[0]
+    return lines[0] if lines else "N/A"
+
+def clean_description_text(text, rows=None):
+    if not text and not rows:
+        return ""
+    lines = []
+    if rows:
+        for r in rows:
+            if isinstance(r, list):
+                lines.extend([str(c).strip() for c in r if str(c).strip()])
+            elif r:
+                lines.append(str(r).strip())
+    if not lines and text:
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+    header_regex = re.compile(
+        r'^(?:DRAWING\s+TITLE|DWG\s+DESCRIPTION|DRAWING\s+DESCRIPTION|DESCRIPTION|TITLE|SHEET\s+TITLE|SHEET\s+NO\.?|DWG\s+NO\.?|DWG\.?|CONTRACT\s+ITEM)\s*[:.\-]*\s*',
+        re.I
+    )
+    exclude_headers = {
+        'DRAWING TITLE', 'DWG DESCRIPTION', 'DRAWING DESCRIPTION', 'DESCRIPTION', 'TITLE', 
+        'SHEET TITLE', 'SHEET NO', 'DWG NO', 'DWG', 'SHEET', 'DRAWING', 'CONTRACT ITEM', 'NO.'
+    }
+
+    cleaned = []
+    for l in lines:
+        stripped = header_regex.sub('', l).strip()
+        if not stripped:
             continue
+        if stripped.upper() in exclude_headers:
+            continue
+        if re.match(r'^(?:SCALE|DATE|REV)\s*[:\-]', stripped, re.I):
+            continue
+        if stripped.isdigit() and len(stripped) <= 3:
+            continue
+        cleaned.append(stripped)
+
+    if cleaned:
+        return " \n ".join(cleaned).strip()
+    fallback = [l.strip() for l in lines if l.strip() and not header_regex.match(l)]
+    return " \n ".join(fallback).strip() if fallback else (text or "").strip()
+
+def process_extracted_data(detections):
+    project_no = "N/A"
+    drawing_no = ""
+    drawing_description = ""
+    revisions = []
+
+    if not isinstance(detections, list):
+        return {
+            "project_no": project_no,
+            "drawing_no": drawing_no,
+            "drawing_description": drawing_description,
+            "revisions": revisions,
+            "latest_revision": {
+                "rev": "0",
+                "date": "",
+                "remarks": "ISSUED FOR FABRICATION"
+            }
+        }
+
+    best_detections = {}
+    for det in detections:
+        label = det.get("label", "")
+        if not label:
+            continue
+        conf = det.get("confidence", 0.0)
+        if label not in best_detections or conf > best_detections[label].get("confidence", 0.0):
+            best_detections[label] = det
+
+    for det in best_detections.values():
+        label = det.get("label", "")
+        text = det.get("text", "")
+        rows = det.get("rows", [])
+
+        if label == "DRAWING_NO":
+            drawing_no = clean_drawing_no(text, rows)
             
-        row_data = [sl_no, drawing_no, drawing_desc, rev, date_str, remarks]
-        for col_index, val in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_index)
-            cell.value = val
-            cell.border = border
-            if col_index in [1, 4]:
-                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            elif col_index == 5:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-            else:
-                cell.alignment = Alignment(vertical='center', wrap_text=True)
-                
-        sl_no += 1
-        row_num += 1
+        elif label == "PROJECT_NO":
+            project_no = clean_project_no(text, rows)
 
-    # Adjust column widths
-    column_widths = {'A': 8, 'B': 20, 'C': 40, 'D': 10, 'E': 15, 'F': 30}
-    for col, width in column_widths.items():
-        ws.column_dimensions[col].width = width
-        
-    wb.save(output_excel)
-    print(f"Excel file generated successfully with custom template: {output_excel}")
+        elif label == "DRAWING_DESCRIPTION":
+            drawing_description = clean_description_text(text, rows)
 
-def main():
-    input_file = "detection_results.json"
-    output_file = "detection_results.json"
-    
-    with open(input_file, "r") as f:
-        data = json.load(f)
-        
-    for filename, detections in data.items():
-        for det in detections:
-            label = det.get("label", "")
-            rows = det.get("rows", [])
-            
-            if label == "DRAWING_NO":
-                det["rows"] = process_simple_field(rows, ["Drawing", "#", "Drawing #"])
-            elif label == "PROJECT_NO":
-                det["rows"] = process_simple_field(rows, ["Contract", "#", "Contract #"])
-                det["rows"] = process_simple_field(det["rows"], ["Drawing", "Title", "Drawing Title:"])
-            elif label == "DRAWING_DESCRIPTION":
-                cleaned_rows = process_simple_field(rows, ["Drawing", "Title", "Drawing Title:"])
-                if cleaned_rows:
-                    concatenated_text = " \n ".join([" ".join(r) for r in cleaned_rows]).strip()
-                    det["rows"] = [[concatenated_text]]
-                else:
-                    det["rows"] = []
-            elif label == "REVISION_TABLE":
-                det["rows"] = process_revision_table(rows)
-                
-    with open(output_file, "w") as f:
-        json.dump(data, f, indent=4)
-        
-    print(f"Extraction formatting script completed. Processed results saved to {output_file}")
-    
-    generate_excel(data, "extraction_results.xlsx")
+        elif label == "REVISION_TABLE":
+            all_tokens = []
+            if rows:
+                for r in rows:
+                    if r:
+                        for cell in r:
+                            if isinstance(cell, str):
+                                all_tokens.extend([t.strip() for t in cell.split('\n') if t.strip()])
+            elif text:
+                all_tokens = [t.strip() for t in text.split('\n') if t.strip()]
 
-if __name__ == "__main__":
-    main()
+            remove_keywords_rev = [
+                "#", "# OF", "COPIES", "# OF COPIES", "REVISION", "ISSUE", "REVISION/ISSUE", 
+                "DESTINATION", "DATE", "REVISION/", "SENT FOR", "FABRICATION", "SENT FOR FABRICATION",
+                "REVISION HISTORY", "HISTORY", "BY", "APP'D", "CHKD", "DWN", "DESCRIPTION", "DESC"
+            ]
+
+            filtered_tokens = []
+            for t in all_tokens:
+                if not any(c.isalnum() for c in t):
+                    continue
+                tu = t.upper().strip()
+                is_header = False
+                for kw in remove_keywords_rev:
+                    if kw == tu or tu.startswith(kw + " "):
+                        is_header = True
+                        break
+                if not is_header:
+                    clean_t = tu.replace(".", "").strip()
+                    is_initials = clean_t.isalpha() and 2 <= len(clean_t) <= 3 and not is_date_token(t)
+                    if not is_initials:
+                        filtered_tokens.append(t)
+
+            containers = []
+            current_container = None
+
+            for t in filtered_tokens:
+                if current_container is None:
+                    current_container = RowContainer()
+                elif not current_container.can_accept(t):
+                    containers.append(current_container)
+                    current_container = RowContainer()
+                current_container.add(t)
+            if current_container:
+                containers.append(current_container)
+
+            for c in containers:
+                rev = "0"
+                remarks = clean_remarks(c.remarks or "")
+                date_val = c.date or ""
+
+                rev = resolve_rev_mark(c.shorts)
+
+                if rev or date_val or remarks:
+                    revisions.append({
+                        "rev": rev,
+                        "date": date_val,
+                        "remarks": remarks
+                    })
+
+    revisions.sort(key=lambda x: parse_date(x["date"]), reverse=True)
+
+    if revisions:
+        latest_revision = revisions[0]
+    else:
+        latest_revision = {
+            "rev": "0",
+            "date": "",
+            "remarks": "ISSUED FOR FABRICATION"
+        }
+
+    if drawing_no and drawing_description:
+        drawing_description = drawing_description.replace(drawing_no, "").strip()
+        drawing_description = " \n ".join([line.strip() for line in drawing_description.split('\n') if line.strip()])
+
+    return {
+        "project_no": project_no,
+        "drawing_no": drawing_no,
+        "drawing_description": drawing_description,
+        "revisions": revisions,
+        "latest_revision": latest_revision
+    }

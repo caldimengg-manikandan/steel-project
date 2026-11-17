@@ -190,44 +190,49 @@ def clean_rem(s):
     if not s:
         return ""
     
-    # Strip leading 'x ', 'X ', 'v ', '*', or '-' noise that often comes from PDF checkmarks or artifacts
-    s = re.sub(r'^[xXv\*\-\.\s]+(?=[A-Z0-9])', '', s).strip()
+    s = str(s).strip()
 
-    # Strip shop/general notes that bleed into the remarks column due to PDF layout.
-    # These are numbered list items like "1. ALL PLATES AND ANGLES ATTACHED SHALL BE..."
-    # that appear on the same line as the actual revision remark.
-    # Strategy: if the string starts with a shop note pattern, find the last numbered note
-    # and take only what follows it.
-    #
-    # Example: "1. ALL PLATES ... U.N.O. A GSV ISSUED FOR APPROVAL"
-    #   → we want just "ISSUED FOR APPROVAL"
-    #
-    # We look for "ISSUED FOR ..." or known revision phrases after a note boundary.
-    rev_phrase_match = re.search(
-        r'\b(ISSUED\s+FOR\s+(?:APPROVAL|FABRICATION|CONSTRUCTION|INFORMATION|BID|TENDER)|'
-        r'FOR\s+(?:APPROVAL|FABRICATION|CONSTRUCTION|INFORMATION)|'
-        r'APPROVED\b|PRELIMINARY\b|FINAL\b)',
-        s, re.I
-    )
-    if rev_phrase_match and rev_phrase_match.start() > 0:
-        idx = int(rev_phrase_match.start())
-        # Check if there's shop note noise before it
-        prefix = s[:idx].strip() # type: ignore
-        # If the prefix looks like shop note content (contains a numbered list item), strip it
-        if re.search(r'\b\d+\.\s+[A-Z]', prefix, re.I) or re.search(r'\bU\.N\.O\b', prefix, re.I):
-            s = s[idx:].strip() # type: ignore
-    
-    patterns = [
-        r'DRAWN\s+BY', r'PROJ[.\s]*NO', r'PROJ', r'DATE', r'CONTRACTOR',
-        r'CHECKED\s+BY', r'CHECKED', r'NO\b', r'N\s*O\b', r'REV[.\s]*#',
-        r'REV\b', r'MARK\b', r'PAGE\b', r'DWG\b', r'HOLES', r'PAINT', r'FINISH'
-    ]
-    regex = r'\s+(?:' + '|'.join(patterns) + r')\b'
-    parts = re.split(regex, s, flags=re.I)
-    res = parts[0].strip()
-    res = re.sub(r'\s+', ' ', res)
-    res = re.sub(r'[:.\-\s]+$', '', res)
-    return res
+    # 1. Strip checkmarks / bullet artifacts at start (e.g. 'x ', '- ', '* ', 'v ')
+    s = re.sub(r'^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])', '', s).strip()
+
+    # 2. Strip shop/general notes that bleed into the remarks column due to PDF layout
+    # Numbered list items like "1. ALL PLATES ... U.N.O." followed by remarks
+    note_match = re.search(r'\b(?:\d+\.\s+[A-Z]|U\.N\.O\b).*?\s+(?=[A-Z]{3,})', s, re.I)
+    if note_match and note_match.end() < len(s):
+        s = s[note_match.end():].strip()
+
+    # 3. Iteratively strip leading column bleed without hardcoding specific remark phrases
+    changed = True
+    while changed:
+        orig = s
+
+        # Leading column header/label ending with BY and colon/dash (e.g. 'DETAILED BY :', 'AILED BY :', 'CHECKED BY :', 'ECKED BY :', 'DRAWN BY :')
+        s = re.sub(r'^(?:[A-Za-z\s\'’]{1,20}\bBY\s*[:\-])\s*', '', s, flags=re.I).strip()
+
+        # Leading header words ending in colon/dash, optionally with revision number
+        # e.g. 'REV # : 0', 'REV: A', 'CHKD :', 'DWN :', 'DATE :'
+        s = re.sub(r'^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,3}\b\s*)?', '', s, flags=re.I).strip()
+
+        # Leading full or partial date (e.g. '05-11', '05-11-2026', '05/11/26', '5.11.2026')
+        s = re.sub(r'^\d{1,2}\s*[-/\.]\s*\d{1,2}(?:\s*[-/\.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*', '', s).strip()
+
+        # Leading standalone initials or single letters followed by colon (e.g. 'Y :', 'E :', 'MSN :', 'JS :')
+        s = re.sub(r'^[A-Za-z]{1,4}\s*[:\-]\s*', '', s).strip()
+
+        # Leading stray colons, dashes, slashes, periods, spaces
+        s = re.sub(r'^[:.\-\/\s]+', '', s).strip()
+
+        changed = (s != orig)
+
+    # 4. Strip trailing column bleed (e.g. '... DRAWN BY: JS', '... CHKD: MK')
+    s = re.sub(r'\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP\'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$', '', s, flags=re.I).strip()
+
+    # 5. Clean trailing punctuation
+    s = re.sub(r'[:.\-\/\s]+$', '', s).strip()
+
+    # Normalize multiple whitespace
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
 
 
 def is_valid_title_candidate(s: str) -> bool:

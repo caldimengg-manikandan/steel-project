@@ -14,6 +14,7 @@ const Drawing = require('../models/Drawing');
 const DrawingExtraction = require('../models/DrawingExtraction');
 const { attachProjectStats } = require('../services/projectStatsService');
 const { buildProjectQueryForUser } = require('../utils/projectAccessFilter');
+const { rebalanceSowPercentages } = require('../utils/sowCalculator');
 
 async function listMyProjects(req, res) {
     const userId = req.principal.id;
@@ -137,7 +138,7 @@ async function updateProjectSequences(req, res) {
         }));
     }
     if (scopeOfWork && Array.isArray(scopeOfWork)) {
-        project.scopeOfWork = scopeOfWork.map((s, idx) => ({
+        const mappedSow = scopeOfWork.map((s, idx) => ({
             name: (s.name || '').trim() || `SOW ${String(idx + 1).padStart(2, '0')}`,
             percentage: Number(s.percentage) || 0,
             approval: Number(s.approval) || 0,
@@ -154,6 +155,7 @@ async function updateProjectSequences(req, res) {
                 fabricationDate: seq.fabricationDate ? new Date(seq.fabricationDate) : null
             })) : []
         }));
+        project.scopeOfWork = rebalanceSowPercentages(mappedSow);
     }
     await project.save();
 

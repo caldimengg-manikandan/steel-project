@@ -30,11 +30,65 @@ const Project = require('../models/Project');
  * @returns {string}
  */
 function normalizeRevision(rev) {
-    if (!rev) return '';
-    return String(rev)
+    if (!rev) return '0';
+    let s = String(rev)
         .trim()
         .replace(/^rev[\s\-_]*/i, '')
         .toUpperCase();
+    s = s.replace(/[^A-Za-z0-9]/g, '').trim();
+
+    if (!s || s.length > 4) return '0';
+
+    return s;
+}
+
+/**
+ * Resolves section heading (e.g. Seq 1, Seq 2, SOW #09, B3 Frame) from file path or sequence metadata.
+ */
+function resolveSectionHeading(fullPath, validSowNames = [], sowPrefixes = []) {
+    if (!fullPath) return '';
+    const parts = String(fullPath).replace(/\\/g, '/').split('/').map(p => p.trim()).filter(Boolean);
+    const ignoreNames = /^(d[\s\-_]*sheets?|detail[\s\-_]*sheets?|detail[\s\-_]*drawings?|e[\s\-_]*sheets?|erection[\s\-_]*sheets?|erection[\s\-_]*drawings?|erection[\s\-_]*plans?|anchor[\s\-_]*bolts?|binder|report|projects|uploads|storage|sample|drawings?|temp)$/i;
+
+    const basePrefixes = ['SEQ', 'SEQUENCE', 'SOW', 'SOWLO', 'AREA', 'PHASE', 'STAGE', 'PKG', 'PACKAGE', 'ZONE', 'BUILDING', 'BLDG', 'LEVEL'];
+    const allPrefixes = Array.from(new Set([...basePrefixes, ...(sowPrefixes || [])])).sort((a, b) => b.length - a.length);
+
+    // 1. Search bottom-up
+    for (let i = parts.length - 2; i >= 0; i--) {
+        const part = parts[i];
+        const upper = part.toUpperCase();
+        if (ignoreNames.test(upper)) continue;
+
+        for (const prefix of allPrefixes) {
+            const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`^(${escaped}[\\s_#-]*\\d+)`, 'i');
+            const match = upper.match(regex);
+            if (match) {
+                return part;
+            }
+        }
+
+        if (validSowNames && validSowNames.length > 0) {
+            if (validSowNames.some(sow => upper.includes(sow.toUpperCase()))) {
+                return part;
+            }
+        }
+
+        if (/\b(frame|stage|unit|tower|skid)\b/i.test(part)) {
+            return part;
+        }
+    }
+
+    // 2. Generic fallback
+    for (let i = parts.length - 2; i >= 0; i--) {
+        const part = parts[i];
+        const upper = part.toUpperCase();
+        if (ignoreNames.test(upper)) continue;
+        if (part.includes('TR#') || part.length > 35) continue;
+        return part;
+    }
+
+    return '';
 }
 
 /**
@@ -352,15 +406,18 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
             : [{ mark: f.revision, date: f.date, remarks: f.remarks }];
 
         const latestRev = ext._latestRevEntry || pickLatestRevision(revHist);
+        const dwgSequence = resolveSectionHeading(ext.storageGatewayPath || ext.fileUrl || '') || 
+                             (Array.isArray(ext.sequences) && ext.sequences[0]) || '';
 
         return {
             extractionId: ext._id,
             drawingNumber: f.drawingNumber || '',
-            drawingTitle: f.drawingTitle || f.drawingDescription || '',
+            drawingTitle: f.drawingTitle || f.drawingDescription || ext.originalFileName || '',
             revision: latestRev.mark || f.revision || '',
             date: latestRev.date || f.date || '',
             remarks: latestRev.remarks || f.remarks || '',
             folderName: ext.folderName || '',
+            sequence: dwgSequence,
             originalFileName: ext.originalFileName || '',
             changeType: ext._changeType || 'new',
             previousRevision: ext._previousRevision || '',
@@ -372,6 +429,8 @@ async function _internalGenerateTransmittal(projectId, adminId, targetExtraction
         if (Array.isArray(ext.sequences)) {
             ext.sequences.forEach(s => combinedSequences.add(s));
         }
+        const sHead = resolveSectionHeading(ext.storageGatewayPath || ext.fileUrl || '');
+        if (sHead) combinedSequences.add(sHead);
     });
     const uniqueSequences = Array.from(combinedSequences);
 
@@ -780,4 +839,5 @@ module.exports = {
     getTransmittals,
     getDrawingLog,
     normalizeRevision,
+    resolveSectionHeading,
 };

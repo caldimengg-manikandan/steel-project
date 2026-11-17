@@ -30,6 +30,23 @@ const { getPythonBin } = require('../utils/pythonBin');
 const PYTHON_SCRIPT = path.join(__dirname, '../scripts/extract_drawing.py');
 const PYTHON_BIN = getPythonBin();
 
+function getParentDrawingRoot(drawingNoOrFilename) {
+    if (!drawingNoOrFilename) return { root: '', suffix: null };
+    let clean = String(drawingNoOrFilename).replace(/\.pdf$/i, '').trim();
+    clean = clean.replace(/^\d{10,14}[-_]/, '').trim();
+    clean = clean.replace(/[-_](?:rev)?\d+$/i, '').trim();
+    clean = clean.toUpperCase();
+    const m = clean.match(/^(.+?)([A-Z])$/);
+    if (m) {
+        const root = m[1];
+        const suffix = m[2];
+        if (root.length >= 2 || /\d/.test(root)) {
+            return { root, suffix };
+        }
+    }
+    return { root: clean, suffix: null };
+}
+
 /**
  * _downloadFromGridFS
  * Downloads a file from Atlas to a local path (temp)
@@ -215,7 +232,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
         const clientName = project ? project.clientName : '';
 
         // ── Step 1+2: Call Python extraction bridge ────────────
-        result = await _callPythonBridge(localPath, originalFileName, clientName, folderName, storageGatewayPath);
+        result = await _callPythonBridge(localPath, originalFileName, clientName, folderName, storageGatewayPath, projectId);
 
         // Cleanup temporary file immediately if we downloaded from GridFS
         if (isTemp && fs.existsSync(localPath)) {
@@ -350,6 +367,33 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
             console.error('[Extraction] Error in fabrication-only count:', err.message);
         }
 
+        // ── Step 5b.1: Parent -> Children Description Propagation ──
+        if (fields.drawingTitle && fields.drawingTitle !== 'DELETED') {
+            try {
+                const { root: parentRoot, suffix } = getParentDrawingRoot(fields.drawingNumber || updatedDoc.originalFileName);
+                if (!suffix && parentRoot) {
+                    const childFilter = {
+                        projectId,
+                        _id: { $ne: extractionId },
+                        'extractedFields.drawingNumber': new RegExp(`^${parentRoot}[A-Za-z]$`, 'i'),
+                        'extractedFields.drawingTitle': { $in: ['', null] },
+                        status: 'completed'
+                    };
+                    const res = await DrawingExtraction.updateMany(childFilter, {
+                        $set: {
+                            'extractedFields.drawingTitle': fields.drawingTitle,
+                            'extractedFields.drawingDescription': fields.drawingTitle
+                        }
+                    });
+                    if (res.modifiedCount > 0) {
+                        console.log(`[Parent Inheritance] Propagated description "${fields.drawingTitle}" from parent "${parentRoot}" to ${res.modifiedCount} child drawing(s).`);
+                    }
+                }
+            } catch (propErr) {
+                console.warn('[Parent Inheritance] Child propagation warning:', propErr.message);
+            }
+        }
+
         // ── Step 5c: Ensure approx count matches local reality ──────
         try {
             const Project = require('../models/Project');
@@ -438,7 +482,7 @@ async function _executePipeline(extractionId, fileRef, projectId, targetTransmit
     }
 }
 
-async function _callPythonBridge(pdfPath, originalFileName = '', clientName = '', folderName = '', storageGatewayPath = '') {
+async function _callPythonBridge(pdfPath, originalFileName = '', clientName = '', folderName = '', storageGatewayPath = '', projectId = null) {
     try {
         const fileName = originalFileName || path.basename(pdfPath);
         
@@ -518,36 +562,118 @@ async function _callPythonBridge(pdfPath, originalFileName = '', clientName = ''
 
         if (isRastiron) {
             if (isErection) {
-                // Rule 1: Erection sheet files inside erection folders must NOT extract description datas.
-                console.log(`[Rastiron Rule 1] File "${fileName}" in erection path "${pathToCheck}". Description cleared.`);
-                finalDescription = '';
+                // Rule 1: Erection sheet files - preserve title block description if present, do not clear
+                let cleanDwgDesc = (aiData.drawing_description || '').trim().replace(/^[\s\.\:\-]+/, '').trim();
+                if (cleanDwgDesc && !['NONE', 'N/A', '.', 'DESCRIPTION', 'DESCRIPTON'].includes(cleanDwgDesc.toUpperCase())) {
+                    finalDescription = cleanDwgDesc;
+                } else {
+                    finalDescription = '';
+                }
             } else if (aiData.is_deleted || aiData.bom_empty || (finalDescription || '').toUpperCase() === 'DELETED') {
                 // Rule 2: If the bill of materials box is empty, the drawing description should be shown as DELETED.
                 console.log(`[Rastiron Rule 2] Empty Bill of Materials detected for "${fileName}". Description set to DELETED.`);
                 finalDescription = 'DELETED';
             } else if (aiData.has_bom === false) {
-                // Rule 3: If there is no box named bill of materials in files under detail sheets, leave description empty.
-                console.log(`[Rastiron Rule 3] No Bill of Materials box detected for "${fileName}". Description left empty.`);
-                finalDescription = '';
+                // Rule 3: If there is no bill of materials box entirely:
+                // If it is a variant child drawing (e.g. B9A, B9B, B3A), inherit description from base parent (e.g. B9, B3).
+                if (!finalDescription && projectId) {
+                    const dwgCandidate = aiData.drawing_no || fileName;
+                    const { root: parentRoot, suffix } = getParentDrawingRoot(dwgCandidate);
+                    if (suffix && parentRoot) {
+                        try {
+                            const parentDoc = await DrawingExtraction.findOne({
+                                projectId,
+                                'extractedFields.drawingNumber': new RegExp(`^${parentRoot}$`, 'i'),
+                                'extractedFields.drawingTitle': { $nin: ['', null, 'DELETED'] },
+                                status: 'completed'
+                            }).lean();
+                            if (parentDoc && parentDoc.extractedFields && parentDoc.extractedFields.drawingTitle) {
+                                finalDescription = parentDoc.extractedFields.drawingTitle;
+                                console.log(`[Rastiron Rule 3 / Parent Inheritance] "${fileName}" inherited description "${finalDescription}" from base parent "${parentRoot}".`);
+                            }
+                        } catch (pErr) {
+                            console.warn('[Parent Inheritance] Lookup failed:', pErr.message);
+                        }
+                    }
+                }
+                if (!finalDescription) {
+                    console.log(`[Rastiron Rule 3] No Bill of Materials box detected for "${fileName}". Description left empty.`);
+                    finalDescription = '';
+                }
             }
         }
 
+function cleanRemarks(text) {
+    if (!text) return '';
+    let s = String(text).trim();
+    s = s.replace(/^(?:[xX*\-.\s]+|[vV]\s+)(?=[A-Z0-9])/, '').trim();
+    let changed = true;
+    while (changed) {
+        const orig = s;
+        // 1. Field labels like 'DETAILED BY :', 'CHECKED BY :', 'BY :'
+        s = s.replace(/^(?:[A-Za-z\s'’]{1,20}\bBY\s*[:\-])\s*/i, '').trim();
+        // 2. Standard column headers
+        s = s.replace(/^(?:DATE|CHKD|DWN|REV(?:ISION)?(?:\s*#|\s*\d+)?|MARK|NO|SHEET|TITLE)\s*[:\-]\s*(?:[A-Za-z0-9]{1,4}\b(?!\s*[-/.]|\s*[A-Z]{3,})\s*)?/i, '').trim();
+        // 3. Initials followed immediately by a date: 'RBS 05-11' -> '05-11'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s+(?=\d{1,2}\s*[-/.]\d{1,2})/, '').trim();
+        // 4. Date at start (MM-DD, MM/DD/YYYY, etc.)
+        s = s.replace(/^\d{1,2}\s*[-/.]\s*\d{1,2}(?:\s*[-/.]\s*(?:20\d{2}|19\d{2}|\d{2}))?\s*/, '').trim();
+        // 5. Standalone initials or mark with colon: 'RBS :', '0 :', 'E :'
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*:\s*/, '').trim();
+        // 6. Initials or mark followed by remark text (strip 2-4 letter initials if not a protected remark word)
+        const protectedWords = new Set([
+            'FOR', 'ISSUED', 'REVISED', 'PER', 'AS', 'NEW', 'ADD', 'ALL', 'HOLD',
+            'VOID', 'GENERAL', 'MEMBER', 'BEAM', 'COLUMN', 'STAIR', 'BASE', 'CHANGE',
+            'RELEASED', 'APPROVED', 'PRELIMINARY', 'SUBMITTED', 'BID', 'RECORD',
+            'FINAL', 'NOTE', 'SEE', 'REF', 'RFI', 'SK', 'CO', 'TENDER', 'PERMIT',
+            'DESIGN', 'FIELD', 'SHOP', 'IFC', 'IFA', 'IFF', 'IFI', 'IFB', 'BULLETIN',
+            'ADDENDUM', 'COMMENTS', 'ARCHITECT', 'ENGINEER', 'CORRECTION', 'REDESIGN'
+        ]);
+        const mStart = s.match(/^([A-Za-z0-9]{1,4})\s+([A-Za-z].+)$/);
+        if (mStart && !protectedWords.has(mStart[1].toUpperCase())) {
+            s = mStart[2].trim();
+        }
+        // 7. Initials followed by a colon
+        s = s.replace(/^[A-Za-z0-9]{1,4}\s*:\s*/, '').trim();
+        // 8. Leading punctuation
+        s = s.replace(/^[:.\-/\s]+/, '').trim();
+        changed = (s !== orig);
+    }
+    s = s.replace(/\s+\b(?:(?:DRAWN|CHECKED|DETAILED|APP'?D?|CHKD|DWN)\s+BY|DRAWN|CHKD|DWN|DATE|REV\s*#)\b\s*[:\-]?(?:\s+[A-Za-z0-9]{1,4})?\s*$/i, '').trim();
+    s = s.replace(/[:.\-/\s]+$/, '').trim();
+    s = s.replace(/\s+/, ' ').trim();
+    if (!/[A-Za-z]/.test(s)) return '';
+    const shortAllowed = new Set(['BID', 'ADD', 'NEW', 'REV', 'IFA', 'IFC', 'IFF', 'IFI', 'IFB', 'RFI', 'FOR', 'PER', 'HOLD', 'VOID']);
+    if (s.length <= 3 && !shortAllowed.has(s.toUpperCase())) return '';
+    if (/\bBY\s*[:\-]?$/i.test(s)) return '';
+    return s;
+}
+
         // Map AI output to the fields expected by the rest of the pipeline
+        const rawRemarks = cleanRemarks(aiData.latest_revision ? aiData.latest_revision.remarks : '');
+        let cleanLatestRev = '0';
+        if (aiData.latest_revision && aiData.latest_revision.rev) {
+            let sRev = String(aiData.latest_revision.rev).trim().replace(/^rev[\s\-_]*/i, '').trim();
+            sRev = sRev.replace(/[^A-Za-z0-9]/g, '').trim().toUpperCase();
+            if (sRev && sRev.length <= 4) {
+                cleanLatestRev = sRev;
+            }
+        }
         const fields = {
             drawingNumber: aiData.drawing_no || '',
             drawingTitle: finalDescription, 
             description: '',
             drawingDescription: finalDescription,
-            revision: aiData.latest_revision ? aiData.latest_revision.rev : '0',
+            revision: cleanLatestRev,
             date: aiData.latest_revision ? aiData.latest_revision.date : '',
             scale: '',
             clientName: clientName || '',
             projectName: aiData.project_no || '',
-            remarks: aiData.latest_revision ? aiData.latest_revision.remarks : '',
+            remarks: rawRemarks,
             revisionHistory: (aiData.revisions || []).map(r => ({
-                mark: r.rev,
+                mark: (r.rev && String(r.rev).replace(/[^A-Za-z0-9]/g, '').trim()) || '0',
                 date: r.date,
-                remarks: r.remarks
+                remarks: cleanRemarks(r.remarks)
             }))
         };
 
