@@ -4,7 +4,7 @@ const DrawingExtraction = require('../models/DrawingExtraction');
 const RfiExtraction = require('../models/RfiExtraction');
 const ChangeOrder = require('../models/ChangeOrder');
 const { getExternalProjects } = require('./externalProjectService');
-const { calculateSowProgress } = require('../utils/sowCalculator');
+const { calculateSowProgress, rebalanceSowPercentages } = require('../utils/sowCalculator');
 
 /**
  * Calculates aggregated statistics for a list of projects.
@@ -208,6 +208,28 @@ async function attachProjectStats(projects) {
                     fabricationDate: seq.fabricationDate || null
                 }))
             }];
+        }
+
+        const isHoldStatus = (status) => {
+            const s = String(status || '').toLowerCase().trim();
+            return s === 'hold' || s === 'on hold' || s === 'on_hold';
+        };
+
+        if (Array.isArray(allSows) && allSows.length > 0) {
+            const hasHold = allSows.some(s => isHoldStatus(s.status));
+            if (hasHold) {
+                const rebalanced = rebalanceSowPercentages(allSows);
+                // Also update DB in background so existing documents are permanently fixed
+                if (pObj._id) {
+                    const needsDbSync = allSows.some((s, idx) => Number(s.percentage) !== Number(rebalanced[idx]?.percentage));
+                    if (needsDbSync) {
+                        Project.updateOne({ _id: pObj._id }, { $set: { scopeOfWork: rebalanced } }).exec().catch(err => {
+                            console.warn('[projectStatsService] Background SOW sync error:', err.message);
+                        });
+                    }
+                }
+                allSows = rebalanced;
+            }
         }
 
         const sowProgress = calculateSowProgress(allSows);

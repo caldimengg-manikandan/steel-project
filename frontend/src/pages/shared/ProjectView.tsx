@@ -31,6 +31,15 @@ function rebalanceSowPercentages(sows: any[]): any[] {
         return s === 'hold' || s === 'on hold' || s === 'on_hold';
     };
 
+    const hasHold = sows.some(sow => isHold(sow.status));
+    if (!hasHold) {
+        const currentSum = sows.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
+        const hasZero = sows.some(s => Number(s.percentage) === 0);
+        if (Math.round(currentSum * 10) / 10 === 100 && !hasZero) {
+            return sows;
+        }
+    }
+
     const activeIndices: number[] = [];
     sows.forEach((sow, idx) => {
         if (!isHold(sow.status)) {
@@ -465,6 +474,10 @@ export default function ProjectView() {
     const derivedSequences = useMemo(() => {
         return getProjectTargetSequences(project);
     }, [project]);
+
+    const rebalancedScopeOfWork = useMemo(() => {
+        return rebalanceSowPercentages(project?.scopeOfWork || []);
+    }, [project?.scopeOfWork]);
 
     // ── Reusable upload helper ────────────────────────────────
     const doUpload = async (filesToUpload: File[]) => {
@@ -1452,7 +1465,7 @@ export default function ProjectView() {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {project.scopeOfWork.map((sow: any, idx: number) => {
+                                                    {rebalancedScopeOfWork.map((sow: any, idx: number) => {
                                                         const rawStatus = sow.status || 'Yet to Start';
                                                         const canEditSow = isAdmin || project.myPermission === 'editor' || project.myPermission === 'admin';
 
@@ -1466,7 +1479,7 @@ export default function ProjectView() {
                                                                 showMessage('Permission Denied', 'Only editors or admins can update Scope of Work status.', 'error');
                                                                 return;
                                                             }
-                                                            let updatedSow = [...(project.scopeOfWork || [])];
+                                                            let updatedSow = [...(rebalancedScopeOfWork || [])];
                                                             const isNewHold = ['hold', 'on hold', 'on_hold'].includes(newStatus.toLowerCase().trim());
                                                             updatedSow[idx] = { 
                                                                 ...updatedSow[idx], 
@@ -1488,7 +1501,7 @@ export default function ProjectView() {
                                                             if (!id || !project) return;
                                                             if (!canEditSow) return;
                                                             const clamped = Math.min(100, Math.max(0, val));
-                                                            const updatedSow = [...(project.scopeOfWork || [])];
+                                                            const updatedSow = [...(rebalancedScopeOfWork || [])];
                                                             updatedSow[idx] = { ...updatedSow[idx], [field]: clamped };
                                                             setProject({ ...project, scopeOfWork: updatedSow });
                                                             try {
@@ -1761,7 +1774,7 @@ export default function ProjectView() {
                                                     setProject({ ...project, sequences: newSeqs });
                                                     await updateProjectSequences(id, newSeqs);
                                                 } else if (seq.source === 'sow-fallback') {
-                                                    let updatedSow = [...(project.scopeOfWork || [])];
+                                                    let updatedSow = [...(rebalancedScopeOfWork || [])];
                                                     const sIdx = seq.sowIndex ?? 0;
                                                     const targetSow = updatedSow[sIdx] || {};
                                                     const nextStatus = updates.status !== undefined ? updates.status : targetSow.status;
